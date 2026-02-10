@@ -36,6 +36,9 @@ button:hover { background:#005fa3; }
 }
 .home-btn:hover { background:#1a252f; }
 .bottom-image { width:100%; margin-top:40px; }
+
+/* ★추가: 전화 아이콘 스타일 */
+.tel-link { margin-left:8px; font-size:20px; text-decoration:none; }
 """
 
 # ================= HOME =================
@@ -134,7 +137,13 @@ onclick="openDetail({{ r['index'] }})">
 <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:500px;border-radius:10px">
 <h3 id="m_title"></h3>
 <p><b>기관명:</b> <span id="m_org"></span></p>
-<p><b>기관 연락처:</b> <span id="m_tel"></span></p>
+
+<!-- ★기존 줄 교체 -->
+<p>
+<b>기관 연락처:</b> <span id="m_tel"></span>
+<a id="tel_link" class="tel-link" style="display:none;">📞</a>
+</p>
+
 <p><b>기관주소:</b> <span id="m_addr"></span></p>
 <iframe id="m_map" width="100%" height="250" style="border:0"></iframe>
 <button onclick="closeModal()">닫기</button>
@@ -142,6 +151,11 @@ onclick="openDetail({{ r['index'] }})">
 </div>
 
 <script>
+/* ★추가: 모바일 판별 */
+function isMobile(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 function openDetail(idx){
 fetch("/detail/"+idx)
 .then(r=>r.json())
@@ -151,6 +165,17 @@ m_org.innerText=d["기관명"];
 m_tel.innerText=d["기관 연락처"];
 m_addr.innerText=d["기관주소"];
 m_map.src="https://www.google.com/maps?q="+encodeURIComponent(d["기관주소"])+"&output=embed";
+
+/* ★추가: 모바일에서만 tel 연결 */
+const telLink=document.getElementById("tel_link");
+if(isMobile() && d["기관 연락처"]){
+  const num=d["기관 연락처"].replace(/[^0-9]/g,"");
+  telLink.href="tel:"+num;
+  telLink.style.display="inline";
+}else{
+  telLink.style.display="none";
+}
+
 modal.style.display="block";
 });
 }
@@ -215,7 +240,13 @@ onclick="openDetail({{ r['index'] }})">
 <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:500px;border-radius:10px">
 <h3 id="m_title"></h3>
 <p><b>기관명:</b> <span id="m_org"></span></p>
-<p><b>기관 연락처:</b> <span id="m_tel"></span></p>
+
+<!-- ★기존 줄 교체 -->
+<p>
+<b>기관 연락처:</b> <span id="m_tel"></span>
+<a id="tel_link" class="tel-link" style="display:none;">📞</a>
+</p>
+
 <p><b>기관주소:</b> <span id="m_addr"></span></p>
 <iframe id="m_map" width="100%" height="250" style="border:0"></iframe>
 <button onclick="closeModal()">닫기</button>
@@ -223,6 +254,11 @@ onclick="openDetail({{ r['index'] }})">
 </div>
 
 <script>
+/* ★추가 */
+function isMobile(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 function openDetail(idx){
 fetch("/detail/"+idx)
 .then(r=>r.json())
@@ -232,6 +268,16 @@ m_org.innerText=d["기관명"];
 m_tel.innerText=d["기관 연락처"];
 m_addr.innerText=d["기관주소"];
 m_map.src="https://www.google.com/maps?q="+encodeURIComponent(d["기관주소"])+"&output=embed";
+
+const telLink=document.getElementById("tel_link");
+if(isMobile() && d["기관 연락처"]){
+  const num=d["기관 연락처"].replace(/[^0-9]/g,"");
+  telLink.href="tel:"+num;
+  telLink.style.display="inline";
+}else{
+  telLink.style.display="none";
+}
+
 modal.style.display="block";
 });
 }
@@ -311,21 +357,16 @@ def desc():
         query=request.form["query"]
         cond={}
 
-        # ✅ 지역: 엑셀 기준 (시/군 단위 추출)
         if "지역" in df.columns:
             for region in df["지역"].dropna().astype(str).unique():
-                # 예: "전라남도 나주시 남평읍" → "나주"
                 m = re.search(r"([가-힣]+)(시|군)", region)
                 if not m:
                     continue
-
-                city = m.group(1)  # "나주", "목포", "화순"
-
+                city = m.group(1)
                 if city in query:
                     cond["지역"] = city
                     cond_display.append(f"지역: {city}")
                     break
-
 
         if any(w in query for w in ["혼자","독거","1인"]):
             cond["가구유형"]="독거"
