@@ -7,6 +7,16 @@ app = Flask(__name__)
 
 FILE_PATH = "service_resources.xlsx"
 df = pd.read_excel(FILE_PATH)
+CARE_QUESTIONS = [
+"의자나 소파에서 걸터앉은 상태에서 무릎을 짚고 일어설 수 있습니까?",
+"집안에서 6걸음을 이동할 수 있습니까?",
+"등을 제외한 몸 전체를 씻을 수 있습니까?",
+"상의 입고 단추를 잠글 수 있습니까?",
+"하의를 입고 지퍼를 올릴 수 있습니까?",
+"소변실수를 하지 않고 화장실에 갈 수 있습니까?",
+"화장실에서 변기에 앉아 용변을 볼 수 있습니까?"
+]
+
 
 # ================= 공통 CSS =================
 BASE_STYLE = """
@@ -57,6 +67,7 @@ HOME_HTML = """
 <p style="text-align:center;">검색 방식을 선택하세요</p>
 <a href="/combo"><button>① 대상자 특성 검색</button></a>
 <a href="/desc"><button>② 서술형 검색</button></a>
+<a href="/care"><button>③ 통합돌봄 사전조사</button></a>
 <img src="/static/bottom.png" class="bottom-image">
 </div>
 </body>
@@ -184,6 +195,82 @@ function closeModal(){ modal.style.display="none"; }
 </body>
 </html>
 """
+# ================= CARE =================
+CARE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 사전조사</title>
+<style>{{ style }}</style>
+</head>
+<body>
+<div class="container">
+<a href="/" class="home-btn">← 홈으로</a>
+<h2>통합돌봄 사전조사</h2>
+
+<form id="careForm">
+<label>치매 관련 약 복용 여부</label>
+<select name="dementia" required>
+<option value="">선택</option>
+<option value="y">예</option>
+<option value="n">아니오</option>
+</select>
+
+<hr>
+
+{% for i,q in questions %}
+<label>{{i+1}}. {{q}}</label>
+<select name="q{{i}}" required>
+<option value="">선택</option>
+<option value="0">도움 없이 가능</option>
+<option value="1">보조도구/준비 필요</option>
+<option value="2">타인 도움 필요</option>
+</select>
+{% endfor %}
+
+<button type="submit">판정하기</button>
+</form>
+</div>
+
+<!-- 결과 팝업 -->
+<div id="resultModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5)">
+<div style="background:white;margin:10% auto;padding:25px;width:90%;max-width:400px;border-radius:12px;text-align:center">
+<h3>사전조사 결과</h3>
+<p id="r_text" style="font-size:20px;font-weight:bold"></p>
+<p id="r_score"></p>
+<button onclick="closeModal()">닫기</button>
+</div>
+</div>
+
+<script>
+document.getElementById("careForm").onsubmit = async function(e){
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    const res = await fetch("/care_check", {
+        method:"POST",
+        body:formData
+    });
+
+    const data = await res.json();
+
+    document.getElementById("r_text").innerText = data.result;
+    document.getElementById("r_score").innerText = "총점: " + data.score;
+    document.getElementById("resultModal").style.display="block";
+}
+
+function closeModal(){
+    document.getElementById("resultModal").style.display="none";
+}
+</script>
+</body>
+</html>
+"""
+
+
 
 # ================= DESC (수정됨) =================
 DESC_HTML = """
@@ -391,6 +478,42 @@ def desc():
         message=message,
         cond_display=cond_display
     )
+
+@app.route("/care", methods=["GET"])
+def care():
+    return render_template_string(
+        CARE_HTML, style=BASE_STYLE,
+        questions=list(enumerate(CARE_QUESTIONS))
+    )
+
+
+@app.route("/care_check", methods=["POST"])
+def care_check():
+    score=0
+    dementia=request.form.get("dementia","n")
+
+    if dementia=="y":
+        return jsonify({"result":"통합돌봄 지원 대상 (치매약 복용)","score":"판정 제외"})
+
+    for i in range(7):
+        val=request.form.get(f"q{i}")
+        if val is None or val=="":
+            val=0
+        score+=int(val)
+
+    if score<=1:
+        result="지원 대상 아님"
+    elif score<=3:
+        result="지자체 자체조사 대상"
+    else:
+        result="통합판정조사 대상"
+
+    return jsonify({"result":result,"score":score})
+
+
+if __name__=="__main__":
+    app.run(debug=True)
+
 
 if __name__=="__main__":
     app.run(debug=True)
