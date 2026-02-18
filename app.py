@@ -6,7 +6,13 @@ import re
 app = Flask(__name__)
 
 FILE_PATH = "service_resources.xlsx"
-df = pd.read_excel(FILE_PATH)
+
+try:
+    df = pd.read_excel(FILE_PATH)
+except Exception as e:
+    print("엑셀 로드 실패:", e)
+    df = pd.DataFrame()
+
 CARE_QUESTIONS = [
 "의자나 소파에서 걸터앉은 상태에서 무릎을 짚고 일어설 수 있습니까?",
 "집안에서 6걸음을 이동할 수 있습니까?",
