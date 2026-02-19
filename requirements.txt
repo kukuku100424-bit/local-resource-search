@@ -1,6 +1,11 @@
 flask
 pandas
+numpy
+scikit-learn
 openai
 python-dotenv
 openpyxl
 gunicorn
+scikit-learn
+numpy
+openpyxl
