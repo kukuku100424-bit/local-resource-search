@@ -65,9 +65,21 @@ JSON 형식:
         match=re.search(r'\{.*\}',text,re.S)
 
         if not match:
-            return []
+            return {}
 
-        data=json.loads(match.group())
+        data = json.loads(match.group())
+
+        # ===== 노인 키워드 제거 =====
+        kw = data.get("키워드")
+        if isinstance(kw, str):
+            ignore_words = ["노인","어르신","고령자","고령","노년","노인가구","노인분"]
+            for w in ignore_words:
+                kw = kw.replace(w,"")
+            kw = kw.strip()
+            data["키워드"] = kw if kw else None
+
+        return data
+
 
         display=[]
         for k,v in data.items():
