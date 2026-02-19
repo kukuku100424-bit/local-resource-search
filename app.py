@@ -681,7 +681,7 @@ def desc():
         found = filter_df_by_json(df, cond)
 
         # 결과 부족하면 의미검색 보조
-        if len(found) < 5:
+        if len(found) < 0:
             found = semantic_search(query)
 
         results = found.reset_index()[["index","프로그램명칭"]].to_dict("records")
