@@ -526,11 +526,18 @@ def desc():
 
         # GPT 조건 추출
         cond = ai_extract_condition(query)
-        print("GPT 추출:", cond)   # ← 이 줄 추가
+
+        import sys
+        try:
+            print("GPT 추출:", cond, flush=True)
+            sys.stdout.flush()
+        except Exception as e:
+            print("로그출력실패:", e, flush=True)
 
         cond_display=[]
         if isinstance(cond, dict):
-            for k,v in cond.items(): cond_display.append(f"{k}: {v}")
+            for k,v in cond.items():
+                cond_display.append(f"{k}: {v}")
 
 
         if not cond:
