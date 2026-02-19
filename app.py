@@ -570,6 +570,44 @@ function closeModal(){ modal.style.display="none"; }
 </body>
 </html>
 """
+def normalize_conditions(data):
+
+    def contains_any(text, keywords):
+        if not text: 
+            return False
+        text = str(text)
+        return any(k in text for k in keywords)
+
+    # ----- 가구유형 -----
+    if contains_any(data.get("가구유형"), ["혼자", "1인", "독거"]):
+        data["가구유형"] = "독거"
+
+    if contains_any(data.get("가구유형"), ["부부", "둘이"]):
+        data["가구유형"] = "노인부부"
+
+
+    # ----- 방문형서비스 -----
+    if contains_any(data.get("키워드"), ["방문", "찾아", "집으로", "재가"]):
+        data["방문형서비스"] = "Y"
+
+
+    # ----- 거동불편 -----
+    if contains_any(data.get("키워드"), ["거동", "보행", "걷기", "이동", "낙상"]):
+        data["거동불편"] = "Y"
+
+
+    # ----- 정서지원 -----
+    if contains_any(data.get("키워드"), ["우울", "외로", "말벗", "정서"]):
+        data["정서지원"] = "Y"
+
+
+    # ----- 장애 -----
+    if contains_any(data.get("키워드"), ["치매", "장애", "인지"]):
+        data["장애여부"] = "Y"
+
+    return data
+
+
 
 def filter_df_by_json(df, cond):
 
@@ -694,6 +732,7 @@ def desc():
         query=request.form["query"]
 
         cond = extract_conditions_json(query)
+        cond = normalize_conditions(cond)
         cond_display = extract_conditions_display(query)
 
         print("사용자 입력:", query, flush=True)
