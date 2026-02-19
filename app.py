@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+
 from openai import OpenAI
 
 def extract_conditions_display(query):
@@ -83,8 +83,6 @@ JSON 형식:
 
         return display
 
-
-        return display
 
     except Exception as e:
         print("조건표시 실패:",e)
@@ -588,40 +586,9 @@ def filter_df_by_json(df, cond):
 
 
 def semantic_search(query, top_k=7):
-    global doc_vectors, documents
-
-    if rag_client is None:
-        print("OPENAI API 없음 → 의미검색 비활성화")
-        return df.head(0)
-
-    if len(df) > 1500:
-        print("데이터 너무 큼 — 상위 1500개만 사용")
-        sample_df = df.head(1500)
-    else:
-        sample_df = df
-
-    if doc_vectors is None:
-        print("RAG 최초 생성 시작")
-
-        documents = sample_df.apply(row_to_text, axis=1).tolist()
-
-
-        emb = rag_client.embeddings.create(
-            model="text-embedding-3-small",
-            input=documents
-        )
-        doc_vectors = np.array([e.embedding for e in emb.data])
-        print("RAG 준비 완료:", len(doc_vectors))
-
-    q_emb = rag_client.embeddings.create(
-        model="text-embedding-3-small",
-        input=query
-    ).data[0].embedding
-
-    sims = cosine_similarity([q_emb], doc_vectors)[0]
-    top_idx = sims.argsort()[-top_k:][::-1]
-
-    return sample_df.iloc[top_idx]
+    # 배포 서버 안정화를 위해 의미검색(RAG) 임시 비활성화
+    print("semantic search skipped")
+    return df.head(0)
 
 
 
@@ -759,5 +726,10 @@ def care_check():
         result="통합판정조사 대상"
 
     return jsonify({"result":result,"score":score})
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
 
 
