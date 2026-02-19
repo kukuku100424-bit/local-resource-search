@@ -11,6 +11,44 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from openai import OpenAI
 
+def extract_conditions_display(query):
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        prompt=f"""
+사용자 문장에서 복지 검색 조건을 추출해라.
+가능한 항목: 지역, 연령, 가구유형, 서비스욕구
+JSON으로만 답해라.
+
+문장:
+{query}
+"""
+
+        res = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[{"role":"user","content":prompt}],
+            temperature=0
+        )
+
+        import json, re
+        text=res.choices[0].message.content
+        match=re.search(r'\{.*\}',text,re.S)
+
+        if not match:
+            return []
+
+        data=json.loads(match.group())
+
+        display=[]
+        for k,v in data.items():
+            display.append(f"{k}: {v}")
+
+        return display
+
+    except Exception as e:
+        print("조건표시 실패:",e)
+        return []
+
 
 app = Flask(__name__)
 
@@ -539,6 +577,7 @@ def desc():
 
     if request.method=="POST":
         query=request.form["query"]
+        cond_display = extract_conditions_display(query)
 
         # 의미검색 실행 (RAG)
         found = semantic_search(query, 7)
@@ -551,7 +590,8 @@ def desc():
         query=query,
         results=results,
         message=None,
-        cond_display=None
+        cond_display=cond_display
+
     )
 
 
