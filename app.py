@@ -544,9 +544,8 @@ def combo():
 
         if keyword: filtered = filtered[filtered.apply(lambda x: keyword.lower() in str(x.to_dict()).lower(), axis=1)]
  
-
-
         results=filtered.reset_index()[["index","프로그램명칭"]].dropna().to_dict("records")
+        cond_display = extract_conditions_display(query)  # 있으면 유지
 
     return render_template_string(
         COMBO_HTML, style=BASE_STYLE,
