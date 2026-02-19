@@ -71,7 +71,11 @@ JSON 형식:
 
         display=[]
         for k,v in data.items():
-            display.append(f"{k}: {v}")
+            if v is None:
+                continue
+            if v is False:
+                continue
+    display.append(f"{k}: {v}")
 
         return display
 
@@ -618,7 +622,7 @@ def desc():
         cond_display = extract_conditions_display(query)
 
         # 의미검색 실행 (RAG)
-        found = semantic_search(query, 7)
+        found = filter_dataframe_by_conditions(df, gpt_json)
 
         results = found.reset_index()[["index","프로그램명칭"]].to_dict("records")
 
