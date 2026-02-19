@@ -585,7 +585,7 @@ def filter_df_by_json(df, cond):
         filtered=filtered[filtered["장애여부"].astype(str)==cond["장애여부"]]
 
     if cond.get("방문형서비스"):
-        filtered=filtered[filtered["방문형서비스"].astype(str)==cond["방문형서비스"]]
+        filtered = filtered[filtered["방문형서비스"].astype(str).str.contains("Y|가능|있음|예|O|○", na=False, regex=True)]
 
     if cond.get("거동불편"):
         filtered=filtered[filtered["거동불편"].astype(str)==cond["거동불편"]]
