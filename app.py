@@ -64,7 +64,12 @@ except Exception as e:
 # ================== RAG 벡터 DB 생성 ==================
 
 api_key = os.getenv("OPENAI_API_KEY")
-rag_client = OpenAI(api_key=api_key)
+
+if api_key:
+    rag_client = OpenAI(api_key=api_key)
+else:
+    rag_client = None
+
 doc_vectors = None
 documents = None
 
@@ -462,6 +467,10 @@ function closeModal(){ modal.style.display="none"; }
 def semantic_search(query, top_k=7):
     global doc_vectors, documents
 
+    if rag_client is None:
+        print("OPENAI API 없음 → 의미검색 비활성화")
+        return df.head(0)
+
     if len(df) > 1500:
         print("데이터 너무 큼 — 상위 1500개만 사용")
         sample_df = df.head(1500)
@@ -478,7 +487,6 @@ def semantic_search(query, top_k=7):
             model="text-embedding-3-small",
             input=documents
         )
-
         doc_vectors = np.array([e.embedding for e in emb.data])
         print("RAG 준비 완료:", len(doc_vectors))
 
