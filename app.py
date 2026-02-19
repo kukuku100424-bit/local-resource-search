@@ -447,9 +447,6 @@ function closeModal(){ modal.style.display="none"; }
 def ai_extract_condition(text):
 
 
-    if client is None:
-        return {}
-
 
     prompt = f"""
 너는 복지 서비스 검색 시스템이다.
