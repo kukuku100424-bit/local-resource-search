@@ -16,13 +16,41 @@ def extract_conditions_display(query):
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         prompt=f"""
-사용자 문장에서 복지 검색 조건을 추출해라.
-가능한 항목: 지역, 연령, 가구유형, 서비스욕구
-JSON으로만 답해라.
 
-문장:
-{query}
+너는 복지서비스 검색 시스템의 자연어 해석기다.
+설명하지 말고 반드시 JSON만 출력한다.
+
+[지역 규칙]
+- 목포 관련 표현 → "목포시"
+- 나주 관련 표현 → "나주시"
+- 영암 관련 표현 → "영암군"
+
+[가구유형 규칙]
+- 혼자 삶, 배우자 사망, 보호자 없음 → "독거"
+- 부부 거주 → "노인부부"
+
+[Y/N 판단]
+- 방문/찾아옴 → 방문형서비스="Y"
+- 거동불편/낙상 → 거동불편="Y"
+- 우울/외로움 → 정서지원="Y"
+- 장애/치매 → 장애여부="Y"
+
+전화번호 요청 시 contact_request=true
+
+JSON 형식:
+{{
+"시군구": string|null,
+"가구유형": string|null,
+"방문형서비스": "Y"|null,
+"거동불편": "Y"|null,
+"정서지원": "Y"|null,
+"장애여부": "Y"|null,
+"contact_request": true|false
+}}
+
+문장: {query}
 """
+
 
         res = client.chat.completions.create(
             model="gpt-4.1-mini",
@@ -32,6 +60,8 @@ JSON으로만 답해라.
 
         import json, re
         text=res.choices[0].message.content
+        print("GPT응답:", text, flush=True)
+
         match=re.search(r'\{.*\}',text,re.S)
 
         if not match:
