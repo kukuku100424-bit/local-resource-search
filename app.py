@@ -433,8 +433,8 @@ def ai_extract_condition(text):
             return {}
 
     except Exception as e:
-    print("GPT 조건추출 실패:", repr(e))
-    return {}
+        print("GPT 조건추출 실패:", repr(e))
+        return {}
 
 # ================= ROUTES =================
 @app.route("/")
