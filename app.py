@@ -522,6 +522,7 @@ def desc():
 
     if request.method=="POST":
         query=request.form["query"]
+        print("GPT 추출:", cond)   # ← 이 줄 추가
 
         # GPT 조건 추출
         cond = ai_extract_condition(query)
