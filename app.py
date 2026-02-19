@@ -10,7 +10,11 @@ load_dotenv()
 app = Flask(__name__)
 
 from openai import OpenAI
-client = OpenAI()
+
+client = None
+if os.getenv("OPENAI_API_KEY"):
+    client = OpenAI()
+
 
 FILE_PATH = "service_resources.xlsx"
 
@@ -396,6 +400,11 @@ function closeModal(){ modal.style.display="none"; }
 """
 
 def ai_extract_condition(text):
+
+
+    if client is None:
+        return {}
+
 
     prompt = f"""
 너는 복지 서비스 검색 시스템이다.
