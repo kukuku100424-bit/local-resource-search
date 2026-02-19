@@ -446,7 +446,13 @@ function closeModal(){ modal.style.display="none"; }
 
 def ai_extract_condition(text):
 
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("API키 없음 - GPT 실행 안함", flush=True)
+        return {}
 
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
 
     prompt = f"""
 너는 복지 서비스 검색 시스템이다.
@@ -465,26 +471,28 @@ def ai_extract_condition(text):
 """
 
     try:
-        res = client.responses.create(
+        response = client.chat.completions.create(
             model="gpt-4.1-mini",
-            input=prompt,
+            messages=[{"role":"user","content":prompt}],
             temperature=0
         )
 
-        import json
-        import re
+        import json, re
+        content = response.choices[0].message.content
 
-        content = res.output[0].content[0].text
+        print("GPT 원문:", content, flush=True)
 
-        # JSON 부분만 추출
         match = re.search(r'\{.*\}', content, re.S)
         if match:
-            return json.loads(match.group())
+            parsed=json.loads(match.group())
+            print("GPT 추출:", parsed, flush=True)
+            return parsed
         else:
+            print("JSON 파싱 실패", flush=True)
             return {}
 
     except Exception as e:
-        print("GPT 조건추출 실패:", repr(e))
+        print("GPT 호출 오류:", repr(e), flush=True)
         return {}
 
 # ================= ROUTES =================
