@@ -127,11 +127,31 @@ JSON:
 
         import json, re
         text=res.choices[0].message.content
+
+
         match=re.search(r'\{.*\}',text,re.S)
+
+
         if not match:
             return {}
 
-        return json.loads(match.group())
+data = json.loads(match.group())
+
+# ===== 노인 관련 키워드 제거 =====
+if data.get("키워드"):
+    ignore_words = ["노인","어르신","고령자","고령","노년","노인가구","노인분"]
+    kw = data["키워드"]
+
+    for w in ignore_words:
+        kw = kw.replace(w,"").strip()
+
+    if kw == "":
+        data["키워드"] = None
+    else:
+        data["키워드"] = kw
+
+return data
+
 
     except Exception as e:
         print("JSON 추출 실패:",e)
