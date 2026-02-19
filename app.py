@@ -16,7 +16,7 @@ FILE_PATH = "service_resources.xlsx"
 
 try:
     df = pd.read_excel(FILE_PATH)
-    df.columns = df.columns.str.replace(" ","")   # ★ 여기 추가
+    df.columns = df.columns.str.replace(" ","")
 except Exception as e:
     print("엑셀 로드 실패:", e)
     df = pd.DataFrame()
