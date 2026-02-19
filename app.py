@@ -128,29 +128,22 @@ JSON:
         import json, re
         text=res.choices[0].message.content
 
-
         match=re.search(r'\{.*\}',text,re.S)
-
-
         if not match:
             return {}
 
-data = json.loads(match.group())
+        data = json.loads(match.group())
 
-# ===== 노인 관련 키워드 제거 (안전버전) =====
-kw = data.get("키워드")
+        # ===== 노인 키워드 제거 =====
+        kw = data.get("키워드")
+        if isinstance(kw, str):
+            ignore_words = ["노인","어르신","고령자","고령","노년","노인가구","노인분"]
+            for w in ignore_words:
+                kw = kw.replace(w,"")
+            kw = kw.strip()
+            data["키워드"] = kw if kw else None
 
-if isinstance(kw, str):
-    ignore_words = ["노인","어르신","고령자","고령","노년","노인가구","노인분"]
-
-    for w in ignore_words:
-        kw = kw.replace(w,"")
-
-    kw = kw.strip()
-    data["키워드"] = kw if kw else None
-
-return data
-
+        return data
 
     except Exception as e:
         print("JSON 추출 실패:",e)
@@ -652,19 +645,6 @@ def filter_df_by_json(df, cond):
 
     if cond.get("연령이상") is not None:
         filtered=filtered[pd.to_numeric(filtered["연령"],errors="coerce")>=cond["연령이상"]]
-
-# ===== 노인 키워드 무시 =====
-    if cond.get("키워드"):
-        ignore_words = ["노인","어르신","고령자","고령","노년","노인가구","노인분"]
-        kw = cond["키워드"]
-
-        for w in ignore_words:
-            kw = kw.replace(w,"").strip()
-
-        if kw == "":
-            cond["키워드"] = None
-        else:
-            cond["키워드"] = kw
 
 
 
