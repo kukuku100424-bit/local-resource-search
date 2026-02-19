@@ -417,14 +417,14 @@ def ai_extract_condition(text):
     try:
         res = client.responses.create(
             model="gpt-4.1-mini",
-            messages=[{"role":"user","content":prompt}],
+            input=prompt,
             temperature=0
         )
 
         import json
         import re
 
-        content = res.output_text
+        content = res.output[0].content[0].text
 
         # JSON 부분만 추출
         match = re.search(r'\{.*\}', content, re.S)
