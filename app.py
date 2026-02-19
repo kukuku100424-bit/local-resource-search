@@ -145,15 +145,25 @@ FILE_PATH = "service_resources.xlsx"
 
 try:
     df = pd.read_excel(FILE_PATH)
-# 컬럼명 강제 정리 (숨은 공백/줄바꿈 제거)
+
+    # 컬럼명 정리 (공백/줄바꿈/특수공백 제거)
     df.columns = (
-        df.columns
+        df.columns.astype(str)
+        .str.replace("\u00A0", "", regex=False)
         .str.replace(r"\s+", "", regex=True)
-        .str.replace("\n","")
         .str.strip()
     )
 
-print("현재 컬럼명:", list(df.columns), flush=True)
+    # 프로그램명칭 컬럼 자동 찾기
+    if "프로그램명칭" not in df.columns:
+        candidates = [c for c in df.columns if ("프로그램" in c and "명" in c) or ("서비스" in c and "명" in c)]
+        if candidates:
+            df = df.rename(columns={candidates[0]: "프로그램명칭"})
+        else:
+            df["프로그램명칭"] = ""
+
+    print("현재 컬럼명:", list(df.columns), flush=True)
+
 except Exception as e:
     print("엑셀 로드 실패:", e)
     df = pd.DataFrame()
@@ -692,7 +702,8 @@ def desc():
         if len(found) < 0:
             found = semantic_search(query)
 
-        results = found.reset_index()[["index","프로그램명칭"]].to_dict("records")
+        results = found.reset_index().get(["index","프로그램명칭"], pd.DataFrame(columns=["index","프로그램명칭"])).to_dict("records")
+
 
     return render_template_string(
         DESC_HTML,
