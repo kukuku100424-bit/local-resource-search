@@ -617,6 +617,3 @@ def care_check():
     return jsonify({"result":result,"score":score})
 
 
-
-return jsonify({"result":result,"score":score})
-
