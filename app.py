@@ -145,7 +145,15 @@ FILE_PATH = "service_resources.xlsx"
 
 try:
     df = pd.read_excel(FILE_PATH)
-    df.columns = df.columns.str.replace(" ","")
+# 컬럼명 강제 정리 (숨은 공백/줄바꿈 제거)
+    df.columns = (
+        df.columns
+        .str.replace(r"\s+", "", regex=True)
+        .str.replace("\n","")
+        .str.strip()
+    )
+
+print("현재 컬럼명:", list(df.columns), flush=True)
 except Exception as e:
     print("엑셀 로드 실패:", e)
     df = pd.DataFrame()
