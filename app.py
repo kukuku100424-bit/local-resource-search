@@ -433,8 +433,7 @@ def ai_extract_condition(text):
             return {}
 
     except Exception as e:
-        print("GPT 조건추출 실패:", e)
-        return {}
+    raise Exception(f"GPT 실패: {repr(e)}")
 
 
 
