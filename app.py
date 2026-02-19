@@ -100,6 +100,32 @@ JSON 형식:
         print("조건표시 실패:",e)
         return []
 
+def build_display_conditions(cond):
+    display = []
+
+    if cond.get("시군구"):
+        display.append(f"시군구: {cond['시군구']}")
+
+    if cond.get("가구유형"):
+        display.append(f"가구유형: {cond['가구유형']}")
+
+    if cond.get("방문형서비스"):
+        display.append("방문형서비스: Y")
+
+    if cond.get("거동불편"):
+        display.append("거동불편: Y")
+
+    if cond.get("정서지원"):
+        display.append("정서지원: Y")
+
+    if cond.get("장애여부"):
+        display.append("장애여부: Y")
+
+    # contact_request는 표시 안함
+
+    return display
+
+
 def extract_conditions_json(query):
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -762,7 +788,8 @@ def desc():
 
         cond = extract_conditions_json(query)
         cond = normalize_conditions(cond)
-        cond_display = extract_conditions_display(query)
+        cond_display = build_display_conditions(cond)
+
 
         print("사용자 입력:", query, flush=True)
         print("해석된 조건:", cond, flush=True) 
