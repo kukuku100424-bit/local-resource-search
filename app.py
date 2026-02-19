@@ -579,6 +579,7 @@ def detail(idx):
         
 @app.route("/desc", methods=["GET","POST"])
 def desc():
+    cond_display = ""
     query=""
     results=None
 
