@@ -83,6 +83,56 @@ JSON 형식:
         print("조건표시 실패:",e)
         return []
 
+def extract_conditions_json(query):
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        prompt=f"""
+너는 복지서비스 검색 시스템의 자연어 해석기다.
+반드시 JSON만 출력한다.
+
+지역:
+목포 → 목포시
+나주 → 나주시
+영암 → 영암군
+
+연령 숫자 추출 (예: 80세 → 80)
+
+JSON:
+{{
+"시군구": string|null,
+"가구유형": string|null,
+"방문형서비스": "Y"|null,
+"거동불편": "Y"|null,
+"정서지원": "Y"|null,
+"장애여부": "Y"|null,
+"연령이상": number|null,
+"키워드": string|null,
+"contact_request": true|false
+}}
+
+문장: {query}
+"""
+
+        res = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[{"role":"user","content":prompt}],
+            temperature=0
+        )
+
+        import json, re
+        text=res.choices[0].message.content
+        match=re.search(r'\{.*\}',text,re.S)
+        if not match:
+            return {}
+
+        return json.loads(match.group())
+
+    except Exception as e:
+        print("JSON 추출 실패:",e)
+        return {}
+
+
 
 app = Flask(__name__)
 
@@ -498,6 +548,38 @@ function closeModal(){ modal.style.display="none"; }
 </html>
 """
 
+def filter_df_by_json(df, cond):
+
+    filtered=df.copy()
+
+    if cond.get("시군구"):
+        filtered=filtered[filtered["시군구"].astype(str).str.contains(cond["시군구"],na=False)]
+
+    if cond.get("가구유형"):
+        filtered=filtered[filtered["가구유형"].astype(str).str.contains(cond["가구유형"],na=False)]
+
+    if cond.get("장애여부"):
+        filtered=filtered[filtered["장애여부"].astype(str)==cond["장애여부"]]
+
+    if cond.get("방문형서비스"):
+        filtered=filtered[filtered["방문형서비스"].astype(str)==cond["방문형서비스"]]
+
+    if cond.get("거동불편"):
+        filtered=filtered[filtered["거동불편"].astype(str)==cond["거동불편"]]
+
+    if cond.get("정서지원"):
+        filtered=filtered[filtered["정서지원"].astype(str)==cond["정서지원"]]
+
+    if cond.get("연령이상") is not None:
+        filtered=filtered[pd.to_numeric(filtered["연령"],errors="coerce")>=cond["연령이상"]]
+
+    if cond.get("키워드"):
+        kw=cond["키워드"].lower()
+        filtered=filtered[filtered.apply(lambda x: kw in str(x.to_dict()).lower(),axis=1)]
+
+    return filtered
+
+
 def semantic_search(query, top_k=7):
     global doc_vectors, documents
 
@@ -618,10 +700,15 @@ def desc():
 
     if request.method=="POST":
         query=request.form["query"]
-        found = semantic_search(query)
 
-        # 의미검색 실행 (RAG)
-        found = filter_dataframe_by_conditions(df, gpt_json)
+        cond = extract_conditions_json(query)
+        cond_display = extract_conditions_display(query)
+
+        found = filter_df_by_json(df, cond)
+
+        # 결과 부족하면 의미검색 보조
+        if len(found) < 5:
+            found = semantic_search(query)
 
         results = found.reset_index()[["index","프로그램명칭"]].to_dict("records")
 
@@ -632,7 +719,6 @@ def desc():
         results=results,
         message=None,
         cond_display=cond_display
-
     )
 
 
