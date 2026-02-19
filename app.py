@@ -696,6 +696,9 @@ def desc():
         cond = extract_conditions_json(query)
         cond_display = extract_conditions_display(query)
 
+        print("사용자 입력:", query, flush=True)
+        print("해석된 조건:", cond, flush=True) 
+
         found = filter_df_by_json(df, cond)
 
         # 결과 부족하면 의미검색 보조
