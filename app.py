@@ -18,9 +18,10 @@ try:
     df = pd.read_excel(FILE_PATH)
     df.columns = df.columns.str.replace(" ","")   # ★ 여기 추가
 except Exception as e:
-    print("엑셀 로드 실패:", e)
-    df = pd.DataFrame()
-
+    import sys
+    print("GPT 조건추출 실패:", repr(e), flush=True)
+    sys.stdout.flush()
+    return {}
 
 CARE_QUESTIONS = [
 "의자나 소파에서 걸터앉은 상태에서 무릎을 짚고 일어설 수 있습니까?",
