@@ -33,17 +33,9 @@ def extract_conditions_display(query):
 - 방문/찾아옴 → 방문형서비스="Y"
 - 거동불편/낙상 → 거동불편="Y"
 - 우울/외로움 → 정서지원="Y"
-- 장애등급 있으면 → 장애여부="Y"
+- 장애/치매 → 장애여부="Y"
 
-[질병/건강상태 규칙]
-- 고혈압, 당뇨, 관절염, 중풍, 파킨슨, 심장질환, 암, 치매 외 질병명은 모두 키워드로 보낸다
-- 건강상태는 절대 버리지 말고 반드시 키워드에 포함
-
-기타 규칙
-- 질병명, 건강상태, 요구사항은 모두 기타로 보낸다
-예: 고혈압, 당뇨, 관절염, 말벗, 식사지원, 병원동행
-- 다른 항목으로 분류되지 않는 단어는 반드시 기타에 포함
-- 버리지 말 것
+전화번호 요청 시 contact_request=true
 
 JSON 형식:
 {{
@@ -53,8 +45,7 @@ JSON 형식:
 "거동불편": "Y"|null,
 "정서지원": "Y"|null,
 "장애여부": "Y"|null,
-"기타": string|null
-
+"contact_request": true|false
 }}
 
 문장: {query}
@@ -718,13 +709,13 @@ def filter_df_by_json(df, cond):
 
 
     # 키워드는 "기타" 컬럼에서만 검색
-    if cond.get("기타") and "기타" in filtered.columns:
-        kw = cond["기타"].lower()
+    if cond.get("키워드") and "기타" in filtered.columns:
+        kw = cond["키워드"].lower()
         filtered = filtered[
             filtered["기타"].astype(str).str.lower().str.contains(kw, na=False)
     ]
 
-return filtered
+    return filtered
 
 
 def semantic_search(query, top_k=7):
