@@ -137,18 +137,17 @@ JSON:
 
 data = json.loads(match.group())
 
-# ===== 노인 관련 키워드 제거 =====
-if data.get("키워드"):
+# ===== 노인 관련 키워드 제거 (안전버전) =====
+kw = data.get("키워드")
+
+if isinstance(kw, str):
     ignore_words = ["노인","어르신","고령자","고령","노년","노인가구","노인분"]
-    kw = data["키워드"]
 
     for w in ignore_words:
-        kw = kw.replace(w,"").strip()
+        kw = kw.replace(w,"")
 
-    if kw == "":
-        data["키워드"] = None
-    else:
-        data["키워드"] = kw
+    kw = kw.strip()
+    data["키워드"] = kw if kw else None
 
 return data
 
