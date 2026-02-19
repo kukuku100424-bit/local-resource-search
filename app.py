@@ -74,12 +74,14 @@ JSON 형식:
             if v is None:
                 continue
 
-    # bool이면 True(Y)만 표시
-        if isinstance(v,bool):
-            if v:
-                display.append(f"{k}: Y")
-        else:
-            display.append(f"{k}: {v}")
+            # bool이면 True(Y)만 표시
+            if isinstance(v,bool):
+                if v:
+                    display.append(f"{k}: Y")
+            else:
+                display.append(f"{k}: {v}")
+
+        return display
 
 
         return display
