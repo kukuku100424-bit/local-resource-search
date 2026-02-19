@@ -9,16 +9,56 @@ load_dotenv()
 
 app = Flask(__name__)
 
-from openai import OpenAI
+def ai_extract_condition(text):
 
-client = None
-api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("API키 없음 - GPT 실행 안함", flush=True)
+        return {}
 
-if api_key:
+    from openai import OpenAI
     client = OpenAI(api_key=api_key)
-    print("OPENAI 연결 성공")
-else:
-    print("OPENAI_API_KEY 없음")
+
+    prompt = f"""
+너는 복지 서비스 검색 시스템이다.
+사용자의 문장에서 검색 조건을 JSON으로 추출해라.
+
+가능한 키:
+지역
+연령
+가구유형
+서비스욕구
+
+설명 없이 JSON만 출력해라.
+
+문장:
+{text}
+"""
+
+    try:
+        res = client.responses.create(
+            model="gpt-4.1-mini",
+            input=prompt,
+            temperature=0
+        )
+
+        import json, re
+        content = res.output[0].content[0].text
+
+        print("GPT 원문:", content, flush=True)
+
+        match = re.search(r'\{.*\}', content, re.S)
+        if match:
+            parsed=json.loads(match.group())
+            print("GPT 추출:", parsed, flush=True)
+            return parsed
+        else:
+            print("JSON 파싱 실패", flush=True)
+            return {}
+
+    except Exception as e:
+        print("GPT 호출 오류:", repr(e), flush=True)
+        return {}
 
 
 FILE_PATH = "service_resources.xlsx"
