@@ -12,8 +12,13 @@ app = Flask(__name__)
 from openai import OpenAI
 
 client = None
-if os.getenv("OPENAI_API_KEY"):
-    client = OpenAI()
+api_key = os.getenv("OPENAI_API_KEY")
+
+if api_key:
+    client = OpenAI(api_key=api_key)
+    print("OPENAI 연결 성공")
+else:
+    print("OPENAI_API_KEY 없음")
 
 
 FILE_PATH = "service_resources.xlsx"
