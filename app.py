@@ -73,9 +73,14 @@ JSON 형식:
         for k,v in data.items():
             if v is None:
                 continue
-            if v is False:
-                continue
+
+    # bool이면 True(Y)만 표시
+        if isinstance(v,bool):
+            if v:
+                display.append(f"{k}: Y")
+        else:
             display.append(f"{k}: {v}")
+
 
         return display
 
