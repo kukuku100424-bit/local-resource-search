@@ -424,10 +424,17 @@ function closeModal(){ modal.style.display="none"; }
 def semantic_search(query, top_k=7):
     global doc_vectors, documents
 
+    if len(df) > 1500:
+        print("데이터 너무 큼 — 상위 1500개만 사용")
+        sample_df = df.head(1500)
+    else:
+        sample_df = df
+
     if doc_vectors is None:
         print("RAG 최초 생성 시작")
 
-        documents = df.apply(row_to_text, axis=1).tolist()
+        documents = sample_df.apply(row_to_text, axis=1).tolist()
+
 
         emb = rag_client.embeddings.create(
             model="text-embedding-3-small",
@@ -445,7 +452,8 @@ def semantic_search(query, top_k=7):
     sims = cosine_similarity([q_emb], doc_vectors)[0]
     top_idx = sims.argsort()[-top_k:][::-1]
 
-    return df.iloc[top_idx]
+    return sample_df.iloc[top_idx]
+
 
 
 # ================= ROUTES =================
