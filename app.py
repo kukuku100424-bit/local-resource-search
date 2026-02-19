@@ -3,10 +3,34 @@ import pandas as pd
 import os
 import re
 
+# ★ .env 파일에서 API키 불러오기
+from dotenv import load_dotenv
+load_dotenv()
+
 app = Flask(__name__)
 
+from openai import OpenAI
+client = OpenAI()
+
 FILE_PATH = "service_resources.xlsx"
-df = pd.read_excel(FILE_PATH)
+
+try:
+    df = pd.read_excel(FILE_PATH)
+    df.columns = df.columns.str.replace(" ","")   # ★ 여기 추가
+except Exception as e:
+    print("엑셀 로드 실패:", e)
+    df = pd.DataFrame()
+
+CARE_QUESTIONS = [
+"의자나 소파에서 걸터앉은 상태에서 무릎을 짚고 일어설 수 있습니까?",
+"집안에서 6걸음을 이동할 수 있습니까?",
+"등을 제외한 몸 전체를 씻을 수 있습니까?",
+"상의 입고 단추를 잠글 수 있습니까?",
+"하의를 입고 지퍼를 올릴 수 있습니까?",
+"소변실수를 하지 않고 화장실에 갈 수 있습니까?",
+"화장실에서 변기에 앉아 용변을 볼 수 있습니까?"
+]
+
 
 # ================= 공통 CSS =================
 BASE_STYLE = """
@@ -57,6 +81,7 @@ HOME_HTML = """
 <p style="text-align:center;">검색 방식을 선택하세요</p>
 <a href="/combo"><button>① 대상자 특성 검색</button></a>
 <a href="/desc"><button>② 서술형 검색</button></a>
+<a href="/care"><button>③ 통합돌봄 사전조사</button></a>
 <img src="/static/bottom.png" class="bottom-image">
 </div>
 </body>
@@ -166,12 +191,15 @@ m_tel.innerText=d["기관 연락처"];
 m_addr.innerText=d["기관주소"];
 m_map.src="https://www.google.com/maps?q="+encodeURIComponent(d["기관주소"])+"&output=embed";
 
-/* ★추가: 모바일에서만 tel 연결 */
 const telLink=document.getElementById("tel_link");
 if(isMobile() && d["기관 연락처"]){
-  const num=d["기관 연락처"].replace(/[^0-9]/g,"");
-  telLink.href="tel:"+num;
-  telLink.style.display="inline";
+  const numMatch = d["기관 연락처"].match(/[0-9-]+/);
+  if(numMatch){
+    telLink.href="tel:"+numMatch[0];
+    telLink.style.display="inline";
+  }else{
+    telLink.style.display="none";
+  }
 }else{
   telLink.style.display="none";
 }
@@ -184,6 +212,82 @@ function closeModal(){ modal.style.display="none"; }
 </body>
 </html>
 """
+# ================= CARE =================
+CARE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 사전조사</title>
+<style>{{ style }}</style>
+</head>
+<body>
+<div class="container">
+<a href="/" class="home-btn">← 홈으로</a>
+<h2>통합돌봄 사전조사</h2>
+
+<form id="careForm">
+<label>치매 관련 약 복용 여부</label>
+<select name="dementia" required>
+<option value="">선택</option>
+<option value="y">예</option>
+<option value="n">아니오</option>
+</select>
+
+<hr>
+
+{% for i,q in questions %}
+<label>{{i+1}}. {{q}}</label>
+<select name="q{{i}}" required>
+<option value="">선택</option>
+<option value="0">도움 없이 가능</option>
+<option value="1">보조도구/준비 필요</option>
+<option value="2">타인 도움 필요</option>
+</select>
+{% endfor %}
+
+<button type="submit">판정하기</button>
+</form>
+</div>
+
+<!-- 결과 팝업 -->
+<div id="resultModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5)">
+<div style="background:white;margin:10% auto;padding:25px;width:90%;max-width:400px;border-radius:12px;text-align:center">
+<h3>사전조사 결과</h3>
+<p id="r_text" style="font-size:20px;font-weight:bold"></p>
+<p id="r_score"></p>
+<button onclick="closeModal()">닫기</button>
+</div>
+</div>
+
+<script>
+document.getElementById("careForm").onsubmit = async function(e){
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    const res = await fetch("/care_check", {
+        method:"POST",
+        body:formData
+    });
+
+    const data = await res.json();
+
+    document.getElementById("r_text").innerText = data.result;
+    document.getElementById("r_score").innerText = "총점: " + data.score;
+    document.getElementById("resultModal").style.display="block";
+}
+
+function closeModal(){
+    document.getElementById("resultModal").style.display="none";
+}
+</script>
+</body>
+</html>
+"""
+
+
 
 # ================= DESC (수정됨) =================
 DESC_HTML = """
@@ -271,9 +375,13 @@ m_map.src="https://www.google.com/maps?q="+encodeURIComponent(d["기관주소"])
 
 const telLink=document.getElementById("tel_link");
 if(isMobile() && d["기관 연락처"]){
-  const num=d["기관 연락처"].replace(/[^0-9]/g,"");
-  telLink.href="tel:"+num;
-  telLink.style.display="inline";
+  const numMatch = d["기관 연락처"].match(/[0-9-]+/);
+  if(numMatch){
+    telLink.href="tel:"+numMatch[0];
+    telLink.style.display="inline";
+  }else{
+    telLink.style.display="none";
+  }
 }else{
   telLink.style.display="none";
 }
@@ -287,6 +395,49 @@ function closeModal(){ modal.style.display="none"; }
 </html>
 """
 
+def ai_extract_condition(text):
+
+    prompt = f"""
+너는 복지 서비스 검색 시스템이다.
+사용자의 문장에서 검색 조건을 JSON으로 추출해라.
+
+가능한 키:
+지역
+연령
+가구유형
+서비스욕구
+
+설명 없이 JSON만 출력해라.
+
+문장:
+{text}
+"""
+
+    try:
+        res = client.responses.create(
+            model="gpt-4.1-mini",
+            input=prompt,
+            temperature=0
+        )
+
+        import json
+        import re
+
+        content = res.output[0].content[0].text
+
+        # JSON 부분만 추출
+        match = re.search(r'\{.*\}', content, re.S)
+        if match:
+            return json.loads(match.group())
+        else:
+            return {}
+
+    except Exception as e:
+        print("GPT 조건추출 실패:", e)
+        return {}
+
+
+
 # ================= ROUTES =================
 @app.route("/")
 def home():
@@ -294,9 +445,10 @@ def home():
 
 @app.route("/combo", methods=["GET","POST"])
 def combo():
-    family_types = sorted(df["가구유형"].dropna().unique().tolist())
-    disabilities = sorted(df["장애여부"].dropna().unique().tolist())
-    services = sorted(df["방문형서비스"].dropna().unique().tolist())
+    family_types = sorted(df["가구유형"].dropna().unique().tolist()) if "가구유형" in df.columns else []
+    disabilities = sorted(df["장애여부"].dropna().unique().tolist()) if "장애여부" in df.columns else []
+    services = sorted(df["방문형서비스"].dropna().unique().tolist()) if "방문형서비스" in df.columns else []
+
 
     results=None
     age=family_type=disability=service_type=region=keyword=""
@@ -312,18 +464,23 @@ def combo():
         filtered=df.copy()
 
         if age.isdigit() and "연령" in df.columns:
-            filtered=filtered[pd.to_numeric(filtered["연령"],errors="coerce")>=int(age)]
-        if family_type:
-            filtered=filtered[filtered["가구유형"].astype(str).str.contains(family_type,na=False)]
-        if disability:
-            filtered=filtered[filtered["장애여부"].astype(str).str.contains(disability,na=False)]
-        if service_type:
-            filtered=filtered[filtered["방문형서비스"].astype(str).str.contains(service_type,na=False)]
-        if region:
-            filtered=filtered[filtered["지역"].astype(str).str.contains(region,na=False)]
-        if keyword:
-            filtered=filtered[filtered.apply(
-                lambda x: keyword.lower() in str(x.to_dict()).lower(), axis=1)]
+            filtered = filtered[pd.to_numeric(filtered["연령"], errors="coerce") >= int(age)]
+
+        if family_type and "가구유형" in filtered.columns:
+            filtered = filtered[filtered["가구유형"].astype(str).str.contains(family_type, na=False)]
+
+        if disability and "장애여부" in filtered.columns:
+            filtered = filtered[filtered["장애여부"].astype(str).str.contains(disability, na=False)]
+
+        if service_type and "방문형서비스" in filtered.columns:
+            filtered = filtered[filtered["방문형서비스"].astype(str).str.contains(service_type, na=False)]
+
+        if region and "지역" in filtered.columns:
+            filtered = filtered[filtered["지역"].astype(str).str.contains(region, na=False)]
+
+        if keyword: filtered = filtered[filtered.apply(lambda x: keyword.lower() in str(x.to_dict()).lower(), axis=1)]
+ 
+
 
         results=filtered.reset_index()[["index","프로그램명칭"]].dropna().to_dict("records")
 
@@ -338,13 +495,22 @@ def combo():
 
 @app.route("/detail/<int:idx>")
 def detail(idx):
+    if idx >= len(df):
+        return jsonify({
+            "프로그램명칭":"데이터가 변경되었습니다",
+            "기관명":"다시 검색해주세요",
+            "기관 연락처":"",
+            "기관주소":""
+        })
+
     r=df.iloc[idx]
     return jsonify({
         "프로그램명칭":str(r.get("프로그램명칭","")),
-        "기관명":str(r.get("서비스 제공기관명","")),
+        "기관명":str(r.get("서비스제공기관명","")),
         "기관 연락처":str(r.get("기관연락처","")),
         "기관주소":str(r.get("기관주소",""))
     })
+
 
 @app.route("/desc", methods=["GET","POST"])
 def desc():
@@ -355,22 +521,23 @@ def desc():
 
     if request.method=="POST":
         query=request.form["query"]
-        cond={}
+    
 
-        if "지역" in df.columns:
-            for region in df["지역"].dropna().astype(str).unique():
-                m = re.search(r"([가-힣]+)(시|군)", region)
-                if not m:
-                    continue
-                city = m.group(1)
-                if city in query:
-                    cond["지역"] = city
-                    cond_display.append(f"지역: {city}")
-                    break
+        # GPT 조건 추출
+        cond = ai_extract_condition(query)
 
-        if any(w in query for w in ["혼자","독거","1인"]):
-            cond["가구유형"]="독거"
-            cond_display.append("가구유형: 독거")
+        import sys
+        try:
+            print("GPT 추출:", cond, flush=True)
+            sys.stdout.flush()
+        except Exception as e:
+            print("로그출력실패:", e, flush=True)
+
+        cond_display=[]
+        if isinstance(cond, dict):
+            for k,v in cond.items():
+                cond_display.append(f"{k}: {v}")
+
 
         if not cond:
             message="검색어에서 조건을 찾지 못했습니다."
@@ -378,9 +545,28 @@ def desc():
             cond_display=[]
         else:
             f=df.copy()
-            for k,v in cond.items():
-                if k in df.columns:
-                    f=f[f[k].astype(str).str.contains(v,na=False)]
+
+            # AND 조건
+            if "지역" in cond and "지역" in df.columns:
+                f=f[f["지역"].astype(str).str.contains(str(cond["지역"]),na=False)]
+
+            if "연령" in cond and "연령" in df.columns:
+                try:
+                    age=int(re.sub(r'[^0-9]', '', str(cond["연령"])) or 0)
+                    f=f[pd.to_numeric(f["연령"],errors="coerce")>=age]
+                except:
+                    pass
+
+            # OR 조건
+            or_mask=None
+            for key in ["가구유형","서비스욕구"]:
+                if key in cond and key in df.columns:
+                    m=f[key].astype(str).str.contains(str(cond[key]),na=False)
+                    or_mask = m if or_mask is None else (or_mask | m)
+
+            if or_mask is not None:
+                f=f[or_mask]
+
             results=f.reset_index()[["index","프로그램명칭"]].dropna().to_dict("records")
 
     return render_template_string(
@@ -392,5 +578,39 @@ def desc():
         cond_display=cond_display
     )
 
+@app.route("/care", methods=["GET"])
+def care():
+    return render_template_string(
+        CARE_HTML, style=BASE_STYLE,
+        questions=list(enumerate(CARE_QUESTIONS))
+    )
+
+
+@app.route("/care_check", methods=["POST"])
+def care_check():
+    score=0
+    dementia=request.form.get("dementia","n")
+
+    if dementia=="y":
+        return jsonify({"result":"통합돌봄 지원 대상 (치매약 복용)","score":"판정 제외"})
+
+    for i in range(7):
+        val=request.form.get(f"q{i}")
+        if val is None or val=="":
+            val=0
+        score+=int(val)
+
+    if score<=1:
+        result="지원 대상 아님"
+    elif score<=3:
+        result="지자체 자체조사 대상"
+    else:
+        result="통합판정조사 대상"
+
+    return jsonify({"result":result,"score":score})
+
+
+
 if __name__=="__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
