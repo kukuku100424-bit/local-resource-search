@@ -7,59 +7,12 @@ import re
 from dotenv import load_dotenv
 load_dotenv()
 
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from openai import OpenAI
+
+
 app = Flask(__name__)
-
-def ai_extract_condition(text):
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("API키 없음 - GPT 실행 안함", flush=True)
-        return {}
-
-    from openai import OpenAI
-    client = OpenAI(api_key=api_key)
-
-    prompt = f"""
-너는 복지 서비스 검색 시스템이다.
-사용자의 문장에서 검색 조건을 JSON으로 추출해라.
-
-가능한 키:
-지역
-연령
-가구유형
-서비스욕구
-
-설명 없이 JSON만 출력해라.
-
-문장:
-{text}
-"""
-
-    try:
-        res = client.responses.create(
-            model="gpt-4.1-mini",
-            input=prompt,
-            temperature=0
-        )
-
-        import json, re
-        content = res.output[0].content[0].text
-
-        print("GPT 원문:", content, flush=True)
-
-        match = re.search(r'\{.*\}', content, re.S)
-        if match:
-            parsed=json.loads(match.group())
-            print("GPT 추출:", parsed, flush=True)
-            return parsed
-        else:
-            print("JSON 파싱 실패", flush=True)
-            return {}
-
-    except Exception as e:
-        print("GPT 호출 오류:", repr(e), flush=True)
-        return {}
-
 
 FILE_PATH = "service_resources.xlsx"
 
@@ -69,6 +22,30 @@ try:
 except Exception as e:
     print("엑셀 로드 실패:", e)
     df = pd.DataFrame()
+
+# ================== RAG 벡터 DB 생성 ==================
+
+api_key = os.getenv("OPENAI_API_KEY")
+rag_client = OpenAI(api_key=api_key)
+doc_vectors = None
+documents = None
+
+def row_to_text(row):
+    return f"""
+    {row.get('지역','')} {row.get('시군구','')} 지역에서 제공되는
+    {row.get('대분류','')} {row.get('중분류','')} 서비스인
+    {row.get('프로그램명칭','')} 이며
+    대상 연령은 {row.get('연령','')}세 이상,
+    가구유형 {row.get('가구유형','')},
+    장애여부 {row.get('장애여부','')},
+    방문서비스 {row.get('방문형서비스','')},
+    거동불편 지원 {row.get('거동불편','')},
+    정서지원 {row.get('정서지원','')},
+    기타 {row.get('기타','')}
+    """
+
+
+
 
 CARE_QUESTIONS = [
 "의자나 소파에서 걸터앉은 상태에서 무릎을 짚고 일어설 수 있습니까?",
@@ -444,56 +421,32 @@ function closeModal(){ modal.style.display="none"; }
 </html>
 """
 
-def ai_extract_condition(text):
+def semantic_search(query, top_k=7):
+    global doc_vectors, documents
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("API키 없음 - GPT 실행 안함", flush=True)
-        return {}
+    if doc_vectors is None:
+        print("RAG 최초 생성 시작")
 
-    from openai import OpenAI
-    client = OpenAI(api_key=api_key)
+        documents = df.apply(row_to_text, axis=1).tolist()
 
-    prompt = f"""
-너는 복지 서비스 검색 시스템이다.
-사용자의 문장에서 검색 조건을 JSON으로 추출해라.
-
-가능한 키:
-지역
-연령
-가구유형
-서비스욕구
-
-설명 없이 JSON만 출력해라.
-
-문장:
-{text}
-"""
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0
+        emb = rag_client.embeddings.create(
+            model="text-embedding-3-small",
+            input=documents
         )
 
-        import json, re
-        content = response.choices[0].message.content
+        doc_vectors = np.array([e.embedding for e in emb.data])
+        print("RAG 준비 완료:", len(doc_vectors))
 
-        print("GPT 원문:", content, flush=True)
+    q_emb = rag_client.embeddings.create(
+        model="text-embedding-3-small",
+        input=query
+    ).data[0].embedding
 
-        match = re.search(r'\{.*\}', content, re.S)
-        if match:
-            parsed=json.loads(match.group())
-            print("GPT 추출:", parsed, flush=True)
-            return parsed
-        else:
-            print("JSON 파싱 실패", flush=True)
-            return {}
+    sims = cosine_similarity([q_emb], doc_vectors)[0]
+    top_idx = sims.argsort()[-top_k:][::-1]
 
-    except Exception as e:
-        print("GPT 호출 오류:", repr(e), flush=True)
-        return {}
+    return df.iloc[top_idx]
+
 
 # ================= ROUTES =================
 @app.route("/")
@@ -568,72 +521,31 @@ def detail(idx):
         "기관주소":str(r.get("기관주소",""))
     })
 
+    
 
+        
 @app.route("/desc", methods=["GET","POST"])
 def desc():
     query=""
     results=None
-    message=None
-    cond_display=[]
 
     if request.method=="POST":
         query=request.form["query"]
-    
 
-        # GPT 조건 추출
-        cond = ai_extract_condition(query)
+        # 의미검색 실행 (RAG)
+        found = semantic_search(query, 7)
 
-        import sys
-        try:
-            print("GPT 추출:", cond, flush=True)
-            sys.stdout.flush()
-        except Exception as e:
-            print("로그출력실패:", e, flush=True)
-
-        cond_display=[]
-        if isinstance(cond, dict):
-            for k,v in cond.items():
-                cond_display.append(f"{k}: {v}")
-
-
-        if not cond:
-            message="검색어에서 조건을 찾지 못했습니다."
-            results=[]
-            cond_display=[]
-        else:
-            f=df.copy()
-
-            # AND 조건
-            if "지역" in cond and "지역" in df.columns:
-                f=f[f["지역"].astype(str).str.contains(str(cond["지역"]),na=False)]
-
-            if "연령" in cond and "연령" in df.columns:
-                try:
-                    age=int(re.sub(r'[^0-9]', '', str(cond["연령"])) or 0)
-                    f=f[pd.to_numeric(f["연령"],errors="coerce")>=age]
-                except:
-                    pass
-
-            # OR 조건
-            or_mask=None
-            for key in ["가구유형","서비스욕구"]:
-                if key in cond and key in df.columns:
-                    m=f[key].astype(str).str.contains(str(cond[key]),na=False)
-                    or_mask = m if or_mask is None else (or_mask | m)
-
-            if or_mask is not None:
-                f=f[or_mask]
-
-            results=f.reset_index()[["index","프로그램명칭"]].dropna().to_dict("records")
+        results = found.reset_index()[["index","프로그램명칭"]].to_dict("records")
 
     return render_template_string(
         DESC_HTML,
         style=BASE_STYLE,
         query=query,
         results=results,
-        message=message,
-        cond_display=cond_display
+        message=None,
+        cond_display=None
     )
+
 
 @app.route("/care", methods=["GET"])
 def care():
