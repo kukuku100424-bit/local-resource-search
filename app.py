@@ -634,9 +634,12 @@ def filter_df_by_json(df, cond):
     if cond.get("연령이상") is not None:
         filtered=filtered[pd.to_numeric(filtered["연령"],errors="coerce")>=cond["연령이상"]]
 
-    if cond.get("키워드"):
-        kw=cond["키워드"].lower()
-        filtered=filtered[filtered.apply(lambda x: kw in str(x.to_dict()).lower(),axis=1)]
+    # 키워드는 "기타" 컬럼에서만 검색
+    if cond.get("키워드") and "기타" in filtered.columns:
+        kw = cond["키워드"].lower()
+        filtered = filtered[
+            filtered["기타"].astype(str).str.lower().str.contains(kw, na=False)
+    ]
 
     return filtered
 
