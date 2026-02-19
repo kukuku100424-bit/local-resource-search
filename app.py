@@ -75,7 +75,7 @@ JSON 형식:
                 continue
             if v is False:
                 continue
-    display.append(f"{k}: {v}")
+            display.append(f"{k}: {v}")
 
         return display
 
@@ -579,7 +579,6 @@ def combo():
         if keyword: filtered = filtered[filtered.apply(lambda x: keyword.lower() in str(x.to_dict()).lower(), axis=1)]
  
         results=filtered.reset_index()[["index","프로그램명칭"]].dropna().to_dict("records")
-        cond_display = extract_conditions_display(query)  # 있으면 유지
 
     return render_template_string(
         COMBO_HTML, style=BASE_STYLE,
@@ -613,13 +612,13 @@ def detail(idx):
         
 @app.route("/desc", methods=["GET","POST"])
 def desc():
-    cond_display = ""
+    cond_display = []
     query=""
     results=None
 
     if request.method=="POST":
         query=request.form["query"]
-        cond_display = extract_conditions_display(query)
+        found = semantic_search(query)
 
         # 의미검색 실행 (RAG)
         found = filter_dataframe_by_conditions(df, gpt_json)
