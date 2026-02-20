@@ -118,6 +118,9 @@ def build_display_conditions(cond):
     if cond.get("정서지원"):
         display.append("정서지원: Y")
 
+    if cond.get("연령이상") is not None:
+        display.append(f"연령: {cond['연령이상']}세 이상")
+
     if cond.get("장애여부"):
         display.append("장애여부: Y")
 
