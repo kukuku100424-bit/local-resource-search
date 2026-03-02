@@ -426,6 +426,7 @@ function openDetail(idx){
   fetch("/detail/"+idx)
     .then(r=>r.json())
     .then(d=>{
+
       document.getElementById("m_title").innerText = d["프로그램명칭"] || "";
       document.getElementById("m_org").innerText   = d["서비스제공기관명"] || "";
       document.getElementById("m_tel").innerText   = d["기관연락처"] || "";
@@ -436,14 +437,30 @@ function openDetail(idx){
       document.getElementById("m_map").src =
         "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
 
+      // 📞 전화버튼 항상 표시 (모바일/아이폰/안드로이드 모두 가능)
+      const telLink = document.getElementById("tel_link");
+      const tel = d["기관연락처"] || "";
+
+      if(tel){
+        const cleanNumber = tel.replace(/[^0-9]/g, "");
+        if(cleanNumber){
+          telLink.href = "tel:" + cleanNumber;
+          telLink.style.display = "inline";
+        } else {
+          telLink.style.display = "none";
+        }
+      } else {
+        telLink.style.display = "none";
+      }
+
       document.getElementById("modal").style.display="block";
     });
 }
+
 function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 </script>
-
 </body>
 </html>
 """
@@ -727,6 +744,7 @@ function openDetail(idx){
   fetch("/detail/"+idx)
     .then(r=>r.json())
     .then(d=>{
+
       document.getElementById("m_title").innerText = d["프로그램명칭"] || "";
       document.getElementById("m_org").innerText   = d["서비스제공기관명"] || "";
       document.getElementById("m_tel").innerText   = d["기관연락처"] || "";
@@ -737,29 +755,26 @@ function openDetail(idx){
       document.getElementById("m_map").src =
         "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
 
-// 📞 모바일에서만 전화 아이콘 활성화
-function isMobile(){
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
+      // 📞 전화버튼 항상 표시 (모바일/아이폰/안드로이드 모두 가능)
+      const telLink = document.getElementById("tel_link");
+      const tel = d["기관연락처"] || "";
 
-const telLink = document.getElementById("tel_link");
-const tel = d["기관연락처"] || "";
-
-if(isMobile() && tel){
-  const numMatch = tel.match(/[0-9-]+/);
-  if(numMatch){
-    telLink.href = "tel:" + numMatch[0];
-    telLink.style.display = "inline";
-  } else {
-    telLink.style.display = "none";
-  }
-} else {
-  telLink.style.display = "none";
-}
+      if(tel){
+        const cleanNumber = tel.replace(/[^0-9]/g, "");
+        if(cleanNumber){
+          telLink.href = "tel:" + cleanNumber;
+          telLink.style.display = "inline";
+        } else {
+          telLink.style.display = "none";
+        }
+      } else {
+        telLink.style.display = "none";
+      }
 
       document.getElementById("modal").style.display="block";
     });
 }
+
 function closeModal(){
   document.getElementById("modal").style.display="none";
 }
