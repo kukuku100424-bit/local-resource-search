@@ -39,8 +39,9 @@ body{
   display:flex;
   justify-content:center;
   align-items:center;
-  height:100vh;
+  min-height:100dvh;   /* 모바일 대응 */
   margin:0;
+  padding:20px;
 }
 .box{
   background:white;
@@ -239,7 +240,7 @@ HOME_HTML = """
   <button class="menu-btn">③ 통합돌봄 사전조사</button>
 </a>
 
-<a href="/guide" style="text-decoration:none;display:block;">
+<a href="/guide" target="_blank" style="text-decoration:none;display:block;">
   <button class="pdf-btn">
     <img src="/static/pdf_icon.png" alt="PDF">
     사업안내 보기
@@ -264,8 +265,7 @@ def guide():
     check = login_required()
     if check:
         return check
-    return '<iframe src="/static/guide.pdf" width="100%" height="100%" style="border:none;height:100vh;"></iframe>'
-
+    return redirect("/static/guide.pdf")
 # =========================
 # 상세 API (팝업에서 사용)
 # =========================
