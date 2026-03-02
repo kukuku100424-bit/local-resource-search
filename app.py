@@ -307,6 +307,7 @@ def combo():
         region = "나주시"
 
     results = {}
+    count = 0
 
     if request.method == "POST":
         filtered = df.copy()
@@ -322,7 +323,7 @@ def combo():
                 filtered["대분류"].astype(str) == main_category
             ]
 
-        if health_kw:
+        if health_kw and "건강상태" in filtered.columns:
             filtered = filtered[
                 filtered["건강상태"].astype(str)
                 .str.contains(health_kw, na=False)
@@ -335,15 +336,17 @@ def combo():
                 "label": f"{row.get('프로그램명칭','')} ({row.get('서비스제공기관명','')})"
             })
 
+        count = sum(len(v) for v in results.values())
+
     return render_template_string(
         COMBO_HTML,
         style=BASE_STYLE,
         region=region,
         main_category=main_category,
         health_kw=health_kw,
-        results=results
+        results=results,
+        count=count
     )
-
 
 
 # =========================
@@ -382,17 +385,25 @@ COMBO_HTML = """
 <button type="submit" class="menu-btn">검색하기</button>
 </form>
 
-{% if results %}
+{% if request.method == "POST" %}
 <div class="result">
+
+<p><b>총 {{count}}건이 조회되었습니다.</b></p>
+
+{% if count == 0 %}
+<p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
+{% endif %}
+
 {% for region,items in results.items() %}
 <h3>📍 {{region}}</h3>
 {% for r in items %}
 <div class="item" onclick="openDetail({{r['index']}})">- {{r['label']}}</div>
 {% endfor %}
 {% endfor %}
+
 </div>
 {% endif %}
-</div>
+
 
 <!-- 팝업 -->
 <div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
