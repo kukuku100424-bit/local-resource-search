@@ -751,10 +751,9 @@ DESC_HTML = """
 <h2>통합돌봄 자원검색(서술형)</h2>
 
 <form method="post">
-<textarea name="query" placeholder="예: 담양에 거동불편한 어르신이 이용가능한 서비스">{{query}}</textarea>
+<textarea id="queryBox" name="query" placeholder="예: 담양에 사는거동불편한 어르신이 이용가능한 서비스">{{query}}</textarea>
 <button type="submit" class="menu-btn">검색하기</button>
 </form>
-
 {% if cond_display is not none %}
 <div class="result">
 
@@ -842,6 +841,12 @@ function openDetail(idx){
 function closeModal(){
   document.getElementById("modal").style.display="none";
 }
+document.getElementById("queryBox").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    this.form.submit();
+  }
+});
 </script>
 
 </body>
