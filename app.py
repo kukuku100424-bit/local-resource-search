@@ -31,107 +31,154 @@ LOGIN_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>사용자 로그인</title>
+<title>케어네비 로그인</title>
+
 <style>
 body{
   font-family:'Pretendard',sans-serif;
-  background:#f7f9fc;
+  background:#f2f4f7;
   display:flex;
   justify-content:center;
   align-items:center;
-  min-height:100dvh;   /* 모바일 대응 */
+  height:100vh;
   margin:0;
-  padding:20px;
 }
+
 .box{
   background:white;
-  padding:40px;
-  border-radius:14px;
-  box-shadow:0 10px 30px rgba(0,0,0,.1);
-  width:360px;
+  width:520px;
+  padding:10px 40px 40px 40px;
+  border-radius:18px;
+  box-shadow:0 15px 40px rgba(0,0,0,0.08);
   text-align:center;
 }
-input, button{
-  width:100%;
-  height:48px;
-  padding:0 12px;
-  border-radius:8px;
-  font-size:16px;
-  box-sizing:border-box;
-}
-input{
-  border:1px solid #ccc;
-  margin-top:10px;
-}
-button{
-  margin-top:15px;
-  border:none;
-  background:#0078d7;
-  color:white;
-  cursor:pointer;
-}
-button:hover{ opacity:0.95; }
-.footer{
-  margin-top:28px;
-  font-size:12px;
-  color:#555;
-  line-height:1.5;
-}
-.ci{
-  margin-top:28px;
-}
-.error{ color:red; margin-top:10px; }
 
-.login-title{
+/* 🔥 로고 영역 */
+.logo-wrapper{
+  margin-bottom:-25px;   /* 여백 줄임 */
+}
+
+.main-title{
   font-size:28px;
   font-weight:700;
-  line-height:1.4;
-  margin-bottom:25px;
+  margin-top:0px;       /* 🔥 위 여백 제거 */
 }
 
-.login-title span{
-  font-size:20px;
-  font-weight:500;
+.logo-wrapper img{
+  width:420px;   /* 🔥 대빵 크게 */
+  display:block;
+  margin:0 auto;
+}
+
+.box{
+  background:white;
+  width:420px;
+  padding:20px 40px;    /* 위아래 여백 줄임 */
+  border-radius:18px;
+}
+
+/* 타이틀 */
+.main-title{
+  font-size:28px;
+  font-weight:700;
+  margin-top:-10px;
+}
+
+.sub-title{
+  font-size:16px;
+  color:#666;
+  margin-bottom:30px;
+}
+
+/* 입력창 */
+input{
+  width:100%;
+  padding:14px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  font-size:15px;
+  margin-bottom:18px;
+  box-sizing:border-box;
+}
+
+/* 버튼 */
+button{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:8px;
+  background:#1e73be;
+  color:white;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+button:hover{
+  background:#155fa0;
+}
+
+.notice{
+  font-size:12px;
+  color:#888;
+  margin-top:25px;
+  line-height:1.5;
+}
+
+.bottom-logo{
+  margin-top:25px;
+  font-size:13px;
   color:#555;
 }
 </style>
 </head>
+
 <body>
 <div class="box">
-<h1 class="login-title">
-  케어네비<br>
-  <span>사용자 로그인</span>
-</h1>
-<form method="post">
-<input type="password" name="password" placeholder="비밀번호 입력">
-<button type="submit">로그인</button>
-</form>
 
-<div class="footer">
-※ 본 서비스는 국민건강보험공단 광주전라제주지역본부 <br>
-관할 지자체, 지사 직원만 이용가능합니다.
-</div>
+  <div class="logo-wrapper">
+    <img src="/static/compass_logo.png">
+  </div>
 
-<div class="ci">
-<img src="/static/ci.png" width="280">
-</div>
+  <div class="main-title">케어네비</div>
+  <div class="sub-title">사용자 로그인</div>
 
-{% if error %}
-<div class="error">비밀번호가 올바르지 않습니다.</div>
-{% endif %}
+  <form method="post">
+    <input type="password" name="password" placeholder="비밀번호 입력">
+    <button type="submit">로그인</button>
+  </form>
+
+  <div class="notice">
+    ※ 본 서비스는 국민건강보험공단 광주전라제주지역본부<br>
+    관할 지자체, 지사 직원만 이용 가능합니다.
+  </div>
+
+  <div class="bottom-logo">
+    <img src="/static/ci.png" style="width:260px;margin-top:15px;">
+  </div>
+
 </div>
 </body>
 </html>
 """
-
-@app.route("/", methods=["GET","POST"])
+# =========================
+# 로그인 라우트
+# =========================
+@app.route("/", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if request.form.get("password") == "admin":
+        pw = request.form.get("password")
+
+        if pw == "admin":  # 원하는 비밀번호
             session["logged_in"] = True
             return redirect(url_for("home"))
-        return render_template_string(LOGIN_HTML, error=True)
-    return render_template_string(LOGIN_HTML, error=False)
+        else:
+            return render_template_string(LOGIN_HTML + "<script>alert('비밀번호 오류');</script>")
+
+    return render_template_string(LOGIN_HTML)
+
 
 # =========================
 # 공통 CSS
@@ -680,29 +727,36 @@ JSON 외 다른 텍스트를 출력하면 안 된다.
                 filtered["대분류"].astype(str) == str(data["대분류"])
             ]
 
-        # 🔎 건강상태 + 확장키워드 검색
+        # 🔎 건강 + 기타 OR 검색 (항상 실행)
+
+        # 🔎 건강 + 기타 OR 검색 (프로그램명 제외)
+
+        keywords = []
+
         if data.get("건강상태"):
+            keywords.append(str(data["건강상태"]))
 
-            keywords = []
+        if data.get("건강확장키워드"):
+            keywords.extend(data["건강확장키워드"])
 
-            if data["건강상태"]:
-                keywords.append(str(data["건강상태"]))
+        keywords = list(set([k for k in keywords if k]))
 
-            if data.get("건강확장키워드"):
-                keywords.extend(data["건강확장키워드"])
+        if keywords:
 
-            keywords = list(set(keywords))
-
-            condition = False
+            import pandas as pd
+            condition = pd.Series(False, index=filtered.index)
 
             for kw in keywords:
-                condition = (
+                condition |= (
                     filtered["건강상태"].astype(str).str.contains(kw, na=False)
                     | filtered["기타"].astype(str).str.contains(kw, na=False)
-                    | condition
                 )
 
             filtered = filtered[condition]
+
+            # 🔥 조건 표시에도 기타 포함 표시
+            cond_display.append("검색열: 건강상태 + 기타")
+
 
         # 🔎 그룹핑
         grouped = {}
