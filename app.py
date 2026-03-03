@@ -55,7 +55,7 @@ body{
   background:white;
   width:100%;
   max-width:460px;
-  padding:5px 40px 40px 40px;
+  padding:30px 40px 40px 40px;
   border-radius:20px;
   box-shadow:0 15px 40px rgba(0,0,0,0.08);
   text-align:center;
@@ -139,7 +139,7 @@ button:hover{
   }
 
   .box{
-    padding:5px 20px 30px 20px;
+    padding:25px 20px 30px 20px;
   }
 
 }
