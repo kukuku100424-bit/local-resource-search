@@ -129,7 +129,10 @@ button:hover{
 
 /* 🔥 모바일 전용 세밀 조정 */
 @media (max-width:480px){
-
+    .home-menu-btn .wrap{
+        padding-left: 20px;   /* 모바일용 */
+    }
+ }
   .main-title{
     font-size:22px;
   }
@@ -297,33 +300,78 @@ HOME_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>지자체 서비스자원 검색 시스템</title>
+<title>통합돌봄 서비스 자원검색</title>
 <style>{{style}}</style>
 <style>
-@media (min-width: 768px) {
-  #tel_link {
-    display: none !important;
+/* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
+/* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
+/* ✅ 홈 메뉴: 1/2/3을 "같이" 오른쪽으로 밀어서 PDF 아이콘 시작점과 정렬 */
+/* 🔥 메뉴 버튼 전체를 중앙 정렬 */
+.home-menu-btn{
+  display:flex;
+  justify-content:center;  /* 버튼 내용 중앙 */
+  align-items:center;
+}
+
+/* 번호+텍스트 묶음 */
+.home-menu-btn .wrap{
+  display:grid;
+  grid-template-columns: 40px auto;
+  column-gap:1px;
+  align-items:center;
+
+  width: 320px;
+  max-width:100%;
+
+  padding-left: 70px;   /* 데스크탑 기준 */
+}
+
+/* 📱 모바일 보정 */
+@media (max-width:480px){
+  .home-menu-btn .wrap{
+    padding-left: 30px;  /* 모바일은 덜 밀기 */
   }
 }
+/* 번호/라벨 */
+.home-menu-btn .num{
+  justify-self:center;
+}
+.home-menu-btn .label{
+  justify-self:start;
+  white-space:nowrap;
+}
 </style>
-
 </head>
 <body>
 <div class="container">
-<h1>🏛 지자체 서비스자원 검색 시스템</h1>
-
-<a href="/combo" style="text-decoration:none;display:block;">
-  <button class="menu-btn">① 통합돌봄 자원검색(선택형)</button>
-</a>
+<h1>통합돌봄 서비스 자원검색</h1>
 
 <a href="/desc" style="text-decoration:none;display:block;">
-  <button class="menu-btn">② 통합돌봄 자원검색(서술형)</button>
+  <button class="menu-btn home-menu-btn">
+    <span class="wrap">
+      <span class="num">①</span>
+      <span class="label">사례기반 자원검색(AI)</span>
+    </span>
+  </button>
+</a>
+
+<a href="/combo" style="text-decoration:none;display:block;">
+  <button class="menu-btn home-menu-btn">
+    <span class="wrap">
+      <span class="num">②</span>
+      <span class="label">조건기반 자원검색</span>
+    </span>
+  </button>
 </a>
 
 <a href="/care" style="text-decoration:none;display:block;">
-  <button class="menu-btn">③ 통합돌봄 사전조사</button>
+  <button class="menu-btn home-menu-btn">
+    <span class="wrap">
+      <span class="num">③</span>
+      <span class="label">통합돌봄 사전조사</span>
+    </span>
+  </button>
 </a>
-
 <a href="/guide" target="_blank" style="text-decoration:none;display:block;">
   <button class="pdf-btn">
     <img src="/static/pdf_icon.png" alt="PDF">
@@ -386,6 +434,7 @@ def combo():
     region = (request.values.get("region","") or "").strip()
     main_category = (request.values.get("main_category","") or "").strip()
     health_kw = (request.values.get("health_kw","") or "").strip()
+    manager = (request.values.get("manager","") or "").strip()
 
     if region == "나주":
         region = "나주시"
@@ -405,6 +454,11 @@ def combo():
         if main_category:
             filtered = filtered[
                 filtered["대분류"].astype(str) == main_category
+            ]
+
+        if manager and "관리주체" in filtered.columns:
+            filtered = filtered[
+                filtered["관리주체"].astype(str) == manager
             ]
 
         if health_kw and "건강상태" in filtered.columns:
@@ -428,6 +482,7 @@ def combo():
         region=region,
         main_category=main_category,
         health_kw=health_kw,
+        manager=manager,   # ← 이 줄 추가
         results=results,
         count=count
     )
@@ -442,7 +497,7 @@ COMBO_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>통합돌봄 자원검색(선택형)</title>
+<title>조건기반 자원검색</title>
 <style>{{style}}</style>
 <style>
 @media (min-width: 768px) {
@@ -454,8 +509,8 @@ COMBO_HTML = """
 </head>
 <body>
 <div class="container">
-<a href="/home" class="home-btn">← 홈으로</a>
-<h2>통합돌봄 자원검색(선택형)</h2>
+<a href="/home" class="home-btn">홈으로</a>
+<h2>조건기반 자원검색</h2>
 
 <form method="post">
 <label>지역(시군구)</label>
@@ -467,6 +522,14 @@ COMBO_HTML = """
   <option value="">무관</option>
   {% for c in ["보건의료","생활지원","요양","주거지원"] %}
   <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
+  {% endfor %}
+</select>
+
+<label>관리기관</label>
+<select name="manager">
+  <option value="">무관</option>
+  {% for m in ["국민건강보험공단","지자체"] %}
+  <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
   {% endfor %}
 </select>
 
@@ -725,7 +788,7 @@ DESC_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>통합돌봄 자원검색(서술형)</title>
+<title>사례기반 자원검색(AI)</title>
 <style>{{style}}</style>
 <style>
 @media (min-width: 768px) {
@@ -737,8 +800,8 @@ DESC_HTML = """
 </head>
 <body>
 <div class="container">
-<a href="/home" class="home-btn">← 홈으로</a>
-<h2>통합돌봄 자원검색(서술형)</h2>
+<a href="/home" class="home-btn">홈으로</a>
+<h2>사례기반 자원검색(AI)</h2>
 
 <form method="post">
 <textarea id="queryBox" name="query" placeholder="예: 담양에 사는거동불편한 어르신이 이용가능한 서비스">{{query}}</textarea>
@@ -897,7 +960,7 @@ CARE_HTML = """
 </head>
 <body>
 <div class="container">
-<a href="/home" class="home-btn">← 홈으로</a>
+<a href="/home" class="home-btn">홈으로</a>
 <h2>통합돌봄 사전조사</h2>
 
 <form id="careForm">
