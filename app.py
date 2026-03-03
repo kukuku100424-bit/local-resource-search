@@ -81,11 +81,27 @@ button:hover{ opacity:0.95; }
   margin-top:28px;
 }
 .error{ color:red; margin-top:10px; }
+
+.login-title{
+  font-size:28px;
+  font-weight:700;
+  line-height:1.4;
+  margin-bottom:25px;
+}
+
+.login-title span{
+  font-size:20px;
+  font-weight:500;
+  color:#555;
+}
 </style>
 </head>
 <body>
 <div class="box">
-<h2>사용자 로그인</h2>
+<h1 class="login-title">
+  케어네비<br>
+  <span>사용자 로그인</span>
+</h1>
 <form method="post">
 <input type="password" name="password" placeholder="비밀번호 입력">
 <button type="submit">로그인</button>
@@ -223,6 +239,14 @@ HOME_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>지자체 서비스자원 검색 시스템</title>
 <style>{{style}}</style>
+<style>
+@media (min-width: 768px) {
+  #tel_link {
+    display: none !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="container">
@@ -360,6 +384,13 @@ COMBO_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>통합돌봄 자원검색(선택형)</title>
 <style>{{style}}</style>
+<style>
+@media (min-width: 768px) {
+  #tel_link {
+    display: none !important;
+  }
+}
+</style>
 </head>
 <body>
 <div class="container">
@@ -507,7 +538,8 @@ JSON 외 다른 텍스트를 출력하면 안 된다.
 {{
   "시군구": string|null,
   "대분류": "보건의료"|"생활지원"|"요양"|"주거지원"|null,
-  "건강상태": string|null
+  "건강상태": string|null,
+  "건강확장키워드": [string]
 }}
 
 [중요 규칙]
@@ -519,6 +551,12 @@ JSON 외 다른 텍스트를 출력하면 안 된다.
 5. "거동"과 "불편"이 함께 있으면 반드시 "거동불편"으로 출력하라.
 6. 건강 관련 단어가 있으면 반드시 건강상태에 반영하라.
 7. 대분류 단어(요양, 의료, 주거, 생활 등)가 있으면 반드시 대분류에 매칭하라.
+8. 건강상태가 추출되면 다음 원칙을 따르라:
+   - 사용자의 표현이 증상이나 상태일 경우, 가장 일반적인 의학적 질환명으로 변환하라.
+     예: 혈압이 높다 → 고혈압, 혈당이 높다 → 당뇨병
+   - 의미적으로 유사하거나 데이터베이스에서 함께 검색될 수 있는 키워드를
+     3~5개 배열로 반드시 생성하라.
+   - 건강상태가 null이면 건강확장키워드는 빈 배열로 출력하라.
 
 [시군구 변환 규칙]
 
@@ -592,7 +630,7 @@ JSON 외 다른 텍스트를 출력하면 안 된다.
 {query}
 """
 
-        data = {"시군구": None, "대분류": None, "건강상태": None}
+        data = {"시군구": None, "대분류": None, "건강상태": None, "건강확장키워드": []}
 
         try:
             res = client.chat.completions.create(
@@ -610,6 +648,7 @@ JSON 외 다른 텍스트를 출력하면 안 된다.
                 data["시군구"] = parsed.get("시군구")
                 data["대분류"] = parsed.get("대분류")
                 data["건강상태"] = parsed.get("건강상태")
+                data["건강확장키워드"] = parsed.get("건강확장키워드", [])
 
         except Exception as e:
             cond_display.append(f"GPT 오류: {e}")
@@ -641,11 +680,29 @@ JSON 외 다른 텍스트를 출력하면 안 된다.
                 filtered["대분류"].astype(str) == str(data["대분류"])
             ]
 
+        # 🔎 건강상태 + 확장키워드 검색
         if data.get("건강상태"):
-            filtered = filtered[
-                filtered["건강상태"].astype(str)
-                .str.contains(str(data["건강상태"]), na=False)
-            ]
+
+            keywords = []
+
+            if data["건강상태"]:
+                keywords.append(str(data["건강상태"]))
+
+            if data.get("건강확장키워드"):
+                keywords.extend(data["건강확장키워드"])
+
+            keywords = list(set(keywords))
+
+            condition = False
+
+            for kw in keywords:
+                condition = (
+                    filtered["건강상태"].astype(str).str.contains(kw, na=False)
+                    | filtered["기타"].astype(str).str.contains(kw, na=False)
+                    | condition
+                )
+
+            filtered = filtered[condition]
 
         # 🔎 그룹핑
         grouped = {}
@@ -680,6 +737,13 @@ DESC_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>통합돌봄 자원검색(서술형)</title>
 <style>{{style}}</style>
+<style>
+@media (min-width: 768px) {
+  #tel_link {
+    display: none !important;
+  }
+}
+</style>
 </head>
 <body>
 <div class="container">
