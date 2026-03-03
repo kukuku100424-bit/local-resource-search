@@ -407,7 +407,7 @@ COMBO_HTML = """
 
 <!-- 팝업 -->
 <div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
-  <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;">
+  <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
     <h3 id="m_title"></h3>
     <p><b>기관명:</b> <span id="m_org"></span></p>
     <p>
@@ -722,7 +722,7 @@ DESC_HTML = """
 
 <!-- 팝업 -->
 <div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
-  <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;">
+  <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
     <h3 id="m_title"></h3>
     <p><b>기관명:</b> <span id="m_org"></span></p>
     <p>
