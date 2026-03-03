@@ -136,6 +136,7 @@ button:hover{
 
   .logo-wrapper img{
     max-width:260px;
+    margin-bottom:40px;   /* ✅ 여기 추가 */
   }
 
   .box{
