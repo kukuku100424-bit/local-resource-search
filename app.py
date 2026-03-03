@@ -139,7 +139,7 @@ button:hover{
   }
 
   .box{
-    padding:25px 20px 30px 20px;
+    padding:40px 20px 30px 20px;
   }
 
 }
