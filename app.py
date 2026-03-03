@@ -68,7 +68,7 @@ body{
 
 .logo-wrapper img{
   width:100%;
-  max-width:380px;
+  max-width:440px;
   display:block;
   margin:0 auto;
 }
@@ -1088,4 +1088,5 @@ def care_check():
     return jsonify({"result":result,"score":score})
 
 if __name__ == "__main__":
+
     app.run(debug=True)
