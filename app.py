@@ -128,11 +128,11 @@ button:hover{
 }
 
 /* 🔥 모바일 전용 세밀 조정 */
-@media (max-width:480px){
-    .home-menu-btn .wrap{
-        padding-left: 20px;   /* 모바일용 */
-    }
- }
+@media (max-width: 480px){
+  .home-menu-btn .wrap{
+    padding-left: 100px !important;   /* 숫자만 바꿔가며 */
+  }
+}
   .main-title{
     font-size:22px;
   }
@@ -205,6 +205,14 @@ body{font-family:'Pretendard',sans-serif;margin:0;padding:20px;background:#f7f9f
 .container{max-width:600px;margin:auto;}
 
 h1,h2{ text-align:center; color:#2c3e50; }
+
+@media (max-width:480px){
+  h1{
+    white-space: nowrap;
+    font-size:20px;   /* 🔥 살짝 줄여서 안전하게 한 줄 유지 */
+  }
+}
+
 h3{ margin:18px 0 10px; color:#111827; }
 
 button{
