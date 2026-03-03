@@ -34,71 +34,66 @@ LOGIN_HTML = """
 <title>케어네비 로그인</title>
 
 <style>
+
+*{
+  box-sizing:border-box;
+}
+
 body{
   font-family:'Pretendard',sans-serif;
   background:#f2f4f7;
   display:flex;
   justify-content:center;
   align-items:center;
-  height:100vh;
+  min-height:100vh;
   margin:0;
+  padding:20px;
 }
 
+/* 카드 */
 .box{
   background:white;
-  width:520px;
-  padding:10px 40px 40px 40px;
-  border-radius:18px;
+  width:100%;
+  max-width:460px;
+  padding:30px 28px 35px 28px;
+  border-radius:20px;
   box-shadow:0 15px 40px rgba(0,0,0,0.08);
   text-align:center;
 }
 
-/* 🔥 로고 영역 */
+/* 로고 */
 .logo-wrapper{
-  margin-bottom:-25px;   /* 여백 줄임 */
-}
-
-.main-title{
-  font-size:28px;
-  font-weight:700;
-  margin-top:0px;       /* 🔥 위 여백 제거 */
+  margin-bottom:-10px;
 }
 
 .logo-wrapper img{
-  width:420px;   /* 🔥 대빵 크게 */
+  width:100%;
+  max-width:380px;
   display:block;
   margin:0 auto;
 }
 
-.box{
-  background:white;
-  width:420px;
-  padding:20px 40px;    /* 위아래 여백 줄임 */
-  border-radius:18px;
-}
-
 /* 타이틀 */
 .main-title{
-  font-size:28px;
+  font-size:26px;
   font-weight:700;
-  margin-top:-10px;
+  margin-top:5px;
 }
 
 .sub-title{
-  font-size:16px;
+  font-size:15px;
   color:#666;
-  margin-bottom:30px;
+  margin-bottom:25px;
 }
 
 /* 입력창 */
 input{
   width:100%;
   padding:14px;
-  border-radius:8px;
+  border-radius:10px;
   border:1px solid #ddd;
-  font-size:15px;
-  margin-bottom:18px;
-  box-sizing:border-box;
+  font-size:16px;
+  margin-bottom:16px;
 }
 
 /* 버튼 */
@@ -106,7 +101,7 @@ button{
   width:100%;
   padding:14px;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
   background:#1e73be;
   color:white;
   font-size:16px;
@@ -122,17 +117,34 @@ button:hover{
 .notice{
   font-size:12px;
   color:#888;
-  margin-top:25px;
+  margin-top:22px;
   line-height:1.5;
 }
 
-.bottom-logo{
-  margin-top:25px;
-  font-size:13px;
-  color:#555;
+.bottom-logo img{
+  width:100%;
+  max-width:220px;
+  margin-top:18px;
 }
-</style>
-</head>
+
+/* 🔥 모바일 전용 세밀 조정 */
+@media (max-width:480px){
+
+  .main-title{
+    font-size:22px;
+  }
+
+  .logo-wrapper img{
+    max-width:260px;
+  }
+
+  .box{
+    padding:25px 20px 30px 20px;
+  }
+
+}
+
+</style></head>
 
 <body>
 <div class="box">
