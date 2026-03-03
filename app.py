@@ -209,7 +209,7 @@ h1,h2{ text-align:center; color:#2c3e50; }
 @media (max-width:480px){
   h1{
     white-space: nowrap;
-    font-size:20px;   /* 🔥 살짝 줄여서 안전하게 한 줄 유지 */
+    font-size:24px;   /* 🔥 살짝 줄여서 안전하게 한 줄 유지 */
   }
 }
 
@@ -337,7 +337,7 @@ HOME_HTML = """
 /* 📱 모바일 보정 */
 @media (max-width:480px){
   .home-menu-btn .wrap{
-    padding-left: 30px;  /* 모바일은 덜 밀기 */
+    padding-left: 55px;  /* 모바일은 덜 밀기 */
   }
 }
 /* 번호/라벨 */
@@ -527,7 +527,7 @@ COMBO_HTML = """
 
 <label>대분류</label>
 <select name="main_category">
-  <option value="">무관</option>
+  <option value="">전체</option>
   {% for c in ["보건의료","생활지원","요양","주거지원"] %}
   <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
   {% endfor %}
@@ -535,7 +535,7 @@ COMBO_HTML = """
 
 <label>관리기관</label>
 <select name="manager">
-  <option value="">무관</option>
+  <option value="">전체</option>
   {% for m in ["국민건강보험공단","지자체"] %}
   <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
   {% endfor %}
