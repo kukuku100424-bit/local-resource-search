@@ -55,7 +55,7 @@ body{
   background:white;
   width:100%;
   max-width:460px;
-  padding:30px 28px 35px 28px;
+  padding:5px 40px 40px 40px;
   border-radius:20px;
   box-shadow:0 15px 40px rgba(0,0,0,0.08);
   text-align:center;
@@ -63,7 +63,7 @@ body{
 
 /* 로고 */
 .logo-wrapper{
-  margin-bottom:-10px;
+  margin-bottom:-60px;
 }
 
 .logo-wrapper img{
@@ -77,7 +77,7 @@ body{
 .main-title{
   font-size:26px;
   font-weight:700;
-  margin-top:5px;
+  margin-top:0px;
 }
 
 .sub-title{
@@ -139,7 +139,7 @@ button:hover{
   }
 
   .box{
-    padding:25px 20px 30px 20px;
+    padding:5px 20px 30px 20px;
   }
 
 }
@@ -1088,5 +1088,4 @@ def care_check():
     return jsonify({"result":result,"score":score})
 
 if __name__ == "__main__":
-
     app.run(debug=True)
