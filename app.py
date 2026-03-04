@@ -211,6 +211,11 @@ def login():
 BASE_STYLE = """
 *{box-sizing:border-box;}
 
+#r_text{
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
 body{
   font-family:'Pretendard',sans-serif;
   margin:0;
@@ -227,8 +232,8 @@ h1,h2{
   text-align:center;
   color:#2c3e50;
   margin-bottom:12px;
+  word-break:keep-all;
 }
-
 @media (max-width:480px){
   .half-menu-row{
     flex-direction:column;
@@ -238,6 +243,14 @@ h1,h2{
 
   .half-menu-row button{
     margin-top:0;   /* 버튼 기본 margin 제거 */
+  }
+}
+
+@media (max-width:480px){
+  h1{
+    font-size:22px;
+    line-height:1.3;
+    word-break:keep-all;
   }
 }
 
@@ -1298,7 +1311,7 @@ document.querySelectorAll('input[name="dementia"]').forEach(radio=>{
   radio.addEventListener("change",function(){
     if(this.value === "y"){
       document.getElementById("adlSection").style.opacity="0.4";
-      showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 <br class='pc-br'> 관계없이 <b>통합돌봄 대상</b>입니다.");
+      showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 관계없이 <b>통합돌봄 대상</b>입니다.");
     }else{
       document.getElementById("adlSection").style.opacity="1";
     }
