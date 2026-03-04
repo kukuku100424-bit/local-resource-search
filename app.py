@@ -407,20 +407,33 @@ HOME_HTML = """
 }
 
 /* ✅ 하단 2개 반쪽 버튼(좌/우) */
+/* 하단 반쪽 메뉴 */
 .half-menu-row{
   display:flex;
   gap:12px;
-  margin-top:12px;
+  margin-top:14px;
 }
 
 .half-menu-row a{
   flex:1;
 }
 
+/* 버튼 크기 맞추기 */
 .half-btn{
   width:100%;
-  height:52px;           /* 기존 느낌 유지 */
+  height:52px;
   justify-content:center;
+}
+
+/* 모바일에서는 세로로 쌓기 */
+@media (max-width:480px){
+  .half-menu-row{
+    flex-direction:column;
+  }
+}
+.half-btn img{
+  width:28px;
+  height:auto;
 }
 
 </style>
@@ -465,7 +478,7 @@ HOME_HTML = """
 
   <a href="/nhis25" style="text-decoration:none;display:block;">
     <button class="pdf-btn half-btn">
-      <img src="/static/pdf_icon.png" alt="PDF">
+      <img src="/static/nhis_heart.png" alt="건강보험">
       건강보험 25시
     </button>
   </a>
@@ -1179,9 +1192,18 @@ CARE_HTML = """
 <div id="resultModal"
      style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
             background:rgba(0,0,0,.5);z-index:999">
-  <div style="background:white;margin:6% auto;padding:28px;width:92%;max-width:460px;
-              border-radius:14px;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.15)">
-
+  <div style="background:white;
+            margin:0 auto;
+            position:absolute;
+            top:8%;
+            left:0;
+            right:0;
+            padding:28px;
+            width:92%;
+            max-width:460px;
+            border-radius:14px;
+            text-align:center;
+            box-shadow:0 10px 25px rgba(0,0,0,0.15)">
     <h3 id="modalTitle" style="margin-bottom:15px;">사전조사 결과 안내</h3>
 
     <div style="background:#f4f8ff;border-radius:10px;padding:14px;margin-bottom:18px">
