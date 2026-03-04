@@ -214,6 +214,7 @@ BASE_STYLE = """
 #r_text{
   word-break:keep-all;
   overflow-wrap:break-word;
+  white-space:normal;
 }
 
 body{
@@ -365,6 +366,16 @@ button{
 
 .choice-btn:hover{
   background:#f1f5f9;
+}
+
+@media (max-width:480px){
+
+  #r_text{
+    font-size:17px !important;
+    line-height:1.55 !important;
+    white-space:normal !important;
+  }
+
 }
 """
 # =========================
