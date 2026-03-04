@@ -25,6 +25,9 @@ def login_required():
 # =========================
 # 로그인 페이지
 # =========================
+# =========================
+# 로그인 페이지
+# =========================
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="ko">
@@ -34,10 +37,7 @@ LOGIN_HTML = """
 <title>케어네비 로그인</title>
 
 <style>
-
-*{
-  box-sizing:border-box;
-}
+*{ box-sizing:border-box; }
 
 body{
   font-family:'Pretendard',sans-serif;
@@ -63,7 +63,7 @@ body{
 
 /* 로고 */
 .logo-wrapper{
-  margin-bottom:-60px;
+  margin-bottom:-40px; /* 너무 겹치면 -20~0 으로 */
 }
 
 .logo-wrapper img{
@@ -79,11 +79,22 @@ body{
   font-weight:700;
   margin-top:0px;
 }
-
 .sub-title{
   font-size:15px;
   color:#666;
-  margin-bottom:25px;
+  margin-bottom:18px;
+}
+
+/* 에러 메시지 */
+.error-msg{
+  background:#fff1f2;
+  color:#b91c1c;
+  border:1px solid #fecdd3;
+  padding:10px 12px;
+  border-radius:10px;
+  font-size:14px;
+  margin:10px 0 14px 0;
+  text-align:left;
 }
 
 /* 입력창 */
@@ -96,7 +107,6 @@ input{
   margin-bottom:16px;
 }
 
-/* 버튼 */
 button{
   width:100%;
   padding:14px;
@@ -109,10 +119,7 @@ button{
   cursor:pointer;
   transition:0.2s;
 }
-
-button:hover{
-  background:#155fa0;
-}
+button:hover{ background:#155fa0; }
 
 .notice{
   font-size:12px;
@@ -127,34 +134,39 @@ button:hover{
   margin-top:18px;
 }
 
-/* 🔥 모바일 전용 세밀 조정 */
+/* 모바일 */
 @media (max-width: 480px){
+  .main-title{ font-size:22px; }
 
-  .main-title{
-    font-size:22px;
+  .logo-wrapper{
+    margin-bottom:-20px;
   }
 
   .logo-wrapper img{
     max-width:260px;
-    margin-bottom:40px;
+    margin-bottom:26px;
   }
 
   .box{
-    padding:40px 20px 30px 20px;
+    padding:34px 20px 28px 20px;
   }
-
 }
-</style></head>
+</style>
+</head>
 
 <body>
 <div class="box">
 
   <div class="logo-wrapper">
-    <img src="/static/compass_logo.png">
+    <img src="/static/compass_logo.png" alt="케어네비 로고">
   </div>
 
   <div class="main-title">케어네비</div>
   <div class="sub-title">사용자 로그인</div>
+
+  {% if error %}
+    <div class="error-msg">❌ {{error}}</div>
+  {% endif %}
 
   <form method="post">
     <input type="password" name="password" placeholder="비밀번호 입력">
@@ -167,20 +179,14 @@ button:hover{
   </div>
 
   <div class="bottom-logo">
-    <img src="/static/ci.png" style="width:260px;margin-top:15px;">
+    <img src="/static/ci.png" style="width:260px;margin-top:15px;" alt="CI">
   </div>
 
 </div>
-
-{% if error %}
-<script>
-alert("비밀번호가 올바르지 않습니다.");
-</script>
-{% endif %}
-
 </body>
 </html>
 """
+
 # =========================
 # 로그인 라우트
 # =========================
@@ -188,16 +194,16 @@ alert("비밀번호가 올바르지 않습니다.");
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        pw = request.form.get("password")
+        pw = request.form.get("password", "")
 
         if pw == "admin":  # 원하는 비밀번호
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
-            return render_template_string(LOGIN_HTML, error=True)
+            # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
+            return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
 
-    return render_template_string(LOGIN_HTML, error=False)
-
+    return render_template_string(LOGIN_HTML, error="")
 
 # =========================
 # 공통 CSS
