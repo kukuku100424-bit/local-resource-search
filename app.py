@@ -1029,6 +1029,18 @@ CARE_HTML = """
 <style>
 /* ====== 사전조사 전용 스타일 ====== */
 
+/* PC에서만 줄바꿈 */
+.pc-br{
+  display:inline;
+}
+
+/* 모바일에서는 줄바꿈 제거 */
+@media (max-width:480px){
+  .pc-br{
+    display:none;
+  }
+}
+
 .options{
   margin-top:12px;
   display:flex;
@@ -1213,7 +1225,7 @@ document.querySelectorAll('input[name="dementia"]').forEach(radio=>{
   radio.addEventListener("change",function(){
     if(this.value === "y"){
       document.getElementById("adlSection").style.opacity="0.4";
-      showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 <br> 관계없이 <b>통합돌봄 대상</b>입니다.");
+      showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 <br class='pc-br'> 관계없이 통합돌봄 대상입니다.");
     }else{
       document.getElementById("adlSection").style.opacity="1";
     }
