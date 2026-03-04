@@ -1143,6 +1143,18 @@ CARE_HTML = """
 @media (max-width:480px){
   .dementia-options{ gap:18px; }
 }
+@media (max-width:480px){
+
+  #resultModal{
+    padding-top:0 !important;
+  }
+
+  #resultModal > div{
+    top:2% !important;
+  }
+
+}
+
 </style>
 </head>
 
@@ -1208,16 +1220,16 @@ CARE_HTML = """
   <div style="background:white;
             margin:0 auto;
             position:absolute;
-            top:2%;
+            top:8%;
             left:0;
             right:0;
-            padding:28px;
+            padding:18px 22px 22px 22px;
             width:92%;
             max-width:460px;
             border-radius:14px;
             text-align:center;
             box-shadow:0 10px 25px rgba(0,0,0,0.15)">
-    <h3 id="modalTitle" style="margin-bottom:15px;">사전조사 결과 안내</h3>
+    <h3 id="modalTitle" style="margin-top:0;margin-bottom:12px;">사전조사 결과 안내</h3>
 
     <div style="background:#f4f8ff;border-radius:10px;padding:14px;margin-bottom:18px">
       <p id="r_text" style="font-size:18px;line-height:1.6;margin:0"></p>
