@@ -129,17 +129,14 @@ button:hover{
 
 /* 🔥 모바일 전용 세밀 조정 */
 @media (max-width: 480px){
-  .home-menu-btn .wrap{
-    padding-left: 100px !important;   /* 숫자만 바꿔가며 */
-  }
-}
+
   .main-title{
     font-size:22px;
   }
 
   .logo-wrapper img{
     max-width:260px;
-    margin-bottom:40px;   /* ✅ 여기 추가 */
+    margin-bottom:40px;
   }
 
   .box{
@@ -147,7 +144,6 @@ button:hover{
   }
 
 }
-
 </style></head>
 
 <body>
@@ -175,6 +171,13 @@ button:hover{
   </div>
 
 </div>
+
+{% if error %}
+<script>
+alert("비밀번호가 올바르지 않습니다.");
+</script>
+{% endif %}
+
 </body>
 </html>
 """
@@ -191,9 +194,9 @@ def login():
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
-            return render_template_string(LOGIN_HTML + "<script>alert('비밀번호 오류');</script>")
+            return render_template_string(LOGIN_HTML, error=True)
 
-    return render_template_string(LOGIN_HTML)
+    return render_template_string(LOGIN_HTML, error=False)
 
 
 # =========================
@@ -201,39 +204,77 @@ def login():
 # =========================
 BASE_STYLE = """
 *{box-sizing:border-box;}
-body{font-family:'Pretendard',sans-serif;margin:0;padding:20px;background:#f7f9fc;}
-.container{max-width:600px;margin:auto;}
 
-h1,h2{ text-align:center; color:#2c3e50; }
+body{
+  font-family:'Pretendard',sans-serif;
+  margin:0;
+  padding:16px;
+  background:#f7f9fc;
+}
+
+.container{
+  max-width:600px;
+  margin:auto;
+}
+
+h1,h2{
+  text-align:center;
+  color:#2c3e50;
+  margin-bottom:18px;
+}
 
 @media (max-width:480px){
   h1{
-    white-space: nowrap;
-    font-size:24px;   /* 🔥 살짝 줄여서 안전하게 한 줄 유지 */
+    white-space:nowrap;
+    font-size:24px;
   }
 }
 
-h3{ margin:18px 0 10px; color:#111827; }
+h3{
+  margin:16px 0 8px;
+  color:#111827;
+}
+
+label{
+  display:block;
+  margin-top:12px;
+  font-weight:600;
+}
+
+input[type=text],
+input[type=password],
+textarea,
+select{
+  width:100%;
+  padding:9px 12px;
+  font-size:15px;
+  border-radius:8px;
+  border:1px solid #ccc;
+  margin-top:3px;
+}
 
 button{
   width:100%;
-  height:52px;
+  height:50px;
   border:none;
   border-radius:8px;
-  font-size:18px;
+  font-size:17px;
   cursor:pointer;
-  margin-top:15px;
+  margin-top:10px;
 }
 
 .menu-btn{
   background:#0078d7;
   color:white;
 }
-.menu-btn:hover{opacity:0.95;}
+
+.menu-btn:hover{
+  opacity:0.95;
+}
 
 .pdf-btn{
   width:100%;
-  height:52px;
+  height:50px;
   background:#ffffff;
   color:#2c3e50;
   border:1px solid #ccc;
@@ -244,16 +285,14 @@ button{
   border-radius:8px;
   cursor:pointer;
 }
-.pdf-btn:hover{background:#f1f5f9;}
-.pdf-btn img{width:36px; height:auto;}
 
-input,select,textarea{
-  width:100%;
-  padding:12px;
-  font-size:16px;
-  border-radius:8px;
-  border:1px solid #ccc;
-  margin-top:5px;
+.pdf-btn:hover{
+  background:#f1f5f9;
+}
+
+.pdf-btn img{
+  width:32px;
+  height:auto;
 }
 
 .home-btn{
@@ -262,36 +301,48 @@ input,select,textarea{
   color:white;
   padding:10px 16px;
   border-radius:6px;
-  margin-bottom:20px;
+  margin-bottom:16px;
   text-decoration:none;
 }
 
 .result{
-  margin-top:30px;
+  margin-top:20px;
   background:white;
-  padding:20px;
+  padding:18px;
   border-radius:8px;
   box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
 
-.item{cursor:pointer;color:#0078d7;margin-top:6px;margin-left:10px;}
-.small{font-size:13px;color:#6b7280;margin-top:6px;}
+.item{
+  cursor:pointer;
+  color:#0078d7;
+  margin-top:6px;
+  margin-left:8px;
+}
+
+.small{
+  font-size:13px;
+  color:#6b7280;
+  margin-top:4px;
+}
 
 .choice-btn{
   width:100%;
-  margin-top:10px;
-  height:48px;
+  margin-top:8px;
+  height:46px;
   padding:0 12px;
   border-radius:10px;
   border:1px solid #cfd8e3;
   background:#ffffff;
   cursor:pointer;
-  font-size:16px;
+  font-size:15px;
   color:#111827;
 }
-.choice-btn:hover{ background:#f1f5f9; }
-"""
 
+.choice-btn:hover{
+  background:#f1f5f9;
+}
+"""
 # =========================
 # 엑셀 로드 + 컬럼 공백 제거
 # =========================
@@ -522,7 +573,8 @@ COMBO_HTML = """
 
 <form method="post">
 <label>지역(시군구)</label>
-<input name="region" value="{{region}}" placeholder="예) 나주시">
+<input type="text" name="region" value="{{region}}" placeholder="예) 나주시">
+
 <div class="small">※ 예: '나주' 입력 시 자동으로 '나주시'로 검색됩니다.</div>
 
 <label>대분류</label>
@@ -542,8 +594,7 @@ COMBO_HTML = """
 </select>
 
 <label>건강상태</label>
-<input name="health_kw" value="{{health_kw}}" placeholder="예) 고혈압">
-
+<input type="text" name="health_kw" value="{{health_kw}}" placeholder="예) 고혈압">
 <button type="submit" class="menu-btn">검색하기</button>
 </form>
 
@@ -622,6 +673,8 @@ function openDetail(idx){
 function closeModal(){
   document.getElementById("modal").style.display="none";
 }
+
+
 </script>
 </body>
 </html>
@@ -957,6 +1010,7 @@ CARE_QUESTIONS = [
     "화장실에서 변기에 앉아 용변을 볼 수 있습니까?"
 ]
 
+
 CARE_HTML = """
 <!DOCTYPE html>
 <html lang="ko">
@@ -965,81 +1019,239 @@ CARE_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>통합돌봄 사전조사</title>
 <style>{{style}}</style>
+
+<style>
+/* ====== 사전조사 전용 스타일 ====== */
+
+.options{
+  margin-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.options label{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+}
+
+.options input[type=radio]{
+  width:auto !important;
+  flex:0 0 auto;
+  transform:scale(1.1);
+}
+
+.question-box{
+  background:#f5faff;              /* ✅ 기본 파란톤 배경 복구 */
+  padding:22px;
+  border-radius:12px;
+  margin-top:18px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.08);
+  border:1px solid #dbeafe;
+}
+
+.question-box.active{
+  border:2px solid #1e73be;
+  background:#eaf4ff;
+}
+
+.dementia-box{
+  background:#fff7ed;
+  padding:18px;
+  border-radius:10px;
+  margin-top:15px;
+  border:1px solid #fed7aa;
+}
+
+.dementia-options{
+  display:flex;
+  gap:30px;
+  margin-top:10px;
+}
+
+/* 모바일에서 치매 선택 박스가 답답하면 줄바꿈 */
+@media (max-width:480px){
+  .dementia-options{ gap:18px; }
+}
+</style>
 </head>
+
 <body>
 <div class="container">
-<a href="/home" class="home-btn">홈으로</a>
-<h2>통합돌봄 사전조사</h2>
 
-<form id="careForm">
-<label>치매 관련 약 복용 여부</label>
-<select name="dementia" required>
-  <option value="">선택</option>
-  <option value="y">예</option>
-  <option value="n">아니오</option>
-</select>
+  <a href="/home" class="home-btn">홈으로</a>
+  <h2>통합돌봄 사전조사</h2>
 
-<hr>
+  <form id="careForm">
+    <div class="dementia-box">
+      <b>치매 관련 약 복용 여부</b>
 
-{% for i,q in questions %}
-<label>{{i+1}}. {{q}}</label>
-<select name="q{{i}}" required>
-  <option value="">선택</option>
-  <option value="0">도움 없이 가능</option>
-  <option value="1">보조도구/준비 필요</option>
-  <option value="2">타인 도움 필요</option>
-</select>
-{% endfor %}
+      <div class="dementia-options">
+        <label>
+          <input type="radio" name="dementia" value="y">
+          예
+        </label>
 
-<button type="submit" class="menu-btn">검사하기</button>
-</form>
-</div>
-
-<!-- 결과 팝업 -->
-<div id="resultModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5)">
-  <div style="background:white;margin:10% auto;padding:25px;width:90%;max-width:420px;border-radius:12px;text-align:center">
-    <h3>사전조사 결과</h3>
-    <p id="r_text" style="font-size:20px;font-weight:bold"></p>
-    <p id="r_score"></p>
-
-    <div style="margin-top:18px;text-align:left;">
-      <b>빠른 검색</b>
-      <div class="small" style="margin-top:6px;">※ 아래 버튼을 눌러 바로 검색할 수 있습니다.</div>
-
-      <button class="choice-btn" onclick="goToDementia(event)">건강상태 '치매' 검색</button>
-      <button class="choice-btn" onclick="goToMedical(event)">대분류 '보건의료' 검색</button>
+        <label>
+          <input type="radio" name="dementia" value="n">
+          아니오
+        </label>
+      </div>
     </div>
 
-    <button style="margin-top:15px;" onclick="closeModal()" class="menu-btn">닫기</button>
+    <div id="adlSection">
+      {% for i,q in questions %}
+      <div class="question-box">
+        <b>{{i+1}}) {{q}}</b>
+
+        <div class="options">
+          <label>
+            <input type="radio" name="q{{i}}" value="0">
+            도움 없이 혼자서 수행 가능 (0점)
+          </label>
+
+          <label>
+            <input type="radio" name="q{{i}}" value="1">
+            보조도구(지팡이 등)를 잡고 수행 가능 (1점)
+          </label>
+
+          <label>
+            <input type="radio" name="q{{i}}" value="2">
+            타인이 도와줘야 수행 가능 (2점)
+          </label>
+        </div>
+      </div>
+      {% endfor %}
+
+      <button type="submit" class="menu-btn">검사하기</button>
+    </div>
+  </form>
+
+</div>
+
+<!-- 결과/안내 팝업 -->
+<div id="resultModal"
+     style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+            background:rgba(0,0,0,.5);z-index:999">
+  <div style="background:white;margin:12% auto;padding:28px;width:92%;max-width:460px;
+              border-radius:14px;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.15)">
+
+    <h3 id="modalTitle" style="margin-bottom:15px;">사전조사 결과 안내</h3>
+
+    <div style="background:#f4f8ff;border-radius:10px;padding:14px;margin-bottom:18px">
+      <p id="r_text" style="font-size:18px;line-height:1.6;margin:0"></p>
+    </div>
+
+    <div style="text-align:left;font-size:14px;line-height:1.6;color:#444;
+                background:#fafafa;padding:14px;border-radius:8px">
+      <b>통합돌봄 지원 기준</b><br><br>
+
+      ① 치매약 복약 중인 경우<br>
+      → 일상생활 수행능력과 관계없이 통합돌봄 지원 대상<br><br>
+
+      ② 일상생활수행능력(ADL) 점수 기준<br>
+      • 0~1점 : 지자체 사업 안내 후 종결<br>
+      • 2~3점 : 지자체 자체조사 후 지원 검토<br>
+      • 4점 이상 : 통합판정조사 대상<br><br>
+
+      <span style="font-size:12px;color:#666;">
+        ※ 본 결과는 통합돌봄 서비스 안내를 위한 참고용 사전조사입니다.<br>
+        최종 지원 여부는 지자체 및 공단의 추가 조사 후 결정됩니다.
+      </span>
+    </div>
+
+    <button onclick="closeModal()" class="menu-btn" style="margin-top:22px">확인</button>
   </div>
 </div>
 
 <script>
+/* ====== 공통 팝업 열기 ====== */
+function showGuide(messageHtml){
+  document.getElementById("modalTitle").innerText = "안내";
+  document.getElementById("r_text").innerHTML = messageHtml;
+  document.getElementById("resultModal").style.display = "block";
+}
+
+function showResult(title, messageText){
+  document.getElementById("modalTitle").innerText = title;
+  document.getElementById("r_text").innerText = messageText;
+  document.getElementById("resultModal").style.display = "block";
+}
+
 function closeModal(){
   document.getElementById("resultModal").style.display="none";
 }
-function goToDementia(e){
-  e.preventDefault();
-  window.location.href = "/combo?health_kw=치매";
-}
-function goToMedical(e){
-  e.preventDefault();
-  window.location.href = "/combo?main_category=보건의료";
-}
 
+/* ====== 1) 치매 선택 안 했는데 ADL 누르면 '차단' ====== */
+document.querySelectorAll('#adlSection .options input[type="radio"]').forEach(radio => {
+  radio.addEventListener("change", function(){
+    const dementia = document.querySelector('input[name="dementia"]:checked');
+
+    if(!dementia){
+      // ✅ ADL 선택 자체를 취소하고 안내
+      this.checked = false;
+      showGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를<br> 선택해주세요.");
+      return;
+    }
+
+    // 치매 선택이 되어 있으면 카드 강조
+    const box = this.closest(".question-box");
+    if(box) box.classList.add("active");
+  });
+});
+
+/* ====== 2) 치매 '예'면 즉시 안내 팝업 + ADL 흐리게 ====== */
+document.querySelectorAll('input[name="dementia"]').forEach(radio=>{
+  radio.addEventListener("change",function(){
+    if(this.value === "y"){
+      document.getElementById("adlSection").style.opacity="0.4";
+      showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 <br> 관계없이 <b>통합돌봄 대상</b>입니다.");
+    }else{
+      document.getElementById("adlSection").style.opacity="1";
+    }
+  });
+});
+
+/* ====== 3) 검사하기 클릭 시: 치매 미선택이면 막기 ====== */
 document.getElementById("careForm").onsubmit = async function(e){
   e.preventDefault();
+
+  const dementia = document.querySelector('input[name="dementia"]:checked');
+
+  if(!dementia){
+    showGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를 선택해주세요.");
+    return;
+  }
+
+  // 치매 '예'는 이미 팝업으로 안내했으니 여기선 종료
+  if(dementia.value === "y"){
+    return;
+  }
+
+  // ✅ 치매 '아니오'면 ADL 응답이 7개 다 되었는지 체크
+  for(let i=0; i<7; i++){
+    const checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(!checked){
+      showGuide((i+1) + "번 문항을 선택해주세요.");
+      return;
+    }
+  }
+
   const formData = new FormData(this);
 
-  const res = await fetch("/care_check", { method:"POST", body:formData });
+  const res = await fetch("/care_check",{
+    method:"POST",
+    body:formData
+  });
+
   const data = await res.json();
 
-  document.getElementById("r_text").innerText = data.result;
-  document.getElementById("r_score").innerText = "총점: " + data.score;
-
-  document.getElementById("resultModal").style.display="block";
+  showResult("사전조사 결과 안내", data.result + "\\n총점: " + data.score);
 }
 </script>
+
 </body>
 </html>
 """
