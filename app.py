@@ -230,9 +230,14 @@ h1,h2{
 }
 
 @media (max-width:480px){
-  h1{
-    white-space:nowrap;
-    font-size:24px;
+  .half-menu-row{
+    flex-direction:column;
+    gap:6px;        /* 간격 줄이기 */
+    margin-top:10px;
+  }
+
+  .half-menu-row button{
+    margin-top:0;   /* 버튼 기본 margin 제거 */
   }
 }
 
@@ -1203,7 +1208,7 @@ CARE_HTML = """
   <div style="background:white;
             margin:0 auto;
             position:absolute;
-            top:8%;
+            top:2%;
             left:0;
             right:0;
             padding:28px;
@@ -1397,6 +1402,3 @@ def nhis25():
         return check
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
