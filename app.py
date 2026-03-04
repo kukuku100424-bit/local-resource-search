@@ -226,7 +226,7 @@ body{
 h1,h2{
   text-align:center;
   color:#2c3e50;
-  margin-bottom:18px;
+  margin-bottom:12px;
 }
 
 @media (max-width:480px){
@@ -266,7 +266,7 @@ button{
   border-radius:8px;
   font-size:17px;
   cursor:pointer;
-  margin-top:10px;
+  margin-top:9px;
 }
 
 .menu-btn{
@@ -307,7 +307,7 @@ button{
   color:white;
   padding:10px 16px;
   border-radius:6px;
-  margin-bottom:16px;
+  margin-bottom:14px;
   text-decoration:none;
 }
 
@@ -414,7 +414,13 @@ HOME_HTML = """
   margin-top:14px;
 }
 
-.half-menu-row a{
+/* 모바일 간격 조정 */
+@media (max-width:480px){
+  .half-menu-row{
+    flex-direction:column;
+    gap:10px;   /* ← 이게 핵심 */
+  }
+}.half-menu-row a{
   flex:1;
 }
 
