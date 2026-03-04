@@ -144,7 +144,7 @@ button:hover{ background:#155fa0; }
 
   .logo-wrapper img{
     max-width:260px;
-    margin-bottom:26px;
+    margin-bottom:10px;
   }
 
   .box{
@@ -665,7 +665,7 @@ COMBO_HTML = """
 
 <!-- 팝업 -->
 <div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
-  <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="background:white;margin:0% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
     <h3 id="m_title"></h3>
     <p><b>기관명:</b> <span id="m_org"></span></p>
     <p>
@@ -1190,8 +1190,10 @@ CARE_HTML = """
 
 <!-- 결과/안내 팝업 -->
 <div id="resultModal"
-     style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
-            background:rgba(0,0,0,.5);z-index:999">
+     style="display:none;position:fixed;inset:0;
+            background:rgba(0,0,0,.5);z-index:999;
+            padding-top:6vh; overflow:auto; -webkit-overflow-scrolling:touch;">
+
   <div style="background:white;
             margin:0 auto;
             position:absolute;
