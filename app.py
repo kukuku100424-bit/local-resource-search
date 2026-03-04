@@ -405,6 +405,24 @@ HOME_HTML = """
   justify-self:start;
   white-space:nowrap;
 }
+
+/* ✅ 하단 2개 반쪽 버튼(좌/우) */
+.half-menu-row{
+  display:flex;
+  gap:12px;
+  margin-top:12px;
+}
+
+.half-menu-row a{
+  flex:1;
+}
+
+.half-btn{
+  width:100%;
+  height:52px;           /* 기존 느낌 유지 */
+  justify-content:center;
+}
+
 </style>
 </head>
 <body>
@@ -437,13 +455,21 @@ HOME_HTML = """
     </span>
   </button>
 </a>
-<a href="/guide" target="_blank" style="text-decoration:none;display:block;">
-  <button class="pdf-btn">
-    <img src="/static/pdf_icon.png" alt="PDF">
-    사업안내 보기
-  </button>
-</a>
+<div class="half-menu-row">
+  <a href="/guide" target="_blank" style="text-decoration:none;display:block;">
+    <button class="pdf-btn half-btn">
+      <img src="/static/pdf_icon.png" alt="PDF">
+      통합돌봄 사업안내
+    </button>
+  </a>
 
+  <a href="/nhis25" style="text-decoration:none;display:block;">
+    <button class="pdf-btn half-btn">
+      <img src="/static/pdf_icon.png" alt="PDF">
+      건강보험 25시
+    </button>
+  </a>
+</div>
 <img src="/static/bottom.png" style="width:100%;margin-top:-20px;">
 </div>
 </body>
@@ -1153,7 +1179,7 @@ CARE_HTML = """
 <div id="resultModal"
      style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
             background:rgba(0,0,0,.5);z-index:999">
-  <div style="background:white;margin:12% auto;padding:28px;width:92%;max-width:460px;
+  <div style="background:white;margin:6% auto;padding:28px;width:92%;max-width:460px;
               border-radius:14px;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.15)">
 
     <h3 id="modalTitle" style="margin-bottom:15px;">사전조사 결과 안내</h3>
@@ -1311,6 +1337,35 @@ def care_check():
         result = "통합판정조사 대상"
 
     return jsonify({"result":result,"score":score})
+
+NHIS25_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>건강보험 25시</title>
+<style>{{style}}</style>
+</head>
+<body>
+<div class="container">
+  <a href="/home" class="home-btn">홈으로</a>
+  <h2>건강보험 25시</h2>
+
+  <div class="result" style="text-align:center;font-size:18px;">
+    준비 중입니다.
+  </div>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/nhis25")
+def nhis25():
+    check = login_required()
+    if check:
+        return check
+    return render_template_string(NHIS25_HTML, style=BASE_STYLE)
 
 if __name__ == "__main__":
     app.run(debug=True)
