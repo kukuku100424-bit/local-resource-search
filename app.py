@@ -1,2105 +1,1440 @@
-from flask import Flask, request, jsonify, render_template_string, Response, send_file
+from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session
 import pandas as pd
 import os
 import re
-import time
-import threading
-import webbrowser
-from urllib.parse import quote
+import json
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from openai import OpenAI
 
 app = Flask(__name__)
+app.secret_key = "super_secret_key"
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FILE_PATH = os.path.join(BASE_DIR, "mapdata_geocoded.xlsx")
-DATA_CACHE = None
+FILE_PATH = "service_resources.xlsx"
 
-TYPE_COLORS = {
-    "교통사고다발구역": "#ef4444",
-    "상습결빙구역": "#06b6d4",
-    "상습결빙지역": "#06b6d4",
-    "상습침수구역": "#2563eb",
-    "화재다빈도발생구역": "#f97316",
-    "우범지역": "#7c3aed",
-}
+# =========================
+# 로그인 체크
+# =========================
+def login_required():
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+    return None
 
-TYPE_ORDER = [
-    "교통사고다발구역",
-    "상습결빙구역",
-    "상습침수구역",
-    "화재다빈도발생구역",
-    "우범지역",
-]
-
-DEFAULT_CENTER = [34.85, 126.90]
-DEFAULT_ZOOM = 9
-
-last_heartbeat = time.time()
-shutdown_started = False
-
-
-def safe_str(v):
-    if pd.isna(v):
-        return ""
-    return str(v).strip()
-
-
-def extract_town_from_address(address):
-    addr = safe_str(address)
-    if not addr:
-        return "읍면동없음"
-
-    # 읍/면/동/가/리 추출
-    found = re.findall(r'([가-힣0-9]+(?:읍|면|동|가|리))', addr)
-    if found:
-        for token in reversed(found):
-            if token.endswith(("읍", "면", "동", "가", "리")):
-                return token
-
-    return "읍면동없음"
-
-
-def sample_desc(category, city, town, address):
-    if category == "교통사고다발구역":
-        return f"{city} {town} 일대 교차로·차량 진출입이 잦아 사고 위험이 높은 지역으로 가정한 샘플 설명입니다."
-    if category in ["상습결빙구역", "상습결빙지역"]:
-        return f"{city} {town} 일대는 겨울철 노면 결빙 우려가 높은 구간으로 가정한 샘플 설명입니다."
-    if category == "상습침수구역":
-        return f"{city} {town} 일대는 집중호우 시 배수 지연 및 도로 침수가 반복될 수 있는 구간으로 가정한 샘플 설명입니다."
-    if category == "화재다빈도발생구역":
-        return f"{city} {town} 일대는 화재 발생 빈도가 상대적으로 높다고 가정한 샘플 설명입니다."
-    if category == "우범지역":
-        return f"{city} {town} 일대는 야간 보행 시 주의가 필요한 구역으로 가정한 샘플 설명입니다."
-    return f"{city} {town} 위험지역 샘플 설명입니다. 주소: {address}"
-
-
-def sample_date(category):
-    m = {
-        "교통사고다발구역": "2025-11-12",
-        "상습결빙구역": "2025-12-28",
-        "상습결빙지역": "2025-12-28",
-        "상습침수구역": "2025-07-18",
-        "화재다빈도발생구역": "2025-10-03",
-        "우범지역": "2025-09-21",
-    }
-    return m.get(category, "2025-01-01")
-
-
-def build_photo_url(row):
-    raw = safe_str(row.get("사진URL", ""))
-    if raw:
-        return raw
-
-    category = quote(safe_str(row.get("구분", "")))
-    city = quote(safe_str(row.get("시군구", "")))
-    town = quote(safe_str(row.get("읍면동", "")))
-    return f"/sample-image?category={category}&city={city}&town={town}"
-
-
-def load_df():
-
-    global DATA_CACHE
-
-    if DATA_CACHE is not None:
-        return DATA_CACHE
-
-    if not os.path.exists(FILE_PATH):
-        raise FileNotFoundError(f"{FILE_PATH} 파일이 없습니다.")
-
-    df = pd.read_excel(FILE_PATH)
-
-    required = ["순번", "구분", "시군구", "주소", "위도", "경도"]
-    for col in required:
-        if col not in df.columns:
-            raise ValueError(f"엑셀에 '{col}' 열이 없습니다.")
-
-    if "읍면동" not in df.columns:
-        df["읍면동"] = df["주소"].apply(extract_town_from_address)
-
-    if "사고설명" not in df.columns:
-        df["사고설명"] = ""
-
-    if "날짜" not in df.columns:
-        df["날짜"] = ""
-
-    if "사진URL" not in df.columns:
-        df["사진URL"] = ""
-
-    for col in ["구분", "시군구", "주소", "읍면동", "사고설명", "날짜", "사진URL"]:
-        df[col] = df[col].apply(safe_str)
-
-    df["위도"] = pd.to_numeric(df["위도"], errors="coerce")
-    df["경도"] = pd.to_numeric(df["경도"], errors="coerce")
-
-    # 좌표 없는 건 자동 제외
-    df = df[df["위도"].notna() & df["경도"].notna()].copy()
-
-    DATA_CACHE = df
-    return DATA_CACHE
-
-
-def row_to_dict(row):
-    category = safe_str(row["구분"])
-    city = safe_str(row["시군구"])
-    town = safe_str(row["읍면동"])
-    address = safe_str(row["주소"])
-
-    desc = safe_str(row.get("사고설명", ""))
-    if not desc:
-        desc = sample_desc(category, city, town, address)
-
-    date_value = safe_str(row.get("날짜", ""))
-    if not date_value:
-        date_value = sample_date(category)
-
-    return {
-        "순번": safe_str(row["순번"]),
-        "구분": category,
-        "시군구": city,
-        "읍면동": town,
-        "주소": address,
-        "위도": float(row["위도"]),
-        "경도": float(row["경도"]),
-        "사고설명": desc,
-        "날짜": date_value,
-        "사진URL": build_photo_url(row),
-        "마커색상": TYPE_COLORS.get(category, "#334155"),
-    }
-
-
-HTML = r"""
+# =========================
+# 로그인 페이지
+# =========================
+# =========================
+# 로그인 페이지
+# =========================
+LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>위험지역 찾기</title>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<title>케어네비 로그인</title>
 
 <style>
-*{box-sizing:border-box}
-html,body{
-  margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
-  font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
-  background:#f8fafc;
-  color:#0f172a;
-}
-.page{
+*{ box-sizing:border-box; }
+
+body{
+  font-family:'Pretendard',sans-serif;
+  background:#f2f4f7;
   display:flex;
-  width:100%;
-  height:100vh;
-  overflow:hidden;
-}
-.sidebar{
-  width:360px;
-  min-width:360px;
-  background:#fff;
-  border-right:1px solid #e5e7eb;
-  padding:18px 16px;
-  overflow-y:auto;
-}
-.brand{
-  display:flex;
+  justify-content:center;
   align-items:center;
-  gap:14px;
+  min-height:100vh;
+  margin:0;
+  padding:20px;
+}
+
+/* 카드 */
+.box{
+  background:white;
+  width:100%;
+  max-width:460px;
+  padding:30px 40px 40px 40px;
+  border-radius:20px;
+  box-shadow:0 15px 40px rgba(0,0,0,0.08);
+  text-align:center;
+}
+
+/* 로고 */
+.logo-wrapper{
+  margin-bottom:-40px; /* 너무 겹치면 -20~0 으로 */
+}
+
+.logo-wrapper img{
+  width:100%;
+  max-width:440px;
+  display:block;
+  margin:0 auto;
+}
+
+/* 타이틀 */
+.main-title{
+  font-size:26px;
+  font-weight:700;
+  margin-top:0px;
+}
+.sub-title{
+  font-size:15px;
+  color:#666;
   margin-bottom:18px;
 }
 
-.brand-left{
-  display:flex;
-  flex-direction:column;
+/* 에러 메시지 */
+.error-msg{
+  background:#fff1f2;
+  color:#b91c1c;
+  border:1px solid #fecdd3;
+  padding:10px 12px;
+  border-radius:10px;
+  font-size:14px;
+  margin:10px 0 14px 0;
+  text-align:left;
 }
 
-.brand-title{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:10px;
+/* 입력창 */
+input{
+  width:100%;
+  padding:14px;
+  border-radius:10px;
+  border:1px solid #ddd;
+  font-size:16px;
+  margin-bottom:16px;
+}
 
-  font-size:22px;
-  font-weight:900;
+button{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:10px;
+  background:#1e73be;
+  color:white;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+  transition:0.2s;
+}
+button:hover{ background:#155fa0; }
+
+.notice{
+  font-size:12px;
+  color:#888;
+  margin-top:22px;
+  line-height:1.5;
+}
+
+.bottom-logo img{
+  width:100%;
+  max-width:220px;
+  margin-top:18px;
+}
+
+/* 모바일 */
+@media (max-width: 480px){
+  .main-title{ font-size:22px; }
+
+  .logo-wrapper{
+    margin-bottom:-20px;
+  }
+
+  .logo-wrapper img{
+    max-width:260px;
+    margin-bottom:10px;
+  }
+
+  .box{
+    padding:34px 20px 28px 20px;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="box">
+
+  <div class="logo-wrapper">
+    <img src="/static/compass_logo.png" alt="케어네비 로고">
+  </div>
+
+  <div class="main-title">케어네비</div>
+  <div class="sub-title">사용자 로그인</div>
+
+  {% if error %}
+    <div class="error-msg">❌ {{error}}</div>
+  {% endif %}
+
+  <form method="post">
+    <input type="password" name="password" placeholder="비밀번호 입력">
+    <button type="submit">로그인</button>
+  </form>
+
+  <div class="notice">
+    ※ 본 서비스는 국민건강보험공단 광주전라제주지역본부<br>
+    관할 지자체, 지사 직원만 이용 가능합니다.
+  </div>
+
+  <div class="bottom-logo">
+    <img src="/static/ci.png" style="width:260px;margin-top:15px;" alt="CI">
+  </div>
+
+</div>
+</body>
+</html>
+"""
+
+# =========================
+# 로그인 라우트
+# =========================
+@app.route("/", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        pw = request.form.get("password", "")
+
+        if pw == "admin":  # 원하는 비밀번호
+            session["logged_in"] = True
+            return redirect(url_for("home"))
+        else:
+            # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
+            return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
+
+    return render_template_string(LOGIN_HTML, error="")
+
+# =========================
+# 공통 CSS
+# =========================
+BASE_STYLE = """
+*{box-sizing:border-box;}
+
+#r_text{
+  word-break:keep-all;
+  overflow-wrap:break-word;
+  white-space:normal;
+}
+
+body{
+  font-family:'Pretendard',sans-serif;
   margin:0;
-  line-height:1.2;
+  padding:16px;
+  background:#f7f9fc;
 }
 
-.brand-sub{
-  font-size:13px;
-  color:#64748b;
+.container{
+  max-width:600px;
+  margin:auto;
+}
+
+h1,h2{
+  text-align:center;
+  color:#2c3e50;
+  margin-bottom:12px;
+  word-break:keep-all;
+}
+@media (max-width:480px){
+  .half-menu-row{
+    flex-direction:column;
+    gap:6px;        /* 간격 줄이기 */
+    margin-top:10px;
+  }
+
+  .half-menu-row button{
+    margin-top:0;   /* 버튼 기본 margin 제거 */
+  }
+}
+
+@media (max-width:480px){
+  h1{
+    font-size:22px;
+    line-height:1.3;
+    word-break:keep-all;
+  }
+}
+
+h3{
+  margin:16px 0 8px;
+  color:#111827;
+}
+
+label{
+  display:block;
+  margin-top:12px;
+  font-weight:600;
+}
+
+input[type=text],
+input[type=password],
+textarea,
+select{
+  width:100%;
+  padding:9px 12px;
+  font-size:15px;
+  border-radius:8px;
+  border:1px solid #ccc;
   margin-top:3px;
 }
 
-.ci-logo{
-  height:48px;
-  object-fit:contain;
-  margin-left:8px;
+button{
+  width:100%;
+  height:50px;
+  border:none;
+  border-radius:8px;
+  font-size:17px;
+  cursor:pointer;
+  margin-top:9px;
 }
 
-@media (max-width:900px){
-  .ci-logo{
-    height:44px;
-  }
+.menu-btn{
+  background:#0078d7;
+  color:white;
 }
 
-.logo{
-  width:48px;
-  height:48px;
-  border-radius:16px;
+.menu-btn:hover{
+  opacity:0.95;
+}
+
+.pdf-btn{
+  width:100%;
+  height:50px;
+  background:#ffffff;
+  color:#2c3e50;
+  border:1px solid #ccc;
   display:flex;
   align-items:center;
   justify-content:center;
-  color:#fff;
-  font-size:24px;
-  background:linear-gradient(135deg,#2563eb,#7c3aed);
-  box-shadow:0 10px 24px rgba(37,99,235,.25);
-}
-.brand h1{
-  margin:0;
-  font-size:22px;
-  line-height:1.2;
-}
-.brand p{
-  margin:4px 0 0 0;
-  font-size:13px;
-  color:#64748b;
-}
-.card{
-  background:#f8fafc;
-  border:1px solid #e2e8f0;
-  border-radius:18px;
-  padding:15px;
-  margin-bottom:14px;
-}
-.card h3{
-  margin:0 0 12px 0;
-  font-size:15px;
-}
-.label{
-  display:block;
-  margin:10px 0 6px;
-  font-size:13px;
-  font-weight:700;
-  color:#334155;
-}
-.select, .btn{
-  width:100%;
-  min-height:46px;
-  border-radius:12px;
-  border:1px solid #cbd5e1;
-  font-size:15px;
-}
-.select{
-  background:#fff;
-  padding:0 12px;
-}
-.check-grid{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:8px;
-}
-.check-item{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:10px 12px;
-  border:1px solid #e2e8f0;
-  background:#fff;
-  border-radius:12px;
-  font-size:14px;
-}
-.dot{
-  width:12px;
-  height:12px;
-  border-radius:999px;
-  flex:0 0 12px;
-}
-.btn-row{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:14px;
-}
-.btn{
+  gap:12px;
+  border-radius:8px;
   cursor:pointer;
-  font-weight:800;
-}
-.btn.primary{
-  background:#2563eb;
-  color:#fff;
-  border:none;
-}
-.btn.secondary{
-  background:#fff;
-  color:#111827;
-}
-.summary{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-.summary-box{
-  background:#fff;
-  border:1px solid #e2e8f0;
-  border-radius:14px;
-  padding:14px;
-}
-.summary-box .num{
-  font-size:24px;
-  font-weight:900;
-  margin-bottom:4px;
-}
-.summary-box .txt{
-  font-size:12px;
-  color:#64748b;
 }
 
-
-@media (max-width:900px){
-
-.legend{
-display:none;
-}
-
-}
-
-.legend-item{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:13px;
-}
-.notice{
-  font-size:12px;
-  line-height:1.6;
-  color:#475569;
-}
-.map-wrap{
-  position:relative;
-  flex:1;
-  min-width:0;
-}
-#map{
-  width:100%;
-  height:100vh;
-}
-
-.top-badge{
-  position:absolute;
-  top:14px;
-  right:14px;
-  z-index:999;
-  background:rgba(255,255,255,.96);
-  border:1px solid #e5e7eb;
-  border-radius:14px;
-  padding:10px 12px;
-  font-size:13px;
-  box-shadow:0 8px 24px rgba(15,23,42,.08);
-}
-
-.map-legend{
-  position:absolute;
-  top:70px;
-  right:14px;
-  z-index:999;
-  background:rgba(255,255,255,.96);
-  border:1px solid #e5e7eb;
-  border-radius:12px;
-  padding:10px 12px;
-  font-size:12px;
-  line-height:1.6;
-  box-shadow:0 8px 24px rgba(15,23,42,.08);
-}
-
-.map-legend-item{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  margin-bottom:4px;
-}
-
-.map-legend-dot{
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  flex-shrink:0;
-  display:inline-block;
-}
-.loading{
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  z-index:1000;
-  background:rgba(15,23,42,.86);
-  color:#fff;
-  padding:12px 16px;
-  border-radius:14px;
-  font-size:14px;
-  display:none;
-}
-.custom-marker{
-  width:18px;
-  height:18px;
-  border-radius:999px;
-  border:3px solid #fff;
-  box-shadow:0 2px 8px rgba(0,0,0,.25);
-}
-.popup-wrap{
-  width:245px;
-}
-.popup-img{
-  width:100%;
-  height:136px;
-  object-fit:cover;
-  border-radius:12px;
-  border:1px solid #e5e7eb;
-  margin-bottom:10px;
+.pdf-btn:hover{
   background:#f1f5f9;
 }
-.popup-title{
-  font-size:16px;
-  font-weight:900;
-  margin-bottom:6px;
-  line-height:1.35;
-}
-.popup-meta{
-  font-size:12px;
-  color:#64748b;
-  line-height:1.5;
-  margin-bottom:8px;
-}
-.popup-desc{
-  font-size:13px;
-  line-height:1.55;
-}
-@media (max-width: 900px){
-  .page{
-    display:block;
-    height:auto;
-    min-height:100vh;
-  }
 
-  .sidebar{
-    width:100%;
-    min-width:0;
-    border-right:none;
-    border-bottom:none;
-    padding:15px 14px;
-  }
-
-  .map-wrap{
-    display:none;
-  }
-
-  .legend{
-    grid-template-columns:1fr;
-  }
+.pdf-btn img{
+  width:32px;
+  height:auto;
 }
 
-
-.mobile-map-popup{
-  position:fixed;
-  inset:0;
-  background:#ffffff;
-  z-index:2000;
-  display:none;
-  flex-direction:column;
-}
-
-.mobile-map-header{
-  height:56px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 16px;
-  border-bottom:1px solid #e5e7eb;
-  font-weight:700;
-}
-
-.mobile-map-close{
-  border:none;
-  background:#ef4444;
-  color:#ffffff;
-  padding:6px 10px;
+.home-btn{
+  display:inline-block;
+  background:#2c3e50;
+  color:white;
+  padding:10px 16px;
   border-radius:6px;
+  margin-bottom:14px;
+  text-decoration:none;
 }
 
-@media (min-width:901px){
-
-  .mobile-map-popup{
-    display:none !important;
-  }
-
-}
-
-.mobile-map{
-  flex:1;
-}
-
-@media(min-width:901px){
-  .mobile-map-popup{
-    display:none !important;
-  }
-}
-
-#locBtn{
-position:absolute;
-bottom:20px;
-right:20px;
-z-index:1000;
-
-width:46px;
-height:46px;
-
-border-radius:50%;
-border:none;
-
-background:#ffffff;
-color:#2563eb;
-
-font-size:20px;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-box-shadow:0 6px 16px rgba(0,0,0,0.25);
-
-cursor:pointer;
-}
-
-
-@media (max-width:900px){
-
-.map-legend{
-  top:auto;
-  bottom:80px;
-  right:10px;
-  font-size:11px;
-  padding:8px;
-}
-
-.map-legend-dot{
-  width:16px;
-  height:16px;
-}
-
-}
-.mobile-map-popup .map-legend{
-  position:absolute;
-  top:70px;
-  right:6px;
-  bottom:auto;
-  z-index:3000;
-}
-
-.user-marker-wrap{
-  position:relative;
-  width:28px;
-  height:28px;
-}
-
-.user-pin{
-  position:relative;
-  width:34px;
-  height:34px;
-}
-
-.user-pin::before{
-  content:"";
-  position:absolute;
-  left:50%;
-  top:50%;
-  width:18px;
-  height:18px;
-  background:#22c55e;
-  border-radius:50%;
-  border:3px solid #ffffff;
-  transform:translate(-50%,-50%);
-  box-shadow:0 4px 12px rgba(0,0,0,.35);
-}
-
-.user-pin::after{
-  content:"";
-  position:absolute;
-  left:50%;
-  top:50%;
-  width:34px;
-  height:34px;
-  border-radius:50%;
-  background:rgba(34,197,94,0.25);
-  transform:translate(-50%,-50%);
-  animation:userPulse 1.8s infinite;
-}
-
-.user-marker-pulse{
-  position:absolute;
-  left:50%;
-  top:50%;
-  width:28px;
-  height:28px;
-  transform:translate(-50%,-50%);
-  border-radius:50%;
-  background:rgba(37,99,235,0.22);
-  animation:userPulse 1.8s ease-out infinite;
-}
-
-.user-marker-dot{
-  position:absolute;
-  left:50%;
-  top:50%;
-  width:14px;
-  height:14px;
-  transform:translate(-50%,-50%);
-  border-radius:50%;
-  background:#2563eb;
-  border:3px solid #ffffff;
-  box-shadow:0 2px 8px rgba(0,0,0,.25);
-}
-
-@keyframes userPulse{
-  0%{
-    transform:translate(-50%,-50%) scale(0.7);
-    opacity:0.9;
-  }
-  100%{
-    transform:translate(-50%,-50%) scale(1.8);
-    opacity:0;
-  }
-}
-
-.location-box{
-  margin-top:12px;
-  padding:12px;
-  border:1px solid #e2e8f0;
-  border-radius:16px;
-  background:#f8fafc;
-}
-
-.location-row{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:8px;
-}
-
-.location-box .btn{
-  background:#ffffff;
-  color:#111827;
-  border:1px solid #cbd5e1;
-}
-
-.mobile-result-panel{
-  position:fixed;
-  bottom:0;
-  left:0;
-  right:0;
-  height:220px;
+.result{
+  margin-top:20px;
   background:white;
-  border-top-left-radius:16px;
-  border-top-right-radius:16px;
-  box-shadow:0 -6px 20px rgba(0,0,0,.15);
-  z-index:3000;
-  display:none;
-  flex-direction:column;
+  padding:18px;
+  border-radius:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
 
-.mobile-result-header{
-  padding:10px 14px;
-  font-weight:700;
-  border-bottom:1px solid #e5e7eb;
+.item{
+  cursor:pointer;
+  color:#0078d7;
+  margin-top:6px;
+  margin-left:8px;
 }
 
-.mobile-result-list{
-  overflow:auto;
+.small{
+  font-size:13px;
+  color:#6b7280;
+  margin-top:4px;
+}
+
+.choice-btn{
+  width:100%;
+  margin-top:8px;
+  height:46px;
+  padding:0 12px;
+  border-radius:10px;
+  border:1px solid #cfd8e3;
+  background:#ffffff;
+  cursor:pointer;
+  font-size:15px;
+  color:#111827;
+}
+
+.choice-btn:hover{
+  background:#f1f5f9;
+}
+
+@media (max-width:480px){
+
+  #r_text{
+    font-size:17px !important;
+    line-height:1.55 !important;
+    white-space:normal !important;
+  }
+
+}
+"""
+# =========================
+# 엑셀 로드 + 컬럼 공백 제거
+# =========================
+df = pd.read_excel(FILE_PATH).fillna("")
+df.columns = df.columns.astype(str).str.replace(" ", "").str.strip()
+print("현재 컬럼명:", list(df.columns))
+
+# =========================
+# HOME
+# =========================
+HOME_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 서비스 자원검색</title>
+<style>{{style}}</style>
+<style>
+/* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
+/* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
+/* ✅ 홈 메뉴: 1/2/3을 "같이" 오른쪽으로 밀어서 PDF 아이콘 시작점과 정렬 */
+/* 🔥 메뉴 버튼 전체를 중앙 정렬 */
+.home-menu-btn{
+  display:flex;
+  justify-content:center;  /* 버튼 내용 중앙 */
+  align-items:center;
+}
+
+/* 번호+텍스트 묶음 */
+.home-menu-btn .wrap{
+  display:grid;
+  grid-template-columns: 40px auto;
+  column-gap:1px;
+  align-items:center;
+
+  width: 320px;
+  max-width:100%;
+
+  padding-left: 70px;   /* 데스크탑 기준 */
+}
+
+/* 📱 모바일 보정 */
+@media (max-width:480px){
+  .home-menu-btn .wrap{
+    padding-left: 55px;  /* 모바일은 덜 밀기 */
+  }
+}
+/* 번호/라벨 */
+.home-menu-btn .num{
+  justify-self:center;
+}
+.home-menu-btn .label{
+  justify-self:start;
+  white-space:nowrap;
+}
+
+/* ✅ 하단 2개 반쪽 버튼(좌/우) */
+/* 하단 반쪽 메뉴 */
+.half-menu-row{
+  display:flex;
+  gap:12px;
+  margin-top:14px;
+}
+
+/* 모바일 간격 조정 */
+@media (max-width:480px){
+  .half-menu-row{
+    flex-direction:column;
+    gap:10px;   /* ← 이게 핵심 */
+  }
+}.half-menu-row a{
   flex:1;
 }
 
-.mobile-result-item{
-  padding:10px 14px;
-  border-bottom:1px solid #f1f5f9;
-  font-size:13px;
-  cursor:pointer;
+/* 버튼 크기 맞추기 */
+.half-btn{
+  width:100%;
+  height:52px;
+  justify-content:center;
 }
 
-.mobile-result-item:hover{
-  background:#f8fafc;
+/* 모바일에서는 세로로 쌓기 */
+@media (max-width:480px){
+  .half-menu-row{
+    flex-direction:column;
+  }
 }
-
-.mobile-result-distance{
-  font-size:12px;
-  color:#2563eb;
+.half-btn img{
+  width:28px;
+  height:auto;
 }
-
-#mobileLocBtn{
-position:absolute;
-bottom:20px;
-right:20px;
-z-index:4000;
-
-width:52px;
-height:52px;
-
-border-radius:50%;
-border:none;
-
-background:#2563eb;
-color:white;
-
-font-size:22px;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-box-shadow:0 6px 16px rgba(0,0,0,0.25);
-
-cursor:pointer;
-}
-
 
 </style>
 </head>
 <body>
+<div class="container">
+<h1>통합돌봄 서비스 자원검색</h1>
 
-<div class="page">
-  <aside class="sidebar">
-<div class="brand">
+<a href="/desc" style="text-decoration:none;display:block;">
+  <button class="menu-btn home-menu-btn">
+    <span class="wrap">
+      <span class="num">①</span>
+      <span class="label">사례기반 자원검색(AI)</span>
+    </span>
+  </button>
+</a>
 
-  <div class="brand-left">
-    <div class="brand-title">
-      <span>위험지역 찾기</span>
-      <img src="/ci" class="ci-logo">
-    </div>
+<a href="/combo" style="text-decoration:none;display:block;">
+  <button class="menu-btn home-menu-btn">
+    <span class="wrap">
+      <span class="num">②</span>
+      <span class="label">조건기반 자원검색</span>
+    </span>
+  </button>
+</a>
 
-    <div class="brand-sub">엑셀 기반 위험정보 지도</div>
-  </div>
+<a href="/care" style="text-decoration:none;display:block;">
+  <button class="menu-btn home-menu-btn">
+    <span class="wrap">
+      <span class="num">③</span>
+      <span class="label">통합돌봄 사전조사</span>
+    </span>
+  </button>
+</a>
+<div class="half-menu-row">
+  <a href="/guide" target="_blank" style="text-decoration:none;display:block;">
+    <button class="pdf-btn half-btn">
+      <img src="/static/pdf_icon.png" alt="PDF">
+      통합돌봄 사업안내
+    </button>
+  </a>
 
-</div>    <div class="card">
-      <h3>조회 조건</h3>
+  <a href="/nhis25" style="text-decoration:none;display:block;">
+    <button class="pdf-btn half-btn">
+      <img src="/static/nhis_heart.png" alt="건강보험">
+      건강보험 25시
+    </button>
+  </a>
+</div>
+<img src="/static/bottom.png" style="width:100%;margin-top:-20px;">
+</div>
+</body>
+</html>
+"""
 
-      <label class="label">1. 시군구</label>
-      <select id="city" class="select">
-        <option value="">전체</option>
-      </select>
+@app.route("/home")
+def home():
+    check = login_required()
+    if check:
+        return check
+    return render_template_string(HOME_HTML, style=BASE_STYLE)
 
-      <label class="label">2. 읍면동</label>
-      <select id="town" class="select">
-        <option value="">전체</option>
-      </select>
+@app.route("/guide")
+def guide():
+    check = login_required()
+    if check:
+        return check
+    return redirect("/static/guide.pdf")
+# =========================
+# 상세 API (팝업에서 사용)
+# =========================
+@app.route("/detail/<int:idx>")
+def detail(idx):
+    check = login_required()
+    if check:
+        return check
 
-      <label class="label">3. 구분</label>
-      <div class="check-grid" id="categoryBox"></div>
+    if idx < 0 or idx >= len(df):
+        return jsonify({
+            "프로그램명칭": "데이터가 변경되었습니다",
+            "서비스제공기관명": "다시 검색해주세요",
+            "기관연락처": "",
+            "기관주소": "",
+            "기타": ""
+        })
 
-            <div class="btn-row">
-        <button class="btn primary" onclick="loadData()">조회</button>
-        <button class="btn secondary" onclick="resetFilters()">필터 초기화</button>
-      </div>
+    r = df.iloc[idx]
+    return jsonify({
+        "프로그램명칭": str(r.get("프로그램명칭", "")),
+        "서비스제공기관명": str(r.get("서비스제공기관명", "")),
+        "기관연락처": str(r.get("기관연락처", "")),
+        "기관주소": str(r.get("기관주소", "")),
+        "기타": str(r.get("기타", "")),
+    })
 
-<div class="location-box">
+@app.route("/combo", methods=["GET","POST"])
+def combo():
+    check = login_required()
+    if check:
+        return check
 
-<button class="btn secondary" onclick="findNearest()">
-내 주변 위험지역 찾기
-</button>
+    region = (request.values.get("region","") or "").strip()
+    main_category = (request.values.get("main_category","") or "").strip()
+    health_kw = (request.values.get("health_kw","") or "").strip()
+    manager = (request.values.get("manager","") or "").strip()
 
-<div class="location-row">
+    if region == "나주":
+        region = "나주시"
 
-<button class="btn secondary" onclick="findRadius(1)">
-1km 위험지역
-</button>
+    results = {}
+    count = 0
 
-<button class="btn secondary" onclick="findRadius(3)">
-3km 위험지역
-</button>
+    if request.method == "POST":
+        filtered = df.copy()
+
+        if region:
+            filtered = filtered[
+                filtered["시군구"].astype(str)
+                .str.contains(region, na=False)
+            ]
+
+        if main_category:
+            filtered = filtered[
+                filtered["대분류"].astype(str) == main_category
+            ]
+
+        if manager and "관리주체" in filtered.columns:
+            filtered = filtered[
+                filtered["관리주체"].astype(str) == manager
+            ]
+
+        if health_kw and "건강상태" in filtered.columns:
+            filtered = filtered[
+                filtered["건강상태"].astype(str)
+                .str.contains(health_kw, na=False)
+            ]
+
+        for _, row in filtered.reset_index().iterrows():
+            sigungu = str(row.get("시군구","")) or "기타"
+            results.setdefault(sigungu, []).append({
+                "index": int(row["index"]),
+                "label": f"{row.get('프로그램명칭','')} ({row.get('서비스제공기관명','')})"
+            })
+
+        count = sum(len(v) for v in results.values())
+
+    return render_template_string(
+        COMBO_HTML,
+        style=BASE_STYLE,
+        region=region,
+        main_category=main_category,
+        health_kw=health_kw,
+        manager=manager,   # ← 이 줄 추가
+        results=results,
+        count=count
+    )
+
+
+# =========================
+# ① 선택형 검색
+# =========================
+COMBO_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>조건기반 자원검색</title>
+<style>{{style}}</style>
+<style>
+@media (min-width: 768px) {
+  #tel_link {
+    display: none !important;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<a href="/home" class="home-btn">홈으로</a>
+<h2>조건기반 자원검색</h2>
+
+<form method="post">
+<label>지역(시군구)</label>
+<input type="text" name="region" value="{{region}}" placeholder="예) 나주시">
+
+<div class="small">※ 예: '나주' 입력 시 자동으로 '나주시'로 검색됩니다.</div>
+
+<label>대분류</label>
+<select name="main_category">
+  <option value="">전체</option>
+  {% for c in ["보건의료","생활지원","요양","주거지원"] %}
+  <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
+  {% endfor %}
+</select>
+
+<label>관리기관</label>
+<select name="manager">
+  <option value="">전체</option>
+  {% for m in ["국민건강보험공단","지자체"] %}
+  <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
+  {% endfor %}
+</select>
+
+<label>건강상태</label>
+<input type="text" name="health_kw" value="{{health_kw}}" placeholder="예) 고혈압">
+<button type="submit" class="menu-btn">검색하기</button>
+</form>
+
+{% if request.method == "POST" %}
+<div class="result">
+
+<p><b>총 {{count}}건이 조회되었습니다.</b></p>
+
+{% if count == 0 %}
+<p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
+{% endif %}
+
+{% for region,items in results.items() %}
+<h3>📍 {{region}}</h3>
+{% for r in items %}
+<div class="item" onclick="openDetail({{r['index']}})">- {{r['label']}}</div>
+{% endfor %}
+{% endfor %}
 
 </div>
+{% endif %}
 
-</div>
-</div>
 
-<div class="card">
-      <h3>조회 결과</h3>
-      <div class="summary">
-        <div class="summary-box">
-          <div class="num" id="countTotal">0</div>
-          <div class="txt">표시된 지점 수</div>
-        </div>
-        <div class="summary-box">
-          <div class="num" id="countCity">전체</div>
-          <div class="txt">현재 시군구</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-        <div class="legend">
-        <div class="legend-item"><span class="dot" style="background:#ef4444"></span>교통사고다발구역</div>
-        <div class="legend-item"><span class="dot" style="background:#06b6d4"></span>상습결빙구역</div>
-        <div class="legend-item"><span class="dot" style="background:#2563eb"></span>상습침수구역</div>
-        <div class="legend-item"><span class="dot" style="background:#f97316"></span>화재다빈도발생구역</div>
-        <div class="legend-item"><span class="dot" style="background:#7c3aed"></span>우범지역</div>
-      </div>
-    </div>
-
-  </aside>
-
-  <main class="map-wrap">
-    <div id="map"></div>
-    <button id="locBtn">📍 내 위치</button>
-    <div class="top-badge">모바일 / PC 지원</div>
-
-<div class="map-legend">
-
-  <div class="map-legend-item">
-    <span class="map-legend-dot" style="background:#ef4444"></span>
-    교통사고다발구역
+<!-- 팝업 -->
+<div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
+  <div style="background:white;margin:0% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+    <h3 id="m_title"></h3>
+    <p><b>기관명:</b> <span id="m_org"></span></p>
+    <p>
+        <b>기관 연락처:</b> <span id="m_tel"></span>
+        <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">📞</a>
+    </p>
+    <p><b>기관주소:</b> <span id="m_addr"></span></p>
+    <p><b>기타:</b> <span id="m_other"></span></p>
+    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;"></iframe>
+    <button onclick="closeModal()" class="menu-btn">닫기</button>
   </div>
-
-  <div class="map-legend-item">
-    <span class="map-legend-dot" style="background:#06b6d4"></span>
-    상습결빙구역
-  </div>
-
-  <div class="map-legend-item">
-    <span class="map-legend-dot" style="background:#2563eb"></span>
-    상습침수구역
-  </div>
-
-  <div class="map-legend-item">
-    <span class="map-legend-dot" style="background:#f97316"></span>
-    화재다빈도발생구역
-  </div>
-
-  <div class="map-legend-item">
-    <span class="map-legend-dot" style="background:#7c3aed"></span>
-    우범지역
-  </div>
-
-<div class="map-legend-item">
-  <span class="map-legend-dot" style="background:#22c55e"></span>
-내 위치
 </div>
-
-</div>
-
-
-    <div class="loading" id="loadingBox">데이터를 불러오는 중입니다...</div>
-  </main>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-const CATEGORY_COLORS = {
-  "교통사고다발구역": "#ef4444",
-  "상습결빙구역": "#06b6d4",
-  "상습결빙지역": "#06b6d4",
-  "상습침수구역": "#2563eb",
-  "화재다빈도발생구역": "#f97316",
-  "우범지역": "#7c3aed"
-};
-
-const CATEGORY_LIST = [
-  "교통사고다발구역",
-  "상습결빙구역",
-  "상습침수구역",
-  "화재다빈도발생구역",
-  "우범지역"
-];
-
-const map = L.map("map", { zoomControl:true }).setView([34.85, 126.90], 9);
-
-let userLat = null;
-let userLng = null;
-
-
-function showMsg(text){
-  document.getElementById("msgText").innerText = text;
-  document.getElementById("msgModal").style.display = "flex";
-}
-
-function closeMsg(){
-  document.getElementById("msgModal").style.display = "none";
-}
-
-function preloadLocation(){
-  if(!navigator.geolocation){
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-
-    function(pos){
-
-      userLat = pos.coords.latitude;
-      userLng = pos.coords.longitude;
-
-    },
-
-    function(err){
-      console.log("위치 사전 요청 실패", err);
-    },
-
-    {
-      enableHighAccuracy:false,
-      timeout:4000,
-      maximumAge:60000
-    }
-
-  );
-
-}
-
-
-L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap"
-  }
-).addTo(map);
-
-let markerGroup = L.markerClusterGroup({
-  showCoverageOnHover:false,
-  spiderfyOnMaxZoom:true,
-  disableClusteringAtZoom:15
-});
-map.addLayer(markerGroup);
-
-function setLoading(show){
-  document.getElementById("loadingBox").style.display = show ? "block" : "none";
-}
-
-function calcDistance(lat1, lng1, lat2, lng2){
-
-  const R = 6371000;
-
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLng = (lng2-lng1) * Math.PI/180;
-
-  const a =
-    Math.sin(dLat/2)*Math.sin(dLat/2) +
-    Math.cos(lat1*Math.PI/180) *
-    Math.cos(lat2*Math.PI/180) *
-    Math.sin(dLng/2)*Math.sin(dLng/2);
-
-  const c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-
-  return R*c;
-
-}
-
-function showMobileResults(items, userLat, userLng){
-history.pushState({mobileResult:true}, "");
-  const panel = document.getElementById("mobileResultPanel");
-  const list = document.getElementById("mobileResultList");
-
-  panel.style.display = "flex";
-
-  list.innerHTML = "";
-
-  items.forEach(item=>{
-
-    const dist = Math.round(
-      calcDistance(userLat,userLng,item.위도,item.경도)
-    );
-
-    const el = document.createElement("div");
-
-    el.className = "mobile-result-item";
-
-    el.innerHTML = `
-      <b>${item.구분}</b><br>
-      ${item.시군구} ${item.읍면동}<br>
-      <span class="mobile-result-distance">${dist} m</span>
-    `;
-
-    el.onclick = function(){
-
-      window.mobileLeafletMap.setView(
-        [item.위도,item.경도],16
-      );
-
-    };
-
-    list.appendChild(el);
-
-  });
-
-  document.getElementById("mobileResultCount").textContent = items.length;
-
-}
-
-
-function createCategoryChecks(){
-  const box = document.getElementById("categoryBox");
-  box.innerHTML = "";
-  CATEGORY_LIST.forEach(cat => {
-    const color = CATEGORY_COLORS[cat] || "#334155";
-    const item = document.createElement("label");
-    item.className = "check-item";
-    item.innerHTML = `
-      <input type="checkbox" class="category-check" value="${cat}">
-      <span class="dot" style="background:${color}"></span>
-      <span>${cat}</span>
-    `;
-    box.appendChild(item);
-  });
-}
-
-function fillCities(cities){
-  const select = document.getElementById("city");
-  const current = select.value;
-  select.innerHTML = '<option value="">전체</option>';
-  cities.forEach(city => {
-    const op = document.createElement("option");
-    op.value = city;
-    op.textContent = city;
-    select.appendChild(op);
-  });
-  if(cities.includes(current)) select.value = current;
-}
-
-function fillTowns(towns){
-  const select = document.getElementById("town");
-  const current = select.value;
-  select.innerHTML = '<option value="">전체</option>';
-  towns.forEach(town => {
-    const op = document.createElement("option");
-    op.value = town;
-    op.textContent = town;
-    select.appendChild(op);
-  });
-  if(towns.includes(current)) select.value = current;
-}
-
-function getCheckedCategories(){
-  return Array.from(document.querySelectorAll(".category-check:checked")).map(el => el.value);
-}
-
-function buildMarkerIcon(color){
-  return L.divIcon({
-    className: "",
-    html: `<div class="custom-marker" style="background:${color};"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    popupAnchor: [0, -8]
-  });
-}
-
-function buildUserIcon(){
-  return L.divIcon({
-    className: "",
-    html: `
-      <div class="user-pin"></div>
-    `,
-    iconSize: [34,34],
-    iconAnchor: [17,17]
-  });
-} 
-
-function escapeHtml(text){
-  if(text === null || text === undefined) return "";
-  return String(text)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-async function loadMeta(){
-  const res = await fetch("/meta");
-  const data = await res.json();
-  fillCities(data.cities || []);
-  fillTowns(data.towns || []);
-}
-
-async function updateTowns(){
-  const city = document.getElementById("city").value;
-  const res = await fetch(`/towns?city=${encodeURIComponent(city)}`);
-  const data = await res.json();
-  fillTowns(data.towns || []);
-}
-
-async function loadData(){
-
-  if(isMobile()){
-    openMobileMap();
-  }
-
-  setLoading(true);
-
-  if(!isMobile()){
-    markerGroup.clearLayers();
-  }
-
-
-  const city = document.getElementById("city").value;
-  const town = document.getElementById("town").value;
-  const categories = getCheckedCategories();
-
-  const params = new URLSearchParams();
-  if(city) params.append("city", city);
-  if(town) params.append("town", town);
-  categories.forEach(cat => params.append("category", cat));
-
-  try{
-    const res = await fetch(`/data?${params.toString()}`);
-    const data = await res.json();
-
-    document.getElementById("countTotal").textContent = data.length;
-    document.getElementById("countCity").textContent = city || "전체";
-
-    const bounds = [];
-
-    data.forEach(item => {
-
-  if(!isMobile()){
-
-    const icon = buildMarkerIcon(item.마커색상);
-    const marker = L.marker([item.위도, item.경도], { icon });
-
-      const popupHtml = `
-        <div class="popup-wrap">
-
-          <img class="popup-img" src="${escapeHtml(item.사진URL)}" alt="현장 사진">
-
-          <div class="popup-title">${escapeHtml(item.구분)}</div>
-
-          <div class="popup-meta">
-            순번: ${escapeHtml(item.순번)}<br>
-            시군구: ${escapeHtml(item.시군구)}<br>
-            읍면동: ${escapeHtml(item.읍면동)}<br>
-            날짜: ${escapeHtml(item.날짜)}<br>
-            주소: ${escapeHtml(item.주소)}
-          </div>
-
-          <div class="popup-desc">
-            ${escapeHtml(item.사고설명)}
-          </div>
-
-          <div style="margin-top:10px;">
-            <a 
-              href="https://map.naver.com/v5/search/${encodeURIComponent(item.주소)}"
-              target="_blank"
-              style="
-                display:block;
-                text-align:center;
-                background:#03C75A;
-                color:#ffffff;
-                font-weight:700;
-                padding:8px;
-                border-radius:8px;
-                text-decoration:none;
-                font-size:13px;
-              ">
-              네이버지도 길찾기
-            </a>
-          </div>
-
-                  </div>
-      `;
-
-      marker.bindPopup(popupHtml, { maxWidth: 290 });
-      markerGroup.addLayer(marker);
-bounds.push([item.위도, item.경도]);
-
-}
-
-});
-
-if(!isMobile()){
-
-  if(bounds.length > 0){
-    map.fitBounds(bounds, { padding:[40,40] });
-  }else{
-    map.setView([34.85, 126.90], 9);
-    showMsg("조건에 맞는 데이터가 없습니다.");
-  }
-
-}
-
-if(isMobile()){
-  syncToMobileMap(data);
-}
-
-  }catch(e){
-    showMsg("데이터를 불러오는 중 오류가 발생했습니다.");
-    console.error(e);
-
-
-  }finally{
-    setLoading(false);
-  }
-}
-
-function resetFilters(){
-
-  // 시군구 초기화
-  document.getElementById("city").value = "";
-
-  // 읍면동 초기화
-  document.getElementById("town").value = "";
-
-  // 구분 체크 해제
-  document.querySelectorAll(".category-check")
-  .forEach(el => el.checked = false);
-
-  // 결과 숫자 초기화
-  document.getElementById("countTotal").textContent = 0;
-  document.getElementById("countCity").textContent = "전체";
-
-  // PC 지도 마커 삭제
-  if(markerGroup){
-    markerGroup.clearLayers();
-  }
-
-  // 모바일 지도 마커 삭제
-  if(window.mobileMarkerGroup){
-    window.mobileMarkerGroup.clearLayers();
-  }
-
-  // 지도 위치 초기화
-  map.setView([34.85,126.90],9);
-
-    // 모바일 결과 패널 닫기
-  const result = document.getElementById("mobileResultPanel");
-  if(result){
-    result.style.display = "none";
-  }
-
-  // 데이터 다시 불러오기
-  loadData();
-
-}
-window.addEventListener("load", function(){
-  setTimeout(()=>{
-    map.invalidateSize();
-  },500);
-});
-
-window.addEventListener("DOMContentLoaded", function(){
-
-  preloadLocation();
-
-  createCategoryChecks();
-
-  loadMeta().then(()=>{
-    document.getElementById("city").addEventListener("change", updateTowns);
-
-    if(!isMobile()){
-      loadData();
-    }
-
-  });
-
-});
-
-// ===== 브라우저 닫힘 감지용 heartbeat =====
-function heartbeat(){
-  fetch("/heartbeat", {method:"POST"}).catch(()=>{});
-}
-setInterval(heartbeat, 5000);
-heartbeat();
-
-window.addEventListener("beforeunload", function(){
-  navigator.sendBeacon("/bye");
-});
-
-
-
-function isMobile(){
-  return window.innerWidth < 900;
-}
-
-function openMobileMap(){
-
-  if(!history.state || !history.state.mobileMap){
-    history.pushState({mobileMap:true}, "");
-  }
-
-  if(!isMobile()) return;
-
-  const popup = document.getElementById("mobileMapPopup");
-  popup.style.display = "flex";
-
-  const mapDiv = document.getElementById("mobileMap");
-
-  if(!window.mobileLeafletMap){
-
-    
-
-    window.mobileLeafletMap = L.map(mapDiv).setView([34.85, 126.90], 9);
-
-    L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 19 }
-    ).addTo(window.mobileLeafletMap);
-
-    window.mobileMarkerGroup = L.markerClusterGroup({
-      showCoverageOnHover:false,
-      spiderfyOnMaxZoom:true,
-      disableClusteringAtZoom:15
-    });
-
-    window.mobileLeafletMap.addLayer(window.mobileMarkerGroup);
-  }
-
-  setTimeout(()=>{
-    window.mobileLeafletMap.invalidateSize();
-  }, 200);
-}
-
-function closeMobileMap(){
-
-  document.getElementById("mobileMapPopup").style.display = "none";
-
-  const result = document.getElementById("mobileResultPanel");
-
-  if(result){
-    result.style.display = "none";
-  }
-
-}
-
-
-function syncToMobileMap(items, userLat=null, userLng=null, radiusMeter=null){
-
-  if(!isMobile()) return;
-
-  if(userLat && userLng){
-
-    items.sort((a,b)=>{
-
-      const da = calcDistance(userLat,userLng,a.위도,a.경도);
-      const db = calcDistance(userLat,userLng,b.위도,b.경도);
-
-      return da-db;
-
-    });
-
-  }
-
-
-
-
-  openMobileMap();
-
-  if(window.mobileMarkerGroup){
-  window.mobileMarkerGroup.clearLayers();
-}
-
-  const bounds = [];
-
-  if(userLat !== null && userLng !== null){
-    const userMarker = L.marker(
-  [userLat, userLng],
-  { icon: buildUserIcon() }
-);
-
-window.mobileMarkerGroup.addLayer(userMarker);
-    bounds.push([userLat, userLng]);
-
-    if(radiusMeter){
-      const circle = L.circle(
-        [userLat, userLng],
-        {
-          radius: radiusMeter,
-          color:"#2563eb",
-          fillColor:"#2563eb",
-          fillOpacity:0.08
+function openDetail(idx){
+  fetch("/detail/"+idx)
+    .then(r=>r.json())
+    .then(d=>{
+
+      document.getElementById("m_title").innerText = d["프로그램명칭"] || "";
+      document.getElementById("m_org").innerText   = d["서비스제공기관명"] || "";
+      document.getElementById("m_tel").innerText   = d["기관연락처"] || "";
+      document.getElementById("m_addr").innerText  = d["기관주소"] || "";
+      document.getElementById("m_other").innerText = d["기타"] || "";
+
+      const addr = d["기관주소"] || "";
+      document.getElementById("m_map").src =
+        "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
+
+      // 📞 전화버튼 항상 표시 (모바일/아이폰/안드로이드 모두 가능)
+      const telLink = document.getElementById("tel_link");
+      const tel = d["기관연락처"] || "";
+
+      if(tel){
+        const cleanNumber = tel.replace(/[^0-9]/g, "");
+        if(cleanNumber){
+          telLink.href = "tel:" + cleanNumber;
+          telLink.style.display = "inline";
+        } else {
+          telLink.style.display = "none";
         }
-      );
-      window.mobileMarkerGroup.addLayer(circle);
-    }
-  }
-
-  items.forEach(item=>{
-    const icon = buildMarkerIcon(item.마커색상);
-
-    const marker = L.marker([item.위도, item.경도], { icon });
-
-    const popupHtml = `
-      <div class="popup-wrap">
-        <img class="popup-img" src="${escapeHtml(item.사진URL)}" alt="현장 사진">
-
-        <div class="popup-title">${escapeHtml(item.구분)}</div>
-
-        <div class="popup-meta">
-          순번: ${escapeHtml(item.순번)}<br>
-          시군구: ${escapeHtml(item.시군구)}<br>
-          읍면동: ${escapeHtml(item.읍면동)}<br>
-          날짜: ${escapeHtml(item.날짜)}<br>
-          주소: ${escapeHtml(item.주소)}
-        </div>
-
-        <div class="popup-desc">
-          ${escapeHtml(item.사고설명)}
-        </div>
-
-          <div style="margin-top:10px;">
-            <a 
-              href="https://map.naver.com/v5/search/${encodeURIComponent(item.주소)}"
-              target="_blank"
-              style="
-                display:block;
-                text-align:center;
-                background:#03C75A;
-                color:#ffffff;
-                font-weight:700;
-                padding:8px;
-                border-radius:8px;
-                text-decoration:none;
-                font-size:13px;
-              ">
-              네이버지도 길찾기
-            </a>
-          </div>
-        </div>
-    `;
-
-    marker.bindPopup(popupHtml, { maxWidth: 290 });
-    window.mobileMarkerGroup.addLayer(marker);
-    bounds.push([item.위도, item.경도]);
-  });
-
-  setTimeout(()=>{
-    window.mobileLeafletMap.invalidateSize();
-
-    if(bounds.length > 0){
-      window.mobileLeafletMap.fitBounds(bounds, { padding:[40,40] });
-    }else{
-      window.mobileLeafletMap.setView([34.85, 126.90], 9);
-    }
-  }, 250);
-
-
-// 🔵 여기 추가
-if(userLat && userLng){
-  showMobileResults(items,userLat,userLng);
-}
-
-}  
-
-
-async function findNearest(){
-
-  if(!navigator.geolocation){
-    showMsg("GPS를 지원하지 않는 기기입니다.");
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-
-  async pos => {
-
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-
-    userLat = lat;
-    userLng = lng;
-
-    const res = await fetch("/data");
-    const data = await res.json();
-
-    markerGroup.clearLayers();
-
-    L.marker(
-      [lat, lng],
-      { icon: buildUserIcon() }
-    ).addTo(markerGroup);
-
-    let nearest = null;
-    let minDist = Infinity;
-
-    data.forEach(item => {
-
-      const dist = map.distance(
-        [lat, lng],
-        [item.위도, item.경도]
-      );
-
-      if(dist < minDist){
-        minDist = dist;
-        nearest = item;
+      } else {
+        telLink.style.display = "none";
       }
 
+      document.getElementById("modal").style.display="block";
     });
-
-    if(!nearest){
-      showMsg("주변 위험지역이 없습니다.");
-      return;
-    }
-
-    const icon = buildMarkerIcon(nearest.마커색상);
-
-    const marker = L.marker(
-      [nearest.위도, nearest.경도],
-      { icon }
-    );
-
-    const popupHtml = `
-<div class="popup-wrap">
-
-<img class="popup-img" src="${escapeHtml(nearest.사진URL)}" alt="현장 사진">
-
-<div class="popup-title">${escapeHtml(nearest.구분)}</div>
-
-<div class="popup-meta">
-순번: ${escapeHtml(nearest.순번)}<br>
-시군구: ${escapeHtml(nearest.시군구)}<br>
-읍면동: ${escapeHtml(nearest.읍면동)}<br>
-날짜: ${escapeHtml(nearest.날짜)}<br>
-주소: ${escapeHtml(nearest.주소)}
-</div>
-
-<div class="popup-desc">
-${escapeHtml(nearest.사고설명)}
-</div>
-
-<div style="margin-top:10px;">
-<a 
-href="https://map.naver.com/v5/search/${encodeURIComponent(nearest.주소)}"
-target="_blank"
-style="
-display:block;
-text-align:center;
-background:#03C75A;
-color:#ffffff;
-font-weight:700;
-padding:8px;
-border-radius:8px;
-text-decoration:none;
-font-size:13px;
-">
-네이버지도 길찾기
-</a>
-</div>
-
-</div>
-`;
-
-
-marker.bindPopup(popupHtml, { maxWidth: 290 });
-
-    markerGroup.addLayer(marker);
-
-    map.setView([nearest.위도, nearest.경도], 16);
-
-    document.getElementById("countTotal").textContent = 1;
-    document.getElementById("countCity").textContent = "내 주변";
-
-    if(isMobile()){
-      syncToMobileMap([nearest], lat, lng, null);
-    }
-
-  },
-  err => {
-    showMsg("위치를 가져올 수 없습니다.");
-  },
-  {
-    enableHighAccuracy:false,
-    timeout:5000,
-    maximumAge:60000
-  });
-
 }
 
-async function findRadius(km){
-
-  if(!navigator.geolocation){
-    showMsg("GPS를 지원하지 않는 기기입니다.");
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-  async pos => {
-
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-
-    userLat = lat;
-    userLng = lng;
-
-    const res = await fetch("/data");
-    const data = await res.json();
-
-    markerGroup.clearLayers();
-
-    const radiusMeter = km * 1000;
-
-    L.marker(
-      [lat, lng],
-      { icon: buildUserIcon() }
-    ).addTo(markerGroup);
-
-    L.circle(
-      [lat, lng],
-      {
-        radius: radiusMeter,
-        color:"#2563eb",
-        fillColor:"#2563eb",
-        fillOpacity:0.08
-      }
-    ).addTo(markerGroup);
-
-    const filtered = [];
-
-    data.forEach(item => {
-
-      const dist = map.distance(
-        [lat, lng],
-        [item.위도, item.경도]
-      );
-
-      if(dist <= radiusMeter){
-
-        filtered.push(item);
-
-        const icon = buildMarkerIcon(item.마커색상);
-
-        const marker = L.marker(
-          [item.위도, item.경도],
-          { icon }
-        );
-const popupHtml = `
-<div class="popup-wrap">
-
-<img class="popup-img" src="${escapeHtml(item.사진URL)}" alt="현장 사진">
-
-<div class="popup-title">${escapeHtml(item.구분)}</div>
-
-<div class="popup-meta">
-순번: ${escapeHtml(item.순번)}<br>
-시군구: ${escapeHtml(item.시군구)}<br>
-읍면동: ${escapeHtml(item.읍면동)}<br>
-날짜: ${escapeHtml(item.날짜)}<br>
-주소: ${escapeHtml(item.주소)}
-</div>
-
-<div class="popup-desc">
-${escapeHtml(item.사고설명)}
-</div>
-
-<div style="margin-top:10px;">
-<a 
-href="https://map.naver.com/v5/search/${encodeURIComponent(item.주소)}"
-target="_blank"
-style="
-display:block;
-text-align:center;
-background:#03C75A;
-color:#ffffff;
-font-weight:700;
-padding:8px;
-border-radius:8px;
-text-decoration:none;
-font-size:13px;
-">
-네이버지도 길찾기
-</a>
-</div>
-
-</div>
-`;
-
-marker.bindPopup(popupHtml, { maxWidth: 290 });
-
-        markerGroup.addLayer(marker);
-
-      }
-
-    });
-
-    if(filtered.length === 0){
-
-  showMsg(`${km}km 안에 위험지역이 없습니다.`);
-
-  return;
+function closeModal(){
+  document.getElementById("modal").style.display="none";
 }
-
-    const bounds = [
-      [lat, lng],
-      ...filtered.map(item => [item.위도, item.경도])
-    ];
-
-    document.getElementById("countTotal").textContent = filtered.length;
-    document.getElementById("countCity").textContent = "내 주변";
-
-    map.fitBounds(bounds, { padding:[40,40] });
-
-    if(isMobile()){
-      syncToMobileMap(filtered, lat, lng, radiusMeter);
-    }
-
-  },
-  err => {
-    showMsg("위치를 가져올 수 없습니다.");
-  },
-  {
-    enableHighAccuracy:false,
-    timeout:5000,
-    maximumAge:60000
-  });
-
-}
-
-window.addEventListener("DOMContentLoaded", function(){
-
-  const locBtn = document.getElementById("locBtn");
-
-  if(locBtn){
-    locBtn.onclick = function(){
-
-      if(!navigator.geolocation){
-        showMsg("GPS를 지원하지 않는 기기입니다.");
-        return;
-      }
-
-navigator.geolocation.getCurrentPosition(
-
-pos=>{
-
-const lat = pos.coords.latitude;
-const lng = pos.coords.longitude;
-
-markerGroup.clearLayers();
-
-map.setView([lat, lng], 15);
-
-L.marker(
-  [lat, lng],
-  { icon: buildUserIcon() }
-).addTo(markerGroup);
-
-if(window.mobileLeafletMap){
-  window.mobileLeafletMap.setView([lat,lng],15);
-}
-
-if(window.mobileMarkerGroup){
-  window.mobileMarkerGroup.clearLayers();
-
-  L.marker([lat,lng],{icon:buildUserIcon()})
-  .addTo(window.mobileMarkerGroup);
-}
-
-
-},
-
-err=>{
-  showMsg("GPS를 지원하지 않는 기기입니다.");
-},
-
-{
-  enableHighAccuracy:false,
-  timeout:4000,
-  maximumAge:60000
-}
-
-);
-    };
-  }
-
-});
-window.addEventListener("popstate", function(){
-
-const popup = document.getElementById("mobileMapPopup");
-const result = document.getElementById("mobileResultPanel");
-
-if(result && result.style.display === "flex"){
-  result.style.display = "none";
-  return;
-}
-
-if(popup && popup.style.display === "flex"){
-  popup.style.display = "none";
-  return;
-}
-
-});
-
-window.addEventListener("DOMContentLoaded", function(){
-
-const mobileBtn = document.getElementById("mobileLocBtn");
-
-if(mobileBtn){
-
-mobileBtn.onclick = function(){
-
-if(!navigator.geolocation){
-  alert("GPS를 지원하지 않습니다.");
-  return;
-}
-
-navigator.geolocation.getCurrentPosition(pos=>{
-const lat = pos.coords.latitude;
-const lng = pos.coords.longitude;
-
-if(window.mobileLeafletMap){
-
-  window.mobileLeafletMap.setView([lat,lng],15);
-
-  if(window.mobileMarkerGroup){
-    window.mobileMarkerGroup.clearLayers();
-
-    L.marker([lat,lng],{icon:buildUserIcon()})
-    .addTo(window.mobileMarkerGroup);
-  }
-
-}});
-
-};
-
-}
-
-});
 
 
 </script>
+</body>
+</html>
+"""
 
-<div class="mobile-result-panel" id="mobileResultPanel">
-  <div class="mobile-result-header">
-    검색 결과 <span id="mobileResultCount">0</span>건
+@app.route("/desc", methods=["GET","POST"])
+def desc():
+    check = login_required()
+    if check:
+        return check
+
+    query = ""
+    results = {}
+    cond_display = None
+    count = 0
+
+    if request.method == "POST":
+        query = (request.form.get("query") or "").strip()
+        cond_display = []
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            cond_display.append("OPENAI_API_KEY가 설정되어 있지 않습니다.")
+            return render_template_string(
+                DESC_HTML,
+                style=BASE_STYLE,
+                query=query,
+                results={},
+                cond_display=cond_display,
+                count=0
+            )
+
+        client = OpenAI(api_key=api_key)
+
+        prompt = f"""
+역할: 통합돌봄 자원검색 조건 추출기.
+반드시 JSON만 출력한다. 설명, 문장, 코드블록 금지.
+
+출력 형식:
+{{
+  "시군구": string|null,
+  "대분류": "보건의료"|"생활지원"|"요양"|"주거지원"|null,
+  "건강상태": string|null,
+  "건강확장키워드": [string]
+}}
+
+규칙:
+1. 문장에 지역이 있으면 반드시 표준 행정명으로 변환해 "시군구"에 채워라.
+2. 요양/의료/주거/생활 관련 단어가 있으면 대분류에 정확히 매칭.
+3. "어르신","노인","고령자"는 조건에서 제외.
+4. "거동"과 "불편"이 함께 있으면 반드시 "거동불편".
+5. 건강 표현이 있으면 가장 일반적인 질환명으로 정규화.
+6. 건강상태가 추출되면 의미적으로 함께 검색될 키워드 3~5개 생성.
+7. 건강상태가 null이면 건강확장키워드는 빈 배열.
+8. 가능한 한 최소 1개 이상 채워라.
+9. 사용자가 명시하지 않은 대분류는 추론하여 채우지 말 것.
+
+입력:
+{query}
+"""
+
+        data = {"시군구": None, "대분류": None, "건강상태": None, "건강확장키워드": []}
+
+        try:
+            res = client.chat.completions.create(
+                model="gpt-4.1-mini",
+                messages=[{"role":"user","content":prompt}],
+                temperature=0,
+                response_format={"type":"json_object"}
+            )
+
+            text = res.choices[0].message.content
+            print("GPT 원문:", text)   # ✅ 이 줄 추가
+            m = re.search(r"\{.*\}", text, re.S)
+
+            if m:
+                parsed = json.loads(m.group())
+                data["시군구"] = parsed.get("시군구")
+                data["대분류"] = parsed.get("대분류")
+                data["건강상태"] = parsed.get("건강상태")
+                data["건강확장키워드"] = parsed.get("건강확장키워드", [])
+
+        except Exception as e:
+            cond_display.append(f"GPT 오류: {e}")
+
+
+        # 후처리
+        if data.get("시군구"):
+            data["시군구"] = normalize_sigungu(data["시군구"])
+            cond_display.append(f"시군구: {data['시군구']}")
+
+        if data.get("대분류"):
+            cond_display.append(f"대분류: {data['대분류']}")
+
+        if data.get("건강상태"):
+            data["건강상태"] = normalize_health(data["건강상태"])
+            cond_display.append(f"건강상태: {data['건강상태']}")
+
+        # 🔎 필터링
+        filtered = df.copy()
+
+        if data.get("시군구"):
+            filtered = filtered[
+                filtered["시군구"].astype(str)
+                .str.contains(str(data["시군구"]), na=False)
+            ]
+
+        if data.get("대분류"):
+            filtered = filtered[
+                filtered["대분류"].astype(str) == str(data["대분류"])
+            ]
+
+        # 🔎 건강 + 기타 OR 검색 (항상 실행)
+
+        # 🔎 건강 + 기타 OR 검색 (프로그램명 제외)
+
+        keywords = []
+
+        if data.get("건강상태"):
+            keywords.append(str(data["건강상태"]))
+
+        if data.get("건강확장키워드"):
+            keywords.extend(data["건강확장키워드"])
+
+        keywords = list(set([k for k in keywords if k]))
+
+        if keywords:
+
+            import pandas as pd
+            condition = pd.Series(False, index=filtered.index)
+
+            for kw in keywords:
+                condition |= (
+                    filtered["건강상태"].astype(str).str.contains(kw, na=False)
+                    | filtered["기타"].astype(str).str.contains(kw, na=False)
+                )
+
+            filtered = filtered[condition]
+
+            # 🔥 조건 표시에도 기타 포함 표시
+            cond_display.append("검색열: 건강상태 + 기타")
+
+
+        # 🔎 그룹핑
+        grouped = {}
+
+        for _, row in filtered.reset_index().iterrows():
+            sigungu = str(row.get("시군구","")) or "기타"
+
+            grouped.setdefault(sigungu, []).append({
+                "index": int(row["index"]),
+                "label": f"{row.get('프로그램명칭','')} ({row.get('서비스제공기관명','')})"
+            })
+
+        results = grouped
+        count = sum(len(v) for v in grouped.values())
+
+    return render_template_string(
+        DESC_HTML,
+        style=BASE_STYLE,
+        query=query,
+        results=results,
+        cond_display=cond_display,
+        count=count
+    )
+# =========================
+# ② 서술형 검색 (GPT 기반) + 팝업/지도 포함
+# =========================
+DESC_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사례기반 자원검색(AI)</title>
+<style>{{style}}</style>
+<style>
+@media (min-width: 768px) {
+  #tel_link {
+    display: none !important;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<a href="/home" class="home-btn">홈으로</a>
+<h2>사례기반 자원검색(AI)</h2>
+
+<form method="post">
+<textarea id="queryBox" name="query" placeholder="예: 담양에 사는거동불편한 어르신이 이용가능한 서비스">{{query}}</textarea>
+<button type="submit" class="menu-btn">검색하기</button>
+</form>
+{% if cond_display is not none %}
+<div class="result">
+
+{% if cond_display %}
+<p><b>이 조건으로 검색했습니다</b></p>
+<ul>
+{% for c in cond_display %}
+<li>✔ {{c}}</li>
+{% endfor %}
+</ul>
+<hr>
+{% endif %}
+
+<p><b>{{count}}건이 조회되었습니다.</b></p>
+
+{% if count == 0 %}
+<p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
+{% endif %}
+
+{% for region,items in results.items() %}
+<h3>📍 {{region}}</h3>
+{% for r in items %}
+<div class="item" onclick="openDetail({{r['index']}})">- {{r['label']}}</div>
+{% endfor %}
+{% endfor %}
+
+</div>
+{% endif %}
+
+<!-- 팝업 -->
+<div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
+  <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+    <h3 id="m_title"></h3>
+    <p><b>기관명:</b> <span id="m_org"></span></p>
+    <p>
+        <b>기관 연락처:</b> <span id="m_tel"></span>
+        <a id="tel_link"
+             style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">
+             📞
+        </a>
+</p>
+    <p><b>기관주소:</b> <span id="m_addr"></span></p>
+    <p><b>기타:</b> <span id="m_other"></span></p>
+    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;"></iframe>
+    <button onclick="closeModal()" class="menu-btn">닫기</button>
   </div>
-  <div class="mobile-result-list" id="mobileResultList"></div>
 </div>
 
-<div class="mobile-map-popup" id="mobileMapPopup">
+<script>
+function openDetail(idx){
+  fetch("/detail/"+idx)
+    .then(r=>r.json())
+    .then(d=>{
 
-  <div class="mobile-map-header">
-    지도 보기
-    <button class="mobile-map-close" onclick="closeMobileMap()">닫기</button>
-  </div>
+      document.getElementById("m_title").innerText = d["프로그램명칭"] || "";
+      document.getElementById("m_org").innerText   = d["서비스제공기관명"] || "";
+      document.getElementById("m_tel").innerText   = d["기관연락처"] || "";
+      document.getElementById("m_addr").innerText  = d["기관주소"] || "";
+      document.getElementById("m_other").innerText = d["기타"] || "";
 
-  <div id="mobileMap" class="mobile-map"></div>
-  <button id="mobileLocBtn">📍</button>
+      const addr = d["기관주소"] || "";
+      document.getElementById("m_map").src =
+        "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
 
-  <div class="map-legend">
+      // 📞 전화버튼 항상 표시 (모바일/아이폰/안드로이드 모두 가능)
+      const telLink = document.getElementById("tel_link");
+      const tel = d["기관연락처"] || "";
 
-    <div class="map-legend-item">
-      <span class="map-legend-dot" style="background:#ef4444"></span>
-      교통사고다발구역
-    </div>
+      if(tel){
+        const cleanNumber = tel.replace(/[^0-9]/g, "");
+        if(cleanNumber){
+          telLink.href = "tel:" + cleanNumber;
+          telLink.style.display = "inline";
+        } else {
+          telLink.style.display = "none";
+        }
+      } else {
+        telLink.style.display = "none";
+      }
 
-    <div class="map-legend-item">
-      <span class="map-legend-dot" style="background:#06b6d4"></span>
-      상습결빙구역
-    </div>
+      document.getElementById("modal").style.display="block";
+    });
+}
 
-    <div class="map-legend-item">
-      <span class="map-legend-dot" style="background:#2563eb"></span>
-      상습침수구역
-    </div>
-
-    <div class="map-legend-item">
-      <span class="map-legend-dot" style="background:#f97316"></span>
-      화재다빈도발생구역
-    </div>
-
-    <div class="map-legend-item">
-      <span class="map-legend-dot" style="background:#7c3aed"></span>
-      우범지역
-    </div>
-<div class="map-legend-item">
-  <span class="map-legend-dot" style="background:#22c55e"></span>
-  내 위치
-</div>
-
-
-  </div>
-
-</div>
-
-
-
-<div id="msgModal" style="
-position:fixed;
-inset:0;
-background:rgba(0,0,0,0.45);
-display:none;
-align-items:center;
-justify-content:center;
-z-index:5000;
-">
-
-<div style="
-background:white;
-padding:22px;
-border-radius:14px;
-width:280px;
-text-align:center;
-box-shadow:0 10px 30px rgba(0,0,0,.25);
-">
-
-<div id="msgText" style="
-font-size:15px;
-margin-bottom:18px;
-line-height:1.5;
-"></div>
-
-<button onclick="closeMsg()" style="
-background:#2563eb;
-border:none;
-color:white;
-padding:8px 16px;
-border-radius:8px;
-font-weight:700;
-cursor:pointer;
-">
-확인
-</button>
-
-</div>
-</div>
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+}
+document.getElementById("queryBox").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    this.form.submit();
+  }
+});
+</script>
 
 </body>
 </html>
 """
 
+def normalize_sigungu(text: str) -> str:
+    if not text:
+        return ""
+    t = str(text).strip()
+    mapping = {"나주":"나주시", "목포":"목포시", "영암":"영암군"}
+    if t in mapping:
+        return mapping[t]
+    return t
 
-@app.route("/ci")
-def ci():
-    return send_file("ci.png", mimetype="image/png")
+def normalize_health(text: str) -> str:
+    if not text:
+        return ""
 
-@app.route("/")
-def index():
-    return render_template_string(HTML)
+    t = str(text).strip()
 
+    # 공백 제거
+    t = t.replace(" ", "")
 
-@app.route("/meta")
-def meta():
-    df = load_df()
+    # 불필요 단어 제거
+    t = t.replace("어르신", "")
+    t = t.replace("노인", "")
+    t = t.replace("고령자", "")
 
-    cities = sorted(df["시군구"].dropna().astype(str).unique().tolist())
-    towns = sorted(df["읍면동"].dropna().astype(str).unique().tolist())
+    # 거동불편 변형 통합
+    if "거동" in t and "불편" in t:
+        return "거동불편"
 
-    return jsonify({
-        "cities": cities,
-        "towns": towns
-    })
-
-
-@app.route("/towns")
-def towns():
-    city = safe_str(request.args.get("city", ""))
-    df = load_df()
-
-    if city:
-        df = df[df["시군구"] == city]
-
-    town_list = sorted(df["읍면동"].dropna().astype(str).unique().tolist())
-    return jsonify({"towns": town_list})
+    return t
 
 
-@app.route("/data")
-def data():
-    city = safe_str(request.args.get("city", ""))
-    town = safe_str(request.args.get("town", ""))
-    categories = request.args.getlist("category")
-
-    df = load_df()
-
-    if city:
-        df = df[df["시군구"] == city]
-
-    if town:
-        df = df[df["읍면동"] == town]
-
-    if categories:
-        df = df[df["구분"].isin(categories)]
-
-    records = [row_to_dict(row) for _, row in df.iterrows()]
-    return jsonify(records)
+# =========================
+# ③ 사전조사 (UI 유지)
+# =========================
+CARE_QUESTIONS = [
+    "의자나 소파에서 걸터앉은 상태에서 무릎을 짚고 일어설 수 있습니까?",
+    "집안에서 6걸음을 이동할 수 있습니까?",
+    "등을 제외한 몸 전체를 씻을 수 있습니까?",
+    "상의 입고 단추를 잠글 수 있습니까?",
+    "하의를 입고 지퍼를 올릴 수 있습니까?",
+    "소변실수를 하지 않고 화장실에 갈 수 있습니까?",
+    "화장실에서 변기에 앉아 용변을 볼 수 있습니까?"
+]
 
 
-@app.route("/sample-image")
-def sample_image():
-    category = safe_str(request.args.get("category", "위험지역"))
-    city = safe_str(request.args.get("city", ""))
-    town = safe_str(request.args.get("town", ""))
+CARE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 사전조사</title>
+<style>{{style}}</style>
 
-    color = TYPE_COLORS.get(category, "#334155")
+<style>
+/* ====== 사전조사 전용 스타일 ====== */
 
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450">
-    <defs>
-      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="{color}"/>
-        <stop offset="100%" stop-color="#0f172a"/>
-      </linearGradient>
-    </defs>
-    <rect width="800" height="450" fill="url(#g)"/>
-    <rect x="30" y="30" width="740" height="390" rx="24" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)"/>
-    <text x="50%" y="42%" text-anchor="middle" fill="white" font-size="42" font-family="Arial" font-weight="700">{category}</text>
-    <text x="50%" y="54%" text-anchor="middle" fill="white" font-size="24" font-family="Arial">{city} {town}</text>
-    <text x="50%" y="70%" text-anchor="middle" fill="white" font-size="18" font-family="Arial">샘플 이미지</text>
-    </svg>"""
-    return Response(svg, mimetype="image/svg+xml")
+/* PC에서만 줄바꿈 */
+.pc-br{
+  display:inline;
+}
 
+/* 모바일에서는 줄바꿈 제거 */
+@media (max-width:480px){
+  .pc-br{
+    display:none;
+  }
+}
 
-@app.route("/heartbeat", methods=["POST"])
-def heartbeat():
-    global last_heartbeat
-    last_heartbeat = time.time()
-    return ("", 204)
+.options{
+  margin-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
 
+.options label{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+}
 
-@app.route("/bye", methods=["POST"])
-def bye():
-    global last_heartbeat
-    last_heartbeat = 0
-    return ("", 204)
+.options input[type=radio]{
+  width:auto !important;
+  flex:0 0 auto;
+  transform:scale(1.1);
+}
 
+.question-box{
+  background:#f5faff;              /* ✅ 기본 파란톤 배경 복구 */
+  padding:22px;
+  border-radius:12px;
+  margin-top:18px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.08);
+  border:1px solid #dbeafe;
+}
 
-def shutdown_watcher():
-    global shutdown_started
-    while True:
-        time.sleep(3)
-        if shutdown_started:
-            return
+.question-box.active{
+  border:2px solid #1e73be;
+  background:#eaf4ff;
+}
 
-        # 브라우저 닫힘 이후 10초 내 서버 종료
-        if time.time() - last_heartbeat > 10:
-            shutdown_started = True
-            print("브라우저 연결이 종료되어 서버를 닫습니다.")
-            os._exit(0)
+.dementia-box{
+  background:#fff7ed;
+  padding:18px;
+  border-radius:10px;
+  margin-top:15px;
+  border:1px solid #fed7aa;
+}
 
+.dementia-options{
+  display:flex;
+  gap:30px;
+  margin-top:10px;
+}
 
-def open_preferred_browser(url):
-    time.sleep(1.5)
+/* 모바일에서 치매 선택 박스가 답답하면 줄바꿈 */
+@media (max-width:480px){
+  .dementia-options{ gap:18px; }
+}
+@media (max-width:480px){
 
-    candidates = [
-        r"C:\Program Files\Naver\Naver Whale\Application\whale.exe",
-        r"C:\Program Files (x86)\Naver\Naver Whale\Application\whale.exe",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-    ]
+  #resultModal{
+    padding-top:0 !important;
+  }
 
-    for path in candidates:
-        if os.path.exists(path):
-            try:
-                webbrowser.register("preferred_browser", None, webbrowser.BackgroundBrowser(path))
-                webbrowser.get("preferred_browser").open(url)
-                return
-            except Exception:
-                pass
+  #resultModal > div{
+    top:2% !important;
+  }
 
-    webbrowser.open(url)
+}
 
+</style>
+</head>
 
-if __name__ == "__main__":
+<body>
+<div class="container">
 
-    port = int(os.environ.get("PORT", 5000))
-    url = f"http://127.0.0.1:{port}"
+  <a href="/home" class="home-btn">홈으로</a>
+  <h2>통합돌봄 사전조사</h2>
 
-    # 로컬 실행일 때만 브라우저 자동 열기
-    if os.environ.get("RENDER_SERVICE_ID") is None:
-        threading.Thread(target=shutdown_watcher, daemon=True).start()
-        threading.Thread(target=open_preferred_browser, args=(url,), daemon=True).start()
+  <form id="careForm">
+    <div class="dementia-box">
+      <b>치매 관련 약 복용 여부</b>
 
-    app.run(host="0.0.0.0", port=port, debug=False)
+      <div class="dementia-options">
+        <label>
+          <input type="radio" name="dementia" value="y">
+          예
+        </label>
+
+        <label>
+          <input type="radio" name="dementia" value="n">
+          아니오
+        </label>
+      </div>
+    </div>
+
+    <div id="adlSection">
+      {% for i,q in questions %}
+      <div class="question-box">
+        <b>{{i+1}}) {{q}}</b>
+
+        <div class="options">
+          <label>
+            <input type="radio" name="q{{i}}" value="0">
+            도움 없이 혼자서 수행 가능 (0점)
+          </label>
+
+          <label>
+            <input type="radio" name="q{{i}}" value="1">
+            보조도구(지팡이 등)를 잡고 수행 가능 (1점)
+          </label>
+
+          <label>
+            <input type="radio" name="q{{i}}" value="2">
+            타인이 도와줘야 수행 가능 (2점)
+          </label>
+        </div>
+      </div>
+      {% endfor %}
+
+      <button type="submit" class="menu-btn">검사하기</button>
+    </div>
+  </form>
+
+</div>
+
+<!-- 결과/안내 팝업 -->
+<div id="resultModal"
+     style="display:none;position:fixed;inset:0;
+            background:rgba(0,0,0,.5);z-index:999;
+            padding-top:6vh; overflow:auto; -webkit-overflow-scrolling:touch;">
+
+  <div style="background:white;
+            margin:0 auto;
+            position:absolute;
+            top:8%;
+            left:0;
+            right:0;
+            padding:18px 22px 22px 22px;
+            width:92%;
+            max-width:460px;
+            border-radius:14px;
+            text-align:center;
+            box-shadow:0 10px 25px rgba(0,0,0,0.15)">
+    <h3 id="modalTitle" style="margin-top:0;margin-bottom:12px;">사전조사 결과 안내</h3>
+
+    <div style="background:#f4f8ff;border-radius:10px;padding:14px;margin-bottom:18px">
+      <p id="r_text" style="font-size:18px;line-height:1.6;margin:0"></p>
+    </div>
+
+    <div style="text-align:left;font-size:14px;line-height:1.6;color:#444;
+                background:#fafafa;padding:14px;border-radius:8px">
+      <b>통합돌봄 지원 기준</b><br><br>
+
+      ① 치매약 복약 중인 경우<br>
+      → 일상생활 수행능력과 관계없이 통합돌봄 지원 대상<br><br>
+
+      ② 일상생활수행능력(ADL) 점수 기준<br>
+      • 0~1점 : 지자체 사업 안내 후 종결<br>
+      • 2~3점 : 지자체 자체조사 후 지원 검토<br>
+      • 4점 이상 : 통합판정조사 대상<br><br>
+
+      <span style="font-size:12px;color:#666;">
+        ※ 본 결과는 통합돌봄 서비스 안내를 위한 참고용 사전조사입니다.<br>
+        최종 지원 여부는 지자체 및 공단의 추가 조사 후 결정됩니다.
+      </span>
+    </div>
+
+    <button onclick="closeModal()" class="menu-btn" style="margin-top:22px">확인</button>
+  </div>
+</div>
+
+<script>
+/* ====== 공통 팝업 열기 ====== */
+function showGuide(messageHtml){
+  document.getElementById("modalTitle").innerText = "안내";
+  document.getElementById("r_text").innerHTML = messageHtml;
+  document.getElementById("resultModal").style.display = "block";
+}
+
+function showResult(title, messageText){
+  document.getElementById("modalTitle").innerText = title;
+  document.getElementById("r_text").innerText = messageText;
+  document.getElementById("resultModal").style.display = "block";
+}
+
+function closeModal(){
+  document.getElementById("resultModal").style.display="none";
+}
+
+/* ====== 1) 치매 선택 안 했는데 ADL 누르면 '차단' ====== */
+document.querySelectorAll('#adlSection .options input[type="radio"]').forEach(radio => {
+  radio.addEventListener("change", function(){
+    const dementia = document.querySelector('input[name="dementia"]:checked');
+
+    if(!dementia){
+      // ✅ ADL 선택 자체를 취소하고 안내
+      this.checked = false;
+      showGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를<br> 선택해주세요.");
+      return;
+    }
+
+    // 치매 선택이 되어 있으면 카드 강조
+    const box = this.closest(".question-box");
+    if(box) box.classList.add("active");
+  });
+});
+
+/* ====== 2) 치매 '예'면 즉시 안내 팝업 + ADL 흐리게 ====== */
+document.querySelectorAll('input[name="dementia"]').forEach(radio=>{
+  radio.addEventListener("change",function(){
+    if(this.value === "y"){
+      document.getElementById("adlSection").style.opacity="0.4";
+      showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 관계없이 <b>통합돌봄 대상</b>입니다.");
+    }else{
+      document.getElementById("adlSection").style.opacity="1";
+    }
+  });
+});
+
+/* ====== 3) 검사하기 클릭 시: 치매 미선택이면 막기 ====== */
+document.getElementById("careForm").onsubmit = async function(e){
+  e.preventDefault();
+
+  const dementia = document.querySelector('input[name="dementia"]:checked');
+
+  if(!dementia){
+    showGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를 선택해주세요.");
+    return;
+  }
+
+  // 치매 '예'는 이미 팝업으로 안내했으니 여기선 종료
+  if(dementia.value === "y"){
+    return;
+  }
+
+  // ✅ 치매 '아니오'면 ADL 응답이 7개 다 되었는지 체크
+  for(let i=0; i<7; i++){
+    const checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(!checked){
+      showGuide((i+1) + "번 문항을 선택해주세요.");
+      return;
+    }
+  }
+
+  const formData = new FormData(this);
+
+  const res = await fetch("/care_check",{
+    method:"POST",
+    body:formData
+  });
+
+  const data = await res.json();
+
+  showResult("사전조사 결과 안내", data.result + "\\n총점: " + data.score);
+}
+</script>
+
+</body>
+</html>
+"""
+
+@app.route("/care")
+def care():
+    check = login_required()
+    if check:
+        return check
+    return render_template_string(
+        CARE_HTML,
+        style=BASE_STYLE,
+        questions=list(enumerate(CARE_QUESTIONS))
+    )
+
+@app.route("/care_check", methods=["POST"])
+def care_check():
+    check = login_required()
+    if check:
+        return check
+
+    score = 0
+    dementia = request.form.get("dementia", "n")
+
+    for i in range(7):
+        val = request.form.get(f"q{i}")
+        if val is None or val == "":
+            val = 0
+        score += int(val)
+
+    if dementia == "y":
+        return jsonify({"result":"통합돌봄 지원 대상 (치매약 복용)","score":"검사 제외"})
+
+    if score <= 1:
+        result = "지원 대상 아님"
+    elif score <= 3:
+        result = "지자체 자체조사 대상"
+    else:
+        result = "통합판정조사 대상"
+
+    return jsonify({"result":result,"score":score})
+
+NHIS25_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>건강보험 25시</title>
+<style>{{style}}</style>
+</head>
+<body>
+<div class="container">
+  <a href="/home" class="home-btn">홈으로</a>
+  <h2>건강보험 25시</h2>
+
+  <div class="result" style="text-align:center;font-size:18px;">
+    준비 중입니다.
+  </div>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/nhis25")
+def nhis25():
+    check = login_required()
+    if check:
+        return check
+    return render_template_string(NHIS25_HTML, style=BASE_STYLE)
+
