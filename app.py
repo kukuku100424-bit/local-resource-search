@@ -13,6 +13,15 @@ app = Flask(__name__)
 app.secret_key = "super_secret_key"
 
 FILE_PATH = "service_resources.xlsx"
+# =========================
+# 서비스 그룹 엑셀 로드 (AI 추천용)
+# =========================
+SERVICE_GROUP_FILE = "service_group.xlsx"
+
+service_df = pd.read_excel(SERVICE_GROUP_FILE).fillna("")
+service_df.columns = service_df.columns.astype(str).str.replace(" ", "").str.strip()
+
+print("서비스그룹 컬럼:", list(service_df.columns))
 
 # =========================
 # 로그인 체크
@@ -168,10 +177,11 @@ button:hover{ background:#155fa0; }
     <div class="error-msg">❌ {{error}}</div>
   {% endif %}
 
-  <form method="post">
+  <form method="post" id="searchForm">
     <input type="password" name="password" placeholder="비밀번호 입력">
     <button type="submit">로그인</button>
   </form>
+
 
   <div class="notice">
     ※ 본 서비스는 국민건강보험공단 광주전라제주지역본부<br>
@@ -396,6 +406,16 @@ HOME_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>통합돌봄 서비스 자원검색</title>
 <style>{{style}}</style>
+
+<style>
+
+@keyframes spin{
+0%{transform:rotate(0deg);}
+100%{transform:rotate(360deg);}
+}
+
+</style>
+
 <style>
 /* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
 /* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
@@ -481,7 +501,7 @@ HOME_HTML = """
   <button class="menu-btn home-menu-btn">
     <span class="wrap">
       <span class="num">①</span>
-      <span class="label">사례기반 자원검색(AI)</span>
+      <span class="label">사례기반 서비스내용 검색(AI)</span>
     </span>
   </button>
 </a>
@@ -754,8 +774,30 @@ function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
+window.addEventListener("load", function(){
 
-</script>
+  const form = document.querySelector("form[method='post']");
+
+  if(form){
+    form.addEventListener("submit", function(e){
+
+  const box = document.getElementById("loadingBox");
+
+  if(box){
+    box.style.display = "flex";
+  }
+
+  // 로딩창 보이게 0.2초 지연
+  e.preventDefault();
+
+  setTimeout(()=>{
+    form.submit();
+      },200);
+
+    });
+  }
+
+});</script>
 </body>
 </html>
 """
@@ -770,147 +812,178 @@ def desc():
     results = {}
     cond_display = None
     count = 0
+    service_results = []
 
     if request.method == "POST":
+
         query = (request.form.get("query") or "").strip()
+
+        # ======================
+        # 서비스 목록 문자열 생성
+        # ======================
+        # ======================
+        # 서비스 1차 필터 (토큰 절약 + 정확도 상승)
+        # ======================
+
+        q = query.lower()
+
+        candidate_rows = []
+
+        for idx, r in service_df.iterrows():
+
+            text = (
+                str(r.get("서비스설명","")) +
+                " " +
+                str(r.get("검색어",""))
+            ).lower()
+
+            score = 0
+
+            for word in q.split():
+
+                if word in text:
+                    score += 1
+
+            candidate_rows.append((score, idx, r))
+
+        # 점수 높은 순 정렬
+        candidate_rows.sort(reverse=True)
+
+        # 상위 40개만 사용
+        candidate_rows = candidate_rows[:40]
+
+        service_text = ""
+
+        for score, idx, r in candidate_rows:
+
+            service_text += f"""
+index: {idx}
+서비스설명: {r.get('서비스설명','')}
+검색어: {r.get('검색어','')}
+---
+"""
+
+        # ======================
+        # 서비스 그룹 데이터 문자열 생성
+        # ======================
+# 서비스 1차 필터 (토큰 절약)
         cond_display = []
 
         api_key = os.getenv("OPENAI_API_KEY")
+
         if not api_key:
             cond_display.append("OPENAI_API_KEY가 설정되어 있지 않습니다.")
             return render_template_string(
                 DESC_HTML,
                 style=BASE_STYLE,
                 query=query,
-                results={},
+                results=results,
                 cond_display=cond_display,
-                count=0
+                count=count,
+                service_results=service_results
             )
 
         client = OpenAI(api_key=api_key)
 
         prompt = f"""
-역할: 통합돌봄 자원검색 조건 추출기.
-반드시 JSON만 출력한다. 설명, 문장, 코드블록 금지.
+너는 통합돌봄 서비스 추천 전문가다.
 
-출력 형식:
+사용자의 사례를 분석하여
+아래 서비스 목록 중에서 가장 유사한 서비스를
+유사도가 높은 순서대로 최대 10개 추천한다.
+
+반드시 유사도가 높은 순서대로 정렬해서 추천해야 한다.
+
+반드시 JSON만 출력한다.
+
+출력 형식
+
+출력 형식
+
 {{
-  "시군구": string|null,
-  "대분류": "보건의료"|"생활지원"|"요양"|"주거지원"|null,
-  "건강상태": string|null,
-  "건강확장키워드": [string]
+  "results": [
+    {{
+      "index": "",
+      "선택이유": ""
+    }}
+  ]
 }}
 
-규칙:
-1. 문장에 지역이 있으면 반드시 표준 행정명으로 변환해 "시군구"에 채워라.
-2. 요양/의료/주거/생활 관련 단어가 있으면 대분류에 정확히 매칭.
-3. "어르신","노인","고령자"는 조건에서 제외.
-4. "거동"과 "불편"이 함께 있으면 반드시 "거동불편".
-5. 건강 표현이 있으면 가장 일반적인 질환명으로 정규화.
-6. 건강상태가 추출되면 의미적으로 함께 검색될 키워드 3~5개 생성.
-7. 건강상태가 null이면 건강확장키워드는 빈 배열.
-8. 가능한 한 최소 1개 이상 채워라.
-9. 사용자가 명시하지 않은 대분류는 추론하여 채우지 말 것.
+추천 기준
+1. 사용자 상황과의 의미적 유사성
+2. 서비스설명과의 일치 정도
+3. 검색어와의 관련성
+4. 실제 통합돌봄 연계 가능성
 
-입력:
+주의사항
+- 최대 10개만 추천한다.
+- 가장 유사한 것을 1번으로 둔다.
+- 불필요한 설명은 하지 말고 JSON만 출력한다.
+
+서비스 목록
+
+{service_text}
+
+사용자 사례
 {query}
 """
 
-        data = {"시군구": None, "대분류": None, "건강상태": None, "건강확장키워드": []}
-
         try:
-            res = client.chat.completions.create(
+
+            res = client.responses.create(
                 model="gpt-4.1-mini",
-                messages=[{"role":"user","content":prompt}],
-                temperature=0,
-                response_format={"type":"json_object"}
+                input=prompt
             )
+            if hasattr(res, "usage"):
 
-            text = res.choices[0].message.content
-            print("GPT 원문:", text)   # ✅ 이 줄 추가
-            m = re.search(r"\{.*\}", text, re.S)
+                try:
 
-            if m:
-                parsed = json.loads(m.group())
-                data["시군구"] = parsed.get("시군구")
-                data["대분류"] = parsed.get("대분류")
-                data["건강상태"] = parsed.get("건강상태")
-                data["건강확장키워드"] = parsed.get("건강확장키워드", [])
+                    print("입력 토큰:", res.usage.input_tokens)
+                    print("출력 토큰:", res.usage.output_tokens)
+                    print("총 토큰:", res.usage.total_tokens)
+
+                except:
+
+                    print("토큰 정보:", res.usage)
+            text = res.output_text
+            print("GPT 원문:", text)
+
+            try:
+                parsed = json.loads(text)
+
+            except:
+                match = re.search(r'\{.*\}', text, re.DOTALL)
+
+                if match:
+                    parsed = json.loads(match.group())
+                else:
+                    parsed = {"results":[]}
+
+            service_results = parsed.get("results", [])[:10]
+
+            final_results = []
+
+            for r in service_results:
+
+                idx = int(r.get("index", -1))
+
+                if 0 <= idx < len(service_df):
+
+                    row = service_df.iloc[idx]
+
+                    final_results.append({
+                        "대분류": row.get("대분류", ""),
+                        "중분류": row.get("중분류", ""),
+                        "서비스내용": row.get("서비스내용", ""),
+                        "선택이유": r.get("선택이유", "")
+                    })
+
+            service_results = final_results
 
         except Exception as e:
+
             cond_display.append(f"GPT 오류: {e}")
-
-
-        # 후처리
-        if data.get("시군구"):
-            data["시군구"] = normalize_sigungu(data["시군구"])
-            cond_display.append(f"시군구: {data['시군구']}")
-
-        if data.get("대분류"):
-            cond_display.append(f"대분류: {data['대분류']}")
-
-        if data.get("건강상태"):
-            data["건강상태"] = normalize_health(data["건강상태"])
-            cond_display.append(f"건강상태: {data['건강상태']}")
-
-        # 🔎 필터링
-        filtered = df.copy()
-
-        if data.get("시군구"):
-            filtered = filtered[
-                filtered["시군구"].astype(str)
-                .str.contains(str(data["시군구"]), na=False)
-            ]
-
-        if data.get("대분류"):
-            filtered = filtered[
-                filtered["대분류"].astype(str) == str(data["대분류"])
-            ]
-
-        # 🔎 건강 + 기타 OR 검색 (항상 실행)
-
-        # 🔎 건강 + 기타 OR 검색 (프로그램명 제외)
-
-        keywords = []
-
-        if data.get("건강상태"):
-            keywords.append(str(data["건강상태"]))
-
-        if data.get("건강확장키워드"):
-            keywords.extend(data["건강확장키워드"])
-
-        keywords = list(set([k for k in keywords if k]))
-
-        if keywords:
-
-            import pandas as pd
-            condition = pd.Series(False, index=filtered.index)
-
-            for kw in keywords:
-                condition |= (
-                    filtered["건강상태"].astype(str).str.contains(kw, na=False)
-                    | filtered["기타"].astype(str).str.contains(kw, na=False)
-                )
-
-            filtered = filtered[condition]
-
-            # 🔥 조건 표시에도 기타 포함 표시
-            cond_display.append("검색열: 건강상태 + 기타")
-
-
-        # 🔎 그룹핑
-        grouped = {}
-
-        for _, row in filtered.reset_index().iterrows():
-            sigungu = str(row.get("시군구","")) or "기타"
-
-            grouped.setdefault(sigungu, []).append({
-                "index": int(row["index"]),
-                "label": f"{row.get('프로그램명칭','')} ({row.get('서비스제공기관명','')})"
-            })
-
-        results = grouped
-        count = sum(len(v) for v in grouped.values())
+        count = len(service_results)
 
     return render_template_string(
         DESC_HTML,
@@ -918,7 +991,8 @@ def desc():
         query=query,
         results=results,
         cond_display=cond_display,
-        count=count
+        count=count,
+        service_results=service_results
     )
 # =========================
 # ② 서술형 검색 (GPT 기반) + 팝업/지도 포함
@@ -929,8 +1003,16 @@ DESC_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>사례기반 자원검색(AI)</title>
+<title>사례기반 서비스내용 검색(AI)</title>
 <style>{{style}}</style>
+
+<style>
+@keyframes spin{
+  0%{transform:rotate(0deg);}
+  100%{transform:rotate(360deg);}
+}
+</style>
+
 <style>
 @media (min-width: 768px) {
   #tel_link {
@@ -942,14 +1024,79 @@ DESC_HTML = """
 <body>
 <div class="container">
 <a href="/home" class="home-btn">홈으로</a>
-<h2>사례기반 자원검색(AI)</h2>
+<h2>사례기반 서비스내용 검색(AI)</h2>
 
 <form method="post">
-<textarea id="queryBox" name="query" placeholder="예: 담양에 사는거동불편한 어르신이 이용가능한 서비스">{{query}}</textarea>
+<textarea id="queryBox" name="query" placeholder="예: 관절염이 있고 정서적으로 고립된 어르신이 필요한 서비스
+">{{query}}</textarea>
 <button type="submit" class="menu-btn">검색하기</button>
+
+<div class="small" style="margin-top:12px; line-height:1.7; text-align:center;">
+  ※ 본 기능은 입력한 사례와 유사한 <b>통합돌봄 서비스 내용 최대 10가지</b>를 추천합니다.<br>
+  지자체 통합지원 계획 수립 및 서비스 연계 검토를 위한 참고자료로 활용하시기 바랍니다.
+</div>
 </form>
+
+<!-- 🔵 AI 분석 로딩창 -->
+<div id="loadingBox" style="
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.5);
+z-index:9999;
+justify-content:center;
+align-items:center;
+">
+
+<!-- 로딩 카드 -->
+<div style="
+background:white;
+padding:32px 42px;
+border-radius:14px;
+text-align:center;
+box-shadow:0 10px 30px rgba(0,0,0,0.25);
+max-width:320px;
+width:90%;
+">
+
+<!-- 🔄 로딩 스피너 -->
+<div style="
+border:6px solid #eee;
+border-top:6px solid #1e73be;
+border-radius:50%;
+width:50px;
+height:50px;
+margin:auto;
+animation:spin 1s linear infinite;
+"></div>
+
+<!-- 안내 문구 -->
+<p style="margin-top:16px;font-size:16px;font-weight:600;">
+AI가 사례를 분석 중입니다...
+</p>
+
+<!-- ⏱ 사용자 안내 -->
+<div style="font-size:12px;color:#777;margin-top:6px;">
+※ 약 3~5초 정도 소요될 수 있습니다.
+</div>
+
+<!-- 🏥 기관 CI -->
+<img src="/static/ci.png" style="
+width:160px;
+margin-top:18px;
+opacity:0.9;
+">
+
+</div>
+</div>
+
 {% if cond_display is not none %}
 <div class="result">
+
+
 
 {% if cond_display %}
 <p><b>이 조건으로 검색했습니다</b></p>
@@ -962,6 +1109,25 @@ DESC_HTML = """
 {% endif %}
 
 <p><b>{{count}}건이 조회되었습니다.</b></p>
+
+{% if service_results %}
+<hr>
+<h3 style="margin-top:20px;">AI 추천 서비스</h3>
+
+{% for r in service_results %}
+<div style="margin-bottom:14px;border-bottom:1px solid #eee;padding-bottom:10px">
+
+<b>{{loop.index}}. {{r["대분류"]}} / {{r["중분류"]}} / {{r["서비스내용"]}}</b>
+
+<div class="small" style="margin-top:6px; line-height:1.6;">
+선정 이유: {{r["선택이유"]}}
+</div>
+
+</div>
+{% endfor %}
+</div>
+
+{% endif %}
 
 {% if count == 0 %}
 <p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
@@ -1036,11 +1202,38 @@ function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 document.getElementById("queryBox").addEventListener("keydown", function(e) {
+
   if (e.key === "Enter" && !e.shiftKey) {
+
     e.preventDefault();
-    this.form.submit();
+
+    const form = this.form;
+
+    const box = document.getElementById("loadingBox");
+
+    if(box){
+      box.style.display = "flex";
+    }
+
+    form.submit();
+
   }
+
 });
+
+
+
+/* 🔥 로딩창 실행 코드 추가 */
+const form = document.querySelector("form");
+
+if(form){
+  form.addEventListener("submit", function(){
+    const box = document.getElementById("loadingBox");
+    if(box){
+      box.style.display = "flex";
+    }
+  });
+}
 </script>
 
 </body>
@@ -1438,3 +1631,6 @@ def nhis25():
         return check
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
 
+
+if __name__ == "__main__":
+    app.run(debug=True)
