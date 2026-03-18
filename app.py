@@ -141,7 +141,7 @@ button:hover{ background:#155fa0; }
 
   .notice{
     font-size:12px;
-    padding:0 6px;
+    padding:6px;
   }
 
 }
@@ -435,12 +435,12 @@ HOME_HTML = """
 
 .bottom-img{
   width:100%;
-  margin-top:-40px;   /* -80 → 줄여라 */
-}
+  margin-top:-30px; }
+
 @media (max-width:480px){
 
   .bottom-img{
-    margin-top:100px;   /* 🔥 -80 → -20으로 줄이기 */
+    margin-top:-30px;   /* 🔥 -80 → -20으로 줄이기 */
   }
 
 }
@@ -546,6 +546,7 @@ body{
   display:flex;
   gap:12px;
   margin-top:10px;
+  margin-bottom:12px;   /* 🔥 이거 추가 */
 }
 .bottom-card{
   flex:1;
@@ -578,12 +579,6 @@ body{
 
 .bottom-card div{
   font-size:14px;
-}
-
-/* 하단 이미지 */
-.bottom-img{
-  width:100%;
-  margin-top:-80px;
 }
 
 /* 모바일 */
@@ -1007,16 +1002,19 @@ def desc():
         candidate_rows.sort(reverse=True)
 
         # 상위 25개만 사용
-        candidate_rows = candidate_rows[:25]
+        candidate_rows = candidate_rows[:40]
 
         service_text = ""
 
         for score, idx, r in candidate_rows:
 
+            desc = str(r.get('서비스설명',''))[:60]
+            kw = str(r.get('검색어',''))[:30]
+
             service_text += f"""
-index: {idx}
-서비스설명: {r.get('서비스설명','')}
-검색어: {r.get('검색어','')}
+        index:{idx}
+        설명:{desc}
+        키워드:{kw}
 ---
 """
 
@@ -1088,7 +1086,7 @@ index: {idx}
         try:
 
             res = client.responses.create(
-                model="gpt-4.1",
+                model="gpt-4.1-mini",
                 input=prompt
             )
             if hasattr(res, "usage"):
@@ -1387,7 +1385,7 @@ button:hover{
 <b>{{loop.index}}. {{r["대분류"]}} / {{r["중분류"]}} / {{r["서비스내용"]}}</b>
 
 <div class="reason">
-선정 이유: {{r["선택이유"]}}
+추천 이유: {{r["선택이유"]}}
 </div>
 
 </div>
