@@ -137,6 +137,15 @@ button:hover{ background:#155fa0; }
   line-height:1.5;
 }
 
+@media (max-width:480px){
+
+  .notice{
+    font-size:12px;
+    padding:0 6px;
+  }
+
+}
+
 .bottom-logo img{
   width:100%;
   max-width:220px;
@@ -160,6 +169,7 @@ button:hover{ background:#155fa0; }
     padding:34px 20px 28px 20px;
   }
 }
+
 </style>
 </head>
 
@@ -219,174 +229,189 @@ def login():
 # 공통 CSS
 # =========================
 BASE_STYLE = """
-*{box-sizing:border-box;}
-
-#r_text{
-  word-break:keep-all;
-  overflow-wrap:break-word;
-  white-space:normal;
-}
 
 body{
-  font-family:'Pretendard',sans-serif;
   margin:0;
-  padding:16px;
-  background:#f7f9fc;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
 }
 
 .container{
-  max-width:600px;
+  max-width:700px;
   margin:auto;
+  padding:10px 20px 20px 20px;   /* 👈 위만 줄임 */
 }
 
-h1,h2{
-  text-align:center;
-  color:#2c3e50;
-  margin-bottom:12px;
-  word-break:keep-all;
-}
-@media (max-width:480px){
-  .half-menu-row{
-    flex-direction:column;
-    gap:6px;        /* 간격 줄이기 */
-    margin-top:10px;
-  }
-
-  .half-menu-row button{
-    margin-top:0;   /* 버튼 기본 margin 제거 */
-  }
-}
-
-@media (max-width:480px){
-  h1{
-    font-size:22px;
-    line-height:1.3;
-    word-break:keep-all;
-  }
-}
-
-h3{
-  margin:16px 0 8px;
-  color:#111827;
+h2{
+  margin-top:0;
+  margin-bottom:20px;
 }
 
 label{
   display:block;
-  margin-top:12px;
+  margin-top:14px;
+  font-size:14px;
   font-weight:600;
 }
 
-input[type=text],
-input[type=password],
-textarea,
-select{
+input, select{
   width:100%;
-  padding:9px 12px;
-  font-size:15px;
-  border-radius:8px;
-  border:1px solid #ccc;
-  margin-top:3px;
-}
-
-button{
-  width:100%;
-  height:50px;
-  border:none;
-  border-radius:8px;
-  font-size:17px;
-  cursor:pointer;
-  margin-top:9px;
-}
-
-.menu-btn{
-  background:#0078d7;
-  color:white;
-}
-
-.menu-btn:hover{
-  opacity:0.95;
-}
-
-.pdf-btn{
-  width:100%;
-  height:50px;
-  background:#ffffff;
-  color:#2c3e50;
-  border:1px solid #ccc;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:12px;
-  border-radius:8px;
-  cursor:pointer;
-}
-
-.pdf-btn:hover{
-  background:#f1f5f9;
-}
-
-.pdf-btn img{
-  width:32px;
-  height:auto;
-}
-
-.home-btn{
-  display:inline-block;
-  background:#2c3e50;
-  color:white;
-  padding:10px 16px;
-  border-radius:6px;
-  margin-bottom:14px;
-  text-decoration:none;
-}
-
-.result{
-  margin-top:20px;
-  background:white;
-  padding:18px;
-  border-radius:8px;
-  box-shadow:0 2px 6px rgba(0,0,0,0.1);
-}
-
-.item{
-  cursor:pointer;
-  color:#0078d7;
+  padding:12px;
   margin-top:6px;
-  margin-left:8px;
+  border-radius:8px;
+  border:1px solid #d1d5db;
+  font-size:14px;
 }
 
 .small{
-  font-size:13px;
+  font-size:12px;
   color:#6b7280;
   margin-top:4px;
 }
 
-.choice-btn{
+.menu-btn{
+  margin-top:18px;
   width:100%;
-  margin-top:8px;
-  height:46px;
-  padding:0 12px;
+  height:44px;
+  border:none;
   border-radius:10px;
-  border:1px solid #cfd8e3;
-  background:#ffffff;
-  cursor:pointer;
+  background:#2563eb;
+  color:white;
   font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.menu-btn:hover{
+  background:#1e40af;
+}
+
+.result{
+  margin-top:24px;
+  background:white;
+  padding:20px;
+  border-radius:14px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+
+.item{
+  padding:8px 0;
+  cursor:pointer;
+}
+
+.item:hover{
+  color:#2563eb;
+}
+
+.top-bar{
+  margin-bottom:20px;
+}
+
+.home-button{
+  display:inline-block;
+  padding:8px 14px;
+  border-radius:8px;
+  background:#e5e7eb;
   color:#111827;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:500;
 }
 
-.choice-btn:hover{
-  background:#f1f5f9;
+.home-button:hover{
+  background:#d1d5db;
 }
 
+/* =========================
+   모바일 최적화 (핵심)
+========================= */
 @media (max-width:480px){
 
-  #r_text{
-    font-size:17px !important;
-    line-height:1.55 !important;
-    white-space:normal !important;
+  /* 전체 여백 줄이기 */
+  .container{
+    padding:12px 12px 20px 12px;
+  }
+
+  /* 타이틀 */
+  h1{
+    font-size:20px !important;
+  }
+
+  h2{
+    font-size:18px !important;
+  }
+
+  /* 카드 */
+  .card{
+    padding:14px !important;
+    gap:12px;
+    border-radius:14px;
+  }
+
+  /* 아이콘 */
+  .icon{
+    width:42px;
+    height:42px;
+    font-size:20px;
+  }
+
+  /* 카드 텍스트 */
+  .text b{
+    font-size:14px;
+  }
+
+  .text span{
+    font-size:12px;
+    line-height:1.4;
+    word-break:keep-all;   /* 🔥 핵심 */
+  }
+
+  /* 하단 카드 */
+  .bottom-card{
+    padding:12px;
+    font-size:13px;
+  }
+
+  /* 버튼 */
+  button, .menu-btn{
+    height:48px;
+    font-size:15px;
+  }
+
+  /* 입력창 */
+  input, select, textarea{
+    font-size:15px;
+  }
+
+  textarea{
+    height:100px;
+    line-height:1.5;
+    word-break:keep-all;   /* 🔥 핵심 */
+  }
+
+  /* 안내문 */
+  .notice{
+    font-size:12px;
+    line-height:1.5;
+    padding:0 4px;
+    word-break:keep-all;   /* 🔥 핵심 */
+  }
+
+  /* 결과 카드 */
+  .result-card{
+    padding:14px;
+  }
+
+  /* 홈 버튼 */
+  .home-button{
+    font-size:13px;
+    padding:6px 12px;
   }
 
 }
+
+
 """
 # =========================
 # 엑셀 로드 + 컬럼 공백 제거
@@ -405,145 +430,246 @@ HOME_HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>통합돌봄 서비스 자원검색</title>
-<style>{{style}}</style>
 
 <style>
 
-@keyframes spin{
-0%{transform:rotate(0deg);}
-100%{transform:rotate(360deg);}
+.bottom-img{
+  width:100%;
+  margin-top:-40px;   /* -80 → 줄여라 */
 }
 
-</style>
 
-<style>
-/* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
-/* ✅ 홈 메뉴: 버튼 중앙 유지 + ①②③ 세로선 정렬 + 라벨 시작점 동일 */
-/* ✅ 홈 메뉴: 1/2/3을 "같이" 오른쪽으로 밀어서 PDF 아이콘 시작점과 정렬 */
-/* 🔥 메뉴 버튼 전체를 중앙 정렬 */
-.home-menu-btn{
+/* 전체 배경 */
+body{
+  margin:0;
+  padding:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+
+/* 컨테이너 */
+.container{
+  max-width:700px;
+  margin:auto;
+  padding:30px 20px;
+}
+
+/* 타이틀 */
+.title{
+  text-align:center;
+  margin-bottom:24px;
+}
+
+.title + .card{
+  margin-top:30px;   /* 👈 여기 추가 */
+}
+
+.title h1{
+  margin:0;
+  font-size:26px;
+}
+
+.title p{
+  margin-top:6px;
+  color:#6b7280;
+  font-size:14px;
+}
+
+/* 메뉴 카드 */
+.card{
   display:flex;
-  justify-content:center;  /* 버튼 내용 중앙 */
   align-items:center;
+  gap:16px;
+
+  background:white;
+
+  padding:16px;        /* 👈 20 → 16 (카드 높이 줄임) */
+
+  border-radius:16px;
+
+  margin-bottom:10px;  /* 👈 16 → 10 (카드 간격 줄임) */
+
+  box-shadow:0 8px 20px rgba(0,0,0,0.08);
+
+  text-decoration:none;
+  color:inherit;
+
+  transition:0.18s;
 }
 
-/* 번호+텍스트 묶음 */
-.home-menu-btn .wrap{
-  display:grid;
-  grid-template-columns: 40px auto;
-  column-gap:1px;
-  align-items:center;
-
-  width: 320px;
-  max-width:100%;
-
-  padding-left: 70px;   /* 데스크탑 기준 */
+.card:hover{
+  transform:translateY(-3px);
+  box-shadow:0 14px 32px rgba(0,0,0,0.12);
 }
 
-/* 📱 모바일 보정 */
-@media (max-width:480px){
-  .home-menu-btn .wrap{
-    padding-left: 55px;  /* 모바일은 덜 밀기 */
-  }
-}
-/* 번호/라벨 */
-.home-menu-btn .num{
-  justify-self:center;
-}
-.home-menu-btn .label{
-  justify-self:start;
-  white-space:nowrap;
-}
+/* 아이콘 */
+.icon{
+  width:50px;
+  height:50px;
 
-/* ✅ 하단 2개 반쪽 버튼(좌/우) */
-/* 하단 반쪽 메뉴 */
-.half-menu-row{
+  border-radius:14px;
+
+  background:#e8f1ff;
+
   display:flex;
-  gap:12px;
-  margin-top:14px;
+  align-items:center;
+  justify-content:center;
+
+  font-size:24px;
 }
 
-/* 모바일 간격 조정 */
-@media (max-width:480px){
-  .half-menu-row{
-    flex-direction:column;
-    gap:10px;   /* ← 이게 핵심 */
-  }
-}.half-menu-row a{
+/* 텍스트 */
+.text{
   flex:1;
 }
 
-/* 버튼 크기 맞추기 */
-.half-btn{
-  width:100%;
-  height:52px;
-  justify-content:center;
+.text b{
+  font-size:16px;
+  display:block;
 }
 
-/* 모바일에서는 세로로 쌓기 */
-@media (max-width:480px){
-  .half-menu-row{
-    flex-direction:column;
-  }
+.text span{
+  font-size:13px;
+  color:#6b7280;
 }
-.half-btn img{
-  width:28px;
-  height:auto;
+
+/* 하단 카드 */
+.bottom-row{
+  display:flex;
+  gap:12px;
+  margin-top:10px;
+}
+.bottom-card{
+  flex:1;
+
+  background:white;
+
+  border-radius:14px;
+
+  padding:16px;
+
+  text-align:center;
+
+  text-decoration:none;
+
+  color:#111827;
+
+  box-shadow:0 6px 16px rgba(0,0,0,0.08);
+
+  transition:0.15s;
+}
+
+.bottom-card:hover{
+  transform:translateY(-2px);
+}
+
+.bottom-card img{
+  width:30px;
+  margin-bottom:6px;
+}
+
+.bottom-card div{
+  font-size:14px;
+}
+
+/* 하단 이미지 */
+.bottom-img{
+  width:100%;
+  margin-top:-80px;
+}
+
+/* 모바일 */
+@media (max-width:480px){
+
+  .title h1{
+    font-size:22px;
+  }
+
+  .card{
+    padding:16px;
+  }
+
+  .icon{
+    width:44px;
+    height:44px;
+    font-size:20px;
+  }
+
 }
 
 </style>
 </head>
+
 <body>
+
 <div class="container">
-<h1>통합돌봄 서비스 자원검색</h1>
 
-<a href="/desc" style="text-decoration:none;display:block;">
-  <button class="menu-btn home-menu-btn">
-    <span class="wrap">
-      <span class="num">①</span>
-      <span class="label">사례기반 서비스내용 검색(AI)</span>
-    </span>
-  </button>
-</a>
-
-<a href="/combo" style="text-decoration:none;display:block;">
-  <button class="menu-btn home-menu-btn">
-    <span class="wrap">
-      <span class="num">②</span>
-      <span class="label">조건기반 자원검색</span>
-    </span>
-  </button>
-</a>
-
-<a href="/care" style="text-decoration:none;display:block;">
-  <button class="menu-btn home-menu-btn">
-    <span class="wrap">
-      <span class="num">③</span>
-      <span class="label">통합돌봄 사전조사</span>
-    </span>
-  </button>
-</a>
-<div class="half-menu-row">
-  <a href="/guide" target="_blank" style="text-decoration:none;display:block;">
-    <button class="pdf-btn half-btn">
-      <img src="/static/pdf_icon.png" alt="PDF">
-      통합돌봄 사업안내
-    </button>
-  </a>
-
-  <a href="/nhis25" style="text-decoration:none;display:block;">
-    <button class="pdf-btn half-btn">
-      <img src="/static/nhis_heart.png" alt="건강보험">
-      건강보험 25시
-    </button>
-  </a>
+<div class="title">
+<h1>NHIS-G 케어네비</h1>
+<p>국민건강보험공단 통합돌봄 지원 시스템</p>
 </div>
-<img src="/static/bottom.png" style="width:100%;margin-top:-20px;">
+
+<a href="/desc" class="card">
+
+<div class="icon">🤖</div>
+
+<div class="text">
+<b>사례기반 서비스내용 검색 (AI)</b>
+<span>입력한 사례를 분석하여 적합한 통합돌봄 서비스를 추천합니다</span>
 </div>
+
+</a>
+
+<a href="/combo" class="card">
+
+<div class="icon">🔎</div>
+
+<div class="text">
+<b>조건기반 자원검색</b>
+<span>지역, 건강상태, 관리기관 조건으로 서비스 자원을 검색합니다</span>
+</div>
+
+</a>
+
+<a href="/care" class="card">
+
+<div class="icon">📝</div>
+
+<div class="text">
+<b>통합돌봄 사전조사</b>
+<span>일상생활 수행능력(ADL) 기반 사전조사를 진행합니다</span>
+</div>
+
+</a>
+
+<div class="bottom-row">
+
+<a href="/guide" target="_blank" class="bottom-card">
+
+<img src="/static/pdf_icon.png">
+
+<div>사업 안내</div>
+
+</a>
+
+<a href="/nhis25" class="bottom-card">
+
+<img src="/static/nhis_heart.png">
+
+<div>건강보험 25시</div>
+
+</a>
+
+</div>
+
+<img src="/static/bottom.png" class="bottom-img">
+
+</div>
+
 </body>
 </html>
 """
-
 @app.route("/home")
 def home():
     check = login_required()
@@ -668,7 +794,11 @@ COMBO_HTML = """
 </head>
 <body>
 <div class="container">
-<a href="/home" class="home-btn">홈으로</a>
+<div class="top-bar">
+<a href="/home" class="home-button">홈으로</a>
+</div>
+
+<div class="card">
 <h2>조건기반 자원검색</h2>
 
 <form method="post">
@@ -716,6 +846,7 @@ COMBO_HTML = """
 
 </div>
 {% endif %}
+</div> 
 
 
 <!-- 팝업 -->
@@ -1003,237 +1134,272 @@ DESC_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>사례기반 서비스내용 검색(AI)</title>
-<style>{{style}}</style>
+<title>사례기반 서비스내용 검색</title>
 
 <style>
+
+*{
+  box-sizing: border-box;
+}
+
+.loading-ci{
+  width:160px;
+  margin-top:18px;
+  opacity:0.85;
+}
+
+.top-bar{
+  margin-bottom:20px;
+}
+
+.home-button{
+  display:inline-block;
+  padding:8px 14px;
+  border-radius:8px;
+  background:#e5e7eb;
+  color:#111827;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:500;
+  transition:0.15s;
+}
+
+.home-button:hover{
+  background:#d1d5db;
+}
+
+
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+
+.container{
+  max-width:720px;
+  margin:auto;
+  padding:30px 20px;
+}
+
+/* 홈버튼 */
+.home{
+  display:inline-block;
+  margin-bottom:20px;
+  text-decoration:none;
+  color:#2563eb;
+  font-size:14px;
+}
+
+/* 제목 */
+.title{
+  text-align:center;
+  margin-bottom:0;     /* 기존 제거 */
+  padding-bottom:30px; /* 👈 이걸로 공간 만든다 */
+}
+
+.title h2{
+  margin:0;
+  font-size:24px;
+}
+
+/* 검색 카드 */
+.search-box{
+  background:white;
+  padding:24px;
+  border-radius:16px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* 텍스트 입력 */
+textarea{
+  width:100%;
+  height:110px;
+  padding:14px;
+  border-radius:10px;
+  border:1px solid #d1d5db;
+  font-size:15px;
+  resize:none;
+
+  line-height:1.5;         /* ✅ 줄 간격 안정 */
+  word-break:keep-all;     /* ✅ 한글 끊김 방지 (핵심) */
+  white-space:pre-wrap;    /* ✅ 줄바꿈 자연스럽게 */
+
+}
+
+textarea:focus{
+  outline:none;
+  border-color:#2563eb;
+}
+
+/* 버튼 */
+button{
+  width:100%;
+  height:48px;
+  margin-top:12px;
+  border:none;
+  border-radius:10px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+button:hover{
+  opacity:0.9;
+}
+
+/* 설명 */
+.notice{
+  text-align:center;
+  margin-top:14px;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+
+/* 결과 카드 */
+.result{
+  margin-top:24px;
+}
+
+.result-card{
+  background:white;
+  padding:18px;
+  border-radius:14px;
+  margin-bottom:12px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+
+.result-card b{
+  font-size:15px;
+}
+
+.reason{
+  margin-top:6px;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+
+/* 로딩 */
+.loading{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  align-items:center;
+  justify-content:center;
+}
+
+.loading-box{
+  background:white;
+  padding:30px;
+  border-radius:14px;
+  text-align:center;
+}
+
+.spinner{
+  border:5px solid #eee;
+  border-top:5px solid #2563eb;
+  border-radius:50%;
+  width:42px;
+  height:42px;
+  margin:auto;
+  animation:spin 1s linear infinite;
+}
+
 @keyframes spin{
-  0%{transform:rotate(0deg);}
-  100%{transform:rotate(360deg);}
+  0%{transform:rotate(0deg)}
+  100%{transform:rotate(360deg)}
 }
-</style>
 
-<style>
-@media (min-width: 768px) {
-  #tel_link {
-    display: none !important;
-  }
-}
 </style>
 </head>
+
 <body>
+
 <div class="container">
-<a href="/home" class="home-btn">홈으로</a>
-<h2>사례기반 서비스내용 검색(AI)</h2>
 
-<form method="post">
-<textarea id="queryBox" name="query" placeholder="예: 관절염이 있고 정서적으로 고립된 어르신이 필요한 서비스
-">{{query}}</textarea>
-<button type="submit" class="menu-btn">검색하기</button>
-
-<div class="small" style="margin-top:12px; line-height:1.7; text-align:center;">
-  ※ 본 기능은 입력한 사례와 유사한 <b>통합돌봄 서비스 내용 최대 10가지</b>를 추천합니다.<br>
-  지자체 통합지원 계획 수립 및 서비스 연계 검토를 위한 참고자료로 활용하시기 바랍니다.
+<div class="top-bar">
+<a href="/home" class="home-button">홈으로</a>
 </div>
+
+<div class="title">
+<h2>사례기반 서비스내용 검색 (AI)</h2>
+</div>
+
+<div class="search-box">
+
+<form method="post" id="searchForm">
+
+<textarea name="query" placeholder="예) 관절염이 있고 정서적으로 고립된 어르신에게 필요한 서비스">{{query}}</textarea>
+
+<button type="submit">AI 검색</button>
+
 </form>
 
-<!-- 🔵 AI 분석 로딩창 -->
-<div id="loadingBox" style="
-display:none;
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:rgba(0,0,0,0.5);
-z-index:9999;
-justify-content:center;
-align-items:center;
-">
-
-<!-- 로딩 카드 -->
-<div style="
-background:white;
-padding:32px 42px;
-border-radius:14px;
-text-align:center;
-box-shadow:0 10px 30px rgba(0,0,0,0.25);
-max-width:320px;
-width:90%;
-">
-
-<!-- 🔄 로딩 스피너 -->
-<div style="
-border:6px solid #eee;
-border-top:6px solid #1e73be;
-border-radius:50%;
-width:50px;
-height:50px;
-margin:auto;
-animation:spin 1s linear infinite;
-"></div>
-
-<!-- 안내 문구 -->
-<p style="margin-top:16px;font-size:16px;font-weight:600;">
-AI가 사례를 분석 중입니다...
-</p>
-
-<!-- ⏱ 사용자 안내 -->
-<div style="font-size:12px;color:#777;margin-top:6px;">
-※ 약 3~5초 정도 소요될 수 있습니다.
+<div class="notice">
+※ 입력한 사례와 유사한 <b>통합돌봄 서비스 최대 10가지</b>를 추천합니다.<br>
+지자체 통합지원 계획 수립 참고용입니다.
 </div>
 
-<!-- 🏥 기관 CI -->
-<img src="/static/ci.png" style="
-width:160px;
-margin-top:18px;
-opacity:0.9;
-">
-
-</div>
 </div>
 
-{% if cond_display is not none %}
-<div class="result">
-
-
-
-{% if cond_display %}
-<p><b>이 조건으로 검색했습니다</b></p>
-<ul>
-{% for c in cond_display %}
-<li>✔ {{c}}</li>
-{% endfor %}
-</ul>
-<hr>
-{% endif %}
-
-<p><b>{{count}}건이 조회되었습니다.</b></p>
 
 {% if service_results %}
-<hr>
-<h3 style="margin-top:20px;">AI 추천 서비스</h3>
+
+<div class="result">
+
+<h3>{{count}}건의 추천 서비스</h3>
 
 {% for r in service_results %}
-<div style="margin-bottom:14px;border-bottom:1px solid #eee;padding-bottom:10px">
+
+<div class="result-card">
 
 <b>{{loop.index}}. {{r["대분류"]}} / {{r["중분류"]}} / {{r["서비스내용"]}}</b>
 
-<div class="small" style="margin-top:6px; line-height:1.6;">
+<div class="reason">
 선정 이유: {{r["선택이유"]}}
 </div>
 
 </div>
-{% endfor %}
-</div>
 
-{% endif %}
-
-{% if count == 0 %}
-<p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
-{% endif %}
-
-{% for region,items in results.items() %}
-<h3>📍 {{region}}</h3>
-{% for r in items %}
-<div class="item" onclick="openDetail({{r['index']}})">- {{r['label']}}</div>
-{% endfor %}
 {% endfor %}
 
 </div>
+
 {% endif %}
 
-<!-- 팝업 -->
-<div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
-  <div style="background:white;margin:5% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
-    <h3 id="m_title"></h3>
-    <p><b>기관명:</b> <span id="m_org"></span></p>
-    <p>
-        <b>기관 연락처:</b> <span id="m_tel"></span>
-        <a id="tel_link"
-             style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">
-             📞
-        </a>
-</p>
-    <p><b>기관주소:</b> <span id="m_addr"></span></p>
-    <p><b>기타:</b> <span id="m_other"></span></p>
-    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;"></iframe>
-    <button onclick="closeModal()" class="menu-btn">닫기</button>
+</div>
+
+
+<div class="loading" id="loading">
+
+  <div class="loading-box">
+
+    <div class="spinner"></div>
+
+    <p style="margin-top:12px;font-weight:600">
+      AI가 사례를 분석 중입니다
+    </p>
+
+    <img src="/static/ci.png" class="loading-ci">
+
   </div>
+
 </div>
+
 
 <script>
-function openDetail(idx){
-  fetch("/detail/"+idx)
-    .then(r=>r.json())
-    .then(d=>{
 
-      document.getElementById("m_title").innerText = d["프로그램명칭"] || "";
-      document.getElementById("m_org").innerText   = d["서비스제공기관명"] || "";
-      document.getElementById("m_tel").innerText   = d["기관연락처"] || "";
-      document.getElementById("m_addr").innerText  = d["기관주소"] || "";
-      document.getElementById("m_other").innerText = d["기타"] || "";
+document.getElementById("searchForm").addEventListener("submit",function(){
 
-      const addr = d["기관주소"] || "";
-      document.getElementById("m_map").src =
-        "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
+document.getElementById("loading").style.display="flex"
 
-      // 📞 전화버튼 항상 표시 (모바일/아이폰/안드로이드 모두 가능)
-      const telLink = document.getElementById("tel_link");
-      const tel = d["기관연락처"] || "";
+})
 
-      if(tel){
-        const cleanNumber = tel.replace(/[^0-9]/g, "");
-        if(cleanNumber){
-          telLink.href = "tel:" + cleanNumber;
-          telLink.style.display = "inline";
-        } else {
-          telLink.style.display = "none";
-        }
-      } else {
-        telLink.style.display = "none";
-      }
-
-      document.getElementById("modal").style.display="block";
-    });
-}
-
-function closeModal(){
-  document.getElementById("modal").style.display="none";
-}
-document.getElementById("queryBox").addEventListener("keydown", function(e) {
-
-  if (e.key === "Enter" && !e.shiftKey) {
-
-    e.preventDefault();
-
-    const form = this.form;
-
-    const box = document.getElementById("loadingBox");
-
-    if(box){
-      box.style.display = "flex";
-    }
-
-    form.submit();
-
-  }
-
-});
-
-
-
-/* 🔥 로딩창 실행 코드 추가 */
-const form = document.querySelector("form");
-
-if(form){
-  form.addEventListener("submit", function(){
-    const box = document.getElementById("loadingBox");
-    if(box){
-      box.style.display = "flex";
-    }
-  });
-}
 </script>
 
 </body>
@@ -1294,7 +1460,41 @@ CARE_HTML = """
 <style>{{style}}</style>
 
 <style>
+
+.dementia-options label{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  white-space:nowrap;   /* 🔥 이거 추가 */
+}
+
+.dementia-options{
+  display:flex;
+  gap:24px;
+  align-items:center;
+  flex-wrap:nowrap;   /* 줄바꿈 방지 */
+}
+
 /* ====== 사전조사 전용 스타일 ====== */
+
+.top-bar{
+  margin-bottom:20px;
+}
+
+.home-button{
+  display:inline-block;
+  padding:8px 14px;
+  border-radius:8px;
+  background:#e5e7eb;
+  color:#111827;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:500;
+}
+
+.home-button:hover{
+  background:#d1d5db;
+}
 
 /* PC에서만 줄바꿈 */
 .pc-br{
@@ -1378,8 +1578,11 @@ CARE_HTML = """
 <body>
 <div class="container">
 
-  <a href="/home" class="home-btn">홈으로</a>
-  <h2>통합돌봄 사전조사</h2>
+<div class="top-bar">
+  <a href="/home" class="home-button">홈으로</a>
+</div>
+
+<h2>통합돌봄 사전조사</h2>
 
   <form id="careForm">
     <div class="dementia-box">
@@ -1613,7 +1816,7 @@ NHIS25_HTML = """
 </head>
 <body>
 <div class="container">
-  <a href="/home" class="home-btn">홈으로</a>
+  <a href="/home" class="home-button">홈으로</a>
   <h2>건강보험 25시</h2>
 
   <div class="result" style="text-align:center;font-size:18px;">
