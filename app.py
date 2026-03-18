@@ -1483,18 +1483,24 @@ CARE_HTML = """
 
 <style>
 
-.dementia-options label{
+.radio-item{
   display:flex;
   align-items:center;
   gap:6px;
-  white-space:nowrap;   /* 🔥 이거 추가 */
+}
+
+.radio-item input[type=radio]{
+  width:18px;
+  height:18px;
+  transform:none !important;
+  -webkit-appearance:radio;
 }
 
 .dementia-options{
   display:flex;
   gap:24px;
   align-items:center;
-  flex-wrap:nowrap;   /* 줄바꿈 방지 */
+  flex-wrap:wrap;   /* 줄바꿈 방지 */
 }
 
 /* ====== 사전조사 전용 스타일 ====== */
@@ -1572,12 +1578,6 @@ CARE_HTML = """
   border:1px solid #fed7aa;
 }
 
-.dementia-options{
-  display:flex;
-  gap:30px;
-  margin-top:10px;
-}
-
 /* 모바일에서 치매 선택 박스가 답답하면 줄바꿈 */
 @media (max-width:480px){
   .dementia-options{ gap:18px; }
@@ -1610,17 +1610,19 @@ CARE_HTML = """
     <div class="dementia-box">
       <b>치매 관련 약 복용 여부</b>
 
-      <div class="dementia-options">
-        <label>
-          <input type="radio" name="dementia" value="y">
-          예
-        </label>
+<div class="dementia-options">
 
-        <label>
-          <input type="radio" name="dementia" value="n">
-          아니오
-        </label>
-      </div>
+  <label class="radio-item">
+    <input type="radio" name="dementia" value="y">
+    <span>예</span>
+  </label>
+
+  <label class="radio-item">
+    <input type="radio" name="dementia" value="n">
+    <span>아니오</span>
+  </label>
+
+</div>
     </div>
 
     <div id="adlSection">
