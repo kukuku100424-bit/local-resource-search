@@ -1088,7 +1088,7 @@ index: {idx}
         try:
 
             res = client.responses.create(
-                model="gpt-4o-mini",
+                model="gpt-4.1",
                 input=prompt
             )
             if hasattr(res, "usage"):
