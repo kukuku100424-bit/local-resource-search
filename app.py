@@ -46,28 +46,6 @@ LOGIN_HTML = """
 <title>케어네비 로그인</title>
 
 <style>
-/* 안내문 (모바일 최적화) */
-.notice-text {
-  font-size: 12px;
-  color: #6b7280;
-  text-align: center;
-
-  line-height: 1.6;   /* 🔥 줄 간격 늘림 */
-  padding: 0 12px;   /* 🔥 좌우 여백 */
-
-  word-break: keep-all;   /* 🔥 한국어 줄바꿈 자연스럽게 */
-  white-space: normal;    /* 🔥 줄바꿈 허용 */
-}
-
-/* 모바일 전용 추가 보정 */
-@media (max-width: 480px) {
-  .notice-text {
-    font-size: 11px;
-    line-height: 1.7;
-    padding: 0 16px;
-  }
-}
-
 *{ box-sizing:border-box; }
 
 body{
@@ -80,6 +58,7 @@ body{
   margin:0;
   padding:20px;
 }
+
 /* 카드 */
 .box{
   background:white;
@@ -215,7 +194,7 @@ button:hover{ background:#155fa0; }
 
 
   <div class="notice">
-    ※ 본 서비스는 국민건강보험공단 광주전라제주지역본부<br>
+    ※ 본 서비스는 광주전라제주지역본부<br>
     관할 지자체, 지사 직원만 이용 가능합니다.
   </div>
 
@@ -456,7 +435,7 @@ HOME_HTML = """
 
 .bottom-img{
   width:100%;
-  margin-top:-80px; }
+  margin-top:-30px; }
 
 @media (max-width:480px){
 
@@ -1187,16 +1166,6 @@ DESC_HTML = """
   box-sizing: border-box;
 }
 
-.m-br{
-  display:none;
-}
-
-@media (max-width:480px){
-  .m-br{
-    display:block;
-  }
-}
-
 .loading-ci{
   width:160px;
   margin-top:18px;
@@ -1396,9 +1365,10 @@ button:hover{
 </form>
 
 <div class="notice">
-※ 입력한 사례와 유사한<br class="m-br"> <b>통합돌봄 서비스 최대 10가지</b>
-를 추천합니다.<br>
+※ 입력한 사례와 유사한 <b>통합돌봄 서비스 최대 10가지</b>를 추천합니다.<br>
 지자체 통합지원 계획 수립 참고용입니다.
+</div>
+
 </div>
 
 
@@ -1577,9 +1547,9 @@ CARE_HTML = """
 }
 
 .options input[type=radio]{
-  width:auto !important;
   flex:0 0 auto;
-  transform:scale(1.1);
+  width:18px;
+  height:18px;
 }
 
 .question-box{
