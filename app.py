@@ -440,7 +440,7 @@ HOME_HTML = """
 @media (max-width:480px){
 
   .bottom-img{
-    margin-top:-20px;   /* 🔥 -80 → -20으로 줄이기 */
+    margin-top:100px;   /* 🔥 -80 → -20으로 줄이기 */
   }
 
 }
