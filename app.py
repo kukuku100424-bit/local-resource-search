@@ -194,9 +194,7 @@ button:hover{ background:#155fa0; }
 
 
   <div class="notice">
-    ※ 본 서비스는 광주전라제주지역본부<br>
-    관할 지자체, 지사 직원만 이용 가능합니다.
-  </div>
+    ※ 본 서비스는 허가된 사용지만 이용가능합니다.  </div>
 
   <div class="bottom-logo">
     <img src="/static/ci.png" style="width:260px;margin-top:15px;" alt="CI">
@@ -1366,7 +1364,7 @@ button:hover{
 
 <div class="notice">
 ※ 입력한 사례와 유사한 <b>통합돌봄 서비스 최대 10가지</b>를 추천합니다.<br>
-지자체 통합지원 계획 수립 참고용입니다.
+지자체 개인별지원계획 수립 참고용입니다.
 </div>
 
 </div>
