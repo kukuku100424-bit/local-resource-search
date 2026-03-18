@@ -58,7 +58,6 @@ body{
   margin:0;
   padding:20px;
 }
-
 /* 카드 */
 .box{
   background:white;
@@ -194,7 +193,7 @@ button:hover{ background:#155fa0; }
 
 
   <div class="notice">
-    ※ 본 서비스는 광주전라제주지역본부<br>
+    ※ 본 서비스는 국민건강보험공단 광주전라제주지역본부<br>
     관할 지자체, 지사 직원만 이용 가능합니다.
   </div>
 
@@ -435,7 +434,7 @@ HOME_HTML = """
 
 .bottom-img{
   width:100%;
-  margin-top:-30px; }
+  margin-top:-80px; }
 
 @media (max-width:480px){
 
@@ -1166,6 +1165,16 @@ DESC_HTML = """
   box-sizing: border-box;
 }
 
+.m-br{
+  display:none;
+}
+
+@media (max-width:480px){
+  .m-br{
+    display:block;
+  }
+}
+
 .loading-ci{
   width:160px;
   margin-top:18px;
@@ -1365,10 +1374,9 @@ button:hover{
 </form>
 
 <div class="notice">
-※ 입력한 사례와 유사한 <b>통합돌봄 서비스 최대 10가지</b>를 추천합니다.<br>
+※ 입력한 사례와 유사한<br class="m-br"> <b>통합돌봄 서비스 최대 10가지</b>
+를 추천합니다.<br>
 지자체 통합지원 계획 수립 참고용입니다.
-</div>
-
 </div>
 
 
