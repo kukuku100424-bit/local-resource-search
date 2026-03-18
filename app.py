@@ -194,7 +194,7 @@ button:hover{ background:#155fa0; }
 
 
   <div class="notice">
-    ※ 본 서비스는 국민건강보험공단 광주전라제주지역본부<br>
+    ※ 본 서비스는 광주전라제주지역본부<br>
     관할 지자체, 지사 직원만 이용 가능합니다.
   </div>
 
@@ -436,6 +436,13 @@ HOME_HTML = """
 .bottom-img{
   width:100%;
   margin-top:-40px;   /* -80 → 줄여라 */
+}
+@media (max-width:480px){
+
+  .bottom-img{
+    margin-top:-20px;   /* 🔥 -80 → -20으로 줄이기 */
+  }
+
 }
 
 
@@ -785,6 +792,25 @@ COMBO_HTML = """
 <title>조건기반 자원검색</title>
 <style>{{style}}</style>
 <style>
+input, select{
+  width:100%;
+  padding:12px;
+  border-radius:8px;
+  border:1px solid #d1d5db;
+  font-size:14px;
+
+  box-sizing:border-box;   /* 🔥 핵심 */
+}
+
+/* 🔥 모바일에서 높이 통일 */
+@media (max-width:480px){
+  input, select{
+    height:44px;
+    font-size:15px;
+  }
+}
+
+/* 기존 */
 @media (min-width: 768px) {
   #tel_link {
     display: none !important;
@@ -980,8 +1006,8 @@ def desc():
         # 점수 높은 순 정렬
         candidate_rows.sort(reverse=True)
 
-        # 상위 40개만 사용
-        candidate_rows = candidate_rows[:40]
+        # 상위 25개만 사용
+        candidate_rows = candidate_rows[:25]
 
         service_text = ""
 
@@ -1062,7 +1088,7 @@ index: {idx}
         try:
 
             res = client.responses.create(
-                model="gpt-4.1-mini",
+                model="gpt-4o-mini",
                 input=prompt
             )
             if hasattr(res, "usage"):
@@ -1836,4 +1862,4 @@ def nhis25():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
