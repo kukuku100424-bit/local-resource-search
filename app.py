@@ -46,6 +46,28 @@ LOGIN_HTML = """
 <title>케어네비 로그인</title>
 
 <style>
+/* 안내문 (모바일 최적화) */
+.notice-text {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+
+  line-height: 1.6;   /* 🔥 줄 간격 늘림 */
+  padding: 0 12px;   /* 🔥 좌우 여백 */
+
+  word-break: keep-all;   /* 🔥 한국어 줄바꿈 자연스럽게 */
+  white-space: normal;    /* 🔥 줄바꿈 허용 */
+}
+
+/* 모바일 전용 추가 보정 */
+@media (max-width: 480px) {
+  .notice-text {
+    font-size: 11px;
+    line-height: 1.7;
+    padding: 0 16px;
+  }
+}
+
 *{ box-sizing:border-box; }
 
 body{
