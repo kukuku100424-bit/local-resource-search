@@ -194,7 +194,7 @@ button:hover{ background:#155fa0; }
 
 
   <div class="notice">
-    ※ 본 서비스는 허가된 사용지만 이용가능합니다.  </div>
+    ※ 본 서비스는 허가된 사용자만 이용가능합니다.  </div>
 
   <div class="bottom-logo">
     <img src="/static/ci.png" style="width:260px;margin-top:15px;" alt="CI">
