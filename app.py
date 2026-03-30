@@ -2374,7 +2374,8 @@ NHIS25_HTML = """
   <div id="mobileBox" class="hidden">
     <p class="desc">
       모바일 환경이 확인되었습니다.<br>
-      아래 버튼을 누르면 건강보험 25시로 이동합니다.
+      아래 버튼을 누르면 건강보험 25시로 이동합니다.<br>
+      앱 미설치 시 설치화면으로 이동합니다.
     </p>
 
     <button id="goBtn" class="btn primary-btn">
