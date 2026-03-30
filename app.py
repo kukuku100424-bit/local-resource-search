@@ -8,6 +8,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from openai import OpenAI
+cache = {}
+
+def compress_text(s, max_len=60):
+    s = str(s).strip()
+    if len(s) <= max_len:
+        return s
+
+    half = max_len // 2
+    return s[:half] + " … " + s[-half:]
+
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
@@ -194,7 +204,9 @@ button:hover{ background:#155fa0; }
 
 
   <div class="notice">
-    ※ 본 서비스는 허가된 사용자만 이용가능합니다.  </div>
+    ※ 본 서비스는 광주전라제주지역본부<br>
+    관할 지자체, 지사 직원만 이용 가능합니다.
+  </div>
 
   <div class="bottom-logo">
     <img src="/static/ci.png" style="width:260px;margin-top:15px;" alt="CI">
@@ -415,8 +427,51 @@ input, select{
 # 엑셀 로드 + 컬럼 공백 제거
 # =========================
 df = pd.read_excel(FILE_PATH).fillna("")
-df.columns = df.columns.astype(str).str.replace(" ", "").str.strip()
+df.columns = [
+    str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+    for c in df.columns
+]
 print("현재 컬럼명:", list(df.columns))
+
+
+# =========================
+# 조건기반 검색용 옵션 정리
+# =========================
+def sorted_unique_values(column_name):
+    real_col = None
+
+    for c in df.columns:
+        clean_c = str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+        if clean_c == column_name:
+            real_col = c
+            break
+
+    if real_col is None:
+        return []
+
+    values = (
+        df[real_col]
+        .fillna("")
+        .astype(str)
+        .str.replace("\ufeff", "", regex=False)
+        .str.replace("\n", "", regex=False)
+        .str.replace("\r", "", regex=False)
+        .str.strip()
+    )
+
+    values = [v for v in values if v]
+
+    unique_values = list(set(values))
+
+    unique_values.sort(key=lambda x: (x == "기타", x))
+
+    return unique_values
+
+
+SIDO_OPTIONS = sorted_unique_values("시도")
+SIGUNGU_OPTIONS = sorted_unique_values("시군구")
+MAIN_CATEGORY_OPTIONS = sorted_unique_values("대분류")
+MIDDLE_CATEGORY_OPTIONS = sorted_unique_values("중분류")
 
 # =========================
 # HOME
@@ -627,7 +682,7 @@ body{
 
 <div class="text">
 <b>조건기반 자원검색</b>
-<span>지역, 건강상태, 관리기관 조건으로 서비스 자원을 검색합니다</span>
+<span>시도, 시군구, 대분류, 중분류, 프로그램, 기관명 조건으로 서비스 자원을 검색합니다</span>
 </div>
 
 </a>
@@ -716,45 +771,83 @@ def combo():
     if check:
         return check
 
-    region = (request.values.get("region","") or "").strip()
-    main_category = (request.values.get("main_category","") or "").strip()
-    health_kw = (request.values.get("health_kw","") or "").strip()
-    manager = (request.values.get("manager","") or "").strip()
-
-    if region == "나주":
-        region = "나주시"
+    sido = (request.values.get("sido", "") or "").strip()
+    sigungu = (request.values.get("sigungu", "") or "").strip()
+    main_category = (request.values.get("main_category", "") or "").strip()
+    middle_category = (request.values.get("middle_category", "") or "").strip()
+    program_kw = (request.values.get("program_kw", "") or "").strip()
+    org_kw = (request.values.get("org_kw", "") or "").strip()
 
     results = {}
     count = 0
 
+    sigungu_options = SIGUNGU_OPTIONS
+    if sido and "시도" in df.columns and "시군구" in df.columns:
+        temp = df[
+            df["시도"].fillna("").astype(str).str.strip() == sido
+        ]
+        sigungu_options = sorted(
+            set(
+                temp["시군구"].fillna("").astype(str).str.strip()
+            )
+        )
+        sigungu_options = [v for v in sigungu_options if v]
+
+    middle_category_options = MIDDLE_CATEGORY_OPTIONS
+    if main_category and "대분류" in df.columns and "중분류" in df.columns:
+        temp = df[
+            df["대분류"].fillna("").astype(str).str.strip() == main_category
+        ]
+        middle_category_options = sorted(
+            set(
+                temp["중분류"].fillna("").astype(str).str.strip()
+            )
+        )
+        middle_category_options = [v for v in middle_category_options if v]
+
     if request.method == "POST":
         filtered = df.copy()
 
-        if region:
+        if sido and "시도" in filtered.columns:
             filtered = filtered[
-                filtered["시군구"].astype(str)
-                .str.contains(region, na=False)
+                filtered["시도"].fillna("").astype(str).str.strip() == sido
             ]
 
-        if main_category:
+        if sigungu and "시군구" in filtered.columns:
             filtered = filtered[
-                filtered["대분류"].astype(str) == main_category
+                filtered["시군구"].fillna("").astype(str).str.strip() == sigungu
             ]
 
-        if manager and "관리주체" in filtered.columns:
+        if main_category and "대분류" in filtered.columns:
             filtered = filtered[
-                filtered["관리주체"].astype(str) == manager
+                filtered["대분류"].fillna("").astype(str).str.strip() == main_category
             ]
 
-        if health_kw and "건강상태" in filtered.columns:
+        if middle_category and "중분류" in filtered.columns:
             filtered = filtered[
-                filtered["건강상태"].astype(str)
-                .str.contains(health_kw, na=False)
+                filtered["중분류"].fillna("").astype(str).str.strip() == middle_category
+            ]
+
+        if program_kw and "프로그램명칭" in filtered.columns:
+            filtered = filtered[
+                filtered["프로그램명칭"]
+                .fillna("")
+                .astype(str)
+                .str.contains(program_kw, case=False, na=False)
+            ]
+
+        if org_kw and "서비스제공기관명" in filtered.columns:
+            filtered = filtered[
+                filtered["서비스제공기관명"]
+                .fillna("")
+                .astype(str)
+                .str.contains(org_kw, case=False, na=False)
             ]
 
         for _, row in filtered.reset_index().iterrows():
-            sigungu = str(row.get("시군구","")) or "기타"
-            results.setdefault(sigungu, []).append({
+            region_key = str(row.get("시군구", "")).strip() or str(row.get("시도", "")).strip() or "기타"
+
+            results.setdefault(region_key, []).append({
                 "index": int(row["index"]),
                 "label": f"{row.get('프로그램명칭','')} ({row.get('서비스제공기관명','')})"
             })
@@ -764,14 +857,19 @@ def combo():
     return render_template_string(
         COMBO_HTML,
         style=BASE_STYLE,
-        region=region,
+        sido=sido,
+        sigungu=sigungu,
         main_category=main_category,
-        health_kw=health_kw,
-        manager=manager,   # ← 이 줄 추가
+        middle_category=middle_category,
+        program_kw=program_kw,
+        org_kw=org_kw,
+        sido_options=SIDO_OPTIONS,
+        sigungu_options=sigungu_options,
+        main_category_options=MAIN_CATEGORY_OPTIONS,
+        middle_category_options=middle_category_options,
         results=results,
         count=count
     )
-
 
 # =========================
 # ① 선택형 검색
@@ -791,11 +889,9 @@ input, select{
   border-radius:8px;
   border:1px solid #d1d5db;
   font-size:14px;
-
-  box-sizing:border-box;   /* 🔥 핵심 */
+  box-sizing:border-box;
 }
 
-/* 🔥 모바일에서 높이 통일 */
 @media (max-width:480px){
   input, select{
     height:44px;
@@ -803,11 +899,32 @@ input, select{
   }
 }
 
-/* 기존 */
 @media (min-width: 768px) {
   #tel_link {
     display: none !important;
   }
+}
+
+.section-box{
+  margin-top:18px;
+  padding:16px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+}
+
+.section-title{
+  font-size:16px;
+  font-weight:700;
+  margin-bottom:8px;
+  color:#111827;
+}
+
+.section-desc{
+  font-size:12px;
+  color:#6b7280;
+  margin-bottom:8px;
+  line-height:1.5;
 }
 </style>
 </head>
@@ -821,29 +938,55 @@ input, select{
 <h2>조건기반 자원검색</h2>
 
 <form method="post">
-<label>지역(시군구)</label>
-<input type="text" name="region" value="{{region}}" placeholder="예) 나주시">
 
-<div class="small">※ 예: '나주' 입력 시 자동으로 '나주시'로 검색됩니다.</div>
+<div class="section-box">
+  <div class="section-title">지역조건</div>
+  <div class="section-desc">시도와 시군구를 선택하여 지역 기준으로 검색합니다.</div>
 
-<label>대분류</label>
-<select name="main_category">
-  <option value="">전체</option>
-  {% for c in ["보건의료","생활지원","요양","주거지원"] %}
-  <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
-  {% endfor %}
-</select>
+  <label>시도</label>
+  <select name="sido">
+    <option value="">전체</option>
+    {% for s in sido_options %}
+    <option value="{{s}}" {% if s==sido %}selected{% endif %}>{{s}}</option>
+    {% endfor %}
+  </select>
 
-<label>관리기관</label>
-<select name="manager">
-  <option value="">전체</option>
-  {% for m in ["국민건강보험공단","지자체"] %}
-  <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
-  {% endfor %}
-</select>
+  <label>시군구</label>
+  <select name="sigungu">
+    <option value="">전체</option>
+    {% for g in sigungu_options %}
+    <option value="{{g}}" {% if g==sigungu %}selected{% endif %}>{{g}}</option>
+    {% endfor %}
+  </select>
+</div>
 
-<label>건강상태</label>
-<input type="text" name="health_kw" value="{{health_kw}}" placeholder="예) 고혈압">
+<div class="section-box">
+  <div class="section-title">상세 조건</div>
+  <div class="section-desc">대분류와 중분류(선택형), 프로그램과 기관명(서술형)으로 검색합니다.</div>
+
+  <label>대분류</label>
+  <select name="main_category">
+    <option value="">전체</option>
+    {% for c in main_category_options %}
+    <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
+    {% endfor %}
+  </select>
+
+  <label>중분류</label>
+  <select name="middle_category">
+    <option value="">전체</option>
+    {% for c in middle_category_options %}
+    <option value="{{c}}" {% if c==middle_category %}selected{% endif %}>{{c}}</option>
+    {% endfor %}
+  </select>
+
+  <label>프로그램</label>
+  <input type="text" name="program_kw" value="{{program_kw}}" placeholder="프로그램명 포함 검색">
+
+  <label>기관명</label>
+  <input type="text" name="org_kw" value="{{org_kw}}" placeholder="기관명 포함 검색">
+</div>
+
 <button type="submit" class="menu-btn">검색하기</button>
 </form>
 
@@ -856,7 +999,7 @@ input, select{
 <p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
 {% endif %}
 
-{% for region,items in results.items() %}
+{% for region, items in results.items() %}
 <h3>📍 {{region}}</h3>
 {% for r in items %}
 <div class="item" onclick="openDetail({{r['index']}})">- {{r['label']}}</div>
@@ -865,17 +1008,15 @@ input, select{
 
 </div>
 {% endif %}
-</div> 
+</div>
 
-
-<!-- 팝업 -->
 <div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
   <div style="background:white;margin:0% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
     <h3 id="m_title"></h3>
     <p><b>기관명:</b> <span id="m_org"></span></p>
     <p>
-        <b>기관 연락처:</b> <span id="m_tel"></span>
-        <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">📞</a>
+      <b>기관 연락처:</b> <span id="m_tel"></span>
+      <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">📞</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
     <p><b>기타:</b> <span id="m_other"></span></p>
@@ -886,21 +1027,19 @@ input, select{
 
 <script>
 function openDetail(idx){
-  fetch("/detail/"+idx)
-    .then(r=>r.json())
-    .then(d=>{
-
+  fetch("/detail/" + idx)
+    .then(r => r.json())
+    .then(d => {
       document.getElementById("m_title").innerText = d["프로그램명칭"] || "";
-      document.getElementById("m_org").innerText   = d["서비스제공기관명"] || "";
-      document.getElementById("m_tel").innerText   = d["기관연락처"] || "";
-      document.getElementById("m_addr").innerText  = d["기관주소"] || "";
+      document.getElementById("m_org").innerText = d["서비스제공기관명"] || "";
+      document.getElementById("m_tel").innerText = d["기관연락처"] || "";
+      document.getElementById("m_addr").innerText = d["기관주소"] || "";
       document.getElementById("m_other").innerText = d["기타"] || "";
 
       const addr = d["기관주소"] || "";
       document.getElementById("m_map").src =
         "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
 
-      // 📞 전화버튼 항상 표시 (모바일/아이폰/안드로이드 모두 가능)
       const telLink = document.getElementById("tel_link");
       const tel = d["기관연락처"] || "";
 
@@ -916,41 +1055,18 @@ function openDetail(idx){
         telLink.style.display = "none";
       }
 
-      document.getElementById("modal").style.display="block";
+      document.getElementById("modal").style.display = "block";
     });
 }
 
 function closeModal(){
-  document.getElementById("modal").style.display="none";
+  document.getElementById("modal").style.display = "none";
 }
-
-window.addEventListener("load", function(){
-
-  const form = document.querySelector("form[method='post']");
-
-  if(form){
-    form.addEventListener("submit", function(e){
-
-  const box = document.getElementById("loadingBox");
-
-  if(box){
-    box.style.display = "flex";
-  }
-
-  // 로딩창 보이게 0.2초 지연
-  e.preventDefault();
-
-  setTimeout(()=>{
-    form.submit();
-      },200);
-
-    });
-  }
-
-});</script>
+</script>
 </body>
 </html>
 """
+
 
 @app.route("/desc", methods=["GET","POST"])
 def desc():
@@ -963,6 +1079,7 @@ def desc():
     cond_display = None
     count = 0
     service_results = []
+    warning_msg = ""
 
     if request.method == "POST":
 
@@ -971,56 +1088,19 @@ def desc():
         # ======================
         # 서비스 목록 문자열 생성
         # ======================
-        # ======================
-        # 서비스 1차 필터 (토큰 절약 + 정확도 상승)
-        # ======================
-
-        q = query.lower()
-
-        candidate_rows = []
-
-        for idx, r in service_df.iterrows():
-
-            text = (
-                str(r.get("서비스설명","")) +
-                " " +
-                str(r.get("검색어",""))
-            ).lower()
-
-            score = 0
-
-            for word in q.split():
-
-                if word in text:
-                    score += 1
-
-            candidate_rows.append((score, idx, r))
-
-        # 점수 높은 순 정렬
-        candidate_rows.sort(reverse=True)
-
-        # 상위 25개만 사용
-        candidate_rows = candidate_rows[:40]
-
         service_text = ""
 
-        for score, idx, r in candidate_rows:
-
-            desc = str(r.get('서비스설명',''))[:60]
-            kw = str(r.get('검색어',''))[:30]
-
-            service_text += f"""
-        index:{idx}
-        설명:{desc}
-        키워드:{kw}
----
-"""
+        for idx, r in service_df.iterrows():
+            service_text += (
+                f"{idx}. {compress_text(r.get('서비스설명',''),40)} / "
+                f"{compress_text(r.get('검색어',''),40)}\n"
+            )
 
         # ======================
         # 서비스 그룹 데이터 문자열 생성
         # ======================
-# 서비스 1차 필터 (토큰 절약)
         cond_display = []
+
 
         api_key = os.getenv("OPENAI_API_KEY")
 
@@ -1038,115 +1118,137 @@ def desc():
 
         client = OpenAI(api_key=api_key)
 
+
         prompt = f"""
 너는 통합돌봄 서비스 추천 전문가다.
 
-사용자의 사례를 분석하여
-아래 서비스 목록 중에서 가장 유사한 서비스를
-유사도가 높은 순서대로 최대 10개 추천한다.
+사용자의 사례를 분석하고,
+아래 서비스 목록 전체를 검토하여
+적합한 서비스들을 폭넓게 추천하라.
 
-반드시 유사도가 높은 순서대로 정렬해서 추천해야 한다.
+중요:
+- 파이썬이 미리 판단하지 않는다.
+- 반드시 서비스목록의 '서비스설명'과 '검색어'를 적극적으로 참고하여 판단한다.
+- 사용자가 직접 정확한 행정용어를 쓰지 않아도 의미가 비슷하면 연결해서 판단한다.
+- 너무 보수적으로 2~4개만 고르지 말고, 실제 현장에서 함께 검토할 만한 서비스는 넓게 포함한다.
+- 단, 완전히 무관한 서비스는 제외한다.
+
+판단 원칙:
+1. 사례의 핵심 욕구를 먼저 정리한다.
+   - 건강/통증/질환
+   - 이동/거동
+   - 식사/영양
+   - 위생/청결
+   - 정서/사회적 고립
+   - 돌봄부담/가족지원
+   - 주거환경
+   - 안전
+2. 서비스설명과 검색어를 보고 사례와 의미적으로 맞는 서비스를 찾는다.
+3. 같은 사례에 대해 하나의 서비스만 고르지 말고, 함께 필요한 연관 서비스도 포함할 수 있다.
+4. 특히 아래 표현은 적극 반영한다.
+   - "집으로 와주길 원함" → 방문형 서비스 우선 고려
+   - "반찬을 못함", "식사 준비 어려움" → 식사지원/반찬지원/영양지원 우선 고려
+   - "지팡이", "워커", "휠체어", "보행보조" → 복지용구 계열 우선 고려
+   - "무릎통증", "통증", "거동불편", "움직이기 어려움" → 재활, 기능회복, 방문보건, 이동지원 계열 고려
+   - "혼자 지냄", "외로움", "고립" → 정서지원, 안부확인, 돌봄연계 고려
+5. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다.
+6. 우선순위가 높은 순서대로 정렬한다.
+7. 최대 30개까지 추천한다.
+8. 가능하면 동일 유형 서비스는 중복 추천하지 말고, 서로 다른 유형의 서비스가 균형 있게 포함되도록 한다.
 
 반드시 JSON만 출력한다.
+설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
 
-출력 형식
-
-출력 형식
-
+출력 형식:
 {{
   "results": [
     {{
-      "index": "",
-      "선택이유": ""
+      "index": 12,
+      "선택이유": "사용자의 무릎통증과 이동불편, 방문 희망 욕구에 맞아 우선 검토할 필요가 있음"
     }}
   ]
 }}
 
-추천 기준
-1. 사용자 상황과의 의미적 유사성
-2. 서비스설명과의 일치 정도
-3. 검색어와의 관련성
-4. 실제 통합돌봄 연계 가능성
-
-주의사항
-- 최대 10개만 추천한다.
-- 가장 유사한 것을 1번으로 둔다.
-- 불필요한 설명은 하지 말고 JSON만 출력한다.
-
-서비스 목록
-
+서비스 목록:
 {service_text}
 
-사용자 사례
+사용자 사례:
 {query}
 """
 
-        try:
 
-            res = client.responses.create(
-                model="gpt-4.1-mini",
-                input=prompt
-            )
-            if hasattr(res, "usage"):
+        try:
+            if query in cache:
+                service_results = cache[query]
+
+            else:
+                res = client.responses.create(
+                    model="gpt-4.1-mini",
+                    input=prompt,
+                    temperature=0
+                )
+
+                if hasattr(res, "usage"):
+                    try:
+                        print("입력 토큰:", res.usage.input_tokens)
+                        print("출력 토큰:", res.usage.output_tokens)
+                        print("총 토큰:", res.usage.total_tokens)
+                    except:
+                        print("토큰 정보:", res.usage)
+
+                text = res.output_text
+                print("GPT 원문:", text)
 
                 try:
-
-                    print("입력 토큰:", res.usage.input_tokens)
-                    print("출력 토큰:", res.usage.output_tokens)
-                    print("총 토큰:", res.usage.total_tokens)
-
+                    parsed = json.loads(text)
                 except:
+                    match = re.search(r'\{.*\}', text, re.DOTALL)
+                    if match:
+                        parsed = json.loads(match.group())
+                    else:
+                        parsed = {"results": []}
 
-                    print("토큰 정보:", res.usage)
-            text = res.output_text
-            print("GPT 원문:", text)
+                raw_results = parsed.get("results", [])[:50]
 
-            try:
-                parsed = json.loads(text)
+                final_results = []
 
-            except:
-                match = re.search(r'\{.*\}', text, re.DOTALL)
+                for r in raw_results:
+                    idx = int(r.get("index", -1))
 
-                if match:
-                    parsed = json.loads(match.group())
-                else:
-                    parsed = {"results":[]}
+                    if 0 <= idx < len(service_df):
+                        row = service_df.iloc[idx]
 
-            service_results = parsed.get("results", [])[:10]
+                        final_results.append({
+                            "대분류": row.get("대분류", ""),
+                            "중분류": row.get("중분류", ""),
+                            "서비스내용": row.get("서비스내용", ""),
+                            "선택이유": r.get("선택이유", "")
+                        })
 
-            final_results = []
-
-            for r in service_results:
-
-                idx = int(r.get("index", -1))
-
-                if 0 <= idx < len(service_df):
-
-                    row = service_df.iloc[idx]
-
-                    final_results.append({
-                        "대분류": row.get("대분류", ""),
-                        "중분류": row.get("중분류", ""),
-                        "서비스내용": row.get("서비스내용", ""),
-                        "선택이유": r.get("선택이유", "")
-                    })
-
-            service_results = final_results
+                service_results = final_results
+                cache[query] = service_results
 
         except Exception as e:
-
             cond_display.append(f"GPT 오류: {e}")
+
+
+
         count = len(service_results)
 
+        if count >= 15:
+            warning_msg = "15개 이상의 서비스내용이 검색되었습니다. 결과를 더 정확하게 확인하려면 대상자의 건강상태, 돌봄 상황, 지역, 기능 상태 등을 조금 더 구체적으로 입력해 주세요."
+
     return render_template_string(
-        DESC_HTML,
-        style=BASE_STYLE,
-        query=query,
-        results=results,
-        cond_display=cond_display,
-        count=count,
-        service_results=service_results
-    )
+    DESC_HTML,
+    style=BASE_STYLE,
+    query=query,
+    results=results,
+    cond_display=cond_display,
+    count=count,
+    service_results=service_results,
+    warning_msg=warning_msg
+)
+
 # =========================
 # ② 서술형 검색 (GPT 기반) + 팝업/지도 포함
 # =========================
@@ -1363,7 +1465,7 @@ button:hover{
 </form>
 
 <div class="notice">
-※ 입력한 사례와 유사한 <b>통합돌봄 서비스 최대 10가지</b>를 추천합니다.<br>
+※ 입력한 사례와 유사한 <b>통합돌봄 서비스 최대 30가지</b>를 추천합니다.<br>
 지자체 개인별지원계획 수립 참고용입니다.
 </div>
 
@@ -1376,17 +1478,55 @@ button:hover{
 
 <h3>{{count}}건의 추천 서비스</h3>
 
+{% if warning_msg %}
+<div style="
+  margin:12px 0 16px 0;
+  padding:14px 16px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.6;
+">
+  ⚠️ {{warning_msg}}
+</div>
+{% endif %}
+
+
 {% for r in service_results %}
 
 <div class="result-card">
 
-<b>{{loop.index}}. {{r["대분류"]}} / {{r["중분류"]}} / {{r["서비스내용"]}}</b>
+<div style="font-weight:700; font-size:16px; margin-bottom:8px;">
+  {{loop.index}}. {{r["대분류"]}} > {{r["중분류"]}} > {{r["서비스내용"]}}
+</div>
+
+<div style="font-size:13px; line-height:1.6; color:#6b7280;">
+
+  <div>
+    <span style="color:#6b7280;">대분류:</span>
+    <b>{{r["대분류"]}}</b>
+  </div>
+
+  <div>
+    <span style="color:#6b7280;">중분류:</span>
+    <b>{{r["중분류"]}}</b>
+  </div>
+
+  <div>
+    <span style="color:#6b7280;">소분류:</span>
+    <b>{{r["서비스내용"]}}</b>
+  </div>
+
+</div>
 
 <div class="reason">
 추천 이유: {{r["선택이유"]}}
 </div>
 
 </div>
+
 
 {% endfor %}
 
@@ -1483,24 +1623,18 @@ CARE_HTML = """
 
 <style>
 
-.radio-item{
+.dementia-options label{
   display:flex;
   align-items:center;
   gap:6px;
-}
-
-.radio-item input[type=radio]{
-  width:18px;
-  height:18px;
-  transform:none !important;
-  -webkit-appearance:radio;
+  white-space:nowrap;   /* 🔥 이거 추가 */
 }
 
 .dementia-options{
   display:flex;
   gap:24px;
   align-items:center;
-  flex-wrap:wrap;   /* 줄바꿈 방지 */
+  flex-wrap:nowrap;   /* 줄바꿈 방지 */
 }
 
 /* ====== 사전조사 전용 스타일 ====== */
@@ -1551,9 +1685,9 @@ CARE_HTML = """
 }
 
 .options input[type=radio]{
+  width:auto !important;
   flex:0 0 auto;
-  width:18px;
-  height:18px;
+  transform:scale(1.1);
 }
 
 .question-box{
@@ -1576,6 +1710,12 @@ CARE_HTML = """
   border-radius:10px;
   margin-top:15px;
   border:1px solid #fed7aa;
+}
+
+.dementia-options{
+  display:flex;
+  gap:30px;
+  margin-top:10px;
 }
 
 /* 모바일에서 치매 선택 박스가 답답하면 줄바꿈 */
@@ -1610,19 +1750,17 @@ CARE_HTML = """
     <div class="dementia-box">
       <b>치매 관련 약 복용 여부</b>
 
-<div class="dementia-options">
+      <div class="dementia-options">
+        <label>
+          <input type="radio" name="dementia" value="y">
+          예
+        </label>
 
-  <label class="radio-item">
-    <input type="radio" name="dementia" value="y">
-    <span>예</span>
-  </label>
-
-  <label class="radio-item">
-    <input type="radio" name="dementia" value="n">
-    <span>아니오</span>
-  </label>
-
-</div>
+        <label>
+          <input type="radio" name="dementia" value="n">
+          아니오
+        </label>
+      </div>
     </div>
 
     <div id="adlSection">
@@ -1837,16 +1975,130 @@ NHIS25_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>건강보험 25시</title>
 <style>{{style}}</style>
+
+<style>
+.app-box{
+  background:white;
+  padding:22px;
+  border-radius:14px;
+  text-align:center;
+  margin-top:20px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+
+.desc{
+  font-size:15px;
+  line-height:1.7;
+  color:#374151;
+  margin-bottom:18px;
+}
+
+.notice{
+  margin-top:14px;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+
+.btn{
+  display:block;
+  width:100%;
+  padding:14px;
+  margin-top:10px;
+  border:none;
+  border-radius:10px;
+  text-decoration:none;
+  font-weight:600;
+  font-size:15px;
+  cursor:pointer;
+  box-sizing:border-box;
+}
+
+.primary-btn{
+  background:#2563eb;
+  color:white;
+}
+
+.hidden{
+  display:none;
+}
+</style>
 </head>
+
 <body>
 <div class="container">
-  <a href="/home" class="home-button">홈으로</a>
-  <h2>건강보험 25시</h2>
 
-  <div class="result" style="text-align:center;font-size:18px;">
-    준비 중입니다.
-  </div>
+<div class="top-bar">
+  <a href="/home" class="home-button">홈으로</a>
 </div>
+
+<h2>건강보험 25시</h2>
+
+<div class="app-box">
+
+  <!-- PC 안내 -->
+  <div id="pcBox" class="hidden">
+    <p class="desc">
+      현재는 <b>PC 환경</b>입니다.<br>
+      건강보험 25시는 <b>모바일 앱 기반 서비스</b>입니다.<br>
+      스마트폰에서 접속하면 앱 실행 또는 설치 화면으로 이동합니다.
+    </p>
+
+    <div class="notice">
+      ※ 모바일에서 QR코드 또는 링크로 접속해 주세요.
+    </div>
+  </div>
+
+  <!-- 모바일 -->
+  <div id="mobileBox" class="hidden">
+    <p class="desc">
+      모바일 환경이 확인되었습니다.<br>
+      아래 버튼을 누르면 건강보험 25시로 이동합니다.
+    </p>
+
+    <button id="goBtn" class="btn primary-btn">
+      건강보험 25시 열기
+    </button>
+
+    <div class="notice">
+      ※ 앱이 설치되어 있으면 자동 실행됩니다.
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+(function () {
+
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isMobile = isAndroid || isIOS;
+
+  const pcBox = document.getElementById("pcBox");
+  const mobileBox = document.getElementById("mobileBox");
+  const goBtn = document.getElementById("goBtn");
+
+  // 👉 핵심 링크 (네 QR이 최종으로 보내는 주소)
+  const NHIS_URL = "https://m.nhis.or.kr/index4.html?path=%2Fmg%2Fwbmmb0010%2FmainApp.do";
+
+  if (!isMobile) {
+    pcBox.classList.remove("hidden");
+    return;
+  }
+
+  mobileBox.classList.remove("hidden");
+
+  goBtn.addEventListener("click", function () {
+    window.location.href = NHIS_URL;
+  });
+
+})();
+</script>
+
 </body>
 </html>
 """
@@ -1858,6 +2110,6 @@ def nhis25():
         return check
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
 
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run()
