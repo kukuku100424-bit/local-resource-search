@@ -1627,14 +1627,14 @@ CARE_HTML = """
   display:flex;
   align-items:center;
   gap:6px;
-  white-space:nowrap;   /* 🔥 이거 추가 */
+  white-space:nowrap;
 }
 
 .dementia-options{
   display:flex;
   gap:24px;
   align-items:center;
-  flex-wrap:nowrap;   /* 줄바꿈 방지 */
+  flex-wrap:nowrap;
 }
 
 /* ====== 사전조사 전용 스타일 ====== */
@@ -1658,12 +1658,10 @@ CARE_HTML = """
   background:#d1d5db;
 }
 
-/* PC에서만 줄바꿈 */
 .pc-br{
   display:inline;
 }
 
-/* 모바일에서는 줄바꿈 제거 */
 @media (max-width:480px){
   .pc-br{
     display:none;
@@ -1682,6 +1680,7 @@ CARE_HTML = """
   align-items:center;
   gap:10px;
   cursor:pointer;
+  line-height:1.5;
 }
 
 .options input[type=radio]{
@@ -1691,25 +1690,28 @@ CARE_HTML = """
 }
 
 .question-box{
-  background:#f5faff;              /* ✅ 기본 파란톤 배경 복구 */
+  background:#f5faff;
   padding:22px;
-  border-radius:12px;
+  border-radius:16px;
   margin-top:18px;
-  box-shadow:0 2px 6px rgba(0,0,0,0.08);
+  box-shadow:0 8px 24px rgba(15, 23, 42, 0.06);
   border:1px solid #dbeafe;
+  transition:0.18s ease;
 }
 
 .question-box.active{
-  border:2px solid #1e73be;
-  background:#eaf4ff;
+  border:2px solid #2563eb;
+  background:#eef6ff;
+  box-shadow:0 12px 28px rgba(37,99,235,0.12);
 }
 
 .dementia-box{
-  background:#fff7ed;
+  background:linear-gradient(135deg,#fff7ed,#fff1f2);
   padding:18px;
-  border-radius:10px;
+  border-radius:14px;
   margin-top:15px;
   border:1px solid #fed7aa;
+  box-shadow:0 6px 18px rgba(251,146,60,0.08);
 }
 
 .dementia-options{
@@ -1718,10 +1720,167 @@ CARE_HTML = """
   margin-top:10px;
 }
 
-/* 모바일에서 치매 선택 박스가 답답하면 줄바꿈 */
-@media (max-width:480px){
-  .dementia-options{ gap:18px; }
+/* ====== 예쁜 점수 배너 ====== */
+.score-banner{
+  position:fixed;
+  top:100px;
+  right:80px;
+  z-index:998;
+  width:132px;
+  padding:14px 12px;
+  border-radius:22px;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(191,219,254,0.95);
+  box-shadow:0 18px 38px rgba(37,99,235,0.18);
+  text-align:center;
+  transition:all 0.2s ease;
 }
+
+.score-banner.disabled{
+  opacity:0.62;
+  transform:scale(0.98);
+}
+
+.score-badge{
+  width:72px;
+  height:72px;
+  margin:0 auto 10px auto;
+  border-radius:50%;
+  background:linear-gradient(135deg,#2563eb,#60a5fa);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  box-shadow:0 10px 22px rgba(37,99,235,0.28);
+}
+
+.score-badge-label{
+  font-size:10px;
+  opacity:0.92;
+  line-height:1;
+  margin-bottom:4px;
+}
+
+.score-value{
+  font-size:28px;
+  font-weight:800;
+  line-height:1;
+}
+
+.score-meta{
+  font-size:11px;
+  color:#64748b;
+  margin-bottom:8px;
+}
+
+.score-progress-wrap{
+  width:100%;
+  height:8px;
+  background:#e5edf9;
+  border-radius:999px;
+  overflow:hidden;
+  margin-bottom:10px;
+}
+
+.score-progress-bar{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#60a5fa,#2563eb);
+  transition:width 0.22s ease;
+}
+
+.score-status{
+  font-size:11px;
+  color:#1e3a8a;
+  line-height:1.45;
+  word-break:keep-all;
+  min-height:34px;
+  font-weight:600;
+}
+
+.score-chip{
+  margin-top:8px;
+  display:inline-block;
+  padding:5px 8px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:700;
+  background:#eff6ff;
+  color:#2563eb;
+}
+
+/* ===== 상태별 색감 ===== */
+.score-banner.state-low .score-badge{
+  background:linear-gradient(135deg,#22c55e,#4ade80);
+  box-shadow:0 10px 22px rgba(34,197,94,0.24);
+}
+.score-banner.state-low .score-progress-bar{
+  background:linear-gradient(90deg,#86efac,#22c55e);
+}
+.score-banner.state-low .score-status{
+  color:#166534;
+}
+.score-banner.state-low .score-chip{
+  background:#f0fdf4;
+  color:#16a34a;
+}
+
+.score-banner.state-mid .score-badge{
+  background:linear-gradient(135deg,#f59e0b,#fbbf24);
+  box-shadow:0 10px 22px rgba(245,158,11,0.24);
+}
+.score-banner.state-mid .score-progress-bar{
+  background:linear-gradient(90deg,#fde68a,#f59e0b);
+}
+.score-banner.state-mid .score-status{
+  color:#92400e;
+}
+.score-banner.state-mid .score-chip{
+  background:#fffbeb;
+  color:#d97706;
+}
+
+.score-banner.state-high .score-badge{
+  background:linear-gradient(135deg,#ef4444,#f87171);
+  box-shadow:0 10px 22px rgba(239,68,68,0.24);
+}
+.score-banner.state-high .score-progress-bar{
+  background:linear-gradient(90deg,#fca5a5,#ef4444);
+}
+.score-banner.state-high .score-status{
+  color:#991b1b;
+}
+.score-banner.state-high .score-chip{
+  background:#fef2f2;
+  color:#dc2626;
+}
+
+.score-banner.state-dementia .score-badge{
+  background:linear-gradient(135deg,#7c3aed,#a78bfa);
+  box-shadow:0 10px 22px rgba(124,58,237,0.24);
+}
+.score-banner.state-dementia .score-progress-bar{
+  background:linear-gradient(90deg,#c4b5fd,#7c3aed);
+  width:100% !important;
+}
+.score-banner.state-dementia .score-status{
+  color:#5b21b6;
+}
+.score-banner.state-dementia .score-chip{
+  background:#f5f3ff;
+  color:#7c3aed;
+}
+
+@media (max-width:480px){
+  .dementia-options{
+    gap:18px;
+  }
+}
+
 @media (max-width:480px){
 
   #resultModal{
@@ -1732,6 +1891,38 @@ CARE_HTML = """
     top:2% !important;
   }
 
+  .score-banner{
+    top:auto;
+    bottom:16px;
+    right:12px;
+    width:116px;
+    padding:12px 10px;
+    border-radius:18px;
+  }
+
+  .score-badge{
+    width:62px;
+    height:62px;
+    margin-bottom:8px;
+  }
+
+  .score-value{
+    font-size:24px;
+  }
+
+  .score-meta{
+    font-size:10px;
+  }
+
+  .score-status{
+    font-size:10px;
+    min-height:30px;
+  }
+
+  .score-chip{
+    font-size:9px;
+    padding:4px 7px;
+  }
 }
 
 </style>
@@ -1746,54 +1937,71 @@ CARE_HTML = """
 
 <h2>통합돌봄 사전조사</h2>
 
-  <form id="careForm">
-    <div class="dementia-box">
-      <b>치매 관련 약 복용 여부</b>
+<div id="scoreBanner" class="score-banner disabled">
+  <div class="score-badge">
+    <div class="score-badge-label">점수</div>
+    <div id="scoreValue" class="score-value">0</div>
+  </div>
 
-      <div class="dementia-options">
+  <div class="score-meta">
+    응답 <span id="answeredCount">0</span>/7 · 최대 14점
+  </div>
+
+  <div class="score-progress-wrap">
+    <div id="scoreProgressBar" class="score-progress-bar"></div>
+  </div>
+
+  <div id="scoreStatus" class="score-status">치매 여부를 먼저 선택하세요</div>
+  <div id="scoreChip" class="score-chip">사전 확인 필요</div>
+</div>
+
+<form id="careForm">
+  <div class="dementia-box">
+    <b>치매 관련 약 복용 여부</b>
+
+    <div class="dementia-options">
+      <label>
+        <input type="radio" name="dementia" value="y">
+        예
+      </label>
+
+      <label>
+        <input type="radio" name="dementia" value="n">
+        아니오
+      </label>
+    </div>
+  </div>
+
+  <div id="adlSection">
+    {% for i,q in questions %}
+    <div class="question-box">
+      <b>{{i+1}}) {{q}}</b>
+
+      <div class="options">
         <label>
-          <input type="radio" name="dementia" value="y">
-          예
+          <input type="radio" name="q{{i}}" value="0">
+          도움 없이 혼자서 수행 가능 (0점)
         </label>
 
         <label>
-          <input type="radio" name="dementia" value="n">
-          아니오
+          <input type="radio" name="q{{i}}" value="1">
+          보조도구(지팡이 등)를 잡고 수행 가능 (1점)
+        </label>
+
+        <label>
+          <input type="radio" name="q{{i}}" value="2">
+          타인이 도와줘야 수행 가능 (2점)
         </label>
       </div>
     </div>
+    {% endfor %}
 
-    <div id="adlSection">
-      {% for i,q in questions %}
-      <div class="question-box">
-        <b>{{i+1}}) {{q}}</b>
-
-        <div class="options">
-          <label>
-            <input type="radio" name="q{{i}}" value="0">
-            도움 없이 혼자서 수행 가능 (0점)
-          </label>
-
-          <label>
-            <input type="radio" name="q{{i}}" value="1">
-            보조도구(지팡이 등)를 잡고 수행 가능 (1점)
-          </label>
-
-          <label>
-            <input type="radio" name="q{{i}}" value="2">
-            타인이 도와줘야 수행 가능 (2점)
-          </label>
-        </div>
-      </div>
-      {% endfor %}
-
-      <button type="submit" class="menu-btn">검사하기</button>
-    </div>
-  </form>
+    <button type="submit" class="menu-btn">검사하기</button>
+  </div>
+</form>
 
 </div>
 
-<!-- 결과/안내 팝업 -->
 <div id="resultModal"
      style="display:none;position:fixed;inset:0;
             background:rgba(0,0,0,.5);z-index:999;
@@ -1840,7 +2048,6 @@ CARE_HTML = """
 </div>
 
 <script>
-/* ====== 공통 팝업 열기 ====== */
 function showGuide(messageHtml){
   document.getElementById("modalTitle").innerText = "안내";
   document.getElementById("r_text").innerHTML = messageHtml;
@@ -1854,40 +2061,154 @@ function showResult(title, messageText){
 }
 
 function closeModal(){
-  document.getElementById("resultModal").style.display="none";
+  document.getElementById("resultModal").style.display = "none";
 }
 
-/* ====== 1) 치매 선택 안 했는데 ADL 누르면 '차단' ====== */
+function getCurrentScore(){
+  let score = 0;
+  for(let i=0; i<7; i++){
+    const checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){
+      score += Number(checked.value);
+    }
+  }
+  return score;
+}
+
+function getAnsweredCount(){
+  let count = 0;
+  for(let i=0; i<7; i++){
+    const checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function getBannerState(score, dementiaValue){
+  if(!dementiaValue){
+    return "disabled";
+  }
+  if(dementiaValue === "y"){
+    return "state-dementia";
+  }
+  if(score <= 1){
+    return "state-low";
+  }else if(score <= 3){
+    return "state-mid";
+  }else{
+    return "state-high";
+  }
+}
+
+function getScoreStatusText(score, dementiaValue){
+  if(!dementiaValue){
+    return "치매 여부를 먼저 선택하세요";
+  }
+
+  if(dementiaValue === "y"){
+    return "치매약 복용으로 별도 조사 없이 대상입니다";
+  }
+
+  if(score <= 1){
+    return "지자체 사업 안내 후 종결 구간입니다";
+  }else if(score <= 3){
+    return "지자체 자체조사 검토 구간입니다";
+  }else{
+    return "통합판정조사 대상 구간입니다";
+  }
+}
+
+function getChipText(score, dementiaValue){
+  if(!dementiaValue){
+    return "사전 확인 필요";
+  }
+
+  if(dementiaValue === "y"){
+    return "치매약 복용";
+  }
+
+  if(score <= 1){
+    return "0~1점";
+  }else if(score <= 3){
+    return "2~3점";
+  }else{
+    return "4점 이상";
+  }
+}
+
+function updateScoreBanner(){
+  const banner = document.getElementById("scoreBanner");
+  const scoreValue = document.getElementById("scoreValue");
+  const answeredCount = document.getElementById("answeredCount");
+  const scoreStatus = document.getElementById("scoreStatus");
+  const scoreChip = document.getElementById("scoreChip");
+  const scoreProgressBar = document.getElementById("scoreProgressBar");
+  const dementia = document.querySelector('input[name="dementia"]:checked');
+
+  const score = getCurrentScore();
+  const answered = getAnsweredCount();
+  const dementiaValue = dementia ? dementia.value : "";
+
+  scoreValue.innerText = score;
+  answeredCount.innerText = answered;
+  scoreStatus.innerText = getScoreStatusText(score, dementiaValue);
+  scoreChip.innerText = getChipText(score, dementiaValue);
+
+  let progress = Math.min((score / 14) * 100, 100);
+  if(dementiaValue === "y"){
+    progress = 100;
+  }
+  scoreProgressBar.style.width = progress + "%";
+
+  banner.classList.remove("disabled","state-low","state-mid","state-high","state-dementia");
+
+  const nextState = getBannerState(score, dementiaValue);
+
+  if(nextState === "disabled"){
+    banner.classList.add("disabled");
+  }else{
+    banner.classList.add(nextState);
+  }
+}
+
+/* 1) 치매 선택 안 했는데 ADL 누르면 차단 */
 document.querySelectorAll('#adlSection .options input[type="radio"]').forEach(radio => {
   radio.addEventListener("change", function(){
     const dementia = document.querySelector('input[name="dementia"]:checked');
 
     if(!dementia){
-      // ✅ ADL 선택 자체를 취소하고 안내
       this.checked = false;
       showGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를<br> 선택해주세요.");
+      updateScoreBanner();
       return;
     }
 
-    // 치매 선택이 되어 있으면 카드 강조
     const box = this.closest(".question-box");
-    if(box) box.classList.add("active");
+    if(box){
+      box.classList.add("active");
+    }
+
+    updateScoreBanner();
   });
 });
 
-/* ====== 2) 치매 '예'면 즉시 안내 팝업 + ADL 흐리게 ====== */
-document.querySelectorAll('input[name="dementia"]').forEach(radio=>{
-  radio.addEventListener("change",function(){
+/* 2) 치매 선택 처리 */
+document.querySelectorAll('input[name="dementia"]').forEach(radio => {
+  radio.addEventListener("change", function(){
     if(this.value === "y"){
-      document.getElementById("adlSection").style.opacity="0.4";
+      document.getElementById("adlSection").style.opacity = "0.4";
       showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 관계없이 <b>통합돌봄 대상</b>입니다.");
     }else{
-      document.getElementById("adlSection").style.opacity="1";
+      document.getElementById("adlSection").style.opacity = "1";
     }
+
+    updateScoreBanner();
   });
 });
 
-/* ====== 3) 검사하기 클릭 시: 치매 미선택이면 막기 ====== */
+/* 3) 검사하기 클릭 시 */
 document.getElementById("careForm").onsubmit = async function(e){
   e.preventDefault();
 
@@ -1898,12 +2219,10 @@ document.getElementById("careForm").onsubmit = async function(e){
     return;
   }
 
-  // 치매 '예'는 이미 팝업으로 안내했으니 여기선 종료
   if(dementia.value === "y"){
     return;
   }
 
-  // ✅ 치매 '아니오'면 ADL 응답이 7개 다 되었는지 체크
   for(let i=0; i<7; i++){
     const checked = document.querySelector('input[name="q'+i+'"]:checked');
     if(!checked){
@@ -1921,8 +2240,11 @@ document.getElementById("careForm").onsubmit = async function(e){
 
   const data = await res.json();
 
+  updateScoreBanner();
   showResult("사전조사 결과 안내", data.result + "\\n총점: " + data.score);
-}
+};
+
+updateScoreBanner();
 </script>
 
 </body>
@@ -1966,6 +2288,7 @@ def care_check():
         result = "통합판정조사 대상"
 
     return jsonify({"result":result,"score":score})
+
 
 NHIS25_HTML = """
 <!DOCTYPE html>
@@ -2036,7 +2359,6 @@ NHIS25_HTML = """
 
 <div class="app-box">
 
-  <!-- PC 안내 -->
   <div id="pcBox" class="hidden">
     <p class="desc">
       현재는 <b>PC 환경</b>입니다.<br>
@@ -2049,7 +2371,6 @@ NHIS25_HTML = """
     </div>
   </div>
 
-  <!-- 모바일 -->
   <div id="mobileBox" class="hidden">
     <p class="desc">
       모바일 환경이 확인되었습니다.<br>
@@ -2082,7 +2403,6 @@ NHIS25_HTML = """
   const mobileBox = document.getElementById("mobileBox");
   const goBtn = document.getElementById("goBtn");
 
-  // 👉 핵심 링크 (네 QR이 최종으로 보내는 주소)
   const NHIS_URL = "https://m.nhis.or.kr/index4.html?path=%2Fmg%2Fwbmmb0010%2FmainApp.do";
 
   if (!isMobile) {
