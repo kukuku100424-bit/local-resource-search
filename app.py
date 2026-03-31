@@ -1900,6 +1900,12 @@ CARE_HTML = """
     border-radius:18px;
   }
 
+@media (max-width:480px){
+  #careForm{
+    padding-bottom:160px;
+  }
+}
+
   .score-badge{
     width:62px;
     height:62px;
@@ -2374,8 +2380,7 @@ NHIS25_HTML = """
   <div id="mobileBox" class="hidden">
     <p class="desc">
       모바일 환경이 확인되었습니다.<br>
-      아래 버튼을 누르면 건강보험 25시로 이동합니다.<br>
-      앱 미설치 시 설치화면으로 이동합니다.
+      버튼을 누르면 건강보험 25시로 이동합니다.<br>
     </p>
 
     <button id="goBtn" class="btn primary-btn">
@@ -2383,7 +2388,7 @@ NHIS25_HTML = """
     </button>
 
     <div class="notice">
-      ※ 앱이 설치되어 있으면 자동 실행됩니다.
+      ※ 앱 미설치 시 설치페이지로 이동합니다.
     </div>
   </div>
 
