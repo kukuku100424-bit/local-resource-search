@@ -250,7 +250,9 @@ body{
 .container{
   max-width:700px;
   margin:auto;
-  padding:10px 20px 20px 20px;   /* 👈 위만 줄임 */
+  padding:10px 20px 20px 20px;
+
+  position:relative;   /* 🔥 여기도 추가 */
 }
 
 h2{
@@ -512,7 +514,9 @@ body{
 .container{
   max-width:700px;
   margin:auto;
-  padding:30px 20px;
+  padding:10px 20px 20px 20px;
+
+  position:relative;   /* 🔥 이거 추가 */
 }
 
 /* 타이틀 */
@@ -1785,9 +1789,7 @@ CARE_HTML = """
 }
 
 .score-meta{
-  font-size:11px;
-  color:#64748b;
-  margin-bottom:8px;
+  display:none;   /* 🔥 이걸로 완전히 숨김 */
 }
 
 .score-progress-wrap{
@@ -1796,7 +1798,7 @@ CARE_HTML = """
   background:#e5edf9;
   border-radius:999px;
   overflow:hidden;
-  margin-bottom:10px;
+  margin-bottom:3px;
 }
 
 .score-progress-bar{
@@ -1906,14 +1908,17 @@ CARE_HTML = """
     top:2% !important;
   }
 
-  .score-banner{
-    top:auto;
-    bottom:16px;
-    right:12px;
-    width:116px;
-    padding:12px 10px;
-    border-radius:18px;
-  }
+.score-banner{
+  position:fixed;   /* 🔥 fixed → absolute */
+  top:10px;            /* 🔥 위쪽으로 딱 붙이기 */
+  right:10px;          /* 🔥 우측 여백 */
+  
+  width:85px;          /* 🔥 작게 */
+  padding:8px 6px;
+  border-radius:16px;
+
+  z-index:10;
+}
 
 @media (max-width:480px){
   #careForm{
@@ -1921,30 +1926,29 @@ CARE_HTML = """
   }
 }
 
-  .score-badge{
-    width:62px;
-    height:62px;
-    margin-bottom:8px;
-  }
-
-  .score-value{
-    font-size:24px;
-  }
-
-  .score-meta{
-    font-size:10px;
-  }
-
-  .score-status{
-    font-size:10px;
-    min-height:30px;
-  }
-
-  .score-chip{
-    font-size:9px;
-    padding:4px 7px;
-  }
+.score-badge{
+  width:44px;
+  height:44px;
 }
+
+.score-value{
+  font-size:18px;
+}
+
+.score-meta{
+  font-size:9px;
+}
+
+.score-status{
+  font-size:10px;
+  line-height:1.2;
+  min-height:20px;   /* 🔥 높이 줄이기 */
+}
+
+.score-chip{
+  font-size:2px;
+  padding:3px 6px;
+}}
 
 </style>
 </head>
