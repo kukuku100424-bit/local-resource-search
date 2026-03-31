@@ -226,7 +226,7 @@ def login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if pw == "admin":  # 원하는 비밀번호
+        if pw == "nhis":  # 원하는 비밀번호
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
@@ -488,12 +488,12 @@ HOME_HTML = """
 
 .bottom-img{
   width:100%;
-  margin-top:-30px; }
+  margin-top:-100px; }
 
 @media (max-width:480px){
 
   .bottom-img{
-    margin-top:-30px;   /* 🔥 -80 → -20으로 줄이기 */
+    margin-top:-50px;   /* 🔥 -80 → -20으로 줄이기 */
   }
 
 }
