@@ -1640,6 +1640,14 @@ CARE_HTML = """
   white-space:nowrap;
   margin:0;
 }
+
+.dementia-options input[type=radio]{
+  width:auto !important;
+  margin:0;
+  flex:0 0 auto;
+  transform:scale(1.1);
+}
+
 /* ====== 사전조사 전용 스타일 ====== */
 
 .top-bar{
@@ -1719,7 +1727,10 @@ CARE_HTML = """
 
 .dementia-options{
   display:flex;
-  gap:30px;
+  width:100%;
+  align-items:center;
+  justify-content:space-between;
+  gap:0;
   margin-top:10px;
 }
 
