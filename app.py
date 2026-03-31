@@ -1623,20 +1623,23 @@ CARE_HTML = """
 
 <style>
 
-.dementia-options label{
+.dementia-options{
   display:flex;
+  width:100%;
+  align-items:center;
+  justify-content:space-between;
+  gap:0;
+}
+
+.dementia-options label{
+  flex:1;
+  display:flex;
+  justify-content:center;
   align-items:center;
   gap:6px;
   white-space:nowrap;
+  margin:0;
 }
-
-.dementia-options{
-  display:flex;
-  gap:24px;
-  align-items:center;
-  flex-wrap:nowrap;
-}
-
 /* ====== 사전조사 전용 스타일 ====== */
 
 .top-bar{
@@ -1877,7 +1880,8 @@ CARE_HTML = """
 
 @media (max-width:480px){
   .dementia-options{
-    gap:18px;
+    width:100%;
+    gap:0;
   }
 }
 
