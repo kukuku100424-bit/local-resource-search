@@ -1946,7 +1946,7 @@ CARE_HTML = """
 }
 
 .score-chip{
-  font-size:2px;
+  font-size:10px;
   padding:3px 6px;
 }}
 
@@ -2139,7 +2139,7 @@ function getScoreStatusText(score, dementiaValue){
   if(score <= 1){
     return "지자체 사업 안내 후 종결 구간입니다";
   }else if(score <= 3){
-    return "지자체 자체조사 검토 구간입니다";
+    return "지자체 자체조사 대상 구간입니다";
   }else{
     return "통합판정조사 대상 구간입니다";
   }
