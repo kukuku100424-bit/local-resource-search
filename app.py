@@ -1366,6 +1366,7 @@ textarea{
   width:100%;
   height:110px;
   padding:14px;
+  padding-right:64px;
   border-radius:10px;
   border:1px solid #d1d5db;
   font-size:15px;
@@ -1484,7 +1485,32 @@ button:hover{
 
 <form method="post" id="searchForm">
 
-<textarea name="query" placeholder="예) 관절염이 있고 정서적으로 고립된 어르신에게 필요한 서비스">{{query}}</textarea>
+<div style="position:relative;">
+
+<textarea id="queryInput" name="query" placeholder="예) 나주에 살고 식사도움이 필요한 어르신에게 필요한 서비스">{{query}}</textarea>
+
+<button type="button" id="voiceBtn"
+style="
+position:absolute;
+right:10px;
+bottom:10px;
+width:44px;
+height:44px;
+margin-top:0;
+padding:0;
+border-radius:50%;
+border:none;
+background:#2563eb;
+color:white;
+font-size:20px;
+display:none;
+cursor:pointer;
+z-index:10;
+">
+🎤
+</button>
+
+</div>
 
 <button type="submit">AI 검색</button>
 
@@ -1605,11 +1631,55 @@ button:hover{
 <script>
 
 document.getElementById("searchForm").addEventListener("submit",function(){
-
-document.getElementById("loading").style.display="flex"
-
+  document.getElementById("loading").style.display="flex"
 })
 
+(function(){
+
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+
+  if(!isMobile) return;
+
+  const btn = document.getElementById("voiceBtn");
+  const input = document.getElementById("queryInput");
+
+  if(!btn || !input) return;
+
+  btn.style.display = "block";
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SpeechRecognition){
+    btn.style.display = "none";
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = "ko-KR";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  btn.addEventListener("click", function(e){
+    e.preventDefault();
+    btn.innerText = "🎙️";
+    recognition.start();
+  });
+
+  recognition.onresult = function(event){
+    const text = event.results[0][0].transcript;
+    input.value = text;
+  };
+
+  recognition.onerror = function(){
+    btn.innerText = "🎤";
+  };
+
+  recognition.onend = function(){
+    btn.innerText = "🎤";
+  };
+
+})();
 </script>
 
 </body>
