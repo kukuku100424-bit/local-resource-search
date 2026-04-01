@@ -1466,6 +1466,12 @@ button:hover{
   100%{transform:rotate(360deg)}
 }
 
+@media (min-width:769px){
+  #voiceBtn{
+    display:none !important;
+  }
+}
+
 </style>
 </head>
 
@@ -1492,22 +1498,27 @@ button:hover{
 <button type="button" id="voiceBtn"
 style="
 position:absolute;
-right:10px;
-bottom:10px;
-width:44px;
-height:44px;
-margin-top:0;
-padding:0;
+right:12px;
+top:12px;
+width:42px;
+height:42px;
+display:flex;
+align-items:center;
+justify-content:center;
 border-radius:50%;
 border:none;
-background:#2563eb;
-color:white;
-font-size:20px;
-display:none;
+background:rgba(37,99,235,0.92);
+backdrop-filter:blur(6px);
+box-shadow:0 4px 12px rgba(0,0,0,0.15);
 cursor:pointer;
 z-index:10;
+transition:0.2s;
 ">
-🎤
+
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 24 24">
+  <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a1 1 0 0 0-2 0 3 3 0 0 1-6 0 1 1 0 0 0-2 0 5 5 0 0 0 4 4.9V19H8a1 1 0 0 0 0 2h8a1 1 0 0 0 0-2h-3v-3.1A5 5 0 0 0 17 11z"/>
+</svg>
+
 </button>
 
 </div>
@@ -1646,7 +1657,6 @@ document.getElementById("searchForm").addEventListener("submit",function(){
 
   if(!btn || !input) return;
 
-  btn.style.display = "block";
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
