@@ -59,149 +59,199 @@ LOGIN_HTML = """
 *{ box-sizing:border-box; }
 
 body{
+  margin:0;
+  min-height:100vh;
   font-family:'Pretendard',sans-serif;
-  background:#f2f4f7;
+  background:#f5f6f7;
+  color:#1f2937;
   display:flex;
   justify-content:center;
   align-items:center;
-  min-height:100vh;
-  margin:0;
-  padding:20px;
+  padding:24px 16px;
 }
 
-/* 카드 */
 .box{
-  background:white;
   width:100%;
-  max-width:460px;
-  padding:30px 40px 40px 40px;
-  border-radius:20px;
-  box-shadow:0 15px 40px rgba(0,0,0,0.08);
+  max-width:420px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:22px;
+  padding:40px 24px 28px 24px;
   text-align:center;
+  box-shadow:0 4px 16px rgba(15,23,42,0.04);
 }
 
-/* 로고 */
-.logo-wrapper{
-  margin-bottom:-40px; /* 너무 겹치면 -20~0 으로 */
+.simple-logo{
+  font-size:30px;
+  font-weight:800;
+  letter-spacing:-0.8px;
+  color:#111827;
+  margin-bottom:8px;
 }
 
-.logo-wrapper img{
-  width:100%;
-  max-width:440px;
-  display:block;
-  margin:0 auto;
+.logo-line{
+  width:40px;
+  height:3px;
+  margin:6px auto 8px auto;
+  border-radius:999px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
 }
 
-/* 타이틀 */
-.main-title{
-  font-size:26px;
-  font-weight:700;
-  margin-top:0px;
-}
 .sub-title{
-  font-size:15px;
-  color:#666;
-  margin-bottom:18px;
+  font-size:14px;
+  color:#6b7280;
+  margin-bottom:48px;
+  line-height:1.5;
 }
 
-/* 에러 메시지 */
+
 .error-msg{
-  background:#fff1f2;
-  color:#b91c1c;
-  border:1px solid #fecdd3;
-  padding:10px 12px;
-  border-radius:10px;
+  background:#fff4f4;
+  color:#d93025;
+  border:1px solid #ffd9d6;
+  padding:12px 14px;
+  border-radius:12px;
   font-size:14px;
-  margin:10px 0 14px 0;
+  margin:0 0 14px 0;
   text-align:left;
 }
 
-/* 입력창 */
+.form-area{
+  text-align:left;
+}
+.input-label{
+  display:block;
+  font-size:14px;
+  font-weight:700;
+  color:#374151;
+  margin-bottom:8px;
+}
+
 input{
   width:100%;
-  padding:14px;
-  border-radius:10px;
-  border:1px solid #ddd;
+  height:54px;
+  padding:0 16px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
   font-size:16px;
-  margin-bottom:16px;
+  color:#111827;
+  background:#fff;
+  outline:none;
+  transition:border-color 0.15s, box-shadow 0.15s;
+  margin-bottom:14px;
+}
+
+input::placeholder{
+  color:#9ca3af;
+}
+
+input:focus{
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.08);
 }
 
 button{
   width:100%;
-  padding:14px;
+  height:54px;
   border:none;
-  border-radius:10px;
-  background:#1e73be;
-  color:white;
-  font-size:16px;
-  font-weight:600;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#ffffff;
+  font-size:17px;
+  font-weight:700;
   cursor:pointer;
-  transition:0.2s;
+  transition:all 0.15s;
+  box-shadow:0 4px 14px rgba(37,99,235,0.25);
 }
-button:hover{ background:#155fa0; }
+
+button:hover{
+  opacity:0.9;
+}
 
 .notice{
-  font-size:12px;
-  color:#888;
   margin-top:22px;
-  line-height:1.5;
+  padding-top:18px;
+  border-top:1px solid #f1f5f9;
+  font-size:12px;
+  color:#6b7280;
+  line-height:1.65;
+  word-break:keep-all;
 }
 
-@media (max-width:480px){
-
-  .notice{
-    font-size:12px;
-    padding:6px;
-  }
-
+.bottom-logo{
+  margin-top:16px;
 }
 
 .bottom-logo img{
   width:100%;
-  max-width:220px;
-  margin-top:18px;
+  max-width:210px;
+  display:block;
+  margin:0 auto;
+  opacity:0.82;
 }
 
-/* 모바일 */
-@media (max-width: 480px){
-  .main-title{ font-size:22px; }
-
-  .logo-wrapper{
-    margin-bottom:-20px;
+@media (max-width:480px){
+  body{
+    padding:16px;
   }
 
-  .logo-wrapper img{
-    max-width:260px;
-    margin-bottom:10px;
-  }
-
-  .box{
-    padding:34px 20px 28px 20px;
-  }
+.box{
+  box-shadow:0 10px 30px rgba(0,0,0,0.06);
+  padding:48px 24px 36px 24px;
 }
 
+  .simple-logo{
+    font-size:28px;
+  }
+
+  .sub-title{
+    font-size:13px;
+    margin-bottom:24px;
+  }
+
+  .input-label{
+    font-size:13px;
+  }
+
+  input{
+    height:50px;
+    font-size:15px;
+    border-radius:10px;
+  }
+
+  button{
+    height:50px;
+    font-size:16px;
+    border-radius:10px;
+  }
+
+  .notice{
+    font-size:11.5px;
+  }
+
+  .bottom-logo img{
+    max-width:190px;
+  }
+}
 </style>
 </head>
 
 <body>
 <div class="box">
 
-  <div class="logo-wrapper">
-    <img src="/static/compass_logo.png" alt="케어네비 로고">
-  </div>
-
-  <div class="main-title">케어네비</div>
-  <div class="sub-title">사용자 로그인</div>
+  <div class="simple-logo">케어네비</div>
+  <div class="logo-line"></div>
+  <div class="sub-title">통합돌봄 지원 시스템 사용자 로그인</div>
 
   {% if error %}
     <div class="error-msg">❌ {{error}}</div>
   {% endif %}
 
-  <form method="post" id="searchForm">
-    <input type="password" name="password" placeholder="비밀번호 입력">
+  <form method="post" class="form-area">
+    <label class="input-label">비밀번호</label>
+    <input type="password" name="password" placeholder="비밀번호를 입력하세요">
     <button type="submit">로그인</button>
   </form>
-
 
   <div class="notice">
     ※ 본 서비스는 광주전라제주지역본부<br>
@@ -209,7 +259,7 @@ button:hover{ background:#155fa0; }
   </div>
 
   <div class="bottom-logo">
-    <img src="/static/ci.png" style="width:260px;margin-top:15px;" alt="CI">
+    <img src="/static/ci.png" alt="CI">
   </div>
 
 </div>
@@ -656,6 +706,23 @@ body{
   }
 
 }
+.text span{
+  display:block;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.5;
+
+  word-break:keep-all;      /* 🔥 단어 안깨짐 (핵심) */
+  overflow-wrap:break-word; /* 🔥 줄 필요하면 자연스럽게 */
+}
+
+@media (max-width:480px){
+  .text span{
+    font-size:12.5px;
+    line-height:1.45;
+  }
+}
+
 
 </style>
 </head>
@@ -675,7 +742,7 @@ body{
 
 <div class="text">
 <b>사례기반 서비스내용 검색 (AI)</b>
-<span>입력한 사례를 분석하여 적합한 통합돌봄 서비스를 추천합니다</span>
+<span>입력한 사례를 분석하여 적합한 통합돌봄 서비스를 추천합니다.</span>
 </div>
 
 </a>
@@ -686,7 +753,7 @@ body{
 
 <div class="text">
 <b>조건기반 자원검색</b>
-<span>시도, 시군구, 대분류, 중분류, 프로그램, 기관명 조건으로 서비스 자원을 검색합니다</span>
+<span>시도, 시군구, 대분류, 중분류, 프로그램, 기관명 조건으로 서비스 자원을 검색합니다.</span>
 </div>
 
 </a>
@@ -697,7 +764,7 @@ body{
 
 <div class="text">
 <b>통합돌봄 사전조사</b>
-<span>일상생활 수행능력(ADL) 기반 사전조사를 진행합니다</span>
+<span>일상생활 수행능력(ADL) 기반 사전조사를 진행합니다.</span>
 </div>
 
 </a>
@@ -723,7 +790,17 @@ body{
 </div>
 
 <img src="/static/bottom.png" class="bottom-img">
+<div class="copyright">
+  <div class="copyright-line"></div>
 
+  <div class="copyright-main">
+    © 2026 국민건강보험공단 광주전라제주지역본부
+  </div>
+
+  <div class="copyright-sub">
+    통합돌봄 연구반 <span>돌봄곳간</span>
+  </div>
+</div>
 </div>
 
 </body>
@@ -887,6 +964,31 @@ COMBO_HTML = """
 <title>조건기반 자원검색</title>
 <style>{{style}}</style>
 <style>
+
+.combo-warning{
+  margin:12px 0 16px 0;
+  padding:14px 16px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.7;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+  text-indent:-1em;
+  padding-left:2em;
+}
+
+@media (max-width:480px){
+  .combo-warning{
+    font-size:13px;
+    line-height:1.65;
+    padding:13px 14px;
+  }
+}
+
+
 input, select{
   width:100%;
   padding:12px;
@@ -929,6 +1031,67 @@ input, select{
   color:#6b7280;
   margin-bottom:8px;
   line-height:1.5;
+}
+
+/* ===== 카피라이트 ===== */
+.copyright{
+  text-align:center;
+  margin-top:22px;
+  margin-bottom:6px;
+  padding:0 12px;
+}
+
+.copyright-line{
+  width:44px;
+  height:2px;
+  margin:0 auto 12px auto;
+  border-radius:999px;
+  background:linear-gradient(135deg,#93c5fd,#2563eb);
+  opacity:0.9;
+}
+
+.copyright-main{
+  font-size:12.5px;
+  color:#9ca3af;
+  line-height:1.5;
+  font-weight:500;
+  word-break:keep-all;
+  letter-spacing:0.2px;
+}
+
+.copyright-sub{
+  margin-top:4px;
+  font-size:15px;
+  color:#374151;
+  font-weight:600;
+  letter-spacing:-0.2px;
+}
+
+.copyright-sub span{
+  color:#2563eb;
+  font-weight:800;
+}
+
+@media (max-width:480px){
+  .copyright{
+    margin-top:18px;
+    margin-bottom:4px;
+    padding:0 8px;
+  }
+
+  .copyright-line{
+    margin-bottom:10px;
+  }
+
+  .copyright-main{
+    font-size:11.5px;
+    line-height:1.45;
+  }
+
+  .copyright-sub{
+    margin-top:3px;
+    font-size:13px;
+  }
 }
 </style>
 </head>
@@ -1012,6 +1175,10 @@ input, select{
 <div class="result">
 
 <p><b>총 {{count}}건이 조회되었습니다.</b></p>
+
+<div class="combo-warning">
+  ※ 서비스 제공기관 정보는 현재 운영 중인 기관이며, 실제 정보와 차이가 있을 수 있으니 정확한 사항은 해당 기관에 직접 확인하시기 바랍니다.
+</div>
 
 {% if count == 0 %}
 <p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
@@ -1108,8 +1275,69 @@ def desc():
         print("추출된 지역:", found_sido, found_sigungu)
 
         # ======================
+        # 검색어 보강 (튜브/줄 + 복지용구 관련 표현 보정)
+        # ======================
+        query_for_ai = query
+        q_norm = query.replace(" ", "")
+
+        wound_context = any(k in q_norm for k in [
+            "상처", "상처소독", "드레싱", "욕창", "염증", "감염", "고름",
+            "진물", "봉합", "절개", "베임", "찰과상", "화상", "욕창관리"
+        ])
+
+        extra_aliases = []
+
+        # ---- 튜브/의료처치 관련 ----
+        if any(k in q_norm for k in ["콧줄", "비위관", "위관", "경관급식", "콧줄영양", "비위관영양"]):
+            extra_aliases += ["튜브관리", "비위관", "경관영양", "위관관리"]
+
+        if any(k in q_norm for k in ["소변줄", "유치도뇨", "도뇨줄", "폴리", "foley", "배뇨줄"]):
+            extra_aliases += ["튜브관리", "유치도뇨관", "도뇨관관리", "배뇨관리"]
+
+        if any(k in q_norm for k in ["기관절개", "석션", "흡인", "루", "장루", "요루", "튜브"]):
+            extra_aliases += ["튜브관리", "루관리", "기관절개관리", "흡인", "감염관리"]
+
+        # ---- 복지용구 관련 ----
+        if any(k in q_norm for k in ["지팡이", "워커", "보행기", "보행차", "휠체어"]):
+            extra_aliases += ["복지용구", "보행보조", "대여", "구입"]
+
+        if any(k in q_norm for k in ["안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이"]):
+            extra_aliases += ["복지용구", "안전손잡이", "욕실안전", "낙상예방", "구입"]
+
+        if any(k in q_norm for k in ["미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립", "미끄럼"]):
+            extra_aliases += ["복지용구", "미끄럼방지", "욕실안전", "낙상예방", "구입"]
+
+        if any(k in q_norm for k in ["목욕의자", "샤워의자", "목욕", "샤워"]):
+            extra_aliases += ["복지용구", "목욕의자", "욕실안전", "구입"]
+
+        if any(k in q_norm for k in ["이동변기", "간이변기", "변기", "좌변기"]):
+            extra_aliases += ["복지용구", "이동변기", "배변보조", "구입"]
+
+        if any(k in q_norm for k in ["기저귀", "요실금", "패드"]):
+            extra_aliases += ["복지용구", "배변보조", "위생", "구입"]
+
+        if any(k in q_norm for k in ["전동침대", "침대", "병원침대"]):
+            extra_aliases += ["복지용구", "전동침대", "대여"]
+
+        if any(k in q_norm for k in ["욕창", "욕창매트", "욕창방지", "자세변환", "체위변경"]):
+            extra_aliases += ["복지용구", "욕창예방", "자세변환", "대여"]
+
+        if any(k in q_norm for k in ["경사로", "문턱", "턱", "이동불편", "출입불편"]):
+            extra_aliases += ["복지용구", "경사로", "이동보조", "구입"]
+
+        # ---- 상처/감염/드레싱 관련 ----
+        if wound_context:
+            extra_aliases += ["감염관리", "상처관리", "드레싱", "의료처치", "방문진료"]
+
+        extra_aliases = list(dict.fromkeys(extra_aliases))
+
+        if extra_aliases:
+            query_for_ai = query + " / 연관표현: " + ", ".join(extra_aliases)
+
+        # ======================
         # 서비스 목록 문자열 생성
         # ======================
+
         service_text = ""
 
         for idx, r in service_df.iterrows():
@@ -1117,6 +1345,11 @@ def desc():
                 f"{idx}. {compress_text(r.get('서비스설명',''),40)} / "
                 f"{compress_text(r.get('검색어',''),40)}\n"
             )
+
+        # ======================
+        # 서비스 그룹 데이터 문자열 생성
+        # ======================
+        cond_display = []
 
         # ======================
         # 서비스 그룹 데이터 문자열 생성
@@ -1172,7 +1405,20 @@ def desc():
 4. 특히 아래 표현은 적극 반영한다.
    - "집으로 와주길 원함" → 방문형 서비스 우선 고려
    - "반찬을 못함", "식사 준비 어려움" → 식사지원/반찬지원/영양지원 우선 고려
-   - "지팡이", "워커", "휠체어", "보행보조" → 복지용구 계열 우선 고려
+   - "지팡이", "워커", "보행기", "보행차", "휠체어" → 복지용구(보행보조, 대여/구입) 적극 고려
+   - "안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이" → 복지용구(안전손잡이, 욕실안전, 낙상예방) 적극 고려
+   - "미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립", "미끄럼" → 복지용구(욕실안전, 낙상예방, 구입) 적극 고려
+   - "목욕의자", "샤워의자", "목욕", "샤워" → 복지용구(목욕의자, 욕실안전, 구입) 고려
+   - "이동변기", "간이변기", "변기", "좌변기" → 복지용구(배변보조, 구입) 고려
+   - "기저귀", "요실금", "패드" → 복지용구(위생, 배변보조, 구입) 고려
+   - "전동침대", "침대", "병원침대" → 복지용구(전동침대, 대여) 우선 고려
+   - "욕창", "욕창매트", "욕창방지", "자세변환", "체위변경" → 복지용구(욕창예방, 자세변환, 대여) 및 의료처치 함께 고려
+   - "경사로", "문턱", "턱", "이동불편", "출입불편" → 복지용구(경사로, 이동보조, 구입) 고려
+   - "콧줄", "비위관", "위관", "경관급식", "소변줄", "도뇨줄", "유치도뇨", "장루", "요루", "기관절개", "석션", "흡인" → 방문진료의 의료처치(욕창, 루, 튜브관리 등)를 적극 우선 고려
+   - 의료처치(욕창, 루, 튜브관리 등)가 적합하면 감염관리도 함께 검토한다
+   - 매우 중요: 서비스내용의 "소독"은 기본적으로 집안/주거환경 관련 소독으로 본다
+   - "상처 소독", "드레싱", "욕창 소독", "감염", "염증", "고름", "진물"처럼 의료적 맥락의 소독은 서비스내용 "소독"으로 연결하지 말고, 반드시 "감염관리" 또는 "의료처치(욕창, 루, 튜브관리 등)" 쪽으로 판단한다
+   - 반대로 집 청소, 방역, 주거 위생, 해충, 집안 환경개선 맥락이면 서비스내용 "소독"을 검토한다
    - "무릎통증", "통증", "거동불편", "움직이기 어려움" → 재활, 기능회복, 방문보건, 이동지원 계열 고려
    - "혼자 지냄", "외로움", "고립" → 정서지원, 안부확인, 돌봄연계 고려
 5. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다.
@@ -1197,7 +1443,7 @@ def desc():
 {service_text}
 
 사용자 사례:
-{query}
+{query_for_ai}
 """
 
 
@@ -1249,8 +1495,74 @@ def desc():
                             "선택이유": r.get("선택이유", "")
                         })
 
+                # ======================
+                # 후처리 1: 중복 제거
+                # ======================
+                deduped = []
+                seen_keys = set()
+
+                for item in final_results:
+                    key = (
+                        str(item.get("대분류", "")).strip(),
+                        str(item.get("중분류", "")).strip(),
+                        str(item.get("서비스내용", "")).strip()
+                    )
+                    if key not in seen_keys:
+                        seen_keys.add(key)
+                        deduped.append(item)
+
+                final_results = deduped
+
+                # ======================
+                # 후처리 2: 상처/감염 맥락이면 집소독 제거
+                # ======================
+                if wound_context:
+                    filtered_results = []
+
+                    for item in final_results:
+                        main_cat = str(item.get("대분류", "")).strip()
+                        middle_cat = str(item.get("중분류", "")).strip()
+                        service_name = str(item.get("서비스내용", "")).strip()
+
+                        is_house_disinfection = (
+                            service_name == "소독"
+                        )
+
+                        if is_house_disinfection:
+                            continue
+
+                        filtered_results.append(item)
+
+                    final_results = filtered_results
+
+                # ======================
+                # 후처리 3: 의료처치가 있으면 감염관리 자동 추가
+                # ======================
+                has_medical_tube = any(
+                    str(item.get("대분류", "")).strip() == "보건의료" and
+                    str(item.get("중분류", "")).strip() == "방문진료" and
+                    str(item.get("서비스내용", "")).strip() == "의료처치(욕창, 루, 튜브관리 등)"
+                    for item in final_results
+                )
+
+                has_infection = any(
+                    str(item.get("대분류", "")).strip() == "보건의료" and
+                    str(item.get("중분류", "")).strip() == "방문진료" and
+                    str(item.get("서비스내용", "")).strip() == "감염관리"
+                    for item in final_results
+                )
+
+                if has_medical_tube and not has_infection:
+                    final_results.append({
+                        "대분류": "보건의료",
+                        "중분류": "방문진료",
+                        "서비스내용": "감염관리",
+                        "선택이유": "의료처치(욕창, 루, 튜브관리 등)가 필요한 경우 감염관리도 함께 검토가 필요함"
+                    })
+
                 service_results = final_results
                 cache[query] = service_results
+
 
         except Exception as e:
             cond_display.append(f"GPT 오류: {e}")
@@ -1287,6 +1599,16 @@ DESC_HTML = """
 <title>사례기반 서비스내용 검색</title>
 
 <style>
+
+.mobile-br{
+  display:none;
+}
+
+@media (max-width:480px){
+  .mobile-br{
+    display:inline;
+  }
+}
 
 *{
   box-sizing: border-box;
@@ -1472,89 +1794,126 @@ button:hover{
   }
 }
 
-.voice-overlay{
+.voice-inline{
   display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(15,23,42,0.45);
-  backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px);
-  z-index:9999;
+  margin-top:14px;
+  padding:16px 18px;
+  border-radius:18px;
+  background:#f8fbff;
+  border:1px solid #dbeafe;
+  box-shadow:0 10px 24px rgba(37,99,235,0.08);
+  animation:voiceInlineShow 0.22s ease;
+}
+
+@keyframes voiceInlineShow{
+  from{
+    opacity:0;
+    transform:translateY(6px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+.voice-inline-box{
+  display:flex;
   align-items:center;
-  justify-content:center;
-  overflow:hidden;
+  gap:14px;
 }
 
-/* 중앙 박스 */
-.voice-overlay-box{
+.voice-wave-wrap{
   position:relative;
-  text-align:center;
-  color:white;
-}
-
-/* 마이크 링 */
-.voice-mic-ring{
-  width:90px;
-  height:90px;
-  border-radius:50%;
-  margin:0 auto 14px auto;
+  width:92px;
+  height:42px;
+  flex:0 0 auto;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:rgba(37,99,235,0.25);
-  animation:pulse 1.4s infinite;
 }
 
-.voice-mic-core{
-  font-size:32px;
+.voice-wave{
+  height:34px;
+  display:flex;
+  align-items:flex-end;
+  gap:4px;
 }
 
-@keyframes pulse{
-  0%{ box-shadow:0 0 0 0 rgba(37,99,235,0.5); }
-  70%{ box-shadow:0 0 0 18px rgba(37,99,235,0); }
-  100%{ box-shadow:0 0 0 0 rgba(37,99,235,0); }
+.voice-bar{
+  width:5px;
+  border-radius:999px;
+  background:linear-gradient(180deg,#93c5fd 0%, #60a5fa 50%, #2563eb 100%);
+  animation:voiceWave 1s ease-in-out infinite;
+  transform-origin:center bottom;
 }
 
-/* 텍스트 */
-.voice-overlay-title{
-  font-size:20px;
+.voice-bar:nth-child(1){ height:12px; animation-delay:0s; }
+.voice-bar:nth-child(2){ height:20px; animation-delay:0.12s; }
+.voice-bar:nth-child(3){ height:30px; animation-delay:0.24s; }
+.voice-bar:nth-child(4){ height:22px; animation-delay:0.36s; }
+.voice-bar:nth-child(5){ height:14px; animation-delay:0.48s; }
+
+@keyframes voiceWave{
+  0%,100%{
+    transform:scaleY(0.55);
+    opacity:0.45;
+  }
+  50%{
+    transform:scaleY(1.08);
+    opacity:1;
+  }
+}
+
+.voice-inline-text{
+  min-width:0;
+}
+
+.voice-inline-title{
+  font-size:14px;
   font-weight:700;
-  margin-bottom:6px;
+  color:#1e3a8a;
+  margin-bottom:2px;
 }
 
-.voice-overlay-subtitle{
-  font-size:13px;
-  opacity:0.85;
+.voice-inline-subtitle{
+  font-size:12px;
+  color:#64748b;
+  line-height:1.45;
 }
 
-/* 점 떠다니는 효과 */
-.voice-particles{
-  position:absolute;
-  inset:0;
+@media (max-width:480px){
+  .voice-inline{
+    margin-top:12px;
+    padding:14px 14px;
+    border-radius:16px;
+  }
+
+  .voice-inline-box{
+    gap:12px;
+  }
+
+  .voice-wave-wrap{
+    width:80px;
+    height:38px;
+  }
+
+  .voice-wave{
+    height:30px;
+    gap:3px;
+  }
+
+  .voice-bar{
+    width:4px;
+  }
+
+  .voice-inline-title{
+    font-size:13px;
+  }
+
+  .voice-inline-subtitle{
+    font-size:11px;
+  }
 }
-
-.vp{
-  position:absolute;
-  width:10px;
-  height:10px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.4);
-  animation:float 6s linear infinite;
-}
-
-.vp1{ left:10%; top:80%; animation-delay:0s; }
-.vp2{ left:30%; top:90%; animation-delay:1s; }
-.vp3{ left:50%; top:85%; animation-delay:2s; }
-.vp4{ left:70%; top:88%; animation-delay:0.5s; }
-.vp5{ left:85%; top:92%; animation-delay:1.5s; }
-.vp6{ left:60%; top:95%; animation-delay:2.5s; }
-
-@keyframes float{
-  0%{ transform:translateY(0); opacity:0; }
-  20%{ opacity:1; }
-  100%{ transform:translateY(-200px); opacity:0; }
-}
-
 
 </style>
 </head>
@@ -1607,15 +1966,36 @@ transition:0.2s;
 
 </div>
 
-<button type="submit">AI 검색</button>
 
+</div>
+
+<div class="voice-inline" id="voiceOverlay">
+  <div class="voice-inline-box">
+    <div class="voice-wave-wrap">
+      <div class="voice-wave">
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+      </div>
+    </div>
+
+    <div class="voice-inline-text">
+      <div class="voice-inline-title">음성 듣는 중</div>
+      <div class="voice-inline-subtitle">말씀하시면 자동으로 입력됩니다.</div>
+    </div>
+  </div>
+</div>
+
+<button type="submit">AI 검색</button>
 </form>
 
 <div class="notice">
-※ 입력한 사례와 유사한 <b>통합돌봄 서비스 최대 30가지</b>를 추천합니다.<br>
-지자체 개인별지원계획 수립 참고용입니다.
-</div>
 
+※ 입력한 사례와 유사한 <b>통합돌봄 서비스를<span class="mobile-br"><br></span>
+최대 30가지</b> 추천합니다.<br>
+지자체 개인별지원계획 수립 참고용입니다.
 </div>
 
 
@@ -1705,25 +2085,6 @@ transition:0.2s;
 
 </div>
 
-<div class="voice-overlay" id="voiceOverlay">
-  <div class="voice-particles">
-    <span class="vp vp1"></span>
-    <span class="vp vp2"></span>
-    <span class="vp vp3"></span>
-    <span class="vp vp4"></span>
-    <span class="vp vp5"></span>
-    <span class="vp vp6"></span>
-  </div>
-
-  <div class="voice-overlay-box">
-    <div class="voice-mic-ring">
-      <div class="voice-mic-core">🎤</div>
-    </div>
-
-    <div class="voice-overlay-title">듣고 있습니다</div>
-    <div class="voice-overlay-subtitle">말씀이 끝나면 자동으로 입력됩니다</div>
-  </div>
-</div>
 
 <div class="loading" id="loading">
 
@@ -1764,7 +2125,7 @@ function playBeep(type="start"){
     osc.frequency.value = (type === "start") ? 880 : 660;
 
     gain.gain.setValueAtTime(0.001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.7, ctx.currentTime + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
 
     osc.connect(gain);
@@ -1816,7 +2177,7 @@ recognition.onstart = function(){
 
   const overlay = document.getElementById("voiceOverlay");
   if(overlay){
-    overlay.style.display = "flex";
+    overlay.style.display = "block";
   }
 };
 
@@ -1830,7 +2191,7 @@ recognition.onresult = function(e){
   }
 };
 
-  recognition.onend = function(){
+recognition.onend = function(){
   isRecording = false;
   setVoiceButtonRecording(false);
   playBeep("end");
@@ -2324,35 +2685,35 @@ CARE_HTML = """
     top:2% !important;
   }
 
-.score-banner{
-  position:fixed;   /* 🔥 fixed → absolute */
-  top:10px;            /* 🔥 위쪽으로 딱 붙이기 */
-  right:10px;          /* 🔥 우측 여백 */
-  
-  width:85px;          /* 🔥 작게 */
-  padding:8px 6px;
-  border-radius:16px;
+  .score-banner{
+    position:fixed;
+    top:10px;
+    right:10px;
+    
+    width:85px;
+    padding:8px 6px;
+    border-radius:16px;
 
-  z-index:10;
-}
+    z-index:10;
+  }
 
-@media (max-width:480px){
   #careForm{
     padding-bottom:160px;
   }
-}
 
-.score-badge{
-  width:44px;
-  height:44px;
-}
+  .score-badge{
+    width:44px;
+    height:44px;
+  }
 
-.score-value{
-  font-size:18px;
-}
+  .score-value{
+    font-size:18px;
+  }
 
-.score-meta{
-  font-size:9px;
+  .score-meta{
+    font-size:9px;
+  }
+
 }
 
 .score-status{
