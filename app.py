@@ -233,7 +233,7 @@ button:hover{
 
   .sub-title{
     font-size:13px;
-    margin-bottom:24px;
+    margin-bottom:40px;
   }
 
   .input-label{
