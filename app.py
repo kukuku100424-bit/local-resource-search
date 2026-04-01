@@ -1638,9 +1638,102 @@ transition:0.2s;
 
 </div>
 
+<script>
+const searchForm = document.getElementById("searchForm");
+const loading = document.getElementById("loading");
+const queryInput = document.getElementById("queryInput");
+const voiceBtn = document.getElementById("voiceBtn");
 
-  btn.setAttribute("data-original-icon", originalIcon);
+const originalIcon = voiceBtn ? voiceBtn.innerHTML : "";
+let recognition = null;
+let isRecording = false;
 
+function playBeep(type="start"){
+  try{
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if(!AudioContextClass) return;
+
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.value = (type === "start") ? 880 : 660;
+
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  }catch(e){
+    console.log("beep error:", e);
+  }
+}
+
+function setVoiceButtonRecording(active){
+  if(!voiceBtn) return;
+
+  if(active){
+    voiceBtn.style.background = "rgba(220,38,38,0.92)";
+    voiceBtn.style.transform = "scale(0.96)";
+    voiceBtn.innerHTML = "■";
+  }else{
+    voiceBtn.style.background = "rgba(37,99,235,0.92)";
+    voiceBtn.style.transform = "scale(1)";
+    voiceBtn.innerHTML = originalIcon;
+  }
+}
+
+function startVoiceInput(event){
+  if(event) event.preventDefault();
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SpeechRecognition){
+    alert("이 브라우저는 음성인식을 지원하지 않습니다.");
+    return;
+  }
+
+  if(isRecording && recognition){
+    recognition.stop();
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = "ko-KR";
+
+  recognition.onstart = function(){
+    isRecording = true;
+    setVoiceButtonRecording(true);
+    playBeep("start");
+  };
+
+  recognition.onresult = function(e){
+    const transcript = e.results[0][0].transcript;
+    queryInput.value = transcript;
+  };
+
+  recognition.onend = function(){
+    isRecording = false;
+    setVoiceButtonRecording(false);
+    playBeep("end");
+  };
+
+  recognition.start();
+}
+
+if(searchForm){
+  searchForm.addEventListener("submit", function(){
+    if(loading){
+      loading.style.display = "flex";
+    }
+  });
+}
+</script>
 
 </body>
 </html>
