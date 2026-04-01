@@ -1647,24 +1647,33 @@ document.getElementById("searchForm").addEventListener("submit",function(){
 
 (function(){
 
-  const ua = navigator.userAgent || navigator.vendor || window.opera;
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
-
-  if(!isMobile) return;
-
   const btn = document.getElementById("voiceBtn");
   const input = document.getElementById("queryInput");
 
   if(!btn || !input) return;
 
+  const originalIcon = btn.innerHTML;
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+  btn.addEventListener("click", function(e){
+    e.preventDefault();
+
+    if(!SpeechRecognition){
+      alert("이 브라우저에서는 음성입력이 지원되지 않습니다. 모바일 크롬에서 시도해주세요.");
+      return;
+    }
+
+    try{
+      btn.innerHTML = "<span style='color:white;font-size:18px;'>●</span>";
+      recognition.start();
+    }catch(err){
+      btn.innerHTML = originalIcon;
+      alert("음성입력을 시작할 수 없습니다. 마이크 권한 또는 브라우저 지원 여부를 확인해주세요.");
+    }
+  });
+
   if(!SpeechRecognition){
-    btn.addEventListener("click", function(e){
-      e.preventDefault();
-      alert("이 브라우저에서는 음성입력이 지원되지 않습니다. 다른 모바일 브라우저에서 시도해주세요.");
-    });
     return;
   }
 
@@ -1673,24 +1682,18 @@ document.getElementById("searchForm").addEventListener("submit",function(){
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
-  btn.addEventListener("click", function(e){
-    e.preventDefault();
-    btn.innerText = "🎙️";
-    recognition.start();
-  });
-
   recognition.onresult = function(event){
     const text = event.results[0][0].transcript;
     input.value = text;
   };
 
   recognition.onerror = function(){
-    btn.innerText = "🎤";
+    btn.innerHTML = originalIcon;
     alert("음성입력을 시작할 수 없습니다. 마이크 권한 또는 브라우저 지원 여부를 확인해주세요.");
   };
 
   recognition.onend = function(){
-    btn.innerText = "🎤";
+    btn.innerHTML = originalIcon;
   };
 
 })();
