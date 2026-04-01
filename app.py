@@ -1495,7 +1495,7 @@ button:hover{
 
 <textarea id="queryInput" name="query" placeholder="예) 나주에 살고 식사도움이 필요한 어르신에게 필요한 서비스">{{query}}</textarea>
 
-<button type="button" id="voiceBtn"
+<button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
 style="
 position:absolute;
 right:12px;
@@ -1641,62 +1641,60 @@ transition:0.2s;
 
 <script>
 
-document.getElementById("searchForm").addEventListener("submit",function(){
-  document.getElementById("loading").style.display="flex"
-})
+document.getElementById("searchForm").addEventListener("submit", function(){
+  document.getElementById("loading").style.display = "flex";
+});
 
-(function(){
+function startVoiceInput(e){
+  if(e) e.preventDefault();
 
   const btn = document.getElementById("voiceBtn");
   const input = document.getElementById("queryInput");
 
-  if(!btn || !input) return;
-
-  const originalIcon = btn.innerHTML;
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  btn.addEventListener("click", function(e){
-    e.preventDefault();
-
-    if(!SpeechRecognition){
-      alert("이 브라우저에서는 음성입력이 지원되지 않습니다. 모바일 크롬에서 시도해주세요.");
-      return;
-    }
-
-    try{
-      btn.innerHTML = "<span style='color:white;font-size:18px;'>●</span>";
-      recognition.start();
-    }catch(err){
-      btn.innerHTML = originalIcon;
-      alert("음성입력을 시작할 수 없습니다. 마이크 권한 또는 브라우저 지원 여부를 확인해주세요.");
-    }
-  });
-
-  if(!SpeechRecognition){
+  if(!btn || !input){
+    alert("음성입력 버튼 요소를 찾지 못했습니다.");
     return;
   }
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = "ko-KR";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
+  const originalIcon = btn.getAttribute("data-original-icon") || btn.innerHTML;
+  btn.setAttribute("data-original-icon", originalIcon);
 
-  recognition.onresult = function(event){
-    const text = event.results[0][0].transcript;
-    input.value = text;
-  };
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  recognition.onerror = function(){
+  if(!SpeechRecognition){
+    alert("이 브라우저에서는 음성입력이 지원되지 않습니다. 모바일 크롬 또는 삼성인터넷에서 시도해주세요.");
+    return;
+  }
+
+  try{
+    const recognition = new SpeechRecognition();
+    recognition.lang = "ko-KR";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    btn.innerHTML = "<span style='color:white;font-size:18px;'>●</span>";
+
+    recognition.onresult = function(event){
+      const text = event.results[0][0].transcript;
+      input.value = text;
+    };
+
+    recognition.onerror = function(event){
+      btn.innerHTML = originalIcon;
+      alert("음성입력 오류: " + (event.error || "unknown"));
+    };
+
+    recognition.onend = function(){
+      btn.innerHTML = originalIcon;
+    };
+
+    recognition.start();
+
+  }catch(err){
     btn.innerHTML = originalIcon;
-    alert("음성입력을 시작할 수 없습니다. 마이크 권한 또는 브라우저 지원 여부를 확인해주세요.");
-  };
-
-  recognition.onend = function(){
-    btn.innerHTML = originalIcon;
-  };
-
-})();
+    alert("음성입력을 시작할 수 없습니다: " + err);
+  }
+}
 </script>
 
 </body>
