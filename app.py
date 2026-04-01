@@ -1171,7 +1171,7 @@ input, select{
 <button type="submit" class="menu-btn">검색하기</button>
 </form>
 
-{% if request.method == "POST" or count > 0 or (sido or sigungu or main_category or middle_category or program_kw or org_kw) %}
+{% if request.method == "POST" %}
 <div class="result">
 
 <p><b>총 {{count}}건이 조회되었습니다.</b></p>
