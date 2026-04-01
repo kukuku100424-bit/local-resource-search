@@ -276,7 +276,6 @@ button:hover{
   {% endif %}
 
   <form method="post" class="form-area">
-    <label class="input-label">비밀번호</label>
     <input type="password" name="password" placeholder="비밀번호를 입력하세요">
     <button type="submit">로그인</button>
   </form>
