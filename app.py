@@ -809,7 +809,7 @@ def combo():
         )
         middle_category_options = [v for v in middle_category_options if v]
 
-    if request.method == "POST":
+    if request.method == "POST" or any([sido, sigungu, main_category, middle_category, program_kw, org_kw]):
         filtered = df.copy()
 
         if sido and "시도" in filtered.columns:
@@ -950,6 +950,9 @@ input, select{
   <label>시도</label>
   <select name="sido">
     <option value="">전체</option>
+    {% if sido and sido not in sido_options %}
+    <option value="{{sido}}" selected>{{sido}}</option>
+    {% endif %}
     {% for s in sido_options %}
     <option value="{{s}}" {% if s==sido %}selected{% endif %}>{{s}}</option>
     {% endfor %}
@@ -958,31 +961,42 @@ input, select{
   <label>시군구</label>
   <select name="sigungu">
     <option value="">전체</option>
+    {% if sigungu and sigungu not in sigungu_options %}
+    <option value="{{sigungu}}" selected>{{sigungu}}</option>
+    {% endif %}
     {% for g in sigungu_options %}
     <option value="{{g}}" {% if g==sigungu %}selected{% endif %}>{{g}}</option>
     {% endfor %}
   </select>
 </div>
 
+
 <div class="section-box">
   <div class="section-title">상세 조건</div>
   <div class="section-desc">대분류와 중분류(선택형), 프로그램과 기관명(서술형)으로 검색합니다.</div>
 
-  <label>대분류</label>
-  <select name="main_category">
-    <option value="">전체</option>
-    {% for c in main_category_options %}
-    <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
-    {% endfor %}
-  </select>
+<label>대분류</label>
+<select name="main_category">
+  <option value="">전체</option>
+  {% if main_category and main_category not in main_category_options %}
+  <option value="{{main_category}}" selected>{{main_category}}</option>
+  {% endif %}
+  {% for c in main_category_options %}
+  <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
+  {% endfor %}
+</select>
 
-  <label>중분류</label>
-  <select name="middle_category">
-    <option value="">전체</option>
-    {% for c in middle_category_options %}
-    <option value="{{c}}" {% if c==middle_category %}selected{% endif %}>{{c}}</option>
-    {% endfor %}
-  </select>
+
+<label>중분류</label>
+<select name="middle_category">
+  <option value="">전체</option>
+  {% if middle_category and middle_category not in middle_category_options %}
+  <option value="{{middle_category}}" selected>{{middle_category}}</option>
+  {% endif %}
+  {% for c in middle_category_options %}
+  <option value="{{c}}" {% if c==middle_category %}selected{% endif %}>{{c}}</option>
+  {% endfor %}
+</select>
 
   <label>프로그램</label>
   <input type="text" name="program_kw" value="{{program_kw}}" placeholder="프로그램명 포함 검색">
@@ -994,7 +1008,7 @@ input, select{
 <button type="submit" class="menu-btn">검색하기</button>
 </form>
 
-{% if request.method == "POST" %}
+{% if request.method == "POST" or count > 0 or (sido or sigungu or main_category or middle_category or program_kw or org_kw) %}
 <div class="result">
 
 <p><b>총 {{count}}건이 조회되었습니다.</b></p>
@@ -1084,10 +1098,14 @@ def desc():
     count = 0
     service_results = []
     warning_msg = ""
+    found_sido = ""
+    found_sigungu = ""
 
     if request.method == "POST":
 
         query = (request.form.get("query") or "").strip()
+        found_sido, found_sigungu = extract_region_from_query(query)
+        print("추출된 지역:", found_sido, found_sigungu)
 
         # ======================
         # 서비스 목록 문자열 생성
@@ -1105,7 +1123,6 @@ def desc():
         # ======================
         cond_display = []
 
-
         api_key = os.getenv("OPENAI_API_KEY")
 
         if not api_key:
@@ -1117,7 +1134,10 @@ def desc():
                 results=results,
                 cond_display=cond_display,
                 count=count,
-                service_results=service_results
+                service_results=service_results,
+                warning_msg=warning_msg,
+                found_sido=found_sido,
+                found_sigungu=found_sigungu
             )
 
         client = OpenAI(api_key=api_key)
@@ -1243,15 +1263,17 @@ def desc():
             warning_msg = "15개 이상의 서비스내용이 검색되었습니다. 결과를 더 정확하게 확인하려면 대상자의 건강상태, 돌봄 상황, 지역, 기능 상태 등을 조금 더 구체적으로 입력해 주세요."
 
     return render_template_string(
-    DESC_HTML,
-    style=BASE_STYLE,
-    query=query,
-    results=results,
-    cond_display=cond_display,
-    count=count,
-    service_results=service_results,
-    warning_msg=warning_msg
-)
+        DESC_HTML,
+        style=BASE_STYLE,
+        query=query,
+        results=results,
+        cond_display=cond_display,
+        count=count,
+        service_results=service_results,
+        warning_msg=warning_msg,
+        found_sido=found_sido,
+        found_sigungu=found_sigungu
+    )
 
 # =========================
 # ② 서술형 검색 (GPT 기반) + 팝업/지도 포함
@@ -1502,37 +1524,59 @@ button:hover{
 
 <div class="result-card">
 
-<div style="font-weight:700; font-size:16px; margin-bottom:8px;">
-  {{loop.index}}. {{r["대분류"]}} > {{r["중분류"]}} > {{r["서비스내용"]}}
-</div>
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px;">
 
-<div style="font-size:13px; line-height:1.6; color:#6b7280;">
+    <div style="font-weight:700; font-size:16px; line-height:1.5; flex:1;">
+      {{loop.index}}. {{r["대분류"]}} > {{r["중분류"]}} > {{r["서비스내용"]}}
+    </div>
 
-  <div>
-    <span style="color:#6b7280;">대분류:</span>
-    <b>{{r["대분류"]}}</b>
+    <a
+      href="/combo?sido={{found_sido|urlencode}}&sigungu={{found_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
+      style="
+        display:inline-block;
+        padding:10px 14px;
+        border-radius:10px;
+        background:#2563eb;
+        color:white;
+        text-decoration:none;
+        font-size:13px;
+        font-weight:600;
+        white-space:nowrap;
+        flex:0 0 auto;
+      "
+    >
+      조건검색
+    </a>
+
   </div>
 
-  <div>
-    <span style="color:#6b7280;">중분류:</span>
-    <b>{{r["중분류"]}}</b>
+  <div style="font-size:13px; line-height:1.6; color:#6b7280;">
+
+    <div>
+      <span style="color:#6b7280;">대분류:</span>
+      <b>{{r["대분류"]}}</b>
+    </div>
+
+    <div>
+      <span style="color:#6b7280;">중분류:</span>
+      <b>{{r["중분류"]}}</b>
+    </div>
+
+    <div>
+      <span style="color:#6b7280;">소분류:</span>
+      <b>{{r["서비스내용"]}}</b>
+    </div>
+
   </div>
 
-  <div>
-    <span style="color:#6b7280;">소분류:</span>
-    <b>{{r["서비스내용"]}}</b>
+  <div class="reason">
+    추천 이유: {{r["선택이유"]}}
   </div>
 
 </div>
-
-<div class="reason">
-추천 이유: {{r["선택이유"]}}
-</div>
-
-</div>
-
 
 {% endfor %}
+
 
 </div>
 
@@ -1600,6 +1644,136 @@ def normalize_health(text: str) -> str:
         return "거동불편"
 
     return t
+
+def extract_region_from_query(query: str):
+    q = str(query or "").strip()
+    q = q.replace(" ", "")
+
+    found_sido = ""
+    found_sigungu = ""
+
+    sido_alias_map = {
+        "전라남도": "전라남도",
+        "전남": "전라남도",
+        "전라북도": "전라북도",
+        "전북": "전라북도",
+        "광주광역시": "광주광역시",
+        "광주": "광주광역시",
+        "제주특별자치도": "제주특별자치도",
+        "제주도": "제주특별자치도",
+        "제주": "제주특별자치도"
+    }
+
+    sigungu_alias_map = {
+        "목포시": ("전라남도", "목포시"),
+        "목포": ("전라남도", "목포시"),
+        "여수시": ("전라남도", "여수시"),
+        "여수": ("전라남도", "여수시"),
+        "순천시": ("전라남도", "순천시"),
+        "순천": ("전라남도", "순천시"),
+        "나주시": ("전라남도", "나주시"),
+        "나주": ("전라남도", "나주시"),
+        "광양시": ("전라남도", "광양시"),
+        "광양": ("전라남도", "광양시"),
+        "담양군": ("전라남도", "담양군"),
+        "담양": ("전라남도", "담양군"),
+        "곡성군": ("전라남도", "곡성군"),
+        "곡성": ("전라남도", "곡성군"),
+        "구례군": ("전라남도", "구례군"),
+        "구례": ("전라남도", "구례군"),
+        "고흥군": ("전라남도", "고흥군"),
+        "고흥": ("전라남도", "고흥군"),
+        "보성군": ("전라남도", "보성군"),
+        "보성": ("전라남도", "보성군"),
+        "화순군": ("전라남도", "화순군"),
+        "화순": ("전라남도", "화순군"),
+        "장흥군": ("전라남도", "장흥군"),
+        "장흥": ("전라남도", "장흥군"),
+        "강진군": ("전라남도", "강진군"),
+        "강진": ("전라남도", "강진군"),
+        "해남군": ("전라남도", "해남군"),
+        "해남": ("전라남도", "해남군"),
+        "영암군": ("전라남도", "영암군"),
+        "영암": ("전라남도", "영암군"),
+        "무안군": ("전라남도", "무안군"),
+        "무안": ("전라남도", "무안군"),
+        "함평군": ("전라남도", "함평군"),
+        "함평": ("전라남도", "함평군"),
+        "영광군": ("전라남도", "영광군"),
+        "영광": ("전라남도", "영광군"),
+        "장성군": ("전라남도", "장성군"),
+        "장성": ("전라남도", "장성군"),
+        "완도군": ("전라남도", "완도군"),
+        "완도": ("전라남도", "완도군"),
+        "진도군": ("전라남도", "진도군"),
+        "진도": ("전라남도", "진도군"),
+        "신안군": ("전라남도", "신안군"),
+        "신안": ("전라남도", "신안군"),
+
+        "전주시": ("전라북도", "전주시"),
+        "전주": ("전라북도", "전주시"),
+        "군산시": ("전라북도", "군산시"),
+        "군산": ("전라북도", "군산시"),
+        "익산시": ("전라북도", "익산시"),
+        "익산": ("전라북도", "익산시"),
+        "정읍시": ("전라북도", "정읍시"),
+        "정읍": ("전라북도", "정읍시"),
+        "남원시": ("전라북도", "남원시"),
+        "남원": ("전라북도", "남원시"),
+        "김제시": ("전라북도", "김제시"),
+        "완산구": ("전라북도", "전주시 완산구"),
+        "덕진구": ("전라북도", "전주시 덕진구"),
+        "김제": ("전라북도", "김제시"),
+        "완주군": ("전라북도", "완주군"),
+        "완주": ("전라북도", "완주군"),
+        "진안군": ("전라북도", "진안군"),
+        "진안": ("전라북도", "진안군"),
+        "무주군": ("전라북도", "무주군"),
+        "무주": ("전라북도", "무주군"),
+        "장수군": ("전라북도", "장수군"),
+        "장수": ("전라북도", "장수군"),
+        "임실군": ("전라북도", "임실군"),
+        "임실": ("전라북도", "임실군"),
+        "순창군": ("전라북도", "순창군"),
+        "순창": ("전라북도", "순창군"),
+        "고창군": ("전라북도", "고창군"),
+        "고창": ("전라북도", "고창군"),
+        "부안군": ("전라북도", "부안군"),
+        "부안": ("전라북도", "부안군"),
+
+        "동구": ("광주광역시", "동구"),
+        "서구": ("광주광역시", "서구"),
+        "남구": ("광주광역시", "남구"),
+        "북구": ("광주광역시", "북구"),
+        "광산구": ("광주광역시", "광산구"),
+        "광산": ("광주광역시", "광산구"),
+
+        "제주시": ("제주특별자치도", "제주시"),
+        "제주시청": ("제주특별자치도", "제주시"),
+        "제주": ("제주특별자치도", "제주시"),
+        "서귀포시": ("제주특별자치도", "서귀포시"),
+        "서귀포": ("제주특별자치도", "서귀포시")
+    }
+
+    for key in list(sigungu_alias_map.keys()):
+        if key.endswith("시") or key.endswith("군") or key.endswith("구"):
+            base = key[:-1]
+            if base and base not in sigungu_alias_map:
+                sigungu_alias_map[base] = sigungu_alias_map[key]
+
+    for alias in sorted(sido_alias_map.keys(), key=len, reverse=True):
+        if alias in q:
+            found_sido = sido_alias_map[alias]
+            break
+
+    for alias in sorted(sigungu_alias_map.keys(), key=len, reverse=True):
+        if alias in q:
+            found_sido = sigungu_alias_map[alias][0]
+            found_sigungu = sigungu_alias_map[alias][1]
+            break
+
+    return found_sido, found_sigungu
+
 
 
 # =========================
