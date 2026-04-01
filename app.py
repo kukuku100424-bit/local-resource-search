@@ -1651,7 +1651,10 @@ document.getElementById("searchForm").addEventListener("submit",function(){
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if(!SpeechRecognition){
-    btn.style.display = "none";
+    btn.addEventListener("click", function(e){
+      e.preventDefault();
+      alert("이 브라우저에서는 음성입력이 지원되지 않습니다. 다른 모바일 브라우저에서 시도해주세요.");
+    });
     return;
   }
 
@@ -1673,6 +1676,7 @@ document.getElementById("searchForm").addEventListener("submit",function(){
 
   recognition.onerror = function(){
     btn.innerText = "🎤";
+    alert("음성입력을 시작할 수 없습니다. 마이크 권한 또는 브라우저 지원 여부를 확인해주세요.");
   };
 
   recognition.onend = function(){
