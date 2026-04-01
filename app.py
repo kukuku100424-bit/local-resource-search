@@ -20,6 +20,31 @@ def compress_text(s, max_len=60):
 
 
 app = Flask(__name__)
+import datetime
+
+VISITOR_FILE = "visitors.json"
+
+def load_visitors():
+    if not os.path.exists(VISITOR_FILE):
+        return {"total": 0, "daily": {}}
+    with open(VISITOR_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_visitors(data):
+    with open(VISITOR_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+def update_visitors():
+    data = load_visitors()
+
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    data["total"] += 1
+    data["daily"][today] = data["daily"].get(today, 0) + 1
+
+    save_visitors(data)
+
+    return data["total"], data["daily"][today]
 app.secret_key = "super_secret_key"
 
 FILE_PATH = "service_resources.xlsx"
@@ -192,7 +217,9 @@ button:hover{
 
 @media (max-width:480px){
   body{
+    min-height:100dvh;
     padding:16px;
+    align-items:center;
   }
 
 .box{
@@ -233,6 +260,7 @@ button:hover{
     max-width:190px;
   }
 }
+
 </style>
 </head>
 
@@ -258,9 +286,15 @@ button:hover{
     관할 지자체, 지사 직원만 이용 가능합니다.
   </div>
 
+
+<div class="bottom-bar">
+
   <div class="bottom-logo">
     <img src="/static/ci.png" alt="CI">
   </div>
+
+  
+</div>
 
 </div>
 </body>
@@ -283,7 +317,8 @@ def login():
             # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
             return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
 
-    return render_template_string(LOGIN_HTML, error="")
+    total, today = update_visitors()
+    return render_template_string(LOGIN_HTML, error="", total=total, today=today)
 
 # =========================
 # 공통 CSS
@@ -723,6 +758,95 @@ body{
   }
 }
 
+/* ===== 카피라이트 (HOME 전용 추가) ===== */
+.copyright{
+  text-align:right;
+  margin-top:22px;
+  margin-bottom:6px;
+  padding:0 12px;
+}
+
+.copyright-line{
+  width:44px;
+  height:2px;
+  margin:0 0 12px auto;
+  border-radius:999px;
+  background:linear-gradient(135deg,#93c5fd,#2563eb);
+  opacity:0.9;
+}
+
+.copyright-main{
+  font-size:12.5px;
+  color:#9ca3af;
+  line-height:1.5;
+  font-weight:500;
+  word-break:keep-all;
+}
+
+.copyright-sub{
+  margin-top:4px;
+  font-size:15px;
+  color:#374151;
+  font-weight:600;
+}
+
+.copyright-sub span{
+  color:#2563eb;
+  font-weight:800;
+}
+
+
+.bottom-footer{
+  margin-top:22px;
+  padding:0 12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:16px;
+}
+
+.visitor-box{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.visitor-box div{
+  padding:4px 10px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#6b7280;
+  font-size:12px;
+  line-height:1.2;
+  white-space:nowrap;
+}
+
+@media (max-width:480px){
+  .bottom-footer{
+    flex-direction:column-reverse;
+    align-items:flex-end;
+    gap:10px;
+    padding:0 8px;
+  }
+
+  .visitor-box{
+    width:100%;
+    justify-content:flex-end;
+  }
+
+  .visitor-box div{
+    font-size:11px;
+    padding:4px 8px;
+  }
+
+  .copyright{
+    width:100%;
+    text-align:right;
+    margin-top:0;
+    margin-bottom:4px;
+    padding:0;
+  }
+}
 
 </style>
 </head>
@@ -769,6 +893,7 @@ body{
 
 </a>
 
+
 <div class="bottom-row">
 
 <a href="/guide" target="_blank" class="bottom-card">
@@ -790,18 +915,184 @@ body{
 </div>
 
 <img src="/static/bottom.png" class="bottom-img">
-<div class="copyright">
-  <div class="copyright-line"></div>
+<div class="bottom-footer">
 
-  <div class="copyright-main">
-    © 2026 국민건강보험공단 광주전라제주지역본부
+  <div class="visitor-box">
+    <div>총 {{total}}</div>
+    <div>오늘 {{today}}</div>
   </div>
 
-  <div class="copyright-sub">
-    통합돌봄 연구반 <span>돌봄곳간</span>
+  <div class="copyright">
+    <div class="copyright-line"></div>
+    <div class="copyright-main">
+      © 국민건강보험공단 광주전라제주지역본부
+    </div>
+    <div class="copyright-sub">
+      통합돌봄 연구반 <span>돌봄곳간</span>
+    </div>
+  </div>
+
+</div>
+
+<style>
+@media (max-width:480px){
+  a[style*="position:fixed"]{
+    right:14px !important;
+    bottom:14px !important;
+    width:54px !important;
+    height:54px !important;
+    font-size:22px !important;
+  }
+}
+</style>
+<!-- ===== Floating Button ===== -->
+<div id="reportBtn">
+  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+    <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+  </svg>
+</div>
+
+<!-- ===== Modal ===== -->
+<div id="reportModal">
+  <div id="reportBox">
+
+    <div class="report-header">
+      오류제보 / 의견보내기
+      <span onclick="closeReport()">✕</span>
+    </div>
+
+    <iframe 
+      src="https://docs.google.com/forms/d/e/1FAIpQLSfDa2M6edO0btvy5tWsOlE_H5Y2u0WaBSLfP2yz58_DwMfwWA/viewform?embedded=true"
+      frameborder="0">
+    </iframe>
+
   </div>
 </div>
-</div>
+
+<style>
+
+/* ===== 버튼 ===== */
+#reportBtn{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  width:60px;
+  height:60px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 10px 24px rgba(0,0,0,0.25);
+  cursor:pointer;
+  z-index:9999;
+  transition:0.2s;
+}
+
+#reportBtn:hover{
+  transform:scale(1.08);
+}
+
+/* ===== 모달 ===== */
+#reportModal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.55);
+  z-index:9998;
+  justify-content:center;
+  align-items:center;
+}
+
+/* ===== 박스 ===== */
+#reportBox{
+  width:90%;
+  max-width:520px;
+  height:80vh;
+  background:white;
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  animation:fadeUp 0.25s ease;
+}
+
+/* ===== 헤더 ===== */
+.report-header{
+  padding:14px 16px;
+  font-weight:700;
+  background:#f3f6fb;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.report-header span{
+  cursor:pointer;
+  font-size:18px;
+}
+
+/* ===== iframe ===== */
+#reportBox iframe{
+  flex:1;
+  width:100%;
+  border:none;
+}
+
+/* ===== 애니메이션 ===== */
+@keyframes fadeUp{
+  from{
+    opacity:0;
+    transform:translateY(20px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+/* ===== 모바일 ===== */
+@media (max-width:480px){
+
+  #reportBtn{
+    left:14px;     /* 👈 추가 */
+    right:auto;    /* 👈 추가 */
+    bottom:14px;
+    width:54px;
+    height:54px;
+  }
+
+  #reportBox{
+    width:100%;
+    height:100%;
+    border-radius:0;
+  }
+
+}
+
+</style>
+
+<script>
+
+const reportBtn = document.getElementById("reportBtn");
+const reportModal = document.getElementById("reportModal");
+
+reportBtn.onclick = () => {
+  reportModal.style.display = "flex";
+};
+
+function closeReport(){
+  reportModal.style.display = "none";
+}
+
+/* 배경 클릭 시 닫기 */
+reportModal.addEventListener("click", function(e){
+  if(e.target === reportModal){
+    reportModal.style.display = "none";
+  }
+});
+
+</script>
 
 </body>
 </html>
@@ -811,7 +1102,13 @@ def home():
     check = login_required()
     if check:
         return check
-    return render_template_string(HOME_HTML, style=BASE_STYLE)
+
+    data = load_visitors()
+    today_key = datetime.datetime.now().strftime("%Y-%m-%d")
+    total = data.get("total", 0)
+    today = data.get("daily", {}).get(today_key, 0)
+
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today)
 
 @app.route("/guide")
 def guide():
@@ -1035,7 +1332,7 @@ input, select{
 
 /* ===== 카피라이트 ===== */
 .copyright{
-  text-align:center;
+  text-align:right;   /* 🔥 핵심 */
   margin-top:22px;
   margin-bottom:6px;
   padding:0 12px;
@@ -1044,7 +1341,7 @@ input, select{
 .copyright-line{
   width:44px;
   height:2px;
-  margin:0 auto 12px auto;
+  margin:0 0 12px auto;   /* 🔥 오른쪽 정렬 */
   border-radius:999px;
   background:linear-gradient(135deg,#93c5fd,#2563eb);
   opacity:0.9;
