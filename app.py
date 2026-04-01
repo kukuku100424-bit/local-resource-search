@@ -1472,6 +1472,90 @@ button:hover{
   }
 }
 
+.voice-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.45);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  z-index:9999;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+
+/* 중앙 박스 */
+.voice-overlay-box{
+  position:relative;
+  text-align:center;
+  color:white;
+}
+
+/* 마이크 링 */
+.voice-mic-ring{
+  width:90px;
+  height:90px;
+  border-radius:50%;
+  margin:0 auto 14px auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(37,99,235,0.25);
+  animation:pulse 1.4s infinite;
+}
+
+.voice-mic-core{
+  font-size:32px;
+}
+
+@keyframes pulse{
+  0%{ box-shadow:0 0 0 0 rgba(37,99,235,0.5); }
+  70%{ box-shadow:0 0 0 18px rgba(37,99,235,0); }
+  100%{ box-shadow:0 0 0 0 rgba(37,99,235,0); }
+}
+
+/* 텍스트 */
+.voice-overlay-title{
+  font-size:20px;
+  font-weight:700;
+  margin-bottom:6px;
+}
+
+.voice-overlay-subtitle{
+  font-size:13px;
+  opacity:0.85;
+}
+
+/* 점 떠다니는 효과 */
+.voice-particles{
+  position:absolute;
+  inset:0;
+}
+
+.vp{
+  position:absolute;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.4);
+  animation:float 6s linear infinite;
+}
+
+.vp1{ left:10%; top:80%; animation-delay:0s; }
+.vp2{ left:30%; top:90%; animation-delay:1s; }
+.vp3{ left:50%; top:85%; animation-delay:2s; }
+.vp4{ left:70%; top:88%; animation-delay:0.5s; }
+.vp5{ left:85%; top:92%; animation-delay:1.5s; }
+.vp6{ left:60%; top:95%; animation-delay:2.5s; }
+
+@keyframes float{
+  0%{ transform:translateY(0); opacity:0; }
+  20%{ opacity:1; }
+  100%{ transform:translateY(-200px); opacity:0; }
+}
+
+
 </style>
 </head>
 
@@ -1621,6 +1705,25 @@ transition:0.2s;
 
 </div>
 
+<div class="voice-overlay" id="voiceOverlay">
+  <div class="voice-particles">
+    <span class="vp vp1"></span>
+    <span class="vp vp2"></span>
+    <span class="vp vp3"></span>
+    <span class="vp vp4"></span>
+    <span class="vp vp5"></span>
+    <span class="vp vp6"></span>
+  </div>
+
+  <div class="voice-overlay-box">
+    <div class="voice-mic-ring">
+      <div class="voice-mic-core">🎤</div>
+    </div>
+
+    <div class="voice-overlay-title">듣고 있습니다</div>
+    <div class="voice-overlay-subtitle">말씀이 끝나면 자동으로 입력됩니다</div>
+  </div>
+</div>
 
 <div class="loading" id="loading">
 
@@ -1706,22 +1809,38 @@ function startVoiceInput(event){
   recognition = new SpeechRecognition();
   recognition.lang = "ko-KR";
 
-  recognition.onstart = function(){
-    isRecording = true;
-    setVoiceButtonRecording(true);
-    playBeep("start");
-  };
+recognition.onstart = function(){
+  isRecording = true;
+  setVoiceButtonRecording(true);
+  playBeep("start");
 
-  recognition.onresult = function(e){
-    const transcript = e.results[0][0].transcript;
-    queryInput.value = transcript;
-  };
+  const overlay = document.getElementById("voiceOverlay");
+  if(overlay){
+    overlay.style.display = "flex";
+  }
+};
+
+recognition.onresult = function(e){
+  const transcript = e.results[0][0].transcript;
+  queryInput.value = transcript;
+
+  const overlay = document.getElementById("voiceOverlay");
+  if(overlay){
+    overlay.style.display = "none";
+  }
+};
 
   recognition.onend = function(){
-    isRecording = false;
-    setVoiceButtonRecording(false);
-    playBeep("end");
-  };
+  isRecording = false;
+  setVoiceButtonRecording(false);
+  playBeep("end");
+
+  const overlay = document.getElementById("voiceOverlay");
+  if(overlay){
+    overlay.style.display = "none";
+  }
+};
+
 
   recognition.start();
 }
