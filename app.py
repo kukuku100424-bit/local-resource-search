@@ -1639,63 +1639,8 @@ transition:0.2s;
 </div>
 
 
-<script>
-
-document.getElementById("searchForm").addEventListener("submit", function(){
-  document.getElementById("loading").style.display = "flex";
-});
-
-function startVoiceInput(e){
-  if(e) e.preventDefault();
-
-  const btn = document.getElementById("voiceBtn");
-  const input = document.getElementById("queryInput");
-
-  if(!btn || !input){
-    alert("음성입력 버튼 요소를 찾지 못했습니다.");
-    return;
-  }
-
-  const originalIcon = btn.getAttribute("data-original-icon") || btn.innerHTML;
   btn.setAttribute("data-original-icon", originalIcon);
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if(!SpeechRecognition){
-    alert("이 브라우저에서는 음성입력이 지원되지 않습니다. 모바일 크롬 또는 삼성인터넷에서 시도해주세요.");
-    return;
-  }
-
-  try{
-    const recognition = new SpeechRecognition();
-    recognition.lang = "ko-KR";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    btn.innerHTML = "<span style='color:white;font-size:18px;'>●</span>";
-
-    recognition.onresult = function(event){
-      const text = event.results[0][0].transcript;
-      input.value = text;
-    };
-
-    recognition.onerror = function(event){
-      btn.innerHTML = originalIcon;
-      alert("음성입력 오류: " + (event.error || "unknown"));
-    };
-
-    recognition.onend = function(){
-      btn.innerHTML = originalIcon;
-    };
-
-    recognition.start();
-
-  }catch(err){
-    btn.innerHTML = originalIcon;
-    alert("음성입력을 시작할 수 없습니다: " + err);
-  }
-}
-</script>
 
 </body>
 </html>
