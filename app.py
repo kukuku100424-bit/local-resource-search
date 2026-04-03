@@ -1072,26 +1072,59 @@ body{
 </style>
 
 <script>
-
 const reportBtn = document.getElementById("reportBtn");
 const reportModal = document.getElementById("reportModal");
 
+/* 홈 진입 시 현재 상태를 홈으로 고정하고, 홈 상태를 하나 더 쌓아둠 */
+history.replaceState({ page: "home-root" }, "", location.href);
+history.pushState({ page: "home" }, "", location.href);
+
+/* 오류제보 버튼 클릭 → 모달 열기 */
 reportBtn.onclick = () => {
   reportModal.style.display = "flex";
+  history.pushState({ modal: "report" }, "", location.href);
 };
 
 function closeReport(){
-  reportModal.style.display = "none";
+  if(reportModal.style.display === "flex"){
+    reportModal.style.display = "none";
+  }
 }
 
 /* 배경 클릭 시 닫기 */
 reportModal.addEventListener("click", function(e){
   if(e.target === reportModal){
-    reportModal.style.display = "none";
+    closeReport();
   }
 });
 
+/* 뒤로가기 처리 */
+window.addEventListener("popstate", function (e) {
+  /* 모달 상태에서 뒤로가기 → 모달만 닫고 홈 유지 */
+  if (e.state && e.state.page === "home") {
+    if (reportModal.style.display === "flex") {
+      reportModal.style.display = "none";
+    }
+    return;
+  }
+
+  /* 홈에서 뒤로가기 → 다시 홈 상태를 쌓아서 로그인으로 못 가게 함 */
+  if (e.state && e.state.page === "home-root") {
+    if (reportModal.style.display === "flex") {
+      reportModal.style.display = "none";
+    }
+    history.pushState({ page: "home" }, "", location.href);
+    return;
+  }
+
+  /* 혹시 예외 상태여도 홈 유지 */
+  if (reportModal.style.display === "flex") {
+    reportModal.style.display = "none";
+  }
+  history.pushState({ page: "home" }, "", location.href);
+});
 </script>
+
 
 </body>
 </html>
@@ -2787,6 +2820,25 @@ CARE_HTML = """
   transition:0.18s ease;
 }
 
+.question-title{
+  display:block;
+  font-size:16px;
+  line-height:1.6;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+  padding-left:26px;
+  text-indent:-26px;
+}
+
+@media (max-width:480px){
+  .question-title{
+    font-size:15px;
+    line-height:1.55;
+    padding-left:19px;
+    text-indent:-19px;
+  }
+}
+
 .question-box.active{
   border:2px solid #2563eb;
   background:#eef6ff;
@@ -3073,7 +3125,7 @@ CARE_HTML = """
   <div id="adlSection">
     {% for i,q in questions %}
     <div class="question-box">
-      <b>{{i+1}}) {{q}}</b>
+      <b class="question-title">{{i+1}}) {{q}}</b>
 
       <div class="options">
         <label>
