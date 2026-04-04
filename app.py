@@ -1600,6 +1600,20 @@ def desc():
     if request.method == "POST":
 
         query = (request.form.get("query") or "").strip()
+
+        cond_display = []
+
+        if is_irrelevant_query(query):
+            return make_no_result_response(
+                query=query,
+                results=results,
+                cond_display=cond_display,
+                count=count,
+                service_results=service_results,
+                found_sido=found_sido,
+                found_sigungu=found_sigungu
+            )
+
         found_sido, found_sigungu = extract_region_from_query(query)
         print("추출된 지역:", found_sido, found_sigungu)
 
@@ -1901,7 +1915,7 @@ def desc():
         count = len(service_results)
 
         if count >= 15:
-            warning_msg = "15개 이상의 서비스내용이 검색되었습니다. 결과를 더 정확하게 확인하려면 대상자의 건강상태, 돌봄 상황, 지역, 기능 상태 등을 조금 더 구체적으로 입력해 주세요."
+            warning_msg = "15개 이상의 서비스가 검색되었습니다.\n대상자의 건강상태, 돌봄 상황, 지역, 기능 상태 등을 조금 더 구체적으로 입력해 주세요."
 
     return render_template_string(
         DESC_HTML,
@@ -2328,26 +2342,41 @@ transition:0.2s;
 </div>
 
 
+{% if warning_msg %}
+<div style="
+  margin-top:24px;
+  padding:14px 20px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.7;
+
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+">
+  <span style="
+    flex:0 0 auto;
+    line-height:1.7;
+  ">⚠️</span>
+
+  <div style="
+    flex:1;
+    white-space:pre-line;
+    word-break:keep-all;
+    overflow-wrap:normal;
+  ">{{warning_msg}}</div>
+</div>
+{% endif %}
+
 {% if service_results %}
 
 <div class="result">
 
 <h3>{{count}}건의 추천 서비스</h3>
 
-{% if warning_msg %}
-<div style="
-  margin:12px 0 16px 0;
-  padding:14px 16px;
-  border-radius:12px;
-  background:#fff7ed;
-  border:1px solid #fdba74;
-  color:#9a3412;
-  font-size:14px;
-  line-height:1.6;
-">
-  ⚠️ {{warning_msg}}
-</div>
-{% endif %}
 
 
 {% for r in service_results %}
@@ -2576,6 +2605,78 @@ def normalize_health(text: str) -> str:
         return "거동불편"
 
     return t
+
+def is_irrelevant_query(query: str) -> bool:
+    q = str(query or "").strip()
+    q_norm = q.replace(" ", "").lower()
+
+    if not q_norm:
+        return True
+
+    # 너무 짧은 입력
+    if len(q_norm) <= 1:
+        return True
+
+    # 완전히 무관한 짧은 입력들
+    short_block_words = [
+        "트럼프", "윤석열", "이재명", "정치", "대통령",
+        "주식", "코인", "비트코인", "나스닥", "s&p",
+        "축구", "야구", "농구", "연예인", "아이돌",
+        "영화", "드라마", "날씨", "로또", "게임"
+    ]
+
+    if q_norm in short_block_words:
+        return True
+
+    # 케어네비 관련 키워드
+    care_keywords = [
+        "어르신", "노인", "고령", "돌봄", "통합돌봄", "복지", "복지용구",
+        "장기요양", "요양", "건강", "질환", "통증", "병원", "의료", "간호",
+        "간병", "치매", "약", "복약", "식사", "영양", "반찬", "목욕", "위생",
+        "청소", "세탁", "이동", "거동", "보행", "낙상", "배뇨", "배변",
+        "욕창", "상처", "감염", "튜브", "비위관", "콧줄", "도뇨", "소변줄",
+        "외로움", "고립", "말벗", "독거", "보호자", "가족", "주거", "안전",
+        "방문", "재활", "장애", "지원", "서비스"
+    ]
+
+    # 케어네비 관련 표현이 하나라도 있으면 통과
+    if any(word in q_norm for word in care_keywords):
+        return False
+
+    # 완전히 무관해 보이는 일반 질문 패턴
+    irrelevant_patterns = [
+        r"^트럼프[\?\!\.\~]*$",
+        r"^날씨[\?\!\.\~]*$",
+        r"^주식[\?\!\.\~]*$",
+        r"^로또[\?\!\.\~]*$",
+        r"^안녕[\?\!\.\~]*$",
+        r"^뭐야[\?\!\.\~]*$",
+        r"^누구야[\?\!\.\~]*$"
+    ]
+
+    for pattern in irrelevant_patterns:
+        if re.match(pattern, q_norm):
+            return True
+
+    return True
+
+
+def make_no_result_response(query, results, cond_display, count, service_results, found_sido, found_sigungu):
+    warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 구체적으로 입력해 주세요."
+
+    return render_template_string(
+        DESC_HTML,
+        style=BASE_STYLE,
+        query=query,
+        results=results,
+        cond_display=cond_display,
+        count=count,
+        service_results=service_results,
+        warning_msg=warning_msg,
+        found_sido=found_sido,
+        found_sigungu=found_sigungu
+    )
+
 
 def extract_region_from_query(query: str):
     q = str(query or "").strip()
