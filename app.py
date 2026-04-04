@@ -2059,6 +2059,20 @@ body{
   white-space:pre-wrap;
 }
 
+@media (max-width:768px){
+
+  #queryInput::placeholder{
+    white-space:pre-line;
+
+    padding-left:0;        /* 기본값 유지 */
+
+    text-indent:-32px;     /* 첫 줄 왼쪽으로 당기고 */
+    padding-left:28px;     /* 전체를 다시 밀어서 */
+
+  }
+
+}
+
 textarea:focus{
   outline:none;
   border-color:#2563eb;
