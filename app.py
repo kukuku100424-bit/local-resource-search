@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from openai import OpenAI
-cache = {}
 
 def make_cache_key(text):
     text = str(text or "")
@@ -637,11 +636,11 @@ body{
 
   background:white;
 
-  padding:16px;        /* 👈 20 → 16 (카드 높이 줄임) */
+  padding:16px;
 
   border-radius:16px;
 
-  margin-bottom:10px;  /* 👈 16 → 10 (카드 간격 줄임) */
+  margin-bottom:10px;
 
   box-shadow:0 8px 20px rgba(0,0,0,0.08);
 
@@ -734,9 +733,10 @@ body{
     font-size:22px;
   }
 
-  .card{
-    padding:16px;
-  }
+.card{
+  padding:16px;
+  min-height:50px;
+}
 
   .icon{
     width:44px;
@@ -978,8 +978,8 @@ body{
 /* ===== 버튼 ===== */
 #reportBtn{
   position:fixed;
-  right:20px;
-  bottom:20px;
+  right:30px;
+  bottom:50px;
   width:60px;
   height:60px;
   border-radius:50%;
@@ -1061,7 +1061,7 @@ body{
   #reportBtn{
     left:14px;     /* 👈 추가 */
     right:auto;    /* 👈 추가 */
-    bottom:14px;
+    bottom:50px;
     width:54px;
     height:54px;
   }
@@ -1609,7 +1609,7 @@ def desc():
     if request.method == "POST":
 
         query = (request.form.get("query") or "").strip()
-        cache_key = make_cache_key(query)
+        
 
         cond_display = []
 
@@ -1625,6 +1625,7 @@ def desc():
             )
 
         found_sido, found_sigungu = extract_region_from_query(query)
+        print("원본 query:", repr(query))
         print("추출된 지역:", found_sido, found_sigungu)
 
         # ======================
@@ -1639,6 +1640,7 @@ def desc():
         ])
 
         extra_aliases = []
+        extra_aliases += expand_query_aliases(query)
 
         # ---- 튜브/의료처치 관련 ----
         if any(k in q_norm for k in ["콧줄", "비위관", "위관", "경관급식", "콧줄영양", "비위관영양"]):
@@ -1758,8 +1760,10 @@ def desc():
 4. 특히 아래 표현은 적극 반영한다.
    - "집으로 와주길 원함" → 방문형 서비스 우선 고려
    - "반찬을 못함", "식사 준비 어려움" → 식사지원/반찬지원/영양지원 우선 고려
+   - "자주 배고파함", "허기짐", "굶는 편", "잘 못 먹음", "영양이 부족해 보임" → 영양지원, 식사지원, 반찬지원, 방문형지원 계열을 우선 검토한다
    - "지팡이", "워커", "보행기", "보행차", "휠체어" → 복지용구(보행보조, 대여/구입) 적극 고려
    - "안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이" → 복지용구(안전손잡이, 욕실안전, 낙상예방) 적극 고려
+   - "도구가 필요함", "보조도구 필요", "이동 도구 필요" → 복지용구(지팡이, 보행기, 휠체어 등)를 적극 우선 검토한다
    - "미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립", "미끄럼" → 복지용구(욕실안전, 낙상예방, 구입) 적극 고려
    - "목욕의자", "샤워의자", "목욕", "샤워" → 복지용구(목욕의자, 욕실안전, 구입) 고려
    - "이동변기", "간이변기", "변기", "좌변기" → 복지용구(배변보조, 구입) 고려
@@ -1774,6 +1778,17 @@ def desc():
    - 반대로 집 청소, 방역, 주거 위생, 해충, 집안 환경개선 맥락이면 서비스내용 "소독"을 검토한다
    - "무릎통증", "통증", "거동불편", "움직이기 어려움" → 재활, 기능회복, 방문보건, 이동지원 계열 고려
    - "혼자 지냄", "외로움", "고립" → 정서지원, 안부확인, 돌봄연계 고려
+   - "요통", "허리가 자주 아픔", "허리 통증", "허리 불편" → 통증관리, 재활, 기능회복, 방문보건 계열을 우선 검토한다
+   - "도시락이 필요함", "밥배달", "식사배달", "배달식" → 식사지원, 반찬지원, 영양지원 계열을 우선 검토한다
+   - "외로움", "말벗 필요", "혼자 지냄", "고립" → 정서지원, 안부확인, 돌봄연계를 우선 검토한다
+   - 표현이 다르더라도 의미가 비슷하면 대표 욕구로 묶어서 판단한다
+   - "다리가 저림", "다리 저림", "발 저림", "손발 저림", "찌릿함", "감각이상" → 신경증상, 통증, 재활, 기능회복, 방문보건, 이동지원 계열을 우선 검토한다
+   - "오줌을 지림", "소변을 지림", "소변 실수", "배뇨 실수", "요실금" → 배뇨관리, 위생지원, 기저귀·패드 등 복지용구, 방문보건 계열을 우선 검토한다
+   - "변을 지림", "대변 실수", "배변 실수", "배변 불편" → 배변관리, 위생지원, 복지용구, 방문보건 계열을 우선 검토한다
+   - "자주 넘어진다", "휘청거린다", "낙상이 걱정된다", "균형이 불안하다" → 낙상예방, 안전지원, 보행보조 복지용구, 이동지원 계열을 우선 검토한다
+   - "기억을 잘 못한다", "자꾸 깜빡한다", "약을 자주 잊는다" → 인지지원, 복약관리, 안부확인, 돌봄연계를 우선 검토한다
+   - "약 챙기기 어렵다", "병원 가기 어렵다", "병원 동행이 필요하다" → 복약관리, 병원동행, 이동지원, 방문보건 계열을 우선 검토한다
+   - "차려 먹기 어렵다", "챙겨 먹기 어렵다", "기운이 없다", "체중이 준다" → 영양지원, 식사지원, 반찬지원 계열을 우선 검토한다
 5. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다.
 6. 우선순위가 높은 순서대로 정렬한다.
 7. 최대 30개까지 추천한다.
@@ -1799,122 +1814,101 @@ def desc():
 {query_for_ai}
 """
 
-
         try:
-            if cache_key in cache:
-                service_results = cache[cache_key]
+            res = client.responses.create(
+                model="gpt-4.1-mini",
+                input=prompt,
+                temperature=0
+            )
 
-            else:
-                res = client.responses.create(
-                    model="gpt-4.1-mini",
-                    input=prompt,
-                    temperature=0
-                )
-
-                if hasattr(res, "usage"):
-                    try:
-                        print("입력 토큰:", res.usage.input_tokens)
-                        print("출력 토큰:", res.usage.output_tokens)
-                        print("총 토큰:", res.usage.total_tokens)
-                    except:
-                        print("토큰 정보:", res.usage)
-
-                text = res.output_text
-                print("GPT 원문:", text)
-
+            if hasattr(res, "usage"):
                 try:
-                    parsed = json.loads(text)
+                    print("입력 토큰:", res.usage.input_tokens)
+                    print("출력 토큰:", res.usage.output_tokens)
+                    print("총 토큰:", res.usage.total_tokens)
                 except:
-                    match = re.search(r'\{.*\}', text, re.DOTALL)
-                    if match:
-                        parsed = json.loads(match.group())
-                    else:
-                        parsed = {"results": []}
+                    print("토큰 정보:", res.usage)
 
-                raw_results = parsed.get("results", [])[:50]
+            text = res.output_text
+            print("GPT 원문:", text)
 
-                final_results = []
+            try:
+                parsed = json.loads(text)
+            except:
+                match = re.search(r'\{.*\}', text, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group())
+                else:
+                    parsed = {"results": []}
 
-                for r in raw_results:
-                    idx = int(r.get("index", -1))
+            raw_results = parsed.get("results", [])[:50]
 
-                    if 0 <= idx < len(service_df):
-                        row = service_df.iloc[idx]
+            final_results = []
 
-                        final_results.append({
-                            "대분류": row.get("대분류", ""),
-                            "중분류": row.get("중분류", ""),
-                            "서비스내용": row.get("서비스내용", ""),
-                            "선택이유": r.get("선택이유", "")
-                        })
+            for r in raw_results:
+                idx = int(r.get("index", -1))
 
-                # ======================
-                # 후처리 1: 중복 제거
-                # ======================
-                deduped = []
-                seen_keys = set()
+                if 0 <= idx < len(service_df):
+                    row = service_df.iloc[idx]
 
-                for item in final_results:
-                    key = (
-                        str(item.get("대분류", "")).strip(),
-                        str(item.get("중분류", "")).strip(),
-                        str(item.get("서비스내용", "")).strip()
-                    )
-                    if key not in seen_keys:
-                        seen_keys.add(key)
-                        deduped.append(item)
-
-                final_results = deduped
-
-                # ======================
-                # 후처리 2: 상처/감염 맥락이면 집소독 제거
-                # ======================
-                if wound_context:
-                    filtered_results = []
-
-                    for item in final_results:
-                        main_cat = str(item.get("대분류", "")).strip()
-                        middle_cat = str(item.get("중분류", "")).strip()
-                        service_name = str(item.get("서비스내용", "")).strip()
-
-                        is_house_disinfection = (
-                            service_name == "소독"
-                        )
-
-                        if is_house_disinfection:
-                            continue
-
-                        filtered_results.append(item)
-
-                    final_results = filtered_results
-
-                # ======================
-                # 후처리 3: 의료처치가 있으면 감염관리 자동 추가
-                # ======================
-                has_medical_tube = any(
-                    str(item.get("대분류", "")).strip() == "보건의료" and
-                    str(item.get("중분류", "")).strip() == "방문진료" and
-                    str(item.get("서비스내용", "")).strip() == "의료처치(욕창, 루, 튜브관리 등)"
-                    for item in final_results
-                )
-
-                has_infection = any(
-                    str(item.get("대분류", "")).strip() == "보건의료" and
-                    str(item.get("중분류", "")).strip() == "방문진료" and
-                    str(item.get("서비스내용", "")).strip() == "감염관리"
-                    for item in final_results
-                )
-
-                if has_medical_tube and not has_infection:
                     final_results.append({
-                        "대분류": "보건의료",
-                        "중분류": "방문진료",
-                        "서비스내용": "감염관리",
-                        "선택이유": "의료처치(욕창, 루, 튜브관리 등)가 필요한 경우 감염관리도 함께 검토가 필요함"
+                        "대분류": row.get("대분류", ""),
+                        "중분류": row.get("중분류", ""),
+                        "서비스내용": row.get("서비스내용", ""),
+                        "선택이유": r.get("선택이유", "")
                     })
 
-                service_results = final_results
-                cache[cache_key] = service_results
+            deduped = []
+            seen_keys = set()
+
+            for item in final_results:
+                key = (
+                    str(item.get("대분류", "")).strip(),
+                    str(item.get("중분류", "")).strip(),
+                    str(item.get("서비스내용", "")).strip()
+                )
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    deduped.append(item)
+
+            final_results = deduped
+
+            if wound_context:
+                filtered_results = []
+
+                for item in final_results:
+                    service_name = str(item.get("서비스내용", "")).strip()
+
+                    if service_name == "소독":
+                        continue
+
+                    filtered_results.append(item)
+
+                final_results = filtered_results
+
+            has_medical_tube = any(
+                str(item.get("대분류", "")).strip() == "보건의료" and
+                str(item.get("중분류", "")).strip() == "방문진료" and
+                str(item.get("서비스내용", "")).strip() == "의료처치(욕창, 루, 튜브관리 등)"
+                for item in final_results
+            )
+
+            has_infection = any(
+                str(item.get("대분류", "")).strip() == "보건의료" and
+                str(item.get("중분류", "")).strip() == "방문진료" and
+                str(item.get("서비스내용", "")).strip() == "감염관리"
+                for item in final_results
+            )
+
+            if has_medical_tube and not has_infection:
+                final_results.append({
+                    "대분류": "보건의료",
+                    "중분류": "방문진료",
+                    "서비스내용": "감염관리",
+                    "선택이유": "의료처치(욕창, 루, 튜브관리 등)가 필요한 경우 감염관리도 함께 검토가 필요함"
+                })
+
+            service_results = final_results
 
         except Exception as e:
             cond_display.append(f"GPT 오류: {e}")
@@ -1967,9 +1961,10 @@ DESC_HTML = """
 }
 
 .loading-ci{
-  width:160px;
-  margin-top:18px;
-  opacity:0.85;
+  width:132px;
+  margin-top:0;
+  opacity:0.82;
+  display:block;
 }
 
 .top-bar{
@@ -2114,13 +2109,20 @@ button:hover{
   background:rgba(0,0,0,0.5);
   align-items:center;
   justify-content:center;
+  z-index:99999;
 }
 
 .loading-box{
   background:white;
-  padding:30px;
-  border-radius:14px;
+  width:86%;
+  max-width:320px;
+  padding:34px 24px 26px 24px;
+  border-radius:20px;
   text-align:center;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
 }
 
 .spinner{
@@ -2276,6 +2278,57 @@ button:hover{
     white-space:pre-line;
   }
 }
+
+.ai-model-wrap{
+  margin-top:8px;
+  margin-bottom:14px;
+  width:100%;
+  display:flex;
+  justify-content:center;
+}
+
+.ai-model-badge{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  margin:0 auto;
+  background:transparent;
+  border:none;
+  box-shadow:none;
+}
+
+.ai-model-top{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  margin:0 auto;
+  font-size:9px;
+  font-weight:400;
+  color:#94a3b8;
+  line-height:1;
+  text-align:center;
+}
+
+.ai-model-icon{
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:#94a3b8;
+  box-shadow:none;
+  flex:0 0 auto;
+}
+
+.ai-engine-text{
+  font-size:9px !important;
+  font-weight:400 !important;
+  color:#94a3b8 !important;
+  letter-spacing:0;
+  line-height:1;
+  text-align:center;
+}
+
 
 </style>
 </head>
@@ -2469,12 +2522,20 @@ transition:0.2s;
 
     <div class="spinner"></div>
 
-    <p style="margin-top:12px;font-weight:600">
-      AI가 사례를 분석 중입니다
-    </p>
+<p style="margin:14px 0 0 0;font-weight:700;font-size:15px;line-height:1.35;text-align:center;">
+  AI가 사례를 분석 중입니다
+</p>
 
-    <img src="/static/ci.png" class="loading-ci">
+<div class="ai-model-wrap">
+  <div class="ai-model-badge">
+    <div class="ai-model-top">
+      <span class="ai-model-icon"></span>
+      <span class="ai-engine-text">검색엔진: GPT-4.1</span>
+    </div>
+  </div>
+</div>
 
+<img src="/static/ci.png" class="loading-ci">
   </div>
 
 </div>
@@ -2596,6 +2657,291 @@ if(searchForm){
 </html>
 """
 
+def normalize_query_text(text: str) -> str:
+    text = str(text or "")
+    text = text.strip().lower()
+    text = re.sub(r"\s+", "", text)
+    return text
+
+
+SYNONYM_GROUPS = {
+    "pain_back": {
+        "keywords": [
+            "요통", "허리통증", "허리아픔", "허리아프", "허리불편",
+            "허리쑤심", "허리가아픔", "허리가자주아픔"
+        ],
+        "aliases": [
+            "허리통증", "허리아픔", "근골격통증", "통증",
+            "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "pain_knee": {
+        "keywords": [
+            "무릎통증", "무릎아픔", "무릎이아픔", "관절통증", "관절아픔"
+        ],
+        "aliases": [
+            "무릎통증", "관절통증", "통증",
+            "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "pain_shoulder_arm": {
+        "keywords": [
+            "어깨통증", "어깨아픔", "팔통증", "팔아픔", "손목통증",
+            "손목아픔", "팔저림", "손저림"
+        ],
+        "aliases": [
+            "상지통증", "근골격통증", "감각이상",
+            "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "neuro_numbness": {
+        "keywords": [
+            "저리", "저림", "저린", "찌릿", "찌릿함", "화끈거림",
+            "감각이상", "감각저하", "감각둔함", "감각무딤",
+            "다리저림", "다리가저림", "다리가저린", "종아리저림",
+            "발저림", "발바닥저림", "허벅지저림", "엉덩이저림",
+            "손저림", "손발저림"
+        ],
+        "aliases": [
+            "저림", "감각이상", "신경증상", "말초신경", "통증",
+            "이동불편", "보행불편", "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "mobility": {
+        "keywords": [
+            "거동불편", "보행불편", "걷기힘듦", "걷기힘들",
+            "움직이기힘듦", "움직이기힘들", "이동불편",
+            "다리가불편", "허리가불편", "무릎이불편",
+            "일어나기힘들", "앉았다일어나기힘들", "계단오르기힘들"
+        ],
+        "aliases": [
+            "이동지원", "보행지원", "재활", "기능회복", "복지용구"
+        ]
+    },
+
+    "fall_safety": {
+        "keywords": [
+            "낙상", "넘어짐", "자주넘어짐", "비틀거림", "휘청거림",
+            "균형이안맞", "균형불안", "넘어질까걱정", "낙상걱정"
+        ],
+        "aliases": [
+            "낙상예방", "안전지원", "보행보조", "복지용구",
+            "방문보건", "이동지원"
+        ]
+    },
+
+    "meal_support": {
+        "keywords": [
+            "도시락", "도시락필요", "식사배달", "밥배달", "배달식",
+            "식사도움", "식사지원", "반찬", "반찬지원", "끼니",
+            "식사를못함", "밥을못함", "차려먹기힘들", "챙겨먹기힘들"
+        ],
+        "aliases": [
+            "식사지원", "반찬지원", "영양지원", "도시락",
+            "식사배달", "방문형지원"
+        ]
+    },
+
+    "nutrition_loss": {
+        "keywords": [
+            "배고프", "배가고프", "허기", "허기짐", "굶", "굶고",
+            "못먹", "못먹음", "입맛없", "식욕없", "식욕부진",
+            "영양부족", "영양불량", "체중감소", "기운없음"
+        ],
+        "aliases": [
+            "영양지원", "식사지원", "반찬지원", "방문형지원", "건강관리"
+        ]
+    },
+
+    "emotional_support": {
+        "keywords": [
+            "외로움", "외롭", "고립", "말벗", "우울", "혼자지냄",
+            "혼자있음", "고독", "불안", "적적함", "심심함"
+        ],
+        "aliases": [
+            "정서지원", "안부확인", "말벗", "돌봄연계", "사회적고립"
+        ]
+    },
+
+    "social_relation": {
+        "keywords": [
+            "잘어울리지못", "어울리지못", "대인관계", "관계어려움",
+            "사람만나기싫", "사회활동어려움", "밖에안나감", "외출안함"
+        ],
+        "aliases": [
+            "정서지원", "사회참여지원", "안부확인", "돌봄연계"
+        ]
+    },
+
+    "hygiene": {
+        "keywords": [
+            "목욕힘듦", "목욕힘들", "씻기힘듦", "씻기힘들",
+            "청소힘듦", "청소힘들", "세탁힘듦", "세탁힘들",
+            "위생관리어려움"
+        ],
+        "aliases": [
+            "위생지원", "목욕지원", "청소지원", "세탁지원", "생활지원"
+        ]
+    },
+
+    "urinary_incontinence": {
+        "keywords": [
+            "요실금", "실금", "소변실수", "배뇨실수", "오줌실수",
+            "오줌지림", "오줌을지림", "오줌을지린", "소변지림",
+            "소변을지림", "소변을지린", "지린다", "지림",
+            "쉬를지림", "쉬실수", "소변이샘", "소변이새",
+            "오줌이샘", "오줌이새"
+        ],
+        "aliases": [
+            "요실금", "배뇨장애", "배뇨관리", "위생지원",
+            "기저귀", "패드", "복지용구", "방문보건"
+        ]
+    },
+
+    "urinary_difficulty": {
+        "keywords": [
+            "소변보기힘듦", "소변보기힘들", "배뇨곤란", "오줌이안나옴",
+            "잔뇨감", "소변불편", "화장실을자주감", "빈뇨", "야간뇨"
+        ],
+        "aliases": [
+            "배뇨관리", "방문보건", "건강관리", "위생지원"
+        ]
+    },
+
+    "bowel_difficulty": {
+        "keywords": [
+            "변실수", "대변실수", "변을지림", "변지림", "변비",
+            "설사", "배변힘듦", "배변불편", "화장실실수"
+        ],
+        "aliases": [
+            "배변관리", "위생지원", "복지용구", "방문보건"
+        ]
+    },
+
+    "tube_care": {
+        "keywords": [
+            "콧줄", "비위관", "위관", "경관급식", "콧줄영양",
+            "비위관영양", "소변줄", "유치도뇨", "도뇨줄",
+            "장루", "요루", "기관절개", "석션", "흡인", "튜브"
+        ],
+        "aliases": [
+            "튜브관리", "의료처치", "감염관리", "방문진료", "방문보건"
+        ]
+    },
+
+    "wound_infection": {
+        "keywords": [
+            "상처", "상처소독", "드레싱", "욕창", "염증", "감염",
+            "고름", "진물", "봉합", "절개", "찰과상", "화상"
+        ],
+        "aliases": [
+            "감염관리", "상처관리", "드레싱", "의료처치", "방문진료"
+        ]
+    },
+
+    "cognitive_dementia": {
+        "keywords": [
+            "치매", "깜빡", "기억못", "기억력저하", "인지저하",
+            "헷갈려", "길을잃", "약을까먹", "약을잊"
+        ],
+        "aliases": [
+            "인지지원", "복약관리", "안부확인", "돌봄연계", "방문보건"
+        ]
+    },
+
+    "medication_hospital": {
+        "keywords": [
+            "약챙기기힘들", "복약어려움", "병원가기힘들", "병원동행",
+            "통원어려움", "진료받기힘들"
+        ],
+        "aliases": [
+            "복약관리", "병원동행", "이동지원", "방문보건", "건강관리"
+        ]
+    },
+
+    "welfare_aid": {
+        "keywords": [
+            "지팡이", "워커", "보행기", "보행차", "휠체어",
+            "도구", "보조도구", "보조기구", "도구필요", "보조필요",
+            "안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이",
+            "미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립",
+            "목욕의자", "샤워의자", "이동변기", "간이변기",
+            "기저귀", "패드", "전동침대", "병원침대",
+            "욕창매트", "욕창방지", "자세변환", "체위변경",
+            "경사로", "문턱", "턱"
+        ],
+        "aliases": [
+            "복지용구", "구입", "대여", "안전지원", "이동보조"
+        ]
+    }
+}
+
+
+def expand_query_aliases(query: str):
+    q_norm = normalize_query_text(query)
+    aliases = []
+
+    for group in SYNONYM_GROUPS.values():
+        if any(keyword in q_norm for keyword in group["keywords"]):
+            aliases.extend(group["aliases"])
+
+    if "아프" in q_norm or "통증" in q_norm or "쑤시" in q_norm or "결리" in q_norm:
+        aliases.extend(["통증", "방문보건", "재활", "기능회복"])
+
+    if "저리" in q_norm or "저림" in q_norm or "찌릿" in q_norm:
+        aliases.extend(["저림", "감각이상", "신경증상", "방문보건", "재활", "기능회복", "이동불편"])
+
+    if "다리" in q_norm and ("저리" in q_norm or "저림" in q_norm):
+        aliases.extend(["다리저림", "보행불편", "이동지원", "재활", "기능회복"])
+
+    if "손" in q_norm and ("저리" in q_norm or "저림" in q_norm):
+        aliases.extend(["손저림", "감각이상", "신경증상", "방문보건"])
+
+    if (
+        "지리" in q_norm or "지림" in q_norm or "실금" in q_norm
+        or "소변실수" in q_norm or "오줌실수" in q_norm
+        or "오줌" in q_norm or "소변" in q_norm or "배뇨" in q_norm
+    ):
+        aliases.extend([
+            "요실금", "배뇨장애", "배뇨관리", "위생지원",
+            "기저귀", "패드", "복지용구", "방문보건"
+        ])
+
+    if "변" in q_norm and ("실수" in q_norm or "지리" in q_norm or "지림" in q_norm):
+        aliases.extend(["배변관리", "위생지원", "복지용구", "방문보건"])
+
+    if "혼자" in q_norm or "외롭" in q_norm or "고립" in q_norm or "말벗" in q_norm:
+        aliases.extend(["정서지원", "안부확인", "돌봄연계"])
+
+    if "밥" in q_norm or "식사" in q_norm or "반찬" in q_norm or "도시락" in q_norm:
+        aliases.extend(["식사지원", "반찬지원", "영양지원"])
+
+    if "낙상" in q_norm or "넘어" in q_norm or "휘청" in q_norm:
+        aliases.extend(["낙상예방", "안전지원", "이동지원", "복지용구"])
+
+    if "약" in q_norm or "병원" in q_norm or "복약" in q_norm:
+        aliases.extend(["복약관리", "병원동행", "방문보건", "건강관리"])
+
+    if "배고프" in q_norm or "배고파" in q_norm or "허기" in q_norm or "허기지" in q_norm or "굶" in q_norm or "못먹" in q_norm or "식욕없" in q_norm:
+        aliases.extend([
+            "영양지원", "식사지원", "반찬지원",
+            "도시락", "식사배달", "방문형지원", "건강관리"
+        ])
+
+    if "도구" in q_norm or "보조도구" in q_norm or "보조기구" in q_norm:
+        aliases.extend([
+            "복지용구", "보행보조", "지팡이", "워커",
+            "보행기", "휠체어", "안전손잡이",
+            "이동지원", "낙상예방"
+        ])
+
+    return list(dict.fromkeys(aliases))
+
+
 def normalize_sigungu(text: str) -> str:
     if not text:
         return ""
@@ -2663,19 +3009,48 @@ def is_irrelevant_query(query: str) -> bool:
         "잘어울리지못", "어울리지못", "대인관계", "관계어려움",
         "혼자지냄", "혼자있음", "혼자생활", "외출안", "밖에안나감",
         "고립", "고독", "우울", "불안", "외롭", "말상대", "말벗",
+        "도구필요", "보조도구", "보조기구", "지팡이필요",
+        "보행기필요", "휠체어필요",
 
         "밥못", "식사못", "반찬못", "끼니", "먹기힘들", "챙겨먹기힘들",
-        "배고프", "배가고프", "허기", "허기짐", "굶", "굶고", "못먹", "못먹음",
+        "배고프", "배고파", "배가고프", "배가고파", "허기", "허기짐", "허기지", "굶", "굶고", "못먹", "못먹음",
         "입맛없", "식욕없", "식욕부진", "영양부족", "영양불량",
+        "도시락", "도시락필요", "식사배달", "밥배달", "배달식", "배달도시락",
+        "반찬지원", "식사지원", "영양지원",
+
         "씻기힘들", "목욕힘들", "청소힘들", "세탁힘들",
         "걷기힘들", "움직이기힘들", "거동불편", "보행불편",
+        "이동불편", "허리불편", "무릎불편",
         "넘어질까", "낙상걱정", "화장실힘들", "배변힘들", "배뇨힘들",
         "병원가기힘들", "병원동행", "약챙기기힘들",
 
         "아프", "통증", "쑤시", "결리", "저리", "불편", "불편함",
         "허리아프", "무릎아프", "어깨아프", "다리아프", "손목아프",
-        "허리통증", "무릎통증", "어깨통증", "다리통증", "관절통증"
+        "허리통증", "무릎통증", "어깨통증", "다리통증", "관절통증",
+        "요통", "허리아픔", "허리가아픔", "허리가자주아픔", "허리쑤심",
+
+        "다리저림", "다리가저림", "발저림", "손저림", "손발저림",
+        "찌릿", "감각이상", "감각저하",
+
+        "요실금", "실금", "소변실수", "배뇨실수", "오줌실수",
+        "오줌지림", "소변지림", "지린다", "지림", "쉬를지림",
+        "소변이샘", "소변이새", "오줌이샘", "오줌이새",
+
+        "변실수", "대변실수", "변지림", "변을지림", "배변불편",
+
+        "낙상", "넘어짐", "자주넘어짐", "휘청거림", "비틀거림",
+        "균형불안", "낙상걱정",
+
+        "깜빡", "기억못", "기억력저하", "인지저하", "헷갈림",
+
+        "약챙기기힘들", "복약어려움", "병원가기힘들", "병원동행",
+        "통원어려움",
+
+        "차려먹기힘들", "챙겨먹기힘들", "체중감소", "기운없음",
+
+        "소변줄", "콧줄", "비위관", "도뇨줄", "장루", "요루",
     ]
+
 
     # 질병/치료/후유증 문맥 표현
     disease_context_keywords = [
@@ -2852,6 +3227,14 @@ def extract_region_from_query(query: str):
         "북구": ("광주광역시", "북구"),
         "광산구": ("광주광역시", "광산구"),
         "광산": ("광주광역시", "광산구"),
+        "광주동구": ("광주광역시", "동구"),
+        "광주서구": ("광주광역시", "서구"),
+        "광주남구": ("광주광역시", "남구"),
+        "광주북구": ("광주광역시", "북구"),
+        "광주광역시동구": ("광주광역시", "동구"),
+        "광주광역시서구": ("광주광역시", "서구"),
+        "광주광역시남구": ("광주광역시", "남구"),
+        "광주광역시북구": ("광주광역시", "북구"),
 
         "제주시": ("제주특별자치도", "제주시"),
         "제주시청": ("제주특별자치도", "제주시"),
@@ -2860,11 +3243,6 @@ def extract_region_from_query(query: str):
         "서귀포": ("제주특별자치도", "서귀포시")
     }
 
-    for key in list(sigungu_alias_map.keys()):
-        if key.endswith("시") or key.endswith("군") or key.endswith("구"):
-            base = key[:-1]
-            if base and base not in sigungu_alias_map:
-                sigungu_alias_map[base] = sigungu_alias_map[key]
 
     for alias in sorted(sido_alias_map.keys(), key=len, reverse=True):
         if alias in q:
@@ -2904,6 +3282,65 @@ CARE_HTML = """
 <style>{{style}}</style>
 
 <style>
+
+.ai-model-wrap{
+  margin-top:10px;
+  display:flex;
+  justify-content:center;
+}
+
+.ai-model-badge{
+  display:inline-flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  padding:8px 14px;
+  border-radius:14px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+}
+
+.ai-model-top{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:13px;
+  font-weight:700;
+  color:#111827;
+  line-height:1.2;
+}
+
+.ai-model-icon{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.12);
+  flex:0 0 auto;
+}
+
+.ai-model-sub{
+  font-size:11px;
+  color:#6b7280;
+  line-height:1.2;
+  letter-spacing:0.2px;
+}
+
+.ai-model-label{
+  margin-top:6px;
+  font-size:12px;
+  color:#6b7280;
+  letter-spacing:0.3px;
+
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:999px;
+
+  background:linear-gradient(135deg,#e0f2fe,#dbeafe);
+  border:1px solid #bfdbfe;
+
+  font-weight:600;
+}
 
 .dementia-options{
   display:flex;
@@ -3622,6 +4059,13 @@ NHIS25_HTML = """
 <style>{{style}}</style>
 
 <style>
+.ai-engine-text{
+  font-size:12px !important;   /* 🔥 핵심: 확 줄임 */
+  font-weight:500 !important;
+  color:#6b7280 !important;    /* 🔥 회색톤 */
+  letter-spacing:0.2px;
+}
+
 .app-box{
   background:white;
   padding:22px;
