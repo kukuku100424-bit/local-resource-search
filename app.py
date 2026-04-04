@@ -10,6 +10,11 @@ load_dotenv()
 from openai import OpenAI
 cache = {}
 
+def make_cache_key(text):
+    text = str(text or "")
+    text = text.strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
 def compress_text(s, max_len=60):
     s = str(s).strip()
     if len(s) <= max_len:
@@ -1600,6 +1605,7 @@ def desc():
     if request.method == "POST":
 
         query = (request.form.get("query") or "").strip()
+        cache_key = make_cache_key(query)
 
         cond_display = []
 
@@ -1791,8 +1797,8 @@ def desc():
 
 
         try:
-            if query in cache:
-                service_results = cache[query]
+            if cache_key in cache:
+                service_results = cache[cache_key]
 
             else:
                 res = client.responses.create(
@@ -1904,8 +1910,7 @@ def desc():
                     })
 
                 service_results = final_results
-                cache[query] = service_results
-
+                cache[cache_key] = service_results
 
         except Exception as e:
             cond_display.append(f"GPT 오류: {e}")
@@ -2628,7 +2633,7 @@ def is_irrelevant_query(query: str) -> bool:
     if q_norm in short_block_words:
         return True
 
-    # 케어네비 관련 키워드
+    # 케어네비 관련 기본 키워드
     care_keywords = [
         "어르신", "노인", "고령", "돌봄", "통합돌봄", "복지", "복지용구",
         "장기요양", "요양", "건강", "질환", "통증", "병원", "의료", "간호",
@@ -2639,8 +2644,57 @@ def is_irrelevant_query(query: str) -> bool:
         "방문", "재활", "장애", "지원", "서비스"
     ]
 
-    # 케어네비 관련 표현이 하나라도 있으면 통과
+    # 의미상 돌봄/생활불편/정서지원으로 볼 수 있는 표현
+    meaning_keywords = [
+        "잘어울리지못", "어울리지못", "대인관계", "관계어려움",
+        "혼자지냄", "혼자있음", "혼자생활", "외출안", "밖에안나감",
+        "고립", "고독", "우울", "불안", "외롭", "말상대", "말벗",
+
+        "밥못", "식사못", "반찬못", "끼니", "먹기힘들", "챙겨먹기힘들",
+        "배고프", "배가고프", "허기", "허기짐", "굶", "굶고", "못먹", "못먹음",
+        "입맛없", "식욕없", "식욕부진", "영양부족", "영양불량",
+        "씻기힘들", "목욕힘들", "청소힘들", "세탁힘들",
+        "걷기힘들", "움직이기힘들", "거동불편", "보행불편",
+        "넘어질까", "낙상걱정", "화장실힘들", "배변힘들", "배뇨힘들",
+        "병원가기힘들", "병원동행", "약챙기기힘들",
+
+        "아프", "통증", "쑤시", "결리", "저리", "불편", "불편함",
+        "허리아프", "무릎아프", "어깨아프", "다리아프", "손목아프",
+        "허리통증", "무릎통증", "어깨통증", "다리통증", "관절통증"
+    ]
+
+    # 질병/치료/후유증 문맥 표현
+    disease_context_keywords = [
+        "진단", "진단받", "앓고", "앓음", "병력", "후유증",
+        "수술후", "수술 후", "입원후", "입원 후",
+        "치료중", "치료 중", "재활필요", "재활 필요",
+        "투석", "마비", "편마비", "통원", "복약",
+        "약복용", "약 복용", "지병", "기저질환", "후유장애",
+        "있다고함", "있다고 함", "라고함", "라고 함"
+    ]
+
+    # 자주 나오는 대표 질환명만 최소한으로
+    disease_keywords = [
+        "뇌출혈", "뇌경색", "중풍", "치매", "파킨슨",
+        "당뇨", "고혈압", "암", "골절", "관절염",
+        "심부전", "심근경색", "폐렴", "신부전", "투석",
+        "편마비", "사지마비"
+    ]
+
+    # 1. 기본 케어 키워드가 있으면 통과
     if any(word in q_norm for word in care_keywords):
+        return False
+
+    # 2. 의미상 돌봄 관련 표현이면 통과
+    if any(word in q_norm for word in meaning_keywords):
+        return False
+
+    # 3. 질병/치료 문맥 표현이 있으면 통과
+    if any(word in q for word in disease_context_keywords):
+        return False
+
+    # 4. 대표 질환명이 있으면 통과
+    if any(word in q_norm for word in disease_keywords):
         return False
 
     # 완전히 무관해 보이는 일반 질문 패턴
@@ -2651,13 +2705,17 @@ def is_irrelevant_query(query: str) -> bool:
         r"^로또[\?\!\.\~]*$",
         r"^안녕[\?\!\.\~]*$",
         r"^뭐야[\?\!\.\~]*$",
-        r"^누구야[\?\!\.\~]*$"
+        r"^누구야[\?\!\.\~]*$",
+        r"^오늘뭐하냐[\?\!\.\~]*$",
+        r"^뭐함[\?\!\.\~]*$",
+        r"^심심하다[\?\!\.\~]*$"
     ]
 
     for pattern in irrelevant_patterns:
         if re.match(pattern, q_norm):
             return True
 
+    # 위 조건들에 안 걸리면 기본적으로 무관 질문으로 처리
     return True
 
 
@@ -2806,7 +2864,6 @@ def extract_region_from_query(query: str):
             break
 
     return found_sido, found_sigungu
-
 
 
 # =========================
