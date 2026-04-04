@@ -1608,6 +1608,29 @@ def desc():
 
     if request.method == "POST":
 
+        import time
+
+        now = time.time()
+        last_time = session.get("last_search_time", 0)
+
+        if now - last_time < 10:
+            warning_msg = "너무 빠르게 검색할 수 없습니다.\n10초 후 다시 시도해 주세요."
+
+            return render_template_string(
+                DESC_HTML,
+                style=BASE_STYLE,
+                query=query,
+                results=results,
+                cond_display=cond_display,
+                count=count,
+                service_results=service_results,
+                warning_msg=warning_msg,
+                found_sido=found_sido,
+                found_sigungu=found_sigungu
+            )
+
+        session["last_search_time"] = now
+
         query = (request.form.get("query") or "").strip()
         
 
@@ -1953,7 +1976,7 @@ DESC_HTML = """
 
 .loading-ci{
   width:132px;
-  margin-top:0;
+  margin-top:22;
   opacity:0.82;
   display:block;
 }
@@ -2272,7 +2295,7 @@ button:hover{
 
 .ai-model-wrap{
   margin-top:8px;
-  margin-bottom:14px;
+  margin-bottom:28px;
   width:100%;
   display:flex;
   justify-content:center;
