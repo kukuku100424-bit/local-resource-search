@@ -929,7 +929,7 @@ body{
   <div class="copyright">
     <div class="copyright-line"></div>
     <div class="copyright-main">
-      © 국민건강보험공단 광주전라제주지역본부
+      ©국민건강보험공단 광주전라제주지역본부
     </div>
     <div class="copyright-sub">
       통합돌봄 연구반 <span>돌봄곳간</span>
@@ -2312,7 +2312,7 @@ button:hover{
 }
 
 .ai-engine-text{
-  font-size:9px !important;
+  font-size:10px !important;
   font-weight:400 !important;
   color:#94a3b8 !important;
   letter-spacing:0;
@@ -2320,6 +2320,15 @@ button:hover{
   text-align:center;
 }
 
+.ai-logo{
+  width:13px;
+  height:13px;
+  object-fit:contain;
+}
+
+.ai-model-top{
+  gap:3px;
+}
 
 </style>
 </head>
@@ -2520,7 +2529,7 @@ transition:0.2s;
 <div class="ai-model-wrap">
   <div class="ai-model-badge">
     <div class="ai-model-top">
-      <span class="ai-model-icon"></span>
+      <img src="/static/gpt.png" class="ai-logo">
       <span class="ai-engine-text">검색엔진: GPT-4.1</span>
     </div>
   </div>
@@ -3301,6 +3310,13 @@ CARE_HTML = """
   line-height:1.2;
 }
 
+.ai-logo{
+  width:9px;
+  height:9px;
+  object-fit:contain;
+  opacity:0.9;
+}
+
 .ai-model-icon{
   width:10px;
   height:10px;
@@ -4051,7 +4067,7 @@ NHIS25_HTML = """
 
 <style>
 .ai-engine-text{
-  font-size:12px !important;   /* 🔥 핵심: 확 줄임 */
+  font-size:14px !important;   /* 🔥 핵심: 확 줄임 */
   font-weight:500 !important;
   color:#6b7280 !important;    /* 🔥 회색톤 */
   letter-spacing:0.2px;
