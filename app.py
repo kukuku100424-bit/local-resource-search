@@ -1300,18 +1300,18 @@ COMBO_HTML = """
 <style>
 
 .combo-warning{
-  margin:12px 0 16px 0;
-  padding:14px 16px;
+  margin:18px 0 16px 0;
+  padding:14px 20px;
   border-radius:12px;
   background:#fff7ed;
   border:1px solid #fdba74;
   color:#9a3412;
   font-size:14px;
   line-height:1.7;
-  word-break:keep-all;
-  overflow-wrap:break-word;
-  text-indent:-1em;
-  padding-left:2em;
+
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
 }
 
 @media (max-width:480px){
@@ -1511,7 +1511,11 @@ input, select{
 <p><b>총 {{count}}건이 조회되었습니다.</b></p>
 
 <div class="combo-warning">
-  ※ 서비스 제공기관 정보는 현재 운영 중인 기관이며, 실제 정보와 차이가 있을 수 있으니 정확한 사항은 해당 기관에 직접 확인하시기 바랍니다.
+  <span style="flex:0 0 auto;">⚠️</span>
+  <div style="flex:1; word-break:keep-all;">
+    서비스 제공기관 정보는 현재 운영 중인 기관이며,
+    실제 정보와 차이가 있을 수 있으니 정확한 사항은 해당 기관에 직접 확인하시기 바랍니다.
+  </div>
 </div>
 
 {% if count == 0 %}
@@ -2032,20 +2036,18 @@ body{
 }
 
 /* 텍스트 입력 */
-textarea{
+/* 텍스트 입력 */
+#queryInput{
   width:100%;
   height:110px;
-  padding:14px;
-  padding-right:64px;
+  padding:14px 64px 14px 14px;
   border-radius:10px;
   border:1px solid #d1d5db;
   font-size:15px;
   resize:none;
-
-  line-height:1.5;         /* ✅ 줄 간격 안정 */
-  word-break:keep-all;     /* ✅ 한글 끊김 방지 (핵심) */
-  white-space:pre-wrap;    /* ✅ 줄바꿈 자연스럽게 */
-
+  line-height:1.6;
+  word-break:keep-all;
+  white-space:pre-wrap;
 }
 
 textarea:focus{
@@ -2263,6 +2265,18 @@ button:hover{
   }
 }
 
+@media (min-width:769px){
+  #queryInput::placeholder{
+    white-space:nowrap;
+  }
+}
+
+@media (max-width:768px){
+  #queryInput::placeholder{
+    white-space:pre-line;
+  }
+}
+
 </style>
 </head>
 
@@ -2284,7 +2298,7 @@ button:hover{
 
 <div style="position:relative;">
 
-<textarea id="queryInput" name="query" placeholder="예) 나주에 살고 식사도움이 필요한 어르신에게 필요한 서비스">{{query}}</textarea>
+<textarea id="queryInput" name="query" placeholder="예) 나주에 살고&#10;식사도움이 필요한&#10;어르신에게 맞는 서비스">{{query}}</textarea>
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
 style="
