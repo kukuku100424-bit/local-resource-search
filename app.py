@@ -1307,6 +1307,7 @@ COMBO_HTML = """
   justify-content:space-between;
   align-items:center;
   gap:12px;
+  margin-top:12px;
 }
 
 .combo-reset-button{
@@ -2032,7 +2033,7 @@ DESC_HTML = """
 }
 
 .top-bar{
-  margin-bottom:20px;
+  margin-bottom:35px;
 }
 
 .home-button,
