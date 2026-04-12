@@ -614,7 +614,7 @@ body{
 }
 
 .title + .card{
-  margin-top:30px;   /* 👈 여기 추가 */
+  margin-top:18px;   /* 👈 여기 추가 */
 }
 
 .title h1{
@@ -1299,6 +1299,43 @@ COMBO_HTML = """
 <style>{{style}}</style>
 <style>
 
+<style>{{style}}</style>
+<style>
+
+.combo-top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+
+.combo-reset-button{
+  display:inline-block;
+  width:auto;
+  height:auto;
+  margin-top:0;
+  padding:8px 14px;
+  border-radius:8px;
+  background:#e5e7eb;
+  color:#111827;
+  font-size:14px;
+  font-weight:500;
+  border:none;
+  cursor:pointer;
+  flex:0 0 auto;
+}
+
+.combo-reset-button:hover{
+  background:#d1d5db;
+}
+
+@media (max-width:480px){
+  .combo-reset-button{
+    font-size:13px;
+    padding:6px 12px;
+  }
+}
+
 .combo-warning{
   margin:18px 0 16px 0;
   padding:14px 20px;
@@ -1432,10 +1469,10 @@ input, select{
 <body>
 <div class="container">
 
-<div class="top-bar">
-<a href="/home" class="home-button">홈으로</a>
+<div class="top-bar combo-top-bar">
+  <a href="/home" class="home-button">홈으로</a>
+  <button type="button" class="combo-reset-button" onclick="resetComboPage()">초기화</button>
 </div>
-
 
 <div class="card">
 <h2>조건기반 자원검색</h2>
@@ -1587,7 +1624,18 @@ function openDetail(idx){
 function closeModal(){
   document.getElementById("modal").style.display = "none";
 }
+
+function resetComboPage(){
+  window.location.href = "/combo";
+}
+
+document.getElementById("modal").addEventListener("click", function(e){
+  if(e.target.id === "modal"){
+    closeModal();
+  }
+});
 </script>
+
 </body>
 </html>
 """
@@ -2007,23 +2055,23 @@ DESC_HTML = """
 }
 
 .reset-button{
+  display:inline-block;
   width:auto;
   height:auto;
   margin-top:0;
   padding:8px 14px;
-  border:none;
   border-radius:8px;
   background:#e5e7eb;
   color:#111827;
   font-size:14px;
   font-weight:500;
+  border:none;
   cursor:pointer;
-  box-shadow:none;
+  flex:0 0 auto;
 }
 
 .reset-button:hover{
   background:#d1d5db;
-  opacity:1;
 }
 
 @media (max-width:480px){
@@ -2478,7 +2526,7 @@ transition:0.2s;
   </div>
 </div>
 
-<button type="submit">AI 검색</button>
+<button type="submit" id="descSubmitBtn">AI 검색</button>
 </form>
 
 <div class="notice">
@@ -2540,10 +2588,11 @@ transition:0.2s;
       href="/combo?sido={{found_sido|urlencode}}&sigungu={{found_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
       style="
         display:inline-block;
-        padding:10px 14px;
+        padding:9px 13px;
         border-radius:10px;
-        background:#2563eb;
-        color:white;
+        background:#eff6ff;
+        border:1px solid #bfdbfe;
+        color:#1d4ed8;
         text-decoration:none;
         font-size:13px;
         font-weight:600;
@@ -2620,6 +2669,7 @@ const searchForm = document.getElementById("searchForm");
 const loading = document.getElementById("loading");
 const queryInput = document.getElementById("queryInput");
 const voiceBtn = document.getElementById("voiceBtn");
+const descSubmitBtn = document.getElementById("descSubmitBtn");
 
 const originalIcon = voiceBtn ? voiceBtn.innerHTML : "";
 let recognition = null;
@@ -2721,6 +2771,13 @@ recognition.onend = function(){
 
 if(searchForm){
   searchForm.addEventListener("submit", function(){
+    if(descSubmitBtn){
+      descSubmitBtn.disabled = true;
+      descSubmitBtn.innerText = "검색 중...";
+      descSubmitBtn.style.opacity = "0.7";
+      descSubmitBtn.style.cursor = "not-allowed";
+    }
+
     if(loading){
       loading.style.display = "flex";
     }
