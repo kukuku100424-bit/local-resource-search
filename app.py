@@ -2068,9 +2068,18 @@ DESC_HTML = """
 }
 
 @media (max-width:480px){
+  .home-button,
   .reset-button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:auto;
+    height:32px;
+    margin-top:0;
+    padding:0 12px;
     font-size:13px;
-    padding:6px 12px;
+    line-height:1;
+    flex:0 0 auto;
   }
 }
 
