@@ -1431,9 +1431,11 @@ input, select{
 </head>
 <body>
 <div class="container">
+
 <div class="top-bar">
 <a href="/home" class="home-button">홈으로</a>
 </div>
+
 
 <div class="card">
 <h2>조건기반 자원검색</h2>
@@ -1997,6 +1999,41 @@ DESC_HTML = """
   transition:0.15s;
 }
 
+.desc-top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+
+.reset-button{
+  width:auto;
+  height:auto;
+  margin-top:0;
+  padding:8px 14px;
+  border:none;
+  border-radius:8px;
+  background:#e5e7eb;
+  color:#111827;
+  font-size:14px;
+  font-weight:500;
+  cursor:pointer;
+  box-shadow:none;
+}
+
+.reset-button:hover{
+  background:#d1d5db;
+  opacity:1;
+}
+
+@media (max-width:480px){
+  .reset-button{
+    font-size:13px;
+    padding:6px 12px;
+  }
+}
+
+
 .home-button:hover{
   background:#d1d5db;
 }
@@ -2374,8 +2411,9 @@ button:hover{
 
 <div class="container">
 
-<div class="top-bar">
-<a href="/home" class="home-button">홈으로</a>
+<div class="top-bar desc-top-bar">
+  <a href="/home" class="home-button">홈으로</a>
+  <button type="button" class="reset-button" onclick="resetDescPage()">초기화</button>
 </div>
 
 <div class="title">
@@ -2452,7 +2490,7 @@ transition:0.2s;
 
 
 {% if warning_msg %}
-<div style="
+<div id="warningBox" style="
   margin-top:24px;
   padding:14px 20px;
   border-radius:12px;
@@ -2482,7 +2520,7 @@ transition:0.2s;
 
 {% if service_results %}
 
-<div class="result">
+<div class="result" id="resultArea">
 
 <h3>{{count}}건의 추천 서비스</h3>
 
@@ -2687,6 +2725,23 @@ if(searchForm){
       loading.style.display = "flex";
     }
   });
+}
+
+function resetDescPage(){
+  if(queryInput){
+    queryInput.value = "";
+    queryInput.focus();
+  }
+
+  const warningBox = document.getElementById("warningBox");
+  if(warningBox){
+    warningBox.style.display = "none";
+  }
+
+  const resultArea = document.getElementById("resultArea");
+  if(resultArea){
+    resultArea.style.display = "none";
+  }
 }
 </script>
 
