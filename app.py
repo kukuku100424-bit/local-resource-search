@@ -2035,16 +2035,25 @@ DESC_HTML = """
   margin-bottom:20px;
 }
 
-.home-button{
-  display:inline-block;
-  padding:8px 14px;
+.home-button,
+.reset-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  height:34px;
+  margin-top:0;
+  padding:0 14px;
   border-radius:8px;
   background:#e5e7eb;
   color:#111827;
   text-decoration:none;
   font-size:14px;
   font-weight:500;
+  border:none;
+  cursor:pointer;
   transition:0.15s;
+  flex:0 0 auto;
 }
 
 .desc-top-bar{
@@ -2052,22 +2061,6 @@ DESC_HTML = """
   justify-content:space-between;
   align-items:center;
   gap:12px;
-}
-
-.reset-button{
-  display:inline-block;
-  width:auto;
-  height:auto;
-  margin-top:0;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-  color:#111827;
-  font-size:14px;
-  font-weight:500;
-  border:none;
-  cursor:pointer;
-  flex:0 0 auto;
 }
 
 .reset-button:hover{
