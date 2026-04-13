@@ -2738,8 +2738,7 @@ button:hover{
 <div class="desc-region-box">
 
   <div class="desc-region-title">지역 설정</div>
-  <div class="desc-region-note">※선택하지 않으면 전체 지역으로 검색됩니다.</div>
-
+  
   <div class="desc-region-row">
 
     <div class="desc-region-item">
