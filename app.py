@@ -552,16 +552,111 @@ def sorted_unique_values(column_name):
     values = [v for v in values if v]
 
     unique_values = list(set(values))
-
     unique_values.sort(key=lambda x: (x == "기타", x))
 
     return unique_values
 
 
-SIDO_OPTIONS = sorted_unique_values("시도")
-SIGUNGU_OPTIONS = sorted_unique_values("시군구")
+def normalize_sido(text):
+    t = str(text or "").strip()
+
+    mapping = {
+        "광주": "광주광역시",
+        "광주광역시": "광주광역시",
+
+        "전남": "전라남도",
+        "전라남도": "전라남도",
+
+        "전북": "전북특별자치도",
+        "전라북도": "전북특별자치도",
+        "전북특별자치도": "전북특별자치도",
+
+        "제주": "제주특별자치도",
+        "제주도": "제주특별자치도",
+        "제주특별자치도": "제주특별자치도"
+    }
+
+    return mapping.get(t, t)
+
+
+def normalize_sigungu(text):
+    t = str(text or "").strip()
+
+    mapping = {
+        "나주": "나주시",
+        "목포": "목포시",
+        "순천": "순천시",
+        "여수": "여수시",
+        "광양": "광양시",
+        "담양": "담양군",
+        "곡성": "곡성군",
+        "구례": "구례군",
+        "고흥": "고흥군",
+        "보성": "보성군",
+        "화순": "화순군",
+        "장흥": "장흥군",
+        "강진": "강진군",
+        "해남": "해남군",
+        "영암": "영암군",
+        "무안": "무안군",
+        "함평": "함평군",
+        "영광": "영광군",
+        "장성": "장성군",
+        "완도": "완도군",
+        "진도": "진도군",
+        "신안": "신안군",
+        "전주": "전주시",
+        "군산": "군산시",
+        "익산": "익산시",
+        "정읍": "정읍시",
+        "남원": "남원시",
+        "김제": "김제시",
+        "완주": "완주군",
+        "진안": "진안군",
+        "무주": "무주군",
+        "장수": "장수군",
+        "임실": "임실군",
+        "순창": "순창군",
+        "고창": "고창군",
+        "부안": "부안군",
+        "제주": "제주시",
+        "서귀포": "서귀포시"
+    }
+
+    return mapping.get(t, t)
+
+
+SIGUNGU_MAP = {
+    "광주광역시": ["동구", "서구", "남구", "북구", "광산구"],
+
+    "전라남도": [
+        "강진군", "고흥군", "곡성군", "광양시", "구례군",
+        "나주시", "담양군", "목포시", "무안군",
+        "보성군", "순천시", "신안군",
+        "여수시", "영광군", "영암군", "완도군",
+        "장성군", "장흥군", "진도군",
+        "함평군", "해남군", "화순군"
+    ],
+
+    "전북특별자치도": [
+        "고창군", "군산시", "김제시", "남원시",
+        "무주군", "부안군",
+        "순창군",
+        "완주군", "익산시", "임실군",
+        "장수군", "전주시", "정읍시", "진안군"
+    ],
+
+    "제주특별자치도": ["제주시", "서귀포시"]
+}
+
+SIDO_OPTIONS = ["광주광역시", "전라남도", "전북특별자치도", "제주특별자치도"]
+SIGUNGU_OPTIONS = sorted(set(
+    normalize_sigungu(v) for v in sorted_unique_values("시군구") if str(v).strip()
+))
+
 MAIN_CATEGORY_OPTIONS = sorted_unique_values("대분류")
 MIDDLE_CATEGORY_OPTIONS = sorted_unique_values("중분류")
+
 
 # =========================
 # HOME
@@ -1186,27 +1281,22 @@ def combo():
     if check:
         return check
 
-    sido = (request.values.get("sido", "") or "").strip()
+    sido = normalize_sido((request.values.get("sido", "") or "").strip())
     sigungu = (request.values.get("sigungu", "") or "").strip()
     main_category = (request.values.get("main_category", "") or "").strip()
     middle_category = (request.values.get("middle_category", "") or "").strip()
     program_kw = (request.values.get("program_kw", "") or "").strip()
     org_kw = (request.values.get("org_kw", "") or "").strip()
+    action = (request.values.get("action", "") or "").strip()
 
     results = {}
     count = 0
+    show_results = (action == "search")
 
-    sigungu_options = SIGUNGU_OPTIONS
-    if sido and "시도" in df.columns and "시군구" in df.columns:
-        temp = df[
-            df["시도"].fillna("").astype(str).str.strip() == sido
-        ]
-        sigungu_options = sorted(
-            set(
-                temp["시군구"].fillna("").astype(str).str.strip()
-            )
-        )
-        sigungu_options = [v for v in sigungu_options if v]
+    sigungu_options = []
+
+    if sido and sido in SIGUNGU_MAP:
+        sigungu_options = SIGUNGU_MAP[sido]
 
     middle_category_options = MIDDLE_CATEGORY_OPTIONS
     if main_category and "대분류" in df.columns and "중분류" in df.columns:
@@ -1220,17 +1310,17 @@ def combo():
         )
         middle_category_options = [v for v in middle_category_options if v]
 
-    if request.method == "POST" or any([sido, sigungu, main_category, middle_category, program_kw, org_kw]):
+    if show_results:
         filtered = df.copy()
 
         if sido and "시도" in filtered.columns:
             filtered = filtered[
-                filtered["시도"].fillna("").astype(str).str.strip() == sido
+                filtered["시도"].fillna("").astype(str).apply(normalize_sido) == sido
             ]
 
         if sigungu and "시군구" in filtered.columns:
             filtered = filtered[
-                filtered["시군구"].fillna("").astype(str).str.strip() == sigungu
+                filtered["시군구"].fillna("").astype(str).apply(normalize_sigungu) == sigungu
             ]
 
         if main_category and "대분류" in filtered.columns:
@@ -1260,7 +1350,11 @@ def combo():
             ]
 
         for _, row in filtered.reset_index().iterrows():
-            region_key = str(row.get("시군구", "")).strip() or str(row.get("시도", "")).strip() or "기타"
+            region_key = (
+                normalize_sigungu(str(row.get("시군구", "")).strip())
+                or normalize_sido(str(row.get("시도", "")).strip())
+                or "기타"
+            )
 
             results.setdefault(region_key, []).append({
                 "index": int(row["index"]),
@@ -1283,7 +1377,8 @@ def combo():
         main_category_options=MAIN_CATEGORY_OPTIONS,
         middle_category_options=middle_category_options,
         results=results,
-        count=count
+        count=count,
+        show_results=show_results
     )
 
 # =========================
@@ -1296,9 +1391,6 @@ COMBO_HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>조건기반 자원검색</title>
-<style>{{style}}</style>
-<style>
-
 <style>{{style}}</style>
 <style>
 
@@ -1479,13 +1571,14 @@ input, select{
 <h2>조건기반 자원검색</h2>
 
 <form method="post">
+<input type="hidden" name="action" id="comboAction" value="">
 
 <div class="section-box">
   <div class="section-title">지역조건</div>
   <div class="section-desc">시도와 시군구를 선택하여 지역 기준으로 검색합니다.</div>
 
   <label>시도</label>
-  <select name="sido">
+  <select name="sido" onchange="handleSidoChange(this.form)">
     <option value="">전체</option>
     {% if sido and sido not in sido_options %}
     <option value="{{sido}}" selected>{{sido}}</option>
@@ -1542,10 +1635,10 @@ input, select{
   <input type="text" name="org_kw" value="{{org_kw}}" placeholder="기관명 포함 검색">
 </div>
 
-<button type="submit" class="menu-btn">검색하기</button>
+<button type="submit" class="menu-btn" onclick="setSearchAction()">검색하기</button>
 </form>
 
-{% if request.method == "POST" %}
+{% if show_results %}
 <div class="result">
 
 <p><b>총 {{count}}건이 조회되었습니다.</b></p>
@@ -1626,6 +1719,16 @@ function closeModal(){
   document.getElementById("modal").style.display = "none";
 }
 
+function handleSidoChange(form){
+  document.getElementById("comboAction").value = "change_sido";
+  form.submit();
+}
+
+function setSearchAction(){
+  document.getElementById("comboAction").value = "search";
+}
+
+
 function resetComboPage(){
   window.location.href = "/combo";
 }
@@ -1648,16 +1751,19 @@ def desc():
     if check:
         return check
 
-    query = ""
+    query = (request.values.get("query", "") or "").strip()
     results = {}
     cond_display = None
     count = 0
     service_results = []
     warning_msg = ""
-    found_sido = ""
-    found_sigungu = ""
+    selected_sido = normalize_sido((request.values.get("sido", "") or "").strip())
+    selected_sigungu = (request.values.get("sigungu", "") or "").strip()
+    action = (request.values.get("action", "") or "").strip()
+    do_search = (action == "search")
 
-    if request.method == "POST":
+    if request.method == "POST" and do_search:
+
 
         import time
 
@@ -1676,20 +1782,14 @@ def desc():
                 count=count,
                 service_results=service_results,
                 warning_msg=warning_msg,
-                found_sido=found_sido,
-                found_sigungu=found_sigungu
+                selected_sido=selected_sido,
+                selected_sigungu=selected_sigungu,
+                sigungu_options=SIGUNGU_OPTIONS
             )
 
         session["last_search_time"] = now
 
-        query = (request.form.get("query") or "").strip()
-        
-
         cond_display = []
-
-        found_sido, found_sigungu = extract_region_from_query(query)
-        print("원본 query:", repr(query))
-        print("추출된 지역:", found_sido, found_sigungu)
 
         # ======================
         # 검색어 보강 (튜브/줄 + 복지용구 관련 표현 보정)
@@ -1789,8 +1889,9 @@ def desc():
                 count=count,
                 service_results=service_results,
                 warning_msg=warning_msg,
-                found_sido=found_sido,
-                found_sigungu=found_sigungu
+                selected_sido=selected_sido,
+                selected_sigungu=selected_sigungu,
+                sigungu_options=SIGUNGU_OPTIONS
             )
 
         client = OpenAI(api_key=api_key)
@@ -1970,7 +2071,41 @@ def desc():
                     "선택이유": "의료처치(욕창, 루, 튜브관리 등)가 필요한 경우 감염관리도 함께 검토가 필요함"
                 })
 
-            service_results = final_results
+            filtered_results = final_results
+
+            if selected_sido or selected_sigungu:
+                region_df = df.copy()
+
+                if selected_sido and "시도" in region_df.columns:
+                    region_df = region_df[
+                        region_df["시도"].fillna("").astype(str).str.strip() == selected_sido
+                    ]
+
+                if selected_sigungu and "시군구" in region_df.columns:
+                    region_df = region_df[
+                        region_df["시군구"].fillna("").astype(str).str.strip() == selected_sigungu
+                    ]
+
+                region_keys = set(
+                    region_df["대분류"].fillna("").astype(str).str.strip() + "|" +
+                    region_df["중분류"].fillna("").astype(str).str.strip()
+                )
+
+                temp_results = []
+
+                for item in filtered_results:
+                    item_key = (
+                        str(item.get("대분류", "")).strip() + "|" +
+                        str(item.get("중분류", "")).strip()
+                    )
+
+                    if item_key in region_keys:
+                        temp_results.append(item)
+
+                filtered_results = temp_results
+
+            service_results = filtered_results
+
 
         except Exception as e:
             cond_display.append(f"GPT 오류: {e}")
@@ -1985,6 +2120,13 @@ def desc():
         elif count >= 15:
             warning_msg = "15개 이상의 서비스가 검색되었습니다.\n대상자의 건강상태, 돌봄 상황, 지역, 기능 상태 등을 조금 더 구체적으로 입력해 주세요."
 
+    sigungu_options = SIGUNGU_OPTIONS
+
+    if selected_sido and selected_sido in SIGUNGU_MAP:
+        sigungu_options = SIGUNGU_MAP[selected_sido]
+    else:
+        sigungu_options = []
+
     return render_template_string(
         DESC_HTML,
         style=BASE_STYLE,
@@ -1994,8 +2136,9 @@ def desc():
         count=count,
         service_results=service_results,
         warning_msg=warning_msg,
-        found_sido=found_sido,
-        found_sigungu=found_sigungu
+        selected_sido=selected_sido,
+        selected_sigungu=selected_sigungu,
+        sigungu_options=sigungu_options
     )
 
 # =========================
@@ -2133,21 +2276,38 @@ body{
 }
 
 /* 텍스트 입력 */
-/* 텍스트 입력 */
 #queryInput{
   width:100%;
-  height:110px;
+  height:150px;
   padding:14px 64px 14px 14px;
-  border-radius:10px;
-  border:1px solid #d1d5db;
+
+  border-radius:12px;
+  border:1.5px solid #2563eb;   /* 🔥 파란 테두리 */
+
+  background:#ffffff;
+
   font-size:15px;
-  resize:none;
   line-height:1.6;
-  word-break:keep-all;
-  white-space:pre-wrap;
+
+  box-shadow:0 8px 22px rgba(37,99,235,0.10);  /* 🔥 은은한 강조 */
+  resize:none;
+}
+
+#queryInput:focus{
+  border-color:#1d4ed8;
+  box-shadow:0 0 0 4px rgba(37,99,235,0.12);
+}
+
+#queryInput:hover{
+  border-color:#3b82f6;
 }
 
 @media (max-width:768px){
+
+  #queryInput{
+    height:140px;
+  }
+}
 
   #queryInput::placeholder{
     white-space:pre-line;
@@ -2455,6 +2615,105 @@ button:hover{
   gap:3px;
 }
 
+/* ===== 사례기반 지역선택 박스 ===== */
+.desc-region-box{
+  margin-bottom:18px;
+  padding:14px;
+  border-radius:14px;
+  background:#f1f5ff;        /* 🔥 살짝 더 진하게 */
+  border:1px solid #dbe6ff;  /* 🔥 테두리 살짝 선명 */
+  box-shadow:0 2px 6px rgba(37,99,235,0.06);  /* 🔥 아주 약한 그림자 */
+
+}
+
+.desc-region-title{
+  font-size:13px;
+  font-weight:700;
+  color:#374151;
+  margin-bottom:10px;
+  line-height:1.4;
+}
+
+.desc-region-note{
+  margin-bottom:10px;
+  font-size:11.5px;
+  color:#6b7280;
+  line-height:1.45;
+  word-break:keep-all;
+}
+
+@media (max-width:480px){
+  .desc-region-note{
+    margin-bottom:8px;
+    font-size:11px;
+    line-height:1.4;
+  }
+}
+
+.desc-region-row{
+  display:flex;
+  gap:10px;
+}
+
+.desc-region-item{
+  flex:1;
+}
+
+.desc-region-item label{
+  display:block;
+  margin:0 0 6px 2px;
+  font-size:13px;
+  font-weight:700;
+  color:#4b5563;
+}
+
+.desc-region-item select{
+  width:100%;
+  height:44px;
+  padding:0 12px;
+  border-radius:10px;
+  border:1px solid #d1d5db;
+  background:#ffffff;
+  font-size:14px;
+  color:#111827;
+  box-sizing:border-box;
+}
+
+.desc-region-item select:focus{
+  outline:none;
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.08);
+}
+
+@media (max-width:480px){
+  .desc-region-box{
+    margin-bottom:14px;
+    padding:12px;
+    border-radius:12px;
+  }
+
+  .desc-region-title{
+    font-size:12.5px;
+    margin-bottom:8px;
+  }
+
+  .desc-region-row{
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .desc-region-item label{
+    font-size:12.5px;
+    margin-bottom:5px;
+  }
+
+  .desc-region-item select{
+    height:42px;
+    font-size:14px;
+    border-radius:9px;
+  }
+}
+
 </style>
 </head>
 
@@ -2474,10 +2733,43 @@ button:hover{
 <div class="search-box">
 
 <form method="post" id="searchForm">
+<input type="hidden" name="action" id="descAction" value="">
+
+<div class="desc-region-box">
+
+  <div class="desc-region-title">지역 설정</div>
+  <div class="desc-region-note">※선택하지 않으면 전체 지역으로 검색됩니다.</div>
+
+  <div class="desc-region-row">
+
+    <div class="desc-region-item">
+      <label>시도</label>
+      <select name="sido" onchange="handleDescSidoChange(this.form)">
+        <option value="">전체</option>
+        <option value="광주광역시" {% if selected_sido=="광주광역시" %}selected{% endif %}>광주광역시</option>
+        <option value="전라남도" {% if selected_sido=="전라남도" %}selected{% endif %}>전라남도</option>
+        <option value="전북특별자치도" {% if selected_sido=="전북특별자치도" %}selected{% endif %}>전북특별자치도</option>
+        <option value="제주특별자치도" {% if selected_sido=="제주특별자치도" %}selected{% endif %}>제주특별자치도</option>
+      </select>
+    </div>
+
+    <div class="desc-region-item">
+      <label>시군구</label>
+      <select name="sigungu">
+        <option value="">전체</option>
+        {% for g in sigungu_options %}
+        <option value="{{g}}" {% if g==selected_sigungu %}selected{% endif %}>{{g}}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+  </div>
+
+</div>
 
 <div style="position:relative;">
 
-<textarea id="queryInput" name="query" placeholder="예) 나주에 살고&#10;식사도움이 필요한&#10;어르신에게 맞는 서비스">{{query}}</textarea>
+<textarea id="queryInput" name="query" placeholder="예) 식사도움이 필요한&#10;어르신에게 맞는 서비스">{{query}}</textarea>
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
 style="
@@ -2507,9 +2799,6 @@ transition:0.2s;
 
 </div>
 
-
-</div>
-
 <div class="voice-inline" id="voiceOverlay">
   <div class="voice-inline-box">
     <div class="voice-wave-wrap">
@@ -2529,8 +2818,10 @@ transition:0.2s;
   </div>
 </div>
 
-<button type="submit" id="descSubmitBtn">AI 검색</button>
+<button type="submit" id="descSubmitBtn" onclick="setDescSearchAction()">AI 검색</button>
+
 </form>
+</div>
 
 <div class="notice">
 
@@ -2588,7 +2879,7 @@ transition:0.2s;
     </div>
 
     <a
-      href="/combo?sido={{found_sido|urlencode}}&sigungu={{found_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
+      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
       style="
         display:inline-block;
         padding:9px 13px;
@@ -2677,6 +2968,16 @@ const descSubmitBtn = document.getElementById("descSubmitBtn");
 const originalIcon = voiceBtn ? voiceBtn.innerHTML : "";
 let recognition = null;
 let isRecording = false;
+
+function handleDescSidoChange(form){
+  document.getElementById("descAction").value = "change_sido";
+  form.submit();
+}
+
+function setDescSearchAction(){
+  document.getElementById("descAction").value = "search";
+}
+
 
 function playBeep(type="start"){
   try{
@@ -2788,20 +3089,7 @@ if(searchForm){
 }
 
 function resetDescPage(){
-  if(queryInput){
-    queryInput.value = "";
-    queryInput.focus();
-  }
-
-  const warningBox = document.getElementById("warningBox");
-  if(warningBox){
-    warningBox.style.display = "none";
-  }
-
-  const resultArea = document.getElementById("resultArea");
-  if(resultArea){
-    resultArea.style.display = "none";
-  }
+  window.location.href = "/desc";
 }
 </script>
 
