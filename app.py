@@ -964,7 +964,7 @@ body{
 <div class="icon">🤖</div>
 
 <div class="text">
-<b>사례기반 서비스내용 검색 (AI)</b>
+<b>사례기반 서비스내용 검색(AI)</b>
 <span>입력한 사례를 분석하여 적합한 통합돌봄 서비스를 추천합니다.</span>
 </div>
 
@@ -2727,7 +2727,7 @@ button:hover{
 </div>
 
 <div class="title">
-<h2>사례기반 서비스내용 검색 (AI)</h2>
+<h2>사례기반 서비스내용 검색(AI)</h2>
 </div>
 
 <div class="search-box">
