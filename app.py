@@ -370,9 +370,9 @@ input, select{
 }
 
 .menu-btn{
-  margin-top:18px;
+  margin-top:16px;
   width:100%;
-  height:44px;
+  height:46px;
   border:none;
   border-radius:10px;
   background:#2563eb;
@@ -2271,8 +2271,8 @@ body{
 /* 제목 */
 .title{
   text-align:center;
-  margin-bottom:0;     /* 기존 제거 */
-  padding-bottom:30px; /* 👈 이걸로 공간 만든다 */
+  margin-bottom:0;
+  padding-bottom:14px;
 }
 
 .title h2{
@@ -2283,7 +2283,7 @@ body{
 /* 검색 카드 */
 .search-box{
   background:white;
-  padding:30px;
+  padding:24px 18px;
   border-radius:20px;
   box-shadow:0 8px 24px rgba(0,0,0,0.08);
 }
@@ -2292,7 +2292,7 @@ body{
 #queryInput{
   width:100%;
   height:150px;
-  padding:14px 64px 14px 14px;
+  padding:14px 58px 14px 12px;
 
   border-radius:12px;
   border:1.5px solid #2563eb;   /* 🔥 파란 테두리 */
@@ -2630,21 +2630,19 @@ button:hover{
 
 /* ===== 사례기반 지역선택 박스 ===== */
 .desc-region-box{
-  margin-bottom:14px;
-  padding:10px 10px 8px 10px;
-  border-radius:12px;
-  background:#f1f5ff;
-  border:1px solid #dbe6ff;
-  box-shadow:0 1px 4px rgba(37,99,235,0.05);
+  width:100%;
+  margin:0 0 16px 0;
+  padding:12px 10px;
+  background:#eef3ff;
+  border:1px solid #dbe5ff;
+  border-radius:14px;
 }
 
 .desc-region-title{
-  font-size:14px;
   font-weight:700;
-  color:#111827;
-  margin-bottom:12px;
-  line-height:1.2;
+  margin-bottom:8px;
 }
+
 
 @media (max-width:480px){
   .desc-region-title{
