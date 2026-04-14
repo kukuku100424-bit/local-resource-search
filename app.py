@@ -1640,7 +1640,7 @@ input, select{
 </form>
 
 {% if show_results %}
-<div class="result">
+<div class="result" id="combo-result">
 
 <p><b>총 {{count}}건이 조회되었습니다.</b></p>
 
@@ -1734,9 +1734,16 @@ function resetComboPage(){
   window.location.href = "/combo";
 }
 
-document.getElementById("modal").addEventListener("click", function(e){
-  if(e.target.id === "modal"){
-    closeModal();
+
+window.addEventListener("load", function(){
+  const resultBox = document.getElementById("combo-result");
+  if(resultBox){
+    setTimeout(function(){
+      resultBox.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 120);
   }
 });
 </script>
