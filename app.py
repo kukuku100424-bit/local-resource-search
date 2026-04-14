@@ -336,12 +336,11 @@ body{
 }
 
 .container{
-  max-width:700px;
+  max-width:860px;
   margin:auto;
-  padding:10px 20px 20px 20px;
-
-  position:relative;   /* 🔥 여기도 추가 */
+  padding:30px 20px 40px 20px;
 }
+
 
 h2{
   margin-top:0;
@@ -2270,8 +2269,8 @@ body{
 /* 검색 카드 */
 .search-box{
   background:white;
-  padding:24px;
-  border-radius:16px;
+  padding:30px;
+  border-radius:20px;
   box-shadow:0 8px 24px rgba(0,0,0,0.08);
 }
 
@@ -2617,102 +2616,91 @@ button:hover{
 
 /* ===== 사례기반 지역선택 박스 ===== */
 .desc-region-box{
-  margin-bottom:18px;
-  padding:14px;
-  border-radius:14px;
-  background:#f1f5ff;        /* 🔥 살짝 더 진하게 */
-  border:1px solid #dbe6ff;  /* 🔥 테두리 살짝 선명 */
-  box-shadow:0 2px 6px rgba(37,99,235,0.06);  /* 🔥 아주 약한 그림자 */
-
+  margin-bottom:14px;
+  padding:10px 10px 8px 10px;
+  border-radius:12px;
+  background:#f1f5ff;
+  border:1px solid #dbe6ff;
+  box-shadow:0 1px 4px rgba(37,99,235,0.05);
 }
 
 .desc-region-title{
-  font-size:13px;
+  font-size:14px;
   font-weight:700;
-  color:#374151;
-  margin-bottom:10px;
-  line-height:1.4;
-}
-
-.desc-region-note{
-  margin-bottom:10px;
-  font-size:11.5px;
-  color:#6b7280;
-  line-height:1.45;
-  word-break:keep-all;
+  color:#111827;
+  margin-bottom:12px;
+  line-height:1.2;
 }
 
 @media (max-width:480px){
-  .desc-region-note{
-    margin-bottom:8px;
-    font-size:11px;
-    line-height:1.4;
+  .desc-region-title{
+    margin-bottom:6px;
+    font-size:13px;
   }
 }
 
 .desc-region-row{
-  display:flex;
-  gap:10px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  align-items:start;
 }
 
 .desc-region-item{
-  flex:1;
+  min-width:0;
+  display:grid;
+  grid-template-rows:auto auto;
+  row-gap:6px;
+  align-content:start;
 }
 
 .desc-region-item label{
   display:block;
-  margin:0 0 6px 2px;
+  margin:0;
+  padding:0;
   font-size:13px;
-  font-weight:700;
-  color:#4b5563;
+  font-weight:600;
+  color:#374151;
+  line-height:1.2;
 }
 
 .desc-region-item select{
   width:100%;
-  height:44px;
-  padding:0 12px;
-  border-radius:10px;
+  height:42px;
+  margin:0;
+  padding:0 10px;
   border:1px solid #d1d5db;
-  background:#ffffff;
+  border-radius:10px;
+  background:#fff;
   font-size:14px;
-  color:#111827;
-  box-sizing:border-box;
-}
-
-.desc-region-item select:focus{
-  outline:none;
-  border-color:#2563eb;
-  box-shadow:0 0 0 3px rgba(37,99,235,0.08);
 }
 
 @media (max-width:480px){
-  .desc-region-box{
-    margin-bottom:14px;
-    padding:12px;
-    border-radius:12px;
-  }
-
-  .desc-region-title{
-    font-size:12.5px;
-    margin-bottom:8px;
-  }
-
   .desc-region-row{
-    flex-direction:column;
-    gap:10px;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    align-items:start;
+  }
+
+  .desc-region-item{
+    row-gap:4px;
   }
 
   .desc-region-item label{
-    font-size:12.5px;
-    margin-bottom:5px;
+    margin:0;
+    font-size:12px;
+    line-height:1.2;
   }
 
   .desc-region-item select{
-    height:42px;
-    font-size:14px;
-    border-radius:9px;
+    height:38px;
+    margin:0;
+    padding:0 8px;
+    font-size:13px;
   }
 }
+
+
 
 </style>
 </head>
@@ -2830,34 +2818,28 @@ transition:0.2s;
 </div>
 
 
+<div id="searchResultSection">
+
 {% if warning_msg %}
-<div id="warningBox" style="
-  margin-top:24px;
-  padding:14px 20px;
-  border-radius:12px;
-  background:#fff7ed;
-  border:1px solid #fdba74;
-  color:#9a3412;
-  font-size:14px;
-  line-height:1.7;
+<div class="warning-box">{{ warning_msg|replace('\n','<br>')|safe }}</div>
+{% endif %}
 
-  display:flex;
-  align-items:flex-start;
-  gap:8px;
-">
-  <span style="
-    flex:0 0 auto;
-    line-height:1.7;
-  ">⚠️</span>
+{% if service_results %}
+<div class="result-box">
 
-  <div style="
-    flex:1;
-    white-space:pre-line;
-    word-break:keep-all;
-    overflow-wrap:normal;
-  ">{{warning_msg}}</div>
+{% for r in service_results %}
+
+<div class="result-card">
+  ...
+</div>
+
+{% endfor %}
+
 </div>
 {% endif %}
+
+</div>
+
 
 {% if service_results %}
 
@@ -2972,6 +2954,22 @@ function handleDescSidoChange(form){
   document.getElementById("descAction").value = "change_sido";
   form.submit();
 }
+
+window.addEventListener("load", function(){
+  const resultBox = document.getElementById("searchResultSection");
+
+  if (!resultBox) return;
+
+  if (window.innerWidth <= 480) {
+    setTimeout(function(){
+      resultBox.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 250);
+  }
+});
+
 
 function setDescSearchAction(){
   document.getElementById("descAction").value = "search";
