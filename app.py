@@ -1728,6 +1728,20 @@ function setSearchAction(){
 }
 
 
+window.addEventListener("load", function(){
+  const resultBox = document.querySelector(".result");
+
+  if (!resultBox) return;
+
+  setTimeout(function(){
+    resultBox.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }, 250);
+});
+
+
 function resetComboPage(){
   window.location.href = "/combo";
 }
@@ -2824,20 +2838,6 @@ transition:0.2s;
 <div class="warning-box">{{ warning_msg|replace('\n','<br>')|safe }}</div>
 {% endif %}
 
-{% if service_results %}
-<div class="result-box">
-
-{% for r in service_results %}
-
-<div class="result-card">
-  ...
-</div>
-
-{% endfor %}
-
-</div>
-{% endif %}
-
 </div>
 
 
@@ -2956,13 +2956,22 @@ function handleDescSidoChange(form){
 }
 
 window.addEventListener("load", function(){
-  const resultBox = document.getElementById("searchResultSection");
+  const resultBox = document.getElementById("resultArea");
+  const warningBox = document.querySelector("#searchResultSection .warning-box");
 
-  if (!resultBox) return;
-
-  if (window.innerWidth <= 480) {
+  if (resultBox) {
     setTimeout(function(){
       resultBox.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 250);
+    return;
+  }
+
+  if (warningBox) {
+    setTimeout(function(){
+      warningBox.scrollIntoView({
         behavior: "smooth",
         block: "start"
       });
