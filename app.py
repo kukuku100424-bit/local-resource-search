@@ -24,6 +24,7 @@ def compress_text(s, max_len=60):
 
 
 app = Flask(__name__)
+DESC_CACHE = {}
 import datetime
 
 VISITOR_FILE = "visitors.json"
@@ -1635,6 +1636,7 @@ input, select{
 </div>
 
 <button type="submit" class="menu-btn" onclick="setSearchAction()">검색하기</button>
+
 </form>
 
 {% if show_results %}
@@ -1728,20 +1730,6 @@ function setSearchAction(){
 }
 
 
-window.addEventListener("load", function(){
-  const resultBox = document.querySelector(".result");
-
-  if (!resultBox) return;
-
-  setTimeout(function(){
-    resultBox.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
-  }, 250);
-});
-
-
 function resetComboPage(){
   window.location.href = "/combo";
 }
@@ -1773,9 +1761,35 @@ def desc():
     selected_sido = normalize_sido((request.values.get("sido", "") or "").strip())
     selected_sigungu = (request.values.get("sigungu", "") or "").strip()
     action = (request.values.get("action", "") or "").strip()
+    cache_key = make_cache_key(query + "|" + selected_sido + "|" + selected_sigungu)
     do_search = (action == "search")
 
     if request.method == "POST" and do_search:
+        import time
+
+        if cache_key in DESC_CACHE:
+            cached = DESC_CACHE[cache_key]
+
+            if time.time() - cached["time"] < 600:
+                service_results = cached["results"]
+                count = len(service_results)
+                warning_msg = cached["warning"]
+
+                return render_template_string(
+                    DESC_HTML,
+                    style=BASE_STYLE,
+                    query=query,
+                    results=results,
+                    cond_display=cond_display,
+                    count=count,
+                    service_results=service_results,
+                    warning_msg=warning_msg,
+                    selected_sido=selected_sido,
+                    selected_sigungu=selected_sigungu,
+                    sigungu_options=SIGUNGU_OPTIONS
+                )
+            else:
+                del DESC_CACHE[cache_key]
 
 
         import time
@@ -2119,7 +2133,6 @@ def desc():
 
             service_results = filtered_results
 
-
         except Exception as e:
             cond_display.append(f"GPT 오류: {e}")
 
@@ -2131,7 +2144,13 @@ def desc():
             warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 조금 더 구체적으로 입력해 주세요."
 
         elif count >= 15:
-            warning_msg = "15개 이상의 서비스가 검색되었습니다.\n대상자의 건강상태, 돌봄 상황, 지역, 기능 상태 등을 조금 더 구체적으로 입력해 주세요."
+            warning_msg = "15개 이상의 서비스가 검색되었습니다.\n복합적인 서비스 연계가 필요한 대상일 수 있습니다."
+
+        DESC_CACHE[cache_key] = {
+            "results": service_results,
+            "warning": warning_msg,
+            "time": time.time()
+        }
 
     sigungu_options = SIGUNGU_OPTIONS
 
@@ -2629,6 +2648,89 @@ button:hover{
 }
 
 /* ===== 사례기반 지역선택 박스 ===== */
+
+.desc-warning{
+  margin:0 0 16px 0;
+  padding:14px 16px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.65;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+
+.desc-warning-icon{
+  flex:0 0 auto;
+  font-size:15px;
+  line-height:1.4;
+  margin-top:1px;
+}
+
+.desc-warning-text{
+  flex:1;
+  white-space:pre-line;
+  word-break:keep-all;
+}
+
+@media (max-width:480px){
+  .desc-warning{
+    margin:0 0 14px 0;
+    padding:13px 14px;
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  .desc-warning-icon{
+    font-size:14px;
+    margin-top:1px;
+  }
+}
+
+.desc-warning{
+  margin:12px 0 0 0;
+  padding:14px 16px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.65;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+
+.desc-warning-icon{
+  flex:0 0 auto;
+  font-size:15px;
+  line-height:1.4;
+  margin-top:1px;
+}
+
+.desc-warning-text{
+  flex:1;
+  white-space:pre-line;
+  word-break:keep-all;
+}
+
+@media (max-width:480px){
+  .desc-warning{
+    margin:12px 0 0 0;
+    padding:13px 14px;
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  .desc-warning-icon{
+    font-size:14px;
+    margin-top:1px;
+  }
+}
+
 .desc-region-box{
   width:100%;
   margin:0 0 16px 0;
@@ -2819,6 +2921,13 @@ transition:0.2s;
 
 <button type="submit" id="descSubmitBtn" onclick="setDescSearchAction()">AI 검색</button>
 
+{% if warning_msg %}
+<div class="desc-warning">
+  <span class="desc-warning-icon">⚠️</span>
+  <div class="desc-warning-text">{{warning_msg}}</div>
+</div>
+{% endif %}
+
 </form>
 </div>
 
@@ -2831,13 +2940,6 @@ transition:0.2s;
 
 
 <div id="searchResultSection">
-
-{% if warning_msg %}
-<div class="warning-box">{{ warning_msg|replace('\n','<br>')|safe }}</div>
-{% endif %}
-
-</div>
-
 
 {% if service_results %}
 
@@ -3095,6 +3197,24 @@ if(searchForm){
 function resetDescPage(){
   window.location.href = "/desc";
 }
+
+window.addEventListener("load", function(){
+  const hasResults =
+    {{ 'true' if service_results else 'false' }} ||
+    {{ 'true' if warning_msg else 'false' }};
+
+  if (hasResults) {
+    history.replaceState({ page: "desc-root" }, "", "/desc");
+    history.pushState({ page: "desc-result" }, "", "/desc");
+  }
+});
+
+window.addEventListener("popstate", function(e){
+  if (e.state && e.state.page === "desc-root") {
+    window.location.replace("/desc");
+  }
+});
+
 </script>
 
 </body>
@@ -3726,6 +3846,21 @@ CARE_HTML = """
 <style>{{style}}</style>
 
 <style>
+
+.desc-warning{
+  margin-top:14px;
+  padding:14px 18px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.7;
+
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
 
 .ai-model-wrap{
   margin-top:10px;
