@@ -1771,7 +1771,7 @@ def desc():
     cache_key = make_cache_key(query + "|" + selected_sido + "|" + selected_sigungu)
     do_search = (action == "search")
 
-    if request.method == "POST" and do_search:
+    if do_search:
         import time
 
         if cache_key in DESC_CACHE:
@@ -2841,7 +2841,7 @@ button:hover{
 
 <div class="search-box">
 
-<form method="post" id="searchForm">
+<form method="get" id="searchForm">
 <input type="hidden" name="action" id="descAction" value="">
 
 <div class="desc-region-box">
