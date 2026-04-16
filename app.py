@@ -2306,6 +2306,342 @@ body{
   font-size:24px;
 }
 
+.title-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap:8px;
+}
+
+.title-row h2{
+  margin:0;
+  line-height:1.2;
+  white-space:nowrap;
+  word-break:keep-all;
+  flex:0 0 auto;
+}
+
+.tip-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  min-width:52px;
+  height:30px;
+  padding:0 12px;
+  margin-top:-1px;
+  border:1px solid #dbeafe;
+  border-radius:999px;
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  color:#2563eb;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:0.3px;
+  line-height:1;
+  cursor:pointer;
+  box-shadow:0 4px 12px rgba(37,99,235,0.14);
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
+.tip-btn:hover{
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(37,99,235,0.34);
+}
+
+.tip-btn:active{
+  transform:translateY(0);
+}
+
+.tip-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.48);
+  z-index:9999;
+  padding:20px;
+  align-items:center;
+  justify-content:center;
+}
+
+.tip-modal.show{
+  display:flex;
+}
+
+.tip-modal-box{
+  width:100%;
+  max-width:620px;
+  max-height:85vh;
+  background:#ffffff;
+  border-radius:22px;
+  box-shadow:0 20px 50px rgba(15,23,42,0.22);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  animation:tipFadeUp 0.18s ease;
+}
+
+.tip-modal-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:18px 20px 14px 20px;
+  border-bottom:1px solid #eef2f7;
+  flex:0 0 auto;
+}
+
+.tip-modal-title{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  font-size:17px;
+  font-weight:800;
+  color:#111827;
+}
+
+.tip-modal-title span{
+  display:inline-block;
+  line-height:1.2;
+}
+
+.tip-badge{
+  width:34px;
+  height:34px;
+  border-radius:999px;
+  background:#eff6ff;
+  color:#2563eb;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:17px;
+  font-weight:800;
+  line-height:1;
+  flex:0 0 auto;
+}
+
+.tip-close{
+  width:40px;
+  height:40px;
+  border:none;
+  border-radius:999px;
+  background:#f3f4f6;
+  color:#64748b;
+  font-size:24px;
+  line-height:1;
+  cursor:pointer;
+  flex:0 0 auto;
+}
+
+.tip-modal-body{
+  padding:18px 20px 18px 20px;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  flex:1 1 auto;
+}
+
+.tip-notice{
+  margin:0 0 16px 0;
+  padding:14px 16px;
+  border-radius:14px;
+  background:#f8fbff;
+  border:1px solid #dbeafe;
+  color:#1f2937;
+  font-size:14px;
+  line-height:1.75;
+  word-break:keep-all;
+}
+
+.tip-notice p{
+  margin:0;
+  padding-left:1.1em;
+  text-indent:-1.4em;
+}
+
+.tip-example-title{
+  margin:0 0 10px 0;
+  font-size:14px;
+  font-weight:800;
+  color:#2563eb;
+}
+
+.tip-example-box{
+  background:#f9fafb;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:16px;
+}
+
+.tip-example-text{
+  font-size:14px;
+  line-height:1.78;
+  color:#374151;
+  word-break:keep-all;
+}
+
+.tip-row{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin:0 0 8px 0;
+}
+
+.tip-num{
+  width:22px;
+  flex:0 0 22px;
+  text-align:right;
+  font-weight:700;
+  color:#374151;
+}
+
+.tip-text{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.tip-heading{
+  margin:10px 0 6px 0;
+  font-weight:700;
+  color:#374151;
+}
+
+.tip-bullet{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin:0 0 6px 18px;
+}
+
+.tip-dash{
+  width:10px;
+  flex:0 0 10px;
+}
+
+.tip-bullet-text{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.tip-subblock{
+  margin:2px 0 6px 18px;
+  font-weight:700;
+  color:#4b5563;
+}
+
+
+.tip-modal-foot{
+  padding:14px 20px 20px 20px;
+  border-top:1px solid #eef2f7;
+  background:#ffffff;
+  flex:0 0 auto;
+}
+
+.tip-confirm{
+  display:block;
+  width:100%;
+  height:46px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#ffffff;
+  font-size:15px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+}
+
+@keyframes tipFadeUp{
+  from{
+    opacity:0;
+    transform:translateY(14px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+@media (max-width:480px){
+  .title-row{
+    gap:8px;
+  }
+
+  .title h2{
+    font-size:21px;
+  }
+
+  .title-row h2{
+    white-space:nowrap;
+  }
+
+.tip-btn{
+  min-width:54px;
+  height:30px;
+  padding:0 12px;
+  margin-top:-4px;
+  font-size:11px;
+  border:1px solid #dbeafe;
+  box-shadow:0 4px 12px rgba(37,99,235,0.14);
+}
+
+
+  .tip-modal{
+    padding:14px;
+  }
+
+  .tip-modal-box{
+    max-height:88vh;
+    border-radius:18px;
+  }
+
+  .tip-modal-head{
+    padding:16px 16px 12px 16px;
+  }
+
+  .tip-modal-title{
+    gap:10px;
+    font-size:16px;
+  }
+
+  .tip-modal-body{
+    padding:16px 16px 16px 16px;
+  }
+
+  .tip-modal-foot{
+    padding:12px 16px 16px 16px;
+  }
+
+  .tip-notice{
+    font-size:13px;
+    line-height:1.72;
+  }
+
+  .tip-example-text{
+    font-size:12.5px;
+    line-height:1.72;
+  }
+
+  .tip-num{
+    width:20px;
+    flex:0 0 20px;
+  }
+
+.tip-bullet{
+  margin:0 0 6px 18px;
+}
+
+.tip-subblock{
+  margin:2px 0 6px 18px;
+}
+
+.tip-confirm{
+  height:44px;
+  font-size:14px;
+}
+}
+
+
+
 /* 검색 카드 */
 .search-box{
   background:white;
@@ -2318,27 +2654,27 @@ body{
 #queryInput{
   width:100%;
   height:150px;
-  padding:14px 58px 14px 12px;
+  padding:14px 58px 14px 14px;
 
   border-radius:12px;
-  border:1.5px solid #2563eb;   /* 🔥 파란 테두리 */
+  border:1px solid #cbd5e1;
 
   background:#ffffff;
 
   font-size:15px;
-  line-height:1.6;
+  line-height:1.7;
 
-  box-shadow:0 8px 22px rgba(37,99,235,0.10);  /* 🔥 은은한 강조 */
+  box-shadow:none;
   resize:none;
 }
 
 #queryInput:focus{
-  border-color:#1d4ed8;
-  box-shadow:0 0 0 4px rgba(37,99,235,0.12);
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.10);
 }
 
 #queryInput:hover{
-  border-color:#3b82f6;
+  border-color:#94a3b8;
 }
 
 @media (max-width:768px){
@@ -2346,18 +2682,6 @@ body{
   #queryInput{
     height:140px;
   }
-}
-
-  #queryInput::placeholder{
-    white-space:pre-line;
-
-    padding-left:0;        /* 기본값 유지 */
-
-    text-indent:-32px;     /* 첫 줄 왼쪽으로 당기고 */
-    padding-left:28px;     /* 전체를 다시 밀어서 */
-
-  }
-
 }
 
 textarea:focus{
@@ -2585,12 +2909,16 @@ button:hover{
 @media (min-width:769px){
   #queryInput::placeholder{
     white-space:nowrap;
+    color:#6b7280;
+    line-height:1.65;
   }
 }
 
 @media (max-width:768px){
   #queryInput::placeholder{
-    white-space:pre-line;
+    white-space:pre-wrap;
+    color:#6b7280;
+    line-height:1.7;
   }
 }
 
@@ -2739,84 +3067,79 @@ button:hover{
 }
 
 .desc-region-box{
-  width:100%;
-  margin:0 0 16px 0;
-  padding:12px 10px;
-  background:#eef3ff;
-  border:1px solid #dbe5ff;
-  border-radius:14px;
+  margin-bottom:18px;
+  padding:14px 14px 12px 14px;
+  border-radius:16px;
+  background:#eef4ff;
+  border:1px solid #c7d7ff;
 }
 
 .desc-region-title{
-  font-weight:700;
-  margin-bottom:8px;
-}
-
-
-@media (max-width:480px){
-  .desc-region-title{
-    margin-bottom:6px;
-    font-size:13px;
-  }
+  font-size:16px;
+  font-weight:800;
+  color:#111827;
+  margin-bottom:10px;
 }
 
 .desc-region-row{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:14px;
-  align-items:start;
+  gap:10px;
 }
 
 .desc-region-item{
-  min-width:0;
-  display:grid;
-  grid-template-rows:auto auto;
-  row-gap:6px;
-  align-content:start;
+  display:flex;
+  flex-direction:column;
 }
 
 .desc-region-item label{
-  display:block;
-  margin:0;
-  padding:0;
+  margin:0 0 6px 0;
   font-size:13px;
-  font-weight:600;
+  font-weight:700;
   color:#374151;
   line-height:1.2;
 }
 
 .desc-region-item select{
   width:100%;
-  height:42px;
+  height:40px;
   margin:0;
   padding:0 10px;
-  border:1px solid #d1d5db;
   border-radius:10px;
-  background:#fff;
+  border:1px solid #cbd5e1;
   font-size:14px;
+  background:#ffffff;
+  box-sizing:border-box;
 }
 
 @media (max-width:480px){
+  .desc-region-box{
+    padding:14px 12px 12px 12px;
+    border-radius:16px;
+  }
+
   .desc-region-row{
     grid-template-columns:1fr 1fr;
     gap:8px;
     align-items:start;
   }
 
-  .desc-region-item{
-    row-gap:4px;
+  .desc-region-title{
+    margin-bottom:10px;
+    font-size:15px;
   }
 
   .desc-region-item label{
-    margin:0;
+    margin:0 0 5px 0;
     font-size:12px;
     line-height:1.2;
   }
 
   .desc-region-item select{
-    height:38px;
+    width:100%;
+    height:40px;
     margin:0;
-    padding:0 8px;
+    padding:0 10px;
     font-size:13px;
   }
 }
@@ -2836,7 +3159,10 @@ button:hover{
 </div>
 
 <div class="title">
-<h2>사례기반 서비스내용 검색(AI)</h2>
+  <div class="title-row">
+    <h2>사례기반 서비스내용 검색</h2>
+    <button type="button" class="tip-btn" onclick="openTipModal()" aria-label="입력 팁 보기">TIP</button>
+  </div>
 </div>
 
 <div class="search-box">
@@ -2877,7 +3203,8 @@ button:hover{
 
 <div style="position:relative;">
 
-<textarea id="queryInput" name="query" placeholder="예) 식사도움이 필요한&#10;어르신에게 맞는 서비스">{{query}}</textarea>
+<textarea id="queryInput" name="query" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
+
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
 style="
@@ -3222,7 +3549,198 @@ window.addEventListener("popstate", function(e){
   }
 });
 
+function openTipModal(){
+  document.getElementById("tipModal").classList.add("show");
+  document.body.style.overflow = "hidden";
+}
+
+function closeTipModal(){
+  document.getElementById("tipModal").classList.remove("show");
+  document.body.style.overflow = "";
+}
+
+function handleTipBackdrop(event){
+  if(event.target.id === "tipModal"){
+    closeTipModal();
+  }
+}
+
 </script>
+
+<div id="tipModal" class="tip-modal" onclick="handleTipBackdrop(event)">
+  <div class="tip-modal-box">
+    <div class="tip-modal-head">
+      <div class="tip-modal-title">
+        <div class="tip-badge">?</div>
+        <span>입력 팁</span>
+      </div>
+      <button type="button" class="tip-close" onclick="closeTipModal()">✕</button>
+    </div>
+
+<div class="tip-modal-body">
+  <div class="tip-notice">
+    <p>※ 통합판정조사, 지자체 조사의 
+<b class="highlight">참고사항 전문</b>을 모두 입력해도 
+<b class="highlight">AI가 추천서비스를 안내</b>합니다.</p>
+  </div>
+
+  <div class="tip-example-title">입력 예시)</div>
+
+  <div class="tip-example-box">
+    <div class="tip-example-text">
+
+      <div class="tip-row">
+        <div class="tip-num">1.</div>
+        <div class="tip-text">병력: 약 10년 전 뇌졸중으로 쓰러진 뒤 좌측 편마비 있음.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">2.</div>
+        <div class="tip-text">복용약물: 고혈압, 당뇨, 요통, 골다공증으로 관련약 및 진통제 복약 중</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">3.</div>
+        <div class="tip-text">인지저하 기능: 의사소통 가능하나 단기기억능력은 다소 저하되어 있음.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">4.</div>
+        <div class="tip-text">신체 저하기능</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">주1회 소변실수 있으며 편마비로 천천히 난간 등을 잡고 걸어야해서 가끔 화장실 가다 참지못하고 소변을 보기도 함.</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">편마비가 있으나 간단한 일상생활정도는 스스로 천천히 하면 수행가능함. 다만 옷은 혼자갈아입지 못해 도움이 필요함.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">5.</div>
+        <div class="tip-text">행동심리증상: 없음</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">6.</div>
+        <div class="tip-text">수발부담행동심리 증상: 없음</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">7.</div>
+        <div class="tip-text">간호 주요처치 및 증상: 최근 편마비로 인한 거동불편으로 낙상 후 좌측 발등이 벗겨져 상처 소독을 하고 있음.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">8.</div>
+        <div class="tip-text">도움이 필요한 수단적 일상생활 기능: 이동도움, 반찬 도움</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">9.</div>
+        <div class="tip-text">구강 건강문제: 없음</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">10.</div>
+        <div class="tip-text">영양 관련문제: 평소 시장에서 장을봐서 혼자 밥을 해먹고 있지만 컨디션이 좋지 않거나 귀찮으면 끼니를 거르기도 하며 과일, 채소 등 불충분한 섭취가 이루어지고 있음.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">11.</div>
+        <div class="tip-text">사회문화적 관계: 배우자가 2년전 사망하였으며 슬하에 2남 1녀 있으나 다들 타지에 살고 소원한 관계라고 함.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">12.</div>
+        <div class="tip-text">정신건강문제: 없음</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">13.</div>
+        <div class="tip-text">주거환경</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">편마비로 거동이 불편함에도 꼼꼼한 성격 탓에 집안 위생상태는 청결한편</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">오래된 다가구 주택에 살고 있어 벽지가 벗겨지거나 곰팡이가 피어있는 등 노후로 인한 주거 환경 개선은 필요함.</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">최근 낙상하는 횟수가 늘어 집안에 의자나 테이블 같은 잡기 쉬운 물건 들을 중간 중간 두고 생활함.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">14.</div>
+        <div class="tip-text">안정성 평가:</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">문틀이 있고 장판이 오래되어 바닥이 굴곡진 부분 등이 있어 낙상의 위험이 있음.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">15.</div>
+        <div class="tip-text">서비스 이용과 희망</div>
+      </div>
+
+      <div class="tip-subblock">(이용 서비스)</div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">최근 주민센터를 통해 도시락 지원서비스를 받았으나 좀 더 횟수가 늘길 희망함.</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">장기요양 4등급으로 방문요양 이용하고 있음.</div>
+      </div>
+
+      <div class="tip-subblock">(희망 서비스)</div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">벽지 교체 등 주택개선 사업에 참여하길 희망함.</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">반찬지원 횟수가 늘기를 희망하며 거동이 불편해 택시 등 이동 서비스 이용 희망함.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">16.</div>
+        <div class="tip-text">가족지지 정도: 슬하에 2남 1녀 있으며 자주 왕래하지는 않음.</div>
+      </div>
+
+      <div class="tip-row">
+        <div class="tip-num">17.</div>
+        <div class="tip-text">기타사항</div>
+      </div>
+
+      <div class="tip-bullet">
+        <div class="tip-dash">-</div>
+        <div class="tip-bullet-text">편마비로 거동이 불편하나 천천히 수행하면 대부분 일상생활은 수행하기도 함.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="tip-modal-foot">
+    <button type="button" class="tip-confirm" onclick="closeTipModal()">확인</button>
+  </div>
+</div>
+</div>
 
 </body>
 </html>
@@ -3854,6 +4372,10 @@ CARE_HTML = """
 
 <style>
 
+.highlight{
+  font-weight:700;
+  color:#1d4ed8;
+}
 .desc-warning{
   margin-top:14px;
   padding:14px 18px;
