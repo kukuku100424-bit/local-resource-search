@@ -61,7 +61,6 @@ SERVICE_GROUP_FILE = "service_group.xlsx"
 service_df = pd.read_excel(SERVICE_GROUP_FILE).fillna("")
 service_df.columns = service_df.columns.astype(str).str.replace(" ", "").str.strip()
 
-print("서비스그룹 컬럼:", list(service_df.columns))
 
 # =========================
 # 로그인 체크
@@ -521,7 +520,14 @@ df.columns = [
     str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
     for c in df.columns
 ]
-print("현재 컬럼명:", list(df.columns))
+def find_col(*names):
+    for name in names:
+        clean_name = str(name).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+        for c in df.columns:
+            clean_c = str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+            if clean_c == clean_name:
+                return c
+    return None
 
 
 # =========================
@@ -558,10 +564,20 @@ def sorted_unique_values(column_name):
 
 
 def normalize_sido(text):
-    t = str(text or "").strip()
+    t = str(text or "")
+
+    t = (
+        t.replace("\u00a0", "")
+         .replace("\ufeff", "")
+         .replace("\n", "")
+         .replace("\r", "")
+         .strip()
+    )
 
     mapping = {
         "광주": "광주광역시",
+        "광주시": "광주광역시",
+        "광주 광역시": "광주광역시",
         "광주광역시": "광주광역시",
 
         "전남": "전라남도",
@@ -1268,7 +1284,7 @@ def detail(idx):
 
     r = df.iloc[idx]
     return jsonify({
-        "프로그램명칭": str(r.get("프로그램명칭", "")),
+        "프로그램명칭": str(r.get("프로그램명(사업명)", "")),
         "서비스제공기관명": str(r.get("서비스제공기관명", "")),
         "기관연락처": str(r.get("기관연락처", "")),
         "기관주소": str(r.get("기관주소", "")),
@@ -1333,9 +1349,9 @@ def combo():
                 filtered["중분류"].fillna("").astype(str).str.strip() == middle_category
             ]
 
-        if program_kw and "프로그램명칭" in filtered.columns:
+        if program_kw and "프로그램명(사업명)" in filtered.columns:
             filtered = filtered[
-                filtered["프로그램명칭"]
+                filtered["프로그램명(사업명)"]
                 .fillna("")
                 .astype(str)
                 .str.contains(program_kw, case=False, na=False)
@@ -1350,15 +1366,21 @@ def combo():
             ]
 
         for _, row in filtered.reset_index().iterrows():
-            region_key = (
-                normalize_sigungu(str(row.get("시군구", "")).strip())
-                or normalize_sido(str(row.get("시도", "")).strip())
-                or "기타"
-            )
+            row_sido = normalize_sido(str(row.get("시도", "")).strip())
+            row_sigungu = normalize_sigungu(str(row.get("시군구", "")).strip())
+
+            if row_sido and row_sigungu:
+                region_key = f"{row_sido}({row_sigungu})"
+            elif row_sido:
+                region_key = row_sido
+            elif row_sigungu:
+                region_key = row_sigungu
+            else:
+                region_key = "기타"
 
             results.setdefault(region_key, []).append({
                 "index": int(row["index"]),
-                "label": f"{row.get('프로그램명칭','')} ({row.get('서비스제공기관명','')})"
+                "label": f"{row.get('프로그램명(사업명)','')} ({row.get('서비스제공기관명','')})"
             })
 
         count = sum(len(v) for v in results.values())
@@ -1564,7 +1586,7 @@ input, select{
 
 <div class="top-bar combo-top-bar">
   <a href="/home" class="home-button">홈으로</a>
-  <button type="button" class="combo-reset-button" onclick="resetComboPage()">초기화</button>
+  <button type="button" class="combo-reset-button" onclick="resetDescPage()">초기화</button>
 </div>
 
 <div class="card">
@@ -1640,7 +1662,7 @@ input, select{
 </form>
 
 {% if show_results %}
-<div class="result" id="combo-result">
+<div class="result" id="desc-result">
 
 <p><b>총 {{count}}건이 조회되었습니다.</b></p>
 
@@ -1670,14 +1692,15 @@ input, select{
 <div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
   <div style="background:white;margin:0% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
     <h3 id="m_title"></h3>
-    <p><b>기관명:</b> <span id="m_org"></span></p>
+    <p style="margin:0 0 14px 0; line-height:1.6;">
+      <b>기관명:</b> <span id="m_org" style="white-space:normal; word-break:keep-all;"></span>
+    </p>
     <p>
       <b>기관 연락처:</b> <span id="m_tel"></span>
       <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">📞</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
-    <p><b>기타:</b> <span id="m_other"></span></p>
-    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;"></iframe>
+    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;display:none;"></iframe>
     <button onclick="closeModal()" class="menu-btn">닫기</button>
   </div>
 </div>
@@ -1691,11 +1714,18 @@ function openDetail(idx){
       document.getElementById("m_org").innerText = d["서비스제공기관명"] || "";
       document.getElementById("m_tel").innerText = d["기관연락처"] || "";
       document.getElementById("m_addr").innerText = d["기관주소"] || "";
-      document.getElementById("m_other").innerText = d["기타"] || "";
 
-      const addr = d["기관주소"] || "";
-      document.getElementById("m_map").src =
-        "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
+      const addr = (d["기관주소"] || "").trim();
+      const mapFrame = document.getElementById("m_map");
+
+      if(addr){
+        mapFrame.src =
+          "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
+        mapFrame.style.display = "block";
+      } else {
+        mapFrame.src = "";
+        mapFrame.style.display = "none";
+      }
 
       const telLink = document.getElementById("tel_link");
       const tel = d["기관연락처"] || "";
@@ -1729,14 +1759,13 @@ function setSearchAction(){
   document.getElementById("comboAction").value = "search";
 }
 
-
-function resetComboPage(){
+function resetDescPage(){
   window.location.href = "/combo";
 }
 
 
 window.addEventListener("load", function(){
-  const resultBox = document.getElementById("combo-result");
+  const resultBox = document.getElementById("desc-result");
   if(resultBox){
     setTimeout(function(){
       resultBox.scrollIntoView({
@@ -1770,7 +1799,7 @@ def desc():
     action = (request.values.get("action", "") or "").strip()
     cache_key = make_cache_key(query + "|" + selected_sido + "|" + selected_sigungu)
     do_search = (action == "search")
-
+        
     if request.method == "POST" and do_search:
         import time
 
@@ -2027,8 +2056,6 @@ def desc():
                     print("토큰 정보:", res.usage)
 
             text = res.output_text
-            print("GPT 원문:", text)
-
             try:
                 parsed = json.loads(text)
             except:
@@ -2071,7 +2098,7 @@ def desc():
             final_results = deduped
 
             if wound_context:
-                filtered_results = []
+                wound_filtered = []
 
                 for item in final_results:
                     service_name = str(item.get("서비스내용", "")).strip()
@@ -2079,9 +2106,9 @@ def desc():
                     if service_name == "소독":
                         continue
 
-                    filtered_results.append(item)
+                    wound_filtered.append(item)
 
-                final_results = filtered_results
+                final_results = wound_filtered
 
             has_medical_tube = any(
                 str(item.get("대분류", "")).strip() == "보건의료" and
@@ -2107,42 +2134,57 @@ def desc():
 
             filtered_results = final_results
 
+
             if selected_sido or selected_sigungu:
                 region_df = df.copy()
 
-                if selected_sido and "시도" in region_df.columns:
-                    region_df = region_df[
-                        region_df["시도"].fillna("").astype(str).str.strip() == selected_sido
-                    ]
+                sido_col = find_col("시도", "시도명", "광역시도")
+                sigungu_col = find_col("시군구")
+                main_col = find_col("대분류")
+                middle_col = find_col("중분류")
 
-                if selected_sigungu and "시군구" in region_df.columns:
+                if selected_sido:
+                    if sido_col:
+                        region_df = region_df[
+                            region_df[sido_col].fillna("").astype(str).apply(normalize_sido) == selected_sido
+                        ]
+                    elif sigungu_col and selected_sido in SIGUNGU_MAP:
+                        region_df = region_df[
+                            region_df[sigungu_col].fillna("").astype(str).apply(normalize_sigungu).isin(SIGUNGU_MAP[selected_sido])
+                        ]
+                    else:
+                        region_df = region_df.iloc[0:0]
+
+                if selected_sigungu and sigungu_col:
                     region_df = region_df[
-                        region_df["시군구"].fillna("").astype(str).str.strip() == selected_sigungu
+                        region_df[sigungu_col].fillna("").astype(str).apply(normalize_sigungu) == selected_sigungu
                     ]
 
                 region_keys = set(
-                    region_df["대분류"].fillna("").astype(str).str.strip() + "|" +
-                    region_df["중분류"].fillna("").astype(str).str.strip()
+                    (region_df[main_col].fillna("").astype(str).str.strip() if main_col else pd.Series(dtype=str)) + "|" +
+                    (region_df[middle_col].fillna("").astype(str).str.strip() if middle_col else pd.Series(dtype=str))
                 )
 
-                temp_results = []
-
-                for item in filtered_results:
-                    item_key = (
+                filtered_results = [
+                    item for item in filtered_results
+                    if (
                         str(item.get("대분류", "")).strip() + "|" +
                         str(item.get("중분류", "")).strip()
-                    )
-
-                    if item_key in region_keys:
-                        temp_results.append(item)
-
-                filtered_results = temp_results
+                    ) in region_keys
+                ]
+            print("검색어 =", repr(query))
+            print("선택 지역(시도) =", repr(selected_sido))
+            print("선택 지역(시군구) =", repr(selected_sigungu))
+            print("지역필터 전 전체 추천 개수 =", len(final_results))
 
             service_results = filtered_results
+            print("최종 service_results 개수 =", len(service_results))
+            for r in service_results:
+                print("→", r.get("대분류",""), "|", r.get("중분류",""), "|", r.get("서비스내용",""))
+
 
         except Exception as e:
             cond_display.append(f"GPT 오류: {e}")
-
 
 
         count = len(service_results)
@@ -3295,7 +3337,7 @@ transition:0.2s;
 
     <a
       href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
-      style="
+     style="
         display:inline-block;
         padding:9px 13px;
         border-radius:10px;
