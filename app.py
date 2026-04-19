@@ -395,8 +395,27 @@ input, select{
 }
 
 .item{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
   padding:8px 0;
   cursor:pointer;
+  line-height:1.6;
+  color:#111827;
+}
+
+.item::before{
+  content:"-";
+  flex:0 0 auto;
+  margin-top:0;
+}
+
+.item-text{
+  flex:1;
+  min-width:0;
+  white-space:normal;
+  word-break:keep-all;
+  overflow-wrap:break-word;
 }
 
 .item:hover{
@@ -672,7 +691,7 @@ SIGUNGU_OPTIONS = sorted(set(
 
 MAIN_CATEGORY_OPTIONS = sorted_unique_values("대분류")
 MIDDLE_CATEGORY_OPTIONS = sorted_unique_values("중분류")
-
+MANAGER_OPTIONS = sorted_unique_values("관리주체")
 
 # =========================
 # HOME
@@ -1297,15 +1316,19 @@ def combo():
     if check:
         return check
 
-    sido = normalize_sido((request.values.get("sido", "") or "").strip())
-    sigungu = (request.values.get("sigungu", "") or "").strip()
-    main_category = (request.values.get("main_category", "") or "").strip()
-    middle_category = (request.values.get("middle_category", "") or "").strip()
-    program_kw = (request.values.get("program_kw", "") or "").strip()
-    org_kw = (request.values.get("org_kw", "") or "").strip()
-    action = (request.values.get("action", "") or "").strip()
+    source = request.form if request.method == "POST" else request.args
+
+    sido = normalize_sido((source.get("sido", "") or "").strip())
+    sigungu = (source.get("sigungu", "") or "").strip()
+    main_category = (source.get("main_category", "") or "").strip()
+    manager = (source.get("manager", "") or "").strip()
+    middle_category = (source.get("middle_category", "") or "").strip()
+    program_kw = (source.get("program_kw", "") or "").strip()
+    org_kw = (source.get("org_kw", "") or "").strip()
+    action = (source.get("action", "") or "").strip()
 
     results = {}
+    sorted_managers_by_region = {}
     count = 0
     show_results = (action == "search")
 
@@ -1322,7 +1345,8 @@ def combo():
         middle_category_options = sorted(
             set(
                 temp["중분류"].fillna("").astype(str).str.strip()
-            )
+            ),
+            key=lambda x: (x == "기타", x)
         )
         middle_category_options = [v for v in middle_category_options if v]
 
@@ -1349,6 +1373,11 @@ def combo():
                 filtered["중분류"].fillna("").astype(str).str.strip() == middle_category
             ]
 
+        if manager and "관리주체" in filtered.columns:
+            filtered = filtered[
+                filtered["관리주체"].fillna("").astype(str).str.strip() == manager
+            ]
+
         if program_kw and "프로그램명(사업명)" in filtered.columns:
             filtered = filtered[
                 filtered["프로그램명(사업명)"]
@@ -1365,9 +1394,11 @@ def combo():
                 .str.contains(org_kw, case=False, na=False)
             ]
 
+        
         for _, row in filtered.reset_index().iterrows():
             row_sido = normalize_sido(str(row.get("시도", "")).strip())
             row_sigungu = normalize_sigungu(str(row.get("시군구", "")).strip())
+            manager_key = str(row.get("관리주체", "")).strip() or "기타"
 
             if row_sido and row_sigungu:
                 region_key = f"{row_sido}({row_sigungu})"
@@ -1378,12 +1409,33 @@ def combo():
             else:
                 region_key = "기타"
 
-            results.setdefault(region_key, []).append({
+            results.setdefault(region_key, {})
+            results[region_key].setdefault(manager_key, [])
+            results[region_key][manager_key].append({
                 "index": int(row["index"]),
                 "label": f"{row.get('프로그램명(사업명)','')} ({row.get('서비스제공기관명','')})"
             })
 
-        count = sum(len(v) for v in results.values())
+        sorted_managers_by_region = {}
+        for rk, mgrs in results.items():
+            sorted_managers_by_region[rk] = sorted(
+                mgrs.keys(),
+                key=lambda x: (x != "공단", x)
+            )
+
+        
+        count = sum(
+            len(items)
+            for manager_groups in results.values()
+            for items in manager_groups.values()
+        )
+
+
+        count = sum(
+            len(items)
+            for manager_groups in results.values()
+            for items in manager_groups.values()
+        )
 
     return render_template_string(
         COMBO_HTML,
@@ -1392,13 +1444,16 @@ def combo():
         sigungu=sigungu,
         main_category=main_category,
         middle_category=middle_category,
+        manager=manager,
         program_kw=program_kw,
         org_kw=org_kw,
         sido_options=SIDO_OPTIONS,
         sigungu_options=sigungu_options,
         main_category_options=MAIN_CATEGORY_OPTIONS,
         middle_category_options=middle_category_options,
+        manager_options=MANAGER_OPTIONS,
         results=results,
+        sorted_managers_by_region=sorted_managers_by_region,
         count=count,
         show_results=show_results
     )
@@ -1415,6 +1470,42 @@ COMBO_HTML = """
 <title>조건기반 자원검색</title>
 <style>{{style}}</style>
 <style>
+
+.result h3{
+  margin:18px 0 8px 0;
+  font-size:18px;
+  font-weight:800;
+  color:#111827;
+}
+
+.manager-badge{
+  display:inline-block;
+  padding:4px 12px;
+  border-radius:999px;
+  background:#dbeafe;
+  color:#1d4ed8;
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:0.3px;
+
+  margin:14px 0 10px 0;   /* 🔥 위아래 간격 늘림 */
+}
+
+.manager-badge[data-type="공단"]{
+  background:#fce7f3;
+  color:#be185d;
+}
+
+.item{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  padding:8px 0;
+  cursor:pointer;
+  line-height:1.6;
+  color:#111827;
+}
+
 
 .combo-top-bar{
   display:flex;
@@ -1628,7 +1719,7 @@ input, select{
   <div class="section-desc">대분류와 중분류(선택형), 프로그램과 기관명(서술형)으로 검색합니다.</div>
 
 <label>대분류</label>
-<select name="main_category">
+<select name="main_category" onchange="handleMainCategoryChange(this.form)">
   <option value="">전체</option>
   {% if main_category and main_category not in main_category_options %}
   <option value="{{main_category}}" selected>{{main_category}}</option>
@@ -1647,6 +1738,14 @@ input, select{
   {% endif %}
   {% for c in middle_category_options %}
   <option value="{{c}}" {% if c==middle_category %}selected{% endif %}>{{c}}</option>
+  {% endfor %}
+</select>
+
+<label>관리주체</label>
+<select name="manager">
+  <option value="">전체</option>
+  {% for m in manager_options %}
+  <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
   {% endfor %}
 </select>
 
@@ -1678,10 +1777,22 @@ input, select{
 <p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
 {% endif %}
 
-{% for region, items in results.items() %}
+
+{% for region, manager_groups in results.items() %}
 <h3>📍 {{region}}</h3>
+
+{% for manager_name in sorted_managers_by_region[region] %}
+{% set items = manager_groups[manager_name] %}
+
+<div class="manager-badge" data-type="{{manager_name}}">{{manager_name}}</div>
+
 {% for r in items %}
-<div class="item" onclick="openDetail({{r['index']}})">- {{r['label']}}</div>
+<div class="item" onclick="openDetail({{r['index']}})">
+  <span class="item-bullet">-</span>
+  <span class="item-text">{{r['label']}}</span>
+</div>
+{% endfor %}
+
 {% endfor %}
 {% endfor %}
 
@@ -1752,6 +1863,12 @@ function closeModal(){
 
 function handleSidoChange(form){
   document.getElementById("comboAction").value = "change_sido";
+  form.submit();
+}
+
+function handleMainCategoryChange(form){
+  form.middle_category.value = "";
+  document.getElementById("comboAction").value = "change_main_category";
   form.submit();
 }
 
@@ -2235,6 +2352,27 @@ DESC_HTML = """
 
 <style>
 
+.item{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  padding:8px 0;
+  cursor:pointer;
+  line-height:1.6;
+}
+
+.item-bullet{
+  flex:0 0 auto;
+}
+
+.item-text{
+  flex:1;
+  min-width:0;
+  white-space:normal;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
 .mobile-br{
   display:none;
 }
@@ -2448,18 +2586,24 @@ body{
 }
 
 .tip-badge{
-  width:34px;
-  height:34px;
-  border-radius:999px;
-  background:#eff6ff;
-  color:#2563eb;
-  display:flex;
+  display:inline-flex;
   align-items:center;
   justify-content:center;
-  font-size:17px;
+  width:auto;
+  min-width:52px;
+  height:30px;
+  padding:0 12px;
+  border:1px solid #dbeafe;
+  border-radius:999px;
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  color:#2563eb;
+  font-size:12px;
   font-weight:800;
+  letter-spacing:0.3px;
   line-height:1;
+  box-shadow:0 4px 12px rgba(37,99,235,0.14);
   flex:0 0 auto;
+  white-space:nowrap;
 }
 
 .tip-close{
@@ -3613,7 +3757,7 @@ function handleTipBackdrop(event){
   <div class="tip-modal-box">
     <div class="tip-modal-head">
       <div class="tip-modal-title">
-        <div class="tip-badge">?</div>
+        <div class="tip-badge">TIP</div>
         <span>입력 팁</span>
       </div>
       <button type="button" class="tip-close" onclick="closeTipModal()">✕</button>
