@@ -1512,6 +1512,7 @@ def combo():
                     "sigungu": sigungu,
                     "result_count": count,
                     "ip": request.remote_addr,
+                    "search_type": "combo"
                }
             )
 
