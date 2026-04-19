@@ -39,10 +39,31 @@ SUPABASE_HEADERS = {
 }
 
 def update_visitors():
+    now = datetime.datetime.now()
+
+    # 🔥 로컬 테스트용
     if os.getenv("RENDER") is None:
         return 100, 5
 
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    # 같은 브라우저에서 1시간 이내 재방문이면 카운트 안 함
+    last_visit_str = session.get("last_visit_time", "")
+    if last_visit_str:
+        try:
+            last_visit = datetime.datetime.fromisoformat(last_visit_str)
+            if (now - last_visit).total_seconds() < 3600:
+                select_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*"
+                res = requests.get(select_url, headers=SUPABASE_HEADERS)
+                rows = res.json()
+
+                if rows:
+                    data = rows[0]
+                    return int(data.get("total_count", 0)), int(data.get("today_count", 0))
+                else:
+                    return 0, 0
+        except:
+            pass
+
+    today = now.strftime("%Y-%m-%d")
 
     select_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*"
     res = requests.get(select_url, headers=SUPABASE_HEADERS)
@@ -79,18 +100,22 @@ def update_visitors():
             json={
                 "total_count": total,
                 "today_date": today,
-                "today_count": today_count,
-                "updated_at": datetime.datetime.now().isoformat()
+                "today_count": today_count
             }
         )
 
+    # 방문 로그 저장
+    log_url = f"{SUPABASE_URL}/rest/v1/visit_logs"
     requests.post(
-        f"{SUPABASE_URL}/rest/v1/visit_logs",
+        log_url,
         headers=SUPABASE_HEADERS,
         json={
             "ip": request.remote_addr
         }
     )
+
+    # 마지막 방문 시각 저장
+    session["last_visit_time"] = now.isoformat()
 
     return total, today_count
 
