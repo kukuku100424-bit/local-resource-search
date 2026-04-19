@@ -9,3 +9,4 @@ gunicorn
 scikit-learn
 numpy
 openpyxl
+requests

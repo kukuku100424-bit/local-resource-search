@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from openai import OpenAI
+import requests
 
 def make_cache_key(text):
     text = str(text or "")
@@ -27,29 +28,71 @@ app = Flask(__name__)
 DESC_CACHE = {}
 import datetime
 
-VISITOR_FILE = "visitors.json"
+SUPABASE_URL = "https://iiktpwqncvvwrzytfssb.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpa3Rwd3FuY3Z3dnJ6eXRmc3NiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjU4ODE4NiwiZXhwIjoyMDkyMTY0MTg2fQ.9BeM37V3wEIixzNBIbEYQRhBMSZiIoh8bW7ilNvXBJI"
 
-def load_visitors():
-    if not os.path.exists(VISITOR_FILE):
-        return {"total": 0, "daily": {}}
-    with open(VISITOR_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_visitors(data):
-    with open(VISITOR_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json"
+}
 
 def update_visitors():
-    data = load_visitors()
+    if os.getenv("RENDER") is None:
+        return 100, 5
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    data["total"] += 1
-    data["daily"][today] = data["daily"].get(today, 0) + 1
+    select_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*"
+    res = requests.get(select_url, headers=SUPABASE_HEADERS)
+    rows = res.json()
 
-    save_visitors(data)
+    if not rows:
+        total = 1
+        today_count = 1
 
-    return data["total"], data["daily"][today]
+        insert_url = f"{SUPABASE_URL}/rest/v1/visit_stats"
+        requests.post(
+            insert_url,
+            headers={**SUPABASE_HEADERS, "Prefer": "return=representation"},
+            json={
+                "id": 1,
+                "total_count": total,
+                "today_date": today,
+                "today_count": today_count
+            }
+        )
+    else:
+        data = rows[0]
+        total = int(data.get("total_count", 0)) + 1
+
+        if data.get("today_date") == today:
+            today_count = int(data.get("today_count", 0)) + 1
+        else:
+            today_count = 1
+
+        patch_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1"
+        requests.patch(
+            patch_url,
+            headers=SUPABASE_HEADERS,
+            json={
+                "total_count": total,
+                "today_date": today,
+                "today_count": today_count,
+                "updated_at": datetime.datetime.now().isoformat()
+            }
+        )
+
+    requests.post(
+        f"{SUPABASE_URL}/rest/v1/visit_logs",
+        headers=SUPABASE_HEADERS,
+        json={
+            "ip": request.remote_addr
+        }
+    )
+
+    return total, today_count
+
 app.secret_key = "super_secret_key"
 
 FILE_PATH = "service_resources.xlsx"
@@ -320,8 +363,7 @@ def login():
             # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
             return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
 
-    total, today = update_visitors()
-    return render_template_string(LOGIN_HTML, error="", total=total, today=today)
+    return render_template_string(LOGIN_HTML, error="", total=0, today=0)
 
 # =========================
 # 공통 CSS
@@ -1270,10 +1312,7 @@ def home():
     if check:
         return check
 
-    data = load_visitors()
-    today_key = datetime.datetime.now().strftime("%Y-%m-%d")
-    total = data.get("total", 0)
-    today = data.get("daily", {}).get(today_key, 0)
+    total, today = update_visitors()
 
     return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today)
 
@@ -1430,12 +1469,17 @@ def combo():
             for items in manager_groups.values()
         )
 
-
-        count = sum(
-            len(items)
-            for manager_groups in results.values()
-            for items in manager_groups.values()
-        )
+        if os.getenv("RENDER") is not None:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/region_logs",
+                headers=SUPABASE_HEADERS,
+                json={
+                    "sido": sido,
+                    "sigungu": sigungu,
+                    "result_count": count,
+                    "ip": request.remote_addr
+                }
+            )
 
     return render_template_string(
         COMBO_HTML,
