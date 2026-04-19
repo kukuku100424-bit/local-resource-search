@@ -28,7 +28,8 @@ app = Flask(__name__)
 DESC_CACHE = {}
 import datetime
 
-SUPABASE_URL = "https://iiktpwqncvvwrzytfssb.supabase.co"
+                           
+SUPABASE_URL = "https://iiktpwqncvwvrzytfssb.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpa3Rwd3FuY3Z3dnJ6eXRmc3NiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjU4ODE4NiwiZXhwIjoyMDkyMTY0MTg2fQ.9BeM37V3wEIixzNBIbEYQRhBMSZiIoh8bW7ilNvXBJI"
 
 SUPABASE_HEADERS = {
