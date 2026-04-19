@@ -96,6 +96,16 @@ def update_visitors():
 
 app.secret_key = "super_secret_key"
 
+@app.before_request
+def require_login_all_pages():
+    allowed_paths = ["/", "/login", "/static"]
+
+    if any(request.path.startswith(p) for p in allowed_paths):
+        return None
+
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+
 FILE_PATH = "service_resources.xlsx"
 # =========================
 # 서비스 그룹 엑셀 로드 (AI 추천용)
