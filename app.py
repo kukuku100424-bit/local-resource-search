@@ -98,9 +98,7 @@ app.secret_key = "super_secret_key"
 
 @app.before_request
 def require_login_all_pages():
-    allowed_paths = ["/", "/login", "/static"]
-
-    if any(request.path.startswith(p) for p in allowed_paths):
+    if request.path == "/" or request.path == "/login" or request.path.startswith("/static"):
         return None
 
     if not session.get("logged_in"):
