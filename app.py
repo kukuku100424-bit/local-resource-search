@@ -1,8 +1,10 @@
-﻿from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session
+﻿from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session, send_file
 import pandas as pd
 import os
 import re
 import json
+from io import BytesIO
+from collections import defaultdict
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -123,7 +125,17 @@ app.secret_key = "super_secret_key"
 
 @app.before_request
 def require_login_all_pages():
-    if request.path == "/" or request.path == "/login" or request.path.startswith("/static"):
+    if (
+        request.path == "/"
+        or request.path == "/login"
+        or request.path == "/admin"
+        or request.path.startswith("/static")
+    ):
+        return None
+
+    if request.path.startswith("/stats"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
         return None
 
     if not session.get("logged_in"):
@@ -142,11 +154,16 @@ service_df.columns = service_df.columns.astype(str).str.replace(" ", "").str.str
 # =========================
 # 로그인 체크
 # =========================
-def login_required():
-    if not session.get("logged_in"):
-        return redirect(url_for("login"))
-    return None
+from functools import wraps
+from flask import session, redirect, url_for
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
 # =========================
 # 로그인 페이지
 # =========================
@@ -176,7 +193,38 @@ body{
   padding:24px 16px;
 }
 
+.admin-link{
+  position:absolute;
+  top:14px;
+  right:14px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:32px;
+  padding:0 12px;
+  border:none;
+  border-radius:999px;
+  background:rgba(255,255,255,0.88);
+  color:#1f2937;
+  font-size:13px;
+  font-weight:700;
+  text-decoration:none;
+  box-shadow:0 4px 14px rgba(0,0,0,0.12);
+  transition:all .18s ease;
+  z-index:2;
+}
+
+.admin-link:hover{
+  background:#ffffff;
+  transform:translateY(-1px);
+}
+
+.admin-link:active{
+  transform:translateY(0);
+}
+
 .box{
+  position:relative;
   width:100%;
   max-width:420px;
   background:#ffffff;
@@ -347,6 +395,7 @@ button:hover{
 
 <body>
 <div class="box">
+  <a href="/admin" class="admin-link">관리자</a>
 
   <div class="simple-logo">케어네비</div>
   <div class="logo-line"></div>
@@ -380,6 +429,189 @@ button:hover{
 </body>
 </html>
 """
+ADMIN_LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 인증</title>
+
+<style>
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:'Pretendard',sans-serif;
+  background:#f5f6f7;
+  color:#1f2937;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:24px 16px;
+}
+
+.box{
+  position:relative;
+  width:100%;
+  max-width:420px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:22px;
+  padding:40px 24px 28px 24px;
+  text-align:center;
+  box-shadow:0 4px 16px rgba(15,23,42,0.04);
+}
+
+.simple-logo{
+  font-size:28px;
+  font-weight:800;
+  letter-spacing:-0.8px;
+  color:#111827;
+  margin-bottom:8px;
+}
+
+.logo-line{
+  width:40px;
+  height:3px;
+  margin:6px auto 8px auto;
+  border-radius:999px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+}
+
+.sub-title{
+  font-size:14px;
+  color:#6b7280;
+  margin-bottom:40px;
+  line-height:1.5;
+}
+
+.error-msg{
+  background:#fff4f4;
+  color:#d93025;
+  border:1px solid #ffd9d6;
+  padding:12px 14px;
+  border-radius:12px;
+  font-size:14px;
+  margin:0 0 14px 0;
+  text-align:left;
+}
+
+.form-area{
+  text-align:left;
+}
+
+input{
+  width:100%;
+  height:54px;
+  padding:0 16px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  font-size:16px;
+  color:#111827;
+  background:#fff;
+  outline:none;
+  transition:border-color 0.15s, box-shadow 0.15s;
+  margin-bottom:14px;
+}
+
+input::placeholder{
+  color:#9ca3af;
+}
+
+input:focus{
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.08);
+}
+
+button{
+  width:100%;
+  height:54px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#ffffff;
+  font-size:17px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.15s;
+  box-shadow:0 4px 14px rgba(37,99,235,0.25);
+}
+
+button:hover{
+  opacity:0.9;
+}
+
+.back-link{
+  display:inline-block;
+  margin-top:14px;
+  font-size:13px;
+  color:#6b7280;
+  text-decoration:none;
+}
+
+.back-link:hover{
+  color:#2563eb;
+}
+
+@media (max-width:480px){
+  body{
+    min-height:100dvh;
+    padding:16px;
+  }
+
+  .box{
+    box-shadow:0 10px 30px rgba(0,0,0,0.06);
+    padding:48px 24px 36px 24px;
+  }
+
+  .simple-logo{
+    font-size:26px;
+  }
+
+  .sub-title{
+    font-size:13px;
+    margin-bottom:34px;
+  }
+
+  input{
+    height:50px;
+    font-size:15px;
+    border-radius:10px;
+  }
+
+  button{
+    height:50px;
+    font-size:16px;
+    border-radius:10px;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="box">
+  <div class="simple-logo">관리자 인증</div>
+  <div class="logo-line"></div>
+  <div class="sub-title">통계 페이지 접근을 위해 관리자 암호를 입력하세요.</div>
+
+  {% if error %}
+    <div class="error-msg">❌ {{error}}</div>
+  {% endif %}
+
+  <form method="post" class="form-area">
+    <input type="password" name="password" placeholder="관리자 암호를 입력하세요">
+    <button type="submit">통계 페이지로 이동</button>
+  </form>
+
+  <a href="/login" class="back-link">로그인 페이지로 돌아가기</a>
+</div>
+</body>
+</html>
+"""
+
+
 
 # =========================
 # 로그인 라우트
@@ -398,6 +630,22 @@ def login():
             return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
 
     return render_template_string(LOGIN_HTML, error="", total=0, today=0)
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        pw = request.form.get("password", "")
+
+        if pw == "admin":
+            session["is_admin"] = True
+            return redirect(url_for("stats"))
+        else:
+            return render_template_string(
+                ADMIN_LOGIN_HTML,
+                error="관리자 암호가 올바르지 않습니다."
+            )
+
+    return render_template_string(ADMIN_LOGIN_HTML, error="")
 
 # =========================
 # 공통 CSS
@@ -1341,30 +1589,407 @@ window.addEventListener("popstate", function (e) {
 </html>
 """
 @app.route("/home")
+@login_required
 def home():
-    check = login_required()
-    if check:
-        return check
-
     total, today = update_visitors()
 
     return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today)
 
+STATS_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통계 페이지</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:900px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+.home-button{
+  display:inline-block;
+  padding:8px 14px;
+  border-radius:8px;
+  background:#e5e7eb;
+  color:#111827;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:500;
+}
+.home-button:hover{
+  background:#d1d5db;
+}
+.card{
+  background:#ffffff;
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:16px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.summary-row{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.summary-box{
+  flex:1;
+  min-width:180px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:14px;
+}
+.summary-label{
+  font-size:13px;
+  color:#6b7280;
+  margin-bottom:6px;
+}
+.summary-value{
+  font-size:24px;
+  font-weight:800;
+  color:#111827;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+th, td{
+  padding:10px 8px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:left;
+  font-size:14px;
+}
+th{
+  background:#f8fafc;
+  font-weight:700;
+}
+h2{
+  margin:0 0 10px 0;
+  font-size:18px;
+}
+.small{
+  font-size:12px;
+  color:#6b7280;
+}
+@media (max-width:480px){
+  .container{
+    padding:16px 12px 28px 12px;
+  }
+  th, td{
+    font-size:13px;
+    padding:8px 6px;
+  }
+  .summary-value{
+    font-size:22px;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+    <a href="/home" class="home-button">홈으로</a>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/stats/export/visits" class="home-button">방문자 엑셀</a>
+      <a href="/stats/export/regions" class="home-button">지역클릭 엑셀</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>요약 통계</h2>
+    <div class="summary-row">
+      <div class="summary-box">
+        <div class="summary-label">총 방문자수</div>
+        <div class="summary-value">{{ total_count }}</div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-label">오늘 방문자수</div>
+        <div class="summary-value">{{ today_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>일자별 방문자수</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>날짜</th>
+          <th>방문자수</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in daily_visits %}
+        <tr>
+          <td>{{ row["date"] }}</td>
+          <td>{{ row["count"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>일자별 지역 클릭수</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>날짜</th>
+          <th>시도</th>
+          <th>시군구</th>
+          <th>검색구분</th>
+          <th>클릭수</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in daily_regions %}
+        <tr>
+          <td>{{ row["date"] }}</td>
+          <td>{{ row["sido"] }}</td>
+          <td>{{ row["sigungu"] }}</td>
+          <td>{{ row["search_type"] }}</td>
+          <td>{{ row["count"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>
+"""
+@app.route("/stats")
+def stats():
+
+    if os.getenv("RENDER") is None:
+        total_count = 100
+        today_count = 5
+
+        daily_visits = [
+            {"date": "2026-04-17", "count": 12},
+            {"date": "2026-04-18", "count": 18},
+            {"date": "2026-04-19", "count": 5}
+        ]
+
+        daily_regions = [
+            {"date": "2026-04-18", "sido": "광주광역시", "sigungu": "북구", "search_type": "조건기반", "count": 3},
+            {"date": "2026-04-18", "sido": "전라남도", "sigungu": "나주시", "search_type": "사례기반", "count": 2},
+            {"date": "2026-04-19", "sido": "광주광역시", "sigungu": "서구", "search_type": "조건기반", "count": 1}
+        ]
+
+        return render_template_string(
+            STATS_HTML,
+            total_count=total_count,
+            today_count=today_count,
+            daily_visits=daily_visits,
+            daily_regions=daily_regions
+        )
+
+    stats_res = requests.get(
+        f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
+        headers=SUPABASE_HEADERS
+    )
+    stats_rows = stats_res.json() if stats_res.ok else []
+    stats_row = stats_rows[0] if stats_rows else {}
+
+    total_count = int(stats_row.get("total_count", 0))
+    today_count = int(stats_row.get("today_count", 0))
+
+    visit_res = requests.get(
+        f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
+        headers=SUPABASE_HEADERS
+    )
+    visit_rows = visit_res.json() if visit_res.ok else []
+
+    daily_visit_map = defaultdict(int)
+    for row in visit_rows:
+        created_at = str(row.get("created_at", ""))
+        if created_at:
+            date_str = created_at[:10]
+            daily_visit_map[date_str] += 1
+
+    daily_visits = []
+    for date_str in sorted(daily_visit_map.keys(), reverse=True):
+        daily_visits.append({
+            "date": date_str,
+            "count": daily_visit_map[date_str]
+        })
+
+    region_res = requests.get(
+        f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
+        headers=SUPABASE_HEADERS
+    )
+    region_rows = region_res.json() if region_res.ok else []
+
+    daily_region_map = defaultdict(int)
+    for row in region_rows:
+        created_at = str(row.get("created_at", ""))
+        date_str = created_at[:10] if created_at else ""
+        sido = str(row.get("sido", "") or "")
+        sigungu = str(row.get("sigungu", "") or "")
+        raw_search_type = str(row.get("search_type", "") or "").strip()
+
+        if raw_search_type == "combo":
+            search_type = "조건기반"
+        elif raw_search_type == "desc":
+            search_type = "사례기반"
+        else:
+            search_type = raw_search_type or "-"
+
+        key = (date_str, sido, sigungu, search_type)
+        daily_region_map[key] += 1
+
+    daily_regions = []
+    for key in sorted(daily_region_map.keys(), reverse=True):
+        date_str, sido, sigungu, search_type = key
+        daily_regions.append({
+            "date": date_str,
+            "sido": sido,
+            "sigungu": sigungu,
+            "search_type": search_type,
+            "count": daily_region_map[key]
+        })
+
+    return render_template_string(
+        STATS_HTML,
+        total_count=total_count,
+        today_count=today_count,
+        daily_visits=daily_visits,
+        daily_regions=daily_regions
+    )
+
+@app.route("/stats/export/visits")
+def export_stats_visits():
+
+    if os.getenv("RENDER") is None:
+        daily_visits = [
+            {"날짜": "2026-04-17", "방문자수": 12},
+            {"날짜": "2026-04-18", "방문자수": 18},
+            {"날짜": "2026-04-19", "방문자수": 5}
+        ]
+    else:
+        visit_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        visit_rows = visit_res.json() if visit_res.ok else []
+
+        daily_visit_map = defaultdict(int)
+        for row in visit_rows:
+            created_at = str(row.get("created_at", ""))
+            if created_at:
+                date_str = created_at[:10]
+                daily_visit_map[date_str] += 1
+
+        daily_visits = []
+        for date_str in sorted(daily_visit_map.keys(), reverse=True):
+            daily_visits.append({
+                "날짜": date_str,
+                "방문자수": daily_visit_map[date_str]
+            })
+
+    df_export = pd.DataFrame(daily_visits)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_export.to_excel(writer, index=False, sheet_name="일자별방문자수")
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="일자별_방문자수.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.route("/stats/export/regions")
+def export_stats_regions():
+
+    if os.getenv("RENDER") is None:
+        daily_regions = [
+            {"날짜": "2026-04-18", "시도": "광주광역시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
+            {"날짜": "2026-04-18", "시도": "전라남도", "시군구": "나주시", "검색구분": "사례기반", "클릭수": 2},
+            {"날짜": "2026-04-19", "시도": "광주광역시", "시군구": "서구", "검색구분": "조건기반", "클릭수": 1}
+        ]
+    else:
+        region_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        region_rows = region_res.json() if region_res.ok else []
+
+        daily_region_map = defaultdict(int)
+        for row in region_rows:
+            created_at = str(row.get("created_at", ""))
+            date_str = created_at[:10] if created_at else ""
+            sido = str(row.get("sido", "") or "")
+            sigungu = str(row.get("sigungu", "") or "")
+            raw_search_type = str(row.get("search_type", "") or "").strip()
+
+            if raw_search_type == "combo":
+                search_type = "조건기반"
+            elif raw_search_type == "desc":
+                search_type = "사례기반"
+            else:
+                search_type = raw_search_type or "-"
+
+            key = (date_str, sido, sigungu, search_type)
+            daily_region_map[key] += 1
+
+        daily_regions = []
+        for key in sorted(daily_region_map.keys(), reverse=True):
+            date_str, sido, sigungu, search_type = key
+            daily_regions.append({
+                "날짜": date_str,
+                "시도": sido,
+                "시군구": sigungu,
+                "검색구분": search_type,
+                "클릭수": daily_region_map[key]
+            })
+
+    df_export = pd.DataFrame(daily_regions)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_export.to_excel(writer, index=False, sheet_name="일자별지역클릭수")
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="일자별_지역클릭수.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 @app.route("/guide")
 def guide():
-    check = login_required()
-    if check:
-        return check
     return redirect("/static/guide.pdf")
+
 # =========================
 # 상세 API (팝업에서 사용)
 # =========================
 @app.route("/detail/<int:idx>")
 def detail(idx):
-    check = login_required()
-    if check:
-        return check
-
     if idx < 0 or idx >= len(df):
         return jsonify({
             "프로그램명칭": "데이터가 변경되었습니다",
@@ -1385,10 +2010,6 @@ def detail(idx):
 
 @app.route("/combo", methods=["GET","POST"])
 def combo():
-    check = login_required()
-    if check:
-        return check
-
     source = request.form if request.method == "POST" else request.args
 
     sido = normalize_sido((source.get("sido", "") or "").strip())
@@ -1980,11 +2601,8 @@ window.addEventListener("load", function(){
 
 @app.route("/desc", methods=["GET","POST"])
 def desc():
-    check = login_required()
-    if check:
-        return check
-
     query = (request.values.get("query", "") or "").strip()
+
     results = {}
     cond_display = None
     count = 0
@@ -5407,9 +6025,6 @@ updateScoreBanner();
 
 @app.route("/care")
 def care():
-    check = login_required()
-    if check:
-        return check
     return render_template_string(
         CARE_HTML,
         style=BASE_STYLE,
@@ -5418,10 +6033,6 @@ def care():
 
 @app.route("/care_check", methods=["POST"])
 def care_check():
-    check = login_required()
-    if check:
-        return check
-
     score = 0
     dementia = request.form.get("dementia", "n")
 
