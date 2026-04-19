@@ -1488,7 +1488,8 @@ def combo():
                     "sido": sido,
                     "sigungu": sigungu,
                     "result_count": count,
-                    "ip": request.remote_addr
+                    "ip": request.remote_addr,
+                    "search_type": "combo"
                 }
             )
 
@@ -2267,7 +2268,22 @@ def desc():
                     seen_keys.add(key)
                     deduped.append(item)
 
+
+
             final_results = deduped
+
+            if os.getenv("RENDER") is not None:
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/region_logs",
+                    headers=SUPABASE_HEADERS,
+                    json={
+                        "sido": selected_sido,
+                        "sigungu": selected_sigungu,
+                        "result_count": len(final_results),
+                        "ip": request.remote_addr,
+                        "search_type": "desc"
+                    }
+                )
 
             if wound_context:
                 wound_filtered = []
