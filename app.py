@@ -6196,12 +6196,9 @@ NHIS25_HTML = """
 """
 
 @app.route("/nhis25")
+@login_required
 def nhis25():
-    check = login_required()
-    if check:
-        return check
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
-
 
 if __name__ == "__main__":
     app.run()
