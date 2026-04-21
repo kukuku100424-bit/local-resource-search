@@ -17,7 +17,7 @@ def make_cache_key(text):
     text = text.strip()
     text = re.sub(r"\s+", " ", text)
     return text
-def compress_text(s, max_len=60):
+def compress_text(s, max_len=100):
     s = str(s).strip()
     if len(s) <= max_len:
         return s
@@ -2608,9 +2608,30 @@ def desc():
     count = 0
     service_results = []
     warning_msg = ""
-    selected_sido = normalize_sido((request.values.get("sido", "") or "").strip())
-    selected_sigungu = (request.values.get("sigungu", "") or "").strip()
     action = (request.values.get("action", "") or "").strip()
+
+    input_sido = normalize_sido((request.values.get("sido", "") or "").strip())
+    input_sigungu = (request.values.get("sigungu", "") or "").strip()
+
+    selected_sido = session.get("desc_selected_sido", "")
+    selected_sigungu = session.get("desc_selected_sigungu", "")
+
+    if action == "reset_region":
+        session.pop("desc_selected_sido", None)
+        session.pop("desc_selected_sigungu", None)
+        return redirect(url_for("desc"))
+
+    else:
+        if action == "change_sido":
+            session["desc_selected_sido"] = input_sido
+            selected_sido = input_sido
+            session.pop("desc_selected_sigungu", None)
+            selected_sigungu = ""
+
+        elif action == "change_sigungu":
+            session["desc_selected_sigungu"] = input_sigungu
+            selected_sigungu = input_sigungu
+
     cache_key = make_cache_key(query + "|" + selected_sido + "|" + selected_sigungu)
     do_search = (action == "search")
         
@@ -2717,6 +2738,15 @@ def desc():
         if any(k in q_norm for k in ["욕창", "욕창매트", "욕창방지", "자세변환", "체위변경"]):
             extra_aliases += ["복지용구", "욕창예방", "자세변환", "대여"]
 
+        if any(k in q_norm for k in ["목욕차", "방문목욕", "목욕도움", "씻기기", "씻겨", "씻겨줬으면", "목욕시켜", "목욕"]):
+            extra_aliases += ["요양", "방문목욕", "장기요양", "목욕지원", "신체청결"]
+
+        if any(k in q_norm for k in ["가사일", "집안일", "청소", "빨래", "반찬", "식사준비", "밥", "집에누가와서도와", "도와줬으면", "도움이필요", "생활도움"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원", "식사도움", "청소도움", "빨래도움"]
+
+        if any(k in q_norm for k in ["돌봄", "간병", "부축", "옆에서도움", "집에서돌봐", "일상생활도움"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "신체활동지원", "일상생활지원"]
+
         if any(k in q_norm for k in ["경사로", "문턱", "턱", "이동불편", "출입불편"]):
             extra_aliases += ["복지용구", "경사로", "이동보조", "구입"]
 
@@ -2738,9 +2768,11 @@ def desc():
         for idx, r in service_df.iterrows():
             service_text += (
                 f"{idx}. "
-                f"{compress_text(r.get('서비스내용',''),18)} | "
-                f"{compress_text(r.get('서비스설명',''),28)} | "
-                f"{compress_text(r.get('검색어',''),28)}\n"
+                f"대분류: {str(r.get('대분류','')).strip()} | "
+                f"중분류: {str(r.get('중분류','')).strip()} | "
+                f"서비스내용: {compress_text(r.get('서비스내용',''),25)} | "
+                f"서비스설명: {compress_text(r.get('서비스설명',''),77)} | "
+                f"검색어: {compress_text(r.get('검색어',''),100)}\n"
             )
 
         # ======================
@@ -2785,7 +2817,12 @@ def desc():
 - 파이썬이 미리 판단하지 않는다.
 - 반드시 서비스목록의 '서비스설명'과 '검색어'를 적극적으로 참고하고, 사용자가 정확한 행정용어를 쓰지 않아도 의미가 비슷하면 연결해서 판단한다.
 - 너무 보수적으로 2~4개만 고르지 말고, 실제 현장에서 함께 검토할 만한 서비스는 넓게 포함한다.
+- 예를 들어 "목욕차가 왔으면 함", "씻는 것을 도와줬으면 함" 같은 표현은 방문목욕으로 연결할 수 있어야 한다.
+- "집에 누가 와서 가사일을 도와줬으면 해", "청소나 빨래를 도와줬으면 해", "식사 준비를 도와줬으면 해" 같은 표현은 방문요양으로 적극 연결한다.
+- 사용자가 '요양', '방문요양', '방문목욕' 같은 정확한 용어를 쓰지 않아도 의미가 같으면 포함한다.
 - 단, 완전히 무관한 서비스는 제외한다.
+- "의료진 방문", "거동불편", "집에서 치료"와 같은 의료·요양 맥락만 있는 경우에는 "방역", "환경소독", "해충방제" 등 환경 관련 서비스는 제외하되, 사용자가 집 청결, 위생, 악취, 오염, 소독 필요성을 함께 언급한 경우에는 관련 환경 서비스도 포함한다.
+-'길을 잃음', '배회', '집을 못 찾음', '귀가 어려움' 등은 배회감지기, 위치확인 가능한 복지용구, 인지안전 관련 지원과 연결한다.
 
 판단 원칙:
 1. 사례의 핵심 욕구를 먼저 정리한다.
@@ -3332,24 +3369,25 @@ body{
 }
 
 .tip-modal-body{
-  padding:18px 20px 18px 20px;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  flex:1 1 auto;
+  margin-top:18px;
+  padding:16px 18px;
+  border-radius:14px;
+  background:#f1f5f9;
+  border:1px solid #dbeafe;
 }
 
 .tip-notice{
-  margin:0 0 16px 0;
-  padding:14px 16px;
-  border-radius:14px;
+  margin:18px 0 0 0;              /* 위 박스랑 간격 맞춤 */
+  padding:16px 18px;              /* 내부 여백 통일 */
+  border-radius:16px;             /* 위 박스랑 비슷하게 */
   background:#f8fbff;
   border:1px solid #dbeafe;
   color:#1f2937;
   font-size:14px;
-  line-height:1.75;
+  line-height:1.7;
   word-break:keep-all;
+  overflow-wrap:break-word;       /* 줄바꿈 자연스럽게 */
 }
-
 .tip-notice p{
   margin:0;
   padding-left:1.1em;
@@ -4059,7 +4097,6 @@ button:hover{
 <div class="title">
   <div class="title-row">
     <h2>사례기반 서비스내용 검색</h2>
-    <button type="button" class="tip-btn" onclick="openTipModal()" aria-label="입력 팁 보기">TIP</button>
   </div>
 </div>
 
@@ -4087,7 +4124,7 @@ button:hover{
 
     <div class="desc-region-item">
       <label>시군구</label>
-      <select name="sigungu">
+      <select name="sigungu" onchange="handleDescSigunguChange(this.form)">
         <option value="">전체</option>
         {% for g in sigungu_options %}
         <option value="{{g}}" {% if g==selected_sigungu %}selected{% endif %}>{{g}}</option>
@@ -4153,23 +4190,8 @@ transition:0.2s;
 
 <button type="submit" id="descSubmitBtn" onclick="setDescSearchAction()">AI 검색</button>
 
-{% if warning_msg %}
-<div class="desc-warning">
-  <span class="desc-warning-icon">⚠️</span>
-  <div class="desc-warning-text">{{warning_msg}}</div>
-</div>
-{% endif %}
-
 </form>
 </div>
-
-<div class="notice">
-
-※ 입력한 사례와 유사한 <b>통합돌봄 서비스를<span class="mobile-br"><br></span>
-최대 30가지</b> 추천합니다.<br>
-지자체 개인별지원계획 수립 참고용입니다.
-</div>
-
 
 <div id="searchResultSection">
 
@@ -4191,24 +4213,25 @@ transition:0.2s;
       {{loop.index}}. {{r["대분류"]}} > {{r["중분류"]}} > {{r["서비스내용"]}}
     </div>
 
-    <a
-      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
-     style="
-        display:inline-block;
-        padding:9px 13px;
-        border-radius:10px;
-        background:#eff6ff;
-        border:1px solid #bfdbfe;
-        color:#1d4ed8;
-        text-decoration:none;
-        font-size:13px;
-        font-weight:600;
-        white-space:nowrap;
-        flex:0 0 auto;
-      "
-    >
-      조건검색
-    </a>
+<a
+  href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
+  onclick="return openComboGuideModal(this.href);"
+  style="
+    display:inline-block;
+    padding:9px 13px;
+    border-radius:10px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1d4ed8;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:600;
+    white-space:nowrap;
+    flex:0 0 auto;
+  "
+>
+  조건검색
+</a>
 
   </div>
 
@@ -4246,8 +4269,33 @@ transition:0.2s;
 
 </div>
 
+<div id="comboGuideModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:420px;background:#ffffff;border-radius:20px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;">
+    
+    <div style="padding:18px 20px 12px 20px;border-bottom:1px solid #eef2f7;">
+      <div style="font-size:17px;font-weight:800;color:#111827;">조건검색 안내</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px;">사례기반 검색 결과 연동</div>
+    </div>
+
+    <div style="padding:18px 20px 8px 20px;font-size:14px;line-height:1.7;color:#374151;word-break:keep-all;">
+      조건검색 화면에는 <b>대분류와 중분류만</b> 반영됩니다.<br>
+      계속 하시겠습니까?
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 20px 20px 20px;">
+      <button type="button" onclick="moveComboGuideModal()" style="height:42px;padding:0 16px;border:none;border-radius:10px;background:#2563eb;color:#ffffff;font-size:14px;font-weight:700;cursor:pointer;">
+        확인
+      </button>
+      <button type="button" onclick="closeComboGuideModal()" style="height:42px;padding:0 16px;border:none;border-radius:10px;background:#e5e7eb;color:#374151;font-size:14px;font-weight:700;cursor:pointer;">
+        취소
+      </button>
+    </div>
+
+  </div>
+</div>
 
 <div class="loading" id="loading">
+
 
   <div class="loading-box">
 
@@ -4284,6 +4332,11 @@ let isRecording = false;
 
 function handleDescSidoChange(form){
   document.getElementById("descAction").value = "change_sido";
+  form.submit();
+}
+
+function handleDescSigunguChange(form){
+  document.getElementById("descAction").value = "change_sigungu";
   form.submit();
 }
 
@@ -4342,6 +4395,51 @@ function playBeep(type="start"){
     console.log("beep error:", e);
   }
 }
+
+let comboGuideTargetHref = "";
+
+function openComboGuideModal(href){
+  comboGuideTargetHref = href || "";
+
+  if(sessionStorage.getItem("comboGuideShown") === "1"){
+    window.location.href = comboGuideTargetHref;
+    return false;
+  }
+
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "flex";
+  }
+  return false;
+}
+
+function closeComboGuideModal(){
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+}
+
+function moveComboGuideModal(){
+  sessionStorage.setItem("comboGuideShown", "1");
+
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+
+  if(comboGuideTargetHref){
+    window.location.href = comboGuideTargetHref;
+  }
+}
+
+
+window.addEventListener("pageshow", function(){
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+});
 
 function setVoiceButtonRecording(active){
   if(!voiceBtn) return;
@@ -4427,7 +4525,7 @@ if(searchForm){
 }
 
 function resetDescPage(){
-  window.location.href = "/desc";
+  window.location.href = "/desc?action=reset_region";
 }
 
 window.addEventListener("load", function(){
@@ -4447,198 +4545,11 @@ window.addEventListener("popstate", function(e){
   }
 });
 
-function openTipModal(){
-  document.getElementById("tipModal").classList.add("show");
-  document.body.style.overflow = "hidden";
-}
-
-function closeTipModal(){
-  document.getElementById("tipModal").classList.remove("show");
-  document.body.style.overflow = "";
-}
-
-function handleTipBackdrop(event){
-  if(event.target.id === "tipModal"){
-    closeTipModal();
-  }
-}
-
 </script>
 
-<div id="tipModal" class="tip-modal" onclick="handleTipBackdrop(event)">
-  <div class="tip-modal-box">
-    <div class="tip-modal-head">
-      <div class="tip-modal-title">
-        <div class="tip-badge">TIP</div>
-        <span>입력 팁</span>
-      </div>
-      <button type="button" class="tip-close" onclick="closeTipModal()">✕</button>
-    </div>
-
-<div class="tip-modal-body">
   <div class="tip-notice">
-    <p>※ 통합판정조사, 지자체 조사의 
-<b class="highlight">참고사항 전문</b>을 모두 입력해도 
-<b class="highlight">AI가 추천서비스를 안내</b>합니다.</p>
-  </div>
-
-  <div class="tip-example-title">입력 예시)</div>
-
-  <div class="tip-example-box">
-    <div class="tip-example-text">
-
-      <div class="tip-row">
-        <div class="tip-num">1.</div>
-        <div class="tip-text">병력: 약 10년 전 뇌졸중으로 쓰러진 뒤 좌측 편마비 있음.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">2.</div>
-        <div class="tip-text">복용약물: 고혈압, 당뇨, 요통, 골다공증으로 관련약 및 진통제 복약 중</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">3.</div>
-        <div class="tip-text">인지저하 기능: 의사소통 가능하나 단기기억능력은 다소 저하되어 있음.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">4.</div>
-        <div class="tip-text">신체 저하기능</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">주1회 소변실수 있으며 편마비로 천천히 난간 등을 잡고 걸어야해서 가끔 화장실 가다 참지못하고 소변을 보기도 함.</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">편마비가 있으나 간단한 일상생활정도는 스스로 천천히 하면 수행가능함. 다만 옷은 혼자갈아입지 못해 도움이 필요함.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">5.</div>
-        <div class="tip-text">행동심리증상: 없음</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">6.</div>
-        <div class="tip-text">수발부담행동심리 증상: 없음</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">7.</div>
-        <div class="tip-text">간호 주요처치 및 증상: 최근 편마비로 인한 거동불편으로 낙상 후 좌측 발등이 벗겨져 상처 소독을 하고 있음.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">8.</div>
-        <div class="tip-text">도움이 필요한 수단적 일상생활 기능: 이동도움, 반찬 도움</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">9.</div>
-        <div class="tip-text">구강 건강문제: 없음</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">10.</div>
-        <div class="tip-text">영양 관련문제: 평소 시장에서 장을봐서 혼자 밥을 해먹고 있지만 컨디션이 좋지 않거나 귀찮으면 끼니를 거르기도 하며 과일, 채소 등 불충분한 섭취가 이루어지고 있음.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">11.</div>
-        <div class="tip-text">사회문화적 관계: 배우자가 2년전 사망하였으며 슬하에 2남 1녀 있으나 다들 타지에 살고 소원한 관계라고 함.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">12.</div>
-        <div class="tip-text">정신건강문제: 없음</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">13.</div>
-        <div class="tip-text">주거환경</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">편마비로 거동이 불편함에도 꼼꼼한 성격 탓에 집안 위생상태는 청결한편</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">오래된 다가구 주택에 살고 있어 벽지가 벗겨지거나 곰팡이가 피어있는 등 노후로 인한 주거 환경 개선은 필요함.</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">최근 낙상하는 횟수가 늘어 집안에 의자나 테이블 같은 잡기 쉬운 물건 들을 중간 중간 두고 생활함.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">14.</div>
-        <div class="tip-text">안정성 평가:</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">문틀이 있고 장판이 오래되어 바닥이 굴곡진 부분 등이 있어 낙상의 위험이 있음.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">15.</div>
-        <div class="tip-text">서비스 이용과 희망</div>
-      </div>
-
-      <div class="tip-subblock">(이용 서비스)</div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">최근 주민센터를 통해 도시락 지원서비스를 받았으나 좀 더 횟수가 늘길 희망함.</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">장기요양 4등급으로 방문요양 이용하고 있음.</div>
-      </div>
-
-      <div class="tip-subblock">(희망 서비스)</div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">벽지 교체 등 주택개선 사업에 참여하길 희망함.</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">반찬지원 횟수가 늘기를 희망하며 거동이 불편해 택시 등 이동 서비스 이용 희망함.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">16.</div>
-        <div class="tip-text">가족지지 정도: 슬하에 2남 1녀 있으며 자주 왕래하지는 않음.</div>
-      </div>
-
-      <div class="tip-row">
-        <div class="tip-num">17.</div>
-        <div class="tip-text">기타사항</div>
-      </div>
-
-      <div class="tip-bullet">
-        <div class="tip-dash">-</div>
-        <div class="tip-bullet-text">편마비로 거동이 불편하나 천천히 수행하면 대부분 일상생활은 수행하기도 함.</div>
-      </div>
-
-    </div>
-  </div>
-
-  <div class="tip-modal-foot">
-    <button type="button" class="tip-confirm" onclick="closeTipModal()">확인</button>
-  </div>
-</div>
-</div>
+    <p>※ 입력한 사례와 유사한 <b class="highlight">통합돌봄 서비스를 최대 30가지</b> 추천합니다.</p>
+    <p>※ 통합판정조사, 지자체 조사의 <b class="highlight">참고사항 전문</b>을 모두 입력해도 <b class="highlight">AI가 추천서비스를 안내</b>합니다.</p>
 
 </body>
 </html>
@@ -4859,7 +4770,7 @@ SYNONYM_GROUPS = {
             "목욕의자", "샤워의자", "이동변기", "간이변기",
             "기저귀", "패드", "전동침대", "병원침대",
             "욕창매트", "욕창방지", "자세변환", "체위변경",
-            "경사로", "문턱", "턱"
+            "경사로", "문턱", "턱", "배회감지기", "길잃음"
         ],
         "aliases": [
             "복지용구", "구입", "대여", "안전지원", "이동보조"
