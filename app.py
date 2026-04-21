@@ -622,7 +622,7 @@ def login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if pw == "nhis":  # 원하는 비밀번호
+        if pw == "nhis0240":  # 원하는 비밀번호
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
