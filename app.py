@@ -2741,8 +2741,17 @@ def desc():
         if any(k in q_norm for k in ["목욕차", "방문목욕", "목욕도움", "씻기기", "씻겨", "씻겨줬으면", "목욕시켜", "목욕"]):
             extra_aliases += ["요양", "방문목욕", "장기요양", "목욕지원", "신체청결"]
 
-        if any(k in q_norm for k in ["가사일", "집안일", "청소", "빨래", "반찬", "식사준비", "밥", "집에누가와서도와", "도와줬으면", "도움이필요", "생활도움"]):
-            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원", "식사도움", "청소도움", "빨래도움"]
+        if any(k in q_norm for k in ["식사", "식사도움", "식사 준비", "식사준비", "밥", "반찬", "도시락", "영양"]):
+            extra_aliases += ["가사지원", "일상생활지원", "식사도움"]
+
+        if any(k in q_norm for k in ["청소", "청소도움"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원", "청소도움"]
+
+        if any(k in q_norm for k in ["빨래", "세탁", "빨래도움"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원", "빨래도움"]
+
+        if any(k in q_norm for k in ["가사일", "집안일", "생활도움", "집에누가와서도와", "도와줬으면"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원"]
 
         if any(k in q_norm for k in ["돌봄", "간병", "부축", "옆에서도움", "집에서돌봐", "일상생활도움"]):
             extra_aliases += ["요양", "방문요양", "장기요양", "신체활동지원", "일상생활지원"]
@@ -2870,8 +2879,18 @@ def desc():
 6. 우선순위가 높은 순서대로 정렬한다.
 7. 최대 30개까지 추천한다.
 8. 가능하면 동일 유형 서비스는 중복 추천하지 말고, 서로 다른 유형의 서비스가 균형 있게 포함되도록 한다.
-
-반드시 JSON만 출력한다.
+9. direct_need는 수급자 또는 보호자가 특정 서비스나 도움을 직접 원한다고 표현한 경우에만 true로 표시한다.
+   - 예: '원함', '희망함', '필요함', '받고 싶어함', '원한다고 함', '희망한다고 함', '지원 희망', '욕구가 있음', '원하고 있음', '희망하고 있음', '바라고 있음'
+   - 하나의 문장에서 '원함', '희망함' 등의 표현이 있을 경우, 해당 표현은 바로 앞 또는 직접 연결된 대상에만 적용된다.
+   - 예를 들어 '식사 도움을 원하고 정서적으로 고립됨'은 식사 도움만 직접 욕구이며, 정서적 고립은 상태 설명이므로 direct_need가 아니다.
+   - 사용자의 상태나 환경을 보고 조사자 또는 시스템이 필요하다고 판단한 경우는 direct_need가 아니다.
+   - 환경 문제, 건강 문제, 위생 문제, 낙상 위험, 영양 문제 등이 있어도 사용자가 해당 서비스를 직접 원한다고 표현하지 않았다면 direct_need는 false이다.
+   - direct_need는 직접 표현된 욕구와 정확히 연결되는 서비스에만 true로 표시한다.
+   - 예를 들어 '외출욕구가 있음'이면 이동지원, 외출지원, 동행지원 등 외출과 직접 관련된 서비스만 direct_need=true이다.
+   - '식사도움이 필요함'이면 식사지원, 도시락배달 등 식사와 직접 관련된 서비스만 direct_need=true이다.
+   - 벌레, 고양이, 주거 문제 등으로 방역소독이 추천될 수는 있지만, 사용자가 방역소독을 직접 원한다고 표현하지 않았다면 direct_need는 false이다.
+10. 사용자의 직접 욕구에 해당하는 서비스만 더 높은 우선순위로 배치하고, 그 외 서비스는 일반 추천으로 유지한다.
+   - 사용자가 특정 영역을 명확히 요청한 경우(예: 식사, 외출 등), 다른 영역(예: 건강관리, 간호, IoT 등)은 직접 언급되지 않았다면 과도하게 확장하여 추천하지 않는다.11. 사용자의 요청이 특정 영역(예: 식사, 이동, 주거 등)에 명확히 해당하는 경우, 다른 영역(예: 건강관리, 간호, IoT 등)은 직접적으로 언급되지 않았다면 과도하게 확장하여 추천하지 않는다.
 설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
 
 출력 형식:
@@ -2879,7 +2898,8 @@ def desc():
   "results": [
     {{
       "index": 12,
-      "선택이유": "사용자의 무릎통증과 이동불편, 방문 희망 욕구에 맞아 우선 검토할 필요가 있음"
+      "선택이유": "사용자의 무릎통증과 이동불편, 방문 희망 욕구에 맞아 우선 검토할 필요가 있음",
+      "direct_need": true
     }}
   ]
 }}
@@ -2930,8 +2950,18 @@ def desc():
                         "대분류": row.get("대분류", ""),
                         "중분류": row.get("중분류", ""),
                         "서비스내용": row.get("서비스내용", ""),
-                        "선택이유": r.get("선택이유", "")
+                        "선택이유": r.get("선택이유", ""),
+                        "direct_need": bool(r.get("direct_need", False))
                     })
+
+            final_results.sort(
+                key=lambda x: (
+                    0 if x.get("direct_need") else 1,
+                    str(x.get("대분류", "")).strip(),
+                    str(x.get("중분류", "")).strip(),
+                    str(x.get("서비스내용", "")).strip()
+                )
+            )
 
             deduped = []
             seen_keys = set()
@@ -2945,8 +2975,6 @@ def desc():
                 if key not in seen_keys:
                     seen_keys.add(key)
                     deduped.append(item)
-
-
 
             final_results = deduped
 
@@ -4081,6 +4109,43 @@ button:hover{
 }
 
 
+.direct-need-box{
+  margin:14px 0 18px 0;
+  padding:14px;
+  border:2px solid #3b82f6;
+  border-radius:16px;
+  background:#eff6ff;
+}
+
+.direct-need-title{
+  display:inline-block;
+  margin-bottom:10px;
+  padding:6px 12px;
+  border-radius:999px;
+  background:#2563eb;
+  color:#ffffff;
+  font-size:13px;
+  font-weight:800;
+  line-height:1;
+}
+
+.direct-need-card{
+  border:1px solid #bfdbfe;
+  background:#ffffff;
+}
+
+@media (max-width:480px){
+  .direct-need-box{
+    margin:12px 0 16px 0;
+    padding:12px;
+    border-radius:14px;
+  }
+
+  .direct-need-title{
+    font-size:12px;
+    padding:6px 10px;
+  }
+}
 
 </style>
 </head>
@@ -4201,73 +4266,70 @@ transition:0.2s;
 
 <h3>{{count}}건의 추천 서비스</h3>
 
-
+{% set ns = namespace(direct_box_open=false) %}
 
 {% for r in service_results %}
 
-<div class="result-card">
+{% if not r.direct_need and ns.direct_box_open %}
+</div>
+{% set ns.direct_box_open = false %}
+{% endif %}
+
+{% if r.direct_need and not ns.direct_box_open %}
+<div class="direct-need-box">
+  <div class="direct-need-title">희망욕구</div>
+{% set ns.direct_box_open = true %}
+{% endif %}
+
+<div class="result-card {% if r.direct_need %}direct-need-card{% endif %}">
 
   <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px;">
 
-    <div style="font-weight:700; font-size:16px; line-height:1.5; flex:1;">
+    <div style="font-weight:800; font-size:17px; line-height:1.5; flex:1; color:#111827;">
       {{loop.index}}. {{r["대분류"]}} > {{r["중분류"]}} > {{r["서비스내용"]}}
     </div>
 
-<a
-  href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
-  onclick="return openComboGuideModal(this.href);"
-  style="
-    display:inline-block;
-    padding:9px 13px;
-    border-radius:10px;
-    background:#eff6ff;
-    border:1px solid #bfdbfe;
-    color:#1d4ed8;
-    text-decoration:none;
-    font-size:13px;
-    font-weight:600;
-    white-space:nowrap;
-    flex:0 0 auto;
-  "
->
-  조건검색
-</a>
+    <a
+      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
+      onclick="return openComboGuideModal(this.href);"
+      style="
+        display:inline-block;
+        padding:9px 13px;
+        border-radius:10px;
+        background:#eff6ff;
+        border:1px solid #bfdbfe;
+        color:#1d4ed8;
+        text-decoration:none;
+        font-size:13px;
+        font-weight:600;
+        white-space:nowrap;
+        flex:0 0 auto;
+      "
+    >
+      조건검색
+    </a>
 
   </div>
 
-  <div style="font-size:13px; line-height:1.6; color:#6b7280;">
-
-    <div>
-      <span style="color:#6b7280;">대분류:</span>
-      <b>{{r["대분류"]}}</b>
-    </div>
-
-    <div>
-      <span style="color:#6b7280;">중분류:</span>
-      <b>{{r["중분류"]}}</b>
-    </div>
-
-    <div>
-      <span style="color:#6b7280;">소분류:</span>
-      <b>{{r["서비스내용"]}}</b>
-    </div>
-
+  <div style="font-size:15px; line-height:1.75; color:#6b7280;">
+    <p style="margin:0 0 8px 0;"><b>대분류:</b> {{r["대분류"]}}</p>
+    <p style="margin:0 0 8px 0;"><b>중분류:</b> {{r["중분류"]}}</p>
+    <p style="margin:0 0 8px 0;"><b>소분류:</b> {{r["서비스내용"]}}</p>
+    <p style="margin:0;"><b>추천 이유:</b> {{r["선택이유"]}}</p>
   </div>
-
-  <div class="reason">
-    추천 이유: {{r["선택이유"]}}
-  </div>
-
 </div>
 
 {% endfor %}
 
+{% if ns.direct_box_open %}
+</div>
+{% endif %}
 
 </div>
 
 {% endif %}
 
-</div>
+
 
 <div id="comboGuideModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:99999;align-items:center;justify-content:center;padding:20px;">
   <div style="width:100%;max-width:420px;background:#ffffff;border-radius:20px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;">
