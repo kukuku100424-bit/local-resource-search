@@ -3800,6 +3800,27 @@ button:hover{
 }
 
 /* 로딩 */
+.loading-step-bar{
+  display:flex;
+  justify-content:center;
+  gap:6px;
+  margin:16px auto 0 auto;
+  width:150px;
+}
+
+.loading-step{
+  flex:1;
+  height:6px;
+  border-radius:999px;
+  background:#e5e7eb;
+  transition:background 0.3s ease, transform 0.3s ease;
+}
+
+.loading-step.active{
+  background:#2563eb;
+  transform:scaleY(1.15);
+}
+
 .loading{
   display:none;
   position:fixed;
@@ -4466,6 +4487,13 @@ transition:0.2s;
   어르신의 건강상태와 생활불편을 확인하고 있습니다.
 </p>
 
+<div class="loading-step-bar">
+  <div class="loading-step active"></div>
+  <div class="loading-step"></div>
+  <div class="loading-step"></div>
+  <div class="loading-step"></div>
+</div>
+
 <div class="ai-model-wrap" style="margin-top:28px;">
   <div class="ai-model-badge">
     <div class="ai-model-top">
@@ -4489,6 +4517,7 @@ const descSubmitBtn = document.getElementById("descSubmitBtn");
 
 const loadingText = document.getElementById("loadingText");
 const loadingSubText = document.getElementById("loadingSubText");
+const loadingSteps = document.querySelectorAll(".loading-step");
 
 const loadingMessages = [
   ["AI가 사례를 분석 중입니다", "어르신의 건강상태와 생활불편을 확인하고 있습니다."],
@@ -4508,6 +4537,14 @@ function startLoadingMessages(){
     loadingSubText.innerText = loadingMessages[0][1];
   }
 
+  loadingSteps.forEach(function(step, idx){
+    if(idx === 0){
+      step.classList.add("active");
+    }else{
+      step.classList.remove("active");
+    }
+  });
+
   loadingMessageTimer = setInterval(function(){
     loadingMessageIndex++;
 
@@ -4520,6 +4557,14 @@ function startLoadingMessages(){
       loadingText.innerText = loadingMessages[loadingMessageIndex][0];
       loadingSubText.innerText = loadingMessages[loadingMessageIndex][1];
     }
+    loadingSteps.forEach(function(step, idx){
+      if(idx <= loadingMessageIndex){
+        step.classList.add("active");
+      }else{
+        step.classList.remove("active");
+      }
+    });
+
   }, 4500);
 }
 
