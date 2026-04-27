@@ -723,11 +723,10 @@ body{
 </html>
 """
 
-@app.errorhandler(500)
-def internal_server_error(e):
+@app.errorhandler(Exception)
+def handle_all_errors(e):
     app.logger.exception(e)
     return render_template_string(ERROR_500_HTML), 500
-
 
 # =========================
 # 서버 오류 테스트용
