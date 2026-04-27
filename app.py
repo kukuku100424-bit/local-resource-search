@@ -4458,11 +4458,15 @@ transition:0.2s;
 
     <div class="spinner"></div>
 
-<p style="margin:14px 0 0 0;font-weight:700;font-size:15px;line-height:1.35;text-align:center;">
+<p id="loadingText" style="margin:14px 0 0 0;font-weight:700;font-size:15px;line-height:1.35;text-align:center;">
   AI가 사례를 분석 중입니다
 </p>
 
-<div class="ai-model-wrap">
+<p id="loadingSubText" style="margin:8px 0 0 0;font-size:13px;line-height:1.5;color:#6b7280;text-align:center;word-break:keep-all;">
+  어르신의 건강상태와 생활불편을 확인하고 있습니다.
+</p>
+
+<div class="ai-model-wrap" style="margin-top:28px;">
   <div class="ai-model-badge">
     <div class="ai-model-top">
       <img src="/static/gpt.png" class="ai-logo">
@@ -4482,6 +4486,42 @@ const loading = document.getElementById("loading");
 const queryInput = document.getElementById("queryInput");
 const voiceBtn = document.getElementById("voiceBtn");
 const descSubmitBtn = document.getElementById("descSubmitBtn");
+
+const loadingText = document.getElementById("loadingText");
+const loadingSubText = document.getElementById("loadingSubText");
+
+const loadingMessages = [
+  ["AI가 사례를 분석 중입니다", "어르신의 건강상태와 생활불편을 확인하고 있습니다."],
+  ["욕구를 분류하고 있습니다", "식사, 이동, 건강, 정서 등 돌봄 필요 상황을 살펴보고 있습니다."],
+  ["서비스 목록과 비교 중입니다", "입력한 사례와 관련 있는 통합돌봄 서비스를 찾고 있습니다."],
+  ["추천 결과를 정리하고 있습니다", "대분류, 중분류, 서비스내용, 추천이유를 정리하고 있습니다."]
+];
+
+let loadingMessageIndex = 0;
+let loadingMessageTimer = null;
+
+function startLoadingMessages(){
+  loadingMessageIndex = 0;
+
+  if(loadingText && loadingSubText){
+    loadingText.innerText = loadingMessages[0][0];
+    loadingSubText.innerText = loadingMessages[0][1];
+  }
+
+  loadingMessageTimer = setInterval(function(){
+    loadingMessageIndex++;
+
+    if(loadingMessageIndex >= loadingMessages.length){
+      loadingMessageIndex = loadingMessages.length - 1;
+      clearInterval(loadingMessageTimer);
+    }
+
+    if(loadingText && loadingSubText){
+      loadingText.innerText = loadingMessages[loadingMessageIndex][0];
+      loadingSubText.innerText = loadingMessages[loadingMessageIndex][1];
+    }
+  }, 4500);
+}
 
 const originalIcon = voiceBtn ? voiceBtn.innerHTML : "";
 let recognition = null;
@@ -4677,6 +4717,7 @@ if(searchForm){
 
     if(loading){
       loading.style.display = "flex";
+      startLoadingMessages();
     }
   });
 }
