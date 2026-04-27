@@ -1121,7 +1121,16 @@ HOME_HTML = """
 
 .bottom-img{
   width:100%;
-  margin-top:-100px; }
+  margin-top:-100px;
+  pointer-events:none;
+  position:relative;
+  z-index:0;
+}
+
+.bottom-row{
+  position:relative;
+  z-index:2;
+}
 
 @media (max-width:480px){
 
