@@ -648,6 +648,95 @@ def admin_login():
     return render_template_string(ADMIN_LOGIN_HTML, error="")
 
 # =========================
+# 서버 오류 안내 페이지
+# =========================
+ERROR_500_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서버 오류 안내</title>
+<style>
+body{
+  margin:0;
+  min-height:100vh;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  color:#111827;
+}
+.error-box{
+  width:100%;
+  max-width:460px;
+  background:white;
+  border-radius:18px;
+  padding:26px 22px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.08);
+  text-align:center;
+}
+.error-icon{
+  font-size:38px;
+  margin-bottom:12px;
+}
+.error-title{
+  font-size:20px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+.error-msg{
+  font-size:14px;
+  line-height:1.7;
+  color:#4b5563;
+  word-break:keep-all;
+  margin-bottom:20px;
+}
+.home-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:44px;
+  padding:0 18px;
+  border-radius:10px;
+  background:#2563eb;
+  color:white;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:700;
+}
+</style>
+</head>
+<body>
+  <div class="error-box">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title">일시적인 오류가 발생했습니다</div>
+    <div class="error-msg">
+      서버 사용량이 많거나 일시적인 오류로 요청을 처리하지 못했습니다.<br>
+      잠시 후 다시 시도해 주세요.
+    </div>
+    <a href="/home" class="home-btn">홈으로 이동</a>
+  </div>
+</body>
+</html>
+"""
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    app.logger.exception(e)
+    return render_template_string(ERROR_500_HTML), 500
+
+
+# =========================
+# 서버 오류 테스트용
+# =========================
+@app.route("/test500")
+def test500():
+    raise Exception("서버 오류 테스트")
+
+# =========================
 # 공통 CSS
 # =========================
 BASE_STYLE = """
@@ -2404,9 +2493,6 @@ input, select{
   <label>시군구</label>
   <select name="sigungu">
     <option value="">전체</option>
-    {% if sigungu and sigungu not in sigungu_options %}
-    <option value="{{sigungu}}" selected>{{sigungu}}</option>
-    {% endif %}
     {% for g in sigungu_options %}
     <option value="{{g}}" {% if g==sigungu %}selected{% endif %}>{{g}}</option>
     {% endfor %}
@@ -2562,6 +2648,7 @@ function closeModal(){
 }
 
 function handleSidoChange(form){
+  form.sigungu.value = "";
   document.getElementById("comboAction").value = "change_sido";
   form.submit();
 }
