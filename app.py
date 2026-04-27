@@ -4290,7 +4290,7 @@ button:hover{
 
 <div style="position:relative;">
 
-<textarea id="queryInput" name="query" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
+<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
 
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
