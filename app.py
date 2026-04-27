@@ -17,7 +17,7 @@ def make_cache_key(text):
     text = text.strip()
     text = re.sub(r"\s+", " ", text)
     return text
-def compress_text(s, max_len=100):
+def compress_text(s, max_len=60):
     s = str(s).strip()
     if len(s) <= max_len:
         return s
