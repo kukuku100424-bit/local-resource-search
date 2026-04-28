@@ -1212,6 +1212,7 @@ body{
   color:#111827;
 }
 
+
 .main-menu-card span{
   color:#4b5563;
 
@@ -1329,8 +1330,8 @@ body{
   }
 
 .card{
-  padding:16px;
-  min-height:50px;
+  padding:10px 14px;
+  min-height:0;
 }
 
   .icon{
