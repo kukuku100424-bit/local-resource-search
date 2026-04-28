@@ -1214,6 +1214,11 @@ body{
 
 .main-menu-card span{
   color:#4b5563;
+
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
 }
 
 .main-menu-card .icon{
