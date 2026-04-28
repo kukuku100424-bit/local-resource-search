@@ -1420,7 +1420,7 @@ body{
 <div class="icon">🤖</div>
 
 <div class="text">
-<b>사례기반 서비스내용 검색(AI)</b>
+<b>사례별 AI 추천 서비스 찾기</b>
 <span>입력한 사례를 분석하여 적합한 통합돌봄 서비스를 추천합니다.</span>
 </div>
 
@@ -1431,7 +1431,7 @@ body{
 <div class="icon">🔎</div>
 
 <div class="text">
-<b>조건기반 자원검색</b>
+<b>통합돌봄 서비스 기관 칮기</b>
 <span>시도, 시군구, 대분류, 중분류, 프로그램, 기관명 조건으로 서비스 자원을 검색합니다.</span>
 </div>
 
@@ -2264,7 +2264,7 @@ COMBO_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>조건기반 자원검색</title>
+<title>통합돌봄 서비스 기관 찾기</title>
 <style>{{style}}</style>
 <style>
 
@@ -2478,7 +2478,7 @@ input, select{
 </div>
 
 <div class="card">
-<h2>조건기반 자원검색</h2>
+<h2>통합돌봄 서비스 기관 찾기</h2>
 
 <form method="post">
 <input type="hidden" name="action" id="comboAction" value="">
@@ -3220,7 +3220,7 @@ DESC_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>사례기반 서비스내용 검색</title>
+<title>사례별 AI 추천 서비스 찾기</title>
 
 <style>
 
@@ -4277,7 +4277,7 @@ button:hover{
 
 <div class="title">
   <div class="title-row">
-    <h2>사례기반 서비스내용 검색</h2>
+    <h2>사례별 AI 추천 서비스 찾기</h2>
   </div>
 </div>
 
@@ -4422,7 +4422,7 @@ transition:0.2s;
         flex:0 0 auto;
       "
     >
-      조건검색
+      기관검색
     </a>
 
   </div>
