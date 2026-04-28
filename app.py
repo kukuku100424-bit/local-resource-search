@@ -1319,6 +1319,29 @@ body{
   margin-bottom:6px;
 }
 
+@media (max-width:480px){
+  .bottom-card{
+    padding:9px 10px !important;
+    border-radius:12px !important;
+  }
+
+  .bottom-card img{
+    width:24px !important;
+    margin-bottom:3px !important;
+  }
+
+  .bottom-card div{
+    font-size:12.5px !important;
+    line-height:1.2 !important;
+  }
+
+  .bottom-row{
+    gap:8px !important;
+    margin-top:6px !important;
+    margin-bottom:8px !important;
+  }
+}
+
 .bottom-card div{
   font-size:14px;
 }
@@ -1331,7 +1354,7 @@ body{
   }
 
 .card{
-  padding:10px 14px;
+  padding:14px 16px;
   min-height:0;
 }
 
@@ -2766,7 +2789,24 @@ def ocr():
         )
 
         text = res.output[0].content[0].text
-        return {"text": text}
+
+        usage = getattr(res, "usage", None)
+
+        input_tokens = getattr(usage, "input_tokens", 0) if usage else 0
+        output_tokens = getattr(usage, "output_tokens", 0) if usage else 0
+        total_tokens = getattr(usage, "total_tokens", 0) if usage else 0
+
+        print("OCR 입력 토큰:", input_tokens)
+        print("OCR 출력 토큰:", output_tokens)
+        print("OCR 총 토큰:", total_tokens)
+
+        return {
+            "text": text,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens
+        }
+
 
     except Exception as e:
         print("OCR 오류:", e)
@@ -4957,6 +4997,17 @@ document.getElementById("imgInput").addEventListener("change", async function(){
 
   const formData = new FormData();
   formData.append("image", file);
+
+  const loadingOverlay = document.getElementById("loadingOverlay");
+  const loadingText = document.getElementById("loadingText");
+
+  if(loadingOverlay){
+    loadingOverlay.style.display = "flex";
+  }
+
+  if(loadingText){
+    loadingText.innerText = "사진 속 글자를 인식하고 있습니다...";
+  }
 
   try{
     const res = await fetch("/ocr", {
