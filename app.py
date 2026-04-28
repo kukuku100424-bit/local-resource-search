@@ -1319,30 +1319,6 @@ body{
   margin-bottom:6px;
 }
 
-@media (max-width:480px){
-  .bottom-card{
-    padding:14px 12px !important;   /* 🔥 핵심: 9 → 14로 키움 */
-    border-radius:12px !important;
-  }
-
-  .bottom-card img{
-    width:28px !important;   /* 🔥 아이콘도 같이 키움 */
-    margin-bottom:5px !important;
-  }
-
-  .bottom-card div{
-    font-size:13.5px !important;   /* 🔥 글자 살짝 키움 */
-    line-height:1.3 !important;
-  }
-}
-
-  .bottom-row{
-    gap:8px !important;
-    margin-top:6px !important;
-    margin-bottom:8px !important;
-  }
-}
-
 .bottom-card div{
   font-size:14px;
 }
@@ -1350,13 +1326,49 @@ body{
 /* 모바일 */
 @media (max-width:480px){
 
+.main-menu-card,
+.sub-card{
+  min-height:60px !important;
+}
+
+.bottom-card{
+  flex:1;
+
+  background:white;
+
+  border-radius:14px;
+
+  padding:6px 10px;
+
+  min-height:54px;
+
+  text-align:center;
+
+  text-decoration:none;
+
+  color:#111827;
+
+  box-shadow:0 6px 16px rgba(0,0,0,0.08);
+
+  transition:0.15s;
+
+  display:flex;
+  flex-direction:column;
+  justify-content:center;   /* 👈 이거 핵심 */
+  align-items:center;       /* 👈 이거 추가 */
+}
+
+.bottom-card img{
+  width:20px !important;
+  margin-bottom:2px !important;
+}
   .title h1{
     font-size:22px;
   }
 
 .card{
-  padding:14px 16px;
-  min-height:0;
+  padding:8px 12px !important;
+  min-height:60px !important;
 }
 
   .icon{
@@ -2741,7 +2753,6 @@ function setSearchAction(){
   document.getElementById("comboAction").value = "search";
 }
 
-
 function resetDescPage(){
   window.location.href = "/combo";
 }
@@ -2808,7 +2819,6 @@ def ocr():
             "total_tokens": total_tokens
         }
 
-
     except Exception as e:
         print("OCR 오류:", e)
         return {"text": ""}
@@ -2851,6 +2861,29 @@ def desc():
         
     if request.method == "POST" and do_search:
         import time
+
+        now_time = time.time()
+        last_search_time = session.get("desc_last_search_time", 0)
+
+        if now_time - float(last_search_time or 0) < 10:
+            warning_msg = "검색 요청이 너무 빠릅니다.\n잠시 후 다시 검색해 주세요."
+
+            return render_template_string(
+                DESC_HTML,
+                style=BASE_STYLE,
+                query=query,
+                results=results,
+                cond_display=cond_display,
+                count=0,
+                service_results=[],
+                warning_msg=warning_msg,
+                selected_sido=selected_sido,
+                selected_sigungu=selected_sigungu,
+                sido_options=SIDO_OPTIONS,
+                sigungu_options=SIGUNGU_MAP.get(selected_sido, [])
+            )
+
+        session["desc_last_search_time"] = now_time
 
         if cache_key in DESC_CACHE:
             cached = DESC_CACHE[cache_key]
@@ -3302,6 +3335,9 @@ def desc():
 
         elif count >= 15:
             warning_msg = "15개 이상의 서비스가 검색되었습니다.\n복합적인 서비스 연계가 필요한 대상일 수 있습니다."
+            if not service_results:
+                warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 구체적으로 입력해 주세요."
+                count = 0
 
         DESC_CACHE[cache_key] = {
             "results": service_results,
@@ -3828,56 +3864,6 @@ body{
   box-shadow:0 8px 24px rgba(0,0,0,0.08);
 }
 
-.input-wrap{
-  position:relative;
-}
-
-#voiceBtn,
-#imgBtn{
-  display:none !important;
-}
-
-@media (max-width:768px){
-  #voiceBtn,
-  #imgBtn{
-    position:absolute !important;
-    right:12px !important;
-    width:42px !important;
-    height:42px !important;
-    min-width:42px !important;
-    max-width:42px !important;
-    margin:0 !important;
-    padding:0 !important;
-    border-radius:50% !important;
-    border:none !important;
-    background:#3b82f6 !important;
-    color:white !important;
-    display:flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-    box-shadow:0 4px 12px rgba(37,99,235,0.35) !important;
-    cursor:pointer !important;
-    z-index:30 !important;
-    line-height:1 !important;
-  }
-
-  #voiceBtn{
-    top:22px !important;
-    font-size:18px !important;
-  }
-
-  #imgBtn{
-    top:72px !important;
-    font-size:0 !important;
-  }
-
-  #imgBtn::before{
-    content:"📷";
-    font-size:18px;
-    line-height:1;
-  }
-}
-
 /* 텍스트 입력 */
 #queryInput{
   width:100%;
@@ -3917,6 +3903,60 @@ textarea:focus{
   border-color:#2563eb;
 }
 
+.warning-box{
+  margin:6px 0 16px 0;
+  padding:14px 18px;
+  border-radius:14px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.7;
+  white-space:pre-line;
+  word-break:keep-all;
+}
+
+
+/* 👇 여기다 붙여 */
+#voiceBtn,
+#imgBtn{
+  display:none !important;
+}
+
+@media (max-width:768px){
+  #voiceBtn,
+  #imgBtn{
+    position:absolute !important;
+    right:12px !important;
+    width:42px !important;
+    height:42px !important;
+    min-width:42px !important;
+    max-width:42px !important;
+    margin:0 !important;
+    padding:0 !important;
+    border-radius:50% !important;
+    border:none !important;
+    background:rgba(37,99,235,0.92) !important;
+    color:white !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15) !important;
+    cursor:pointer !important;
+    z-index:30 !important;
+    line-height:1 !important;
+  }
+
+  #voiceBtn{
+    top:24px !important;
+  }
+
+  #imgBtn{
+    top:70px !important;
+  }
+}
+
 #imgBtn{
   display:none;
 }
@@ -3925,7 +3965,7 @@ textarea:focus{
   #imgBtn{
     position:absolute;
     right:12px;
-    top:108px;
+    top:62px;
     width:42px;
     height:42px;
     margin:0;
@@ -3935,25 +3975,15 @@ textarea:focus{
     justify-content:center;
     border-radius:50%;
     border:none;
-    background:#3b82f6;
+    background:rgba(37,99,235,0.92);
     color:white;
-    font-size:0;
-    box-shadow:0 4px 12px rgba(37,99,235,0.35);
+    font-size:18px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15);
     cursor:pointer;
     z-index:10;
   }
+}
 
-  #imgBtn::before{
-    content:"";
-    width:20px;
-    height:20px;
-    display:block;
-    background:white;
-    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4l-1.8 2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-3.2L15 4H9zm3 14c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-2.2c1.55 0 2.8-1.25 2.8-2.8s-1.25-2.8-2.8-2.8-2.8 1.25-2.8 2.8 1.25 2.8 2.8 2.8z'/%3E%3C/svg%3E") center / contain no-repeat;
-    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4l-1.8 2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-3.2L15 4H9zm3 14c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-2.2c1.55 0 2.8-1.25 2.8-2.8s-1.25-2.8-2.8-2.8-2.8 1.25-2.8 2.8 1.25 2.8 2.8 2.8z'/%3E%3C/svg%3E") center / contain no-repeat;
-  }
-
-  
 /* 버튼 */
 button{
   width:100%;
@@ -4525,17 +4555,9 @@ button:hover{
 
 <div style="position:relative;">
 
-<div class="input-wrap">
+<div class="textarea-wrap">
 
-  <textarea id="queryInput" name="query" maxlength="2000"
-  placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
-
-  <button type="button" id="voiceBtn" onclick="startVoiceInput(event)">🎤</button>
-
-  <input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none;">
-  <button type="button" onclick="openImage()" id="imgBtn">📷</button>
-
-</div>
+<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
 
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
@@ -4564,9 +4586,13 @@ transition:0.2s;
 
 </button>
 
-<input type="file" id="imgInput" accept="image/*" style="display:none;">
-<button type="button" onclick="openImage()" id="imgBtn">📷</button>
+<input type="file" id="imgInput" accept="image/*;capture=camera" capture="environment" style="display:none;">
 
+<button type="button" onclick="openImage()" id="imgBtn">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 24 24">
+    <path d="M20 5h-3.2l-1.6-2H8.8L7.2 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 13c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm0-8.2c-1.8 0-3.2 1.4-3.2 3.2s1.4 3.2 3.2 3.2 3.2-1.4 3.2-3.2-1.4-3.2-3.2-3.2z"/>
+  </svg>
+</button>
 </div>
 
 <div class="voice-inline" id="voiceOverlay">
@@ -4594,7 +4620,9 @@ transition:0.2s;
 </div>
 
 <div id="searchResultSection">
-
+{% if warning_msg %}
+<div class="warning-box">{{ warning_msg }}</div>
+{% endif %}
 {% if service_results %}
 
 <div class="result" id="resultArea">
@@ -4953,8 +4981,6 @@ recognition.onresult = function(e){
   if(overlay){
     overlay.style.display = "none";
   }
-
-  document.getElementById("descSubmitBtn").click();
 };
 
 recognition.onend = function(){
@@ -4970,38 +4996,6 @@ recognition.onend = function(){
 
 
   recognition.start();
-}
-
-if(searchForm){
-  searchForm.addEventListener("submit", function(){
-    if(descSubmitBtn){
-      descSubmitBtn.disabled = true;
-      descSubmitBtn.innerText = "검색 중...";
-      descSubmitBtn.style.opacity = "0.7";
-      descSubmitBtn.style.cursor = "not-allowed";
-    }
-
-    if(loading){
-      loading.style.display = "flex";
-      startLoadingMessages();
-    }
-  });
-}
-
-if(searchForm){
-  searchForm.addEventListener("submit", function(){
-    if(descSubmitBtn){
-      descSubmitBtn.disabled = true;
-      descSubmitBtn.innerText = "검색 중...";
-      descSubmitBtn.style.opacity = "0.7";
-      descSubmitBtn.style.cursor = "not-allowed";
-    }
-
-    if(loading){
-      loading.style.display = "flex";
-      startLoadingMessages();
-    }
-  });
 }
 
 function openImage(){
@@ -5065,6 +5059,21 @@ document.getElementById("imgInput").addEventListener("change", async function(){
   }
 });
 
+if(searchForm){
+  searchForm.addEventListener("submit", function(){
+    if(descSubmitBtn){
+      descSubmitBtn.disabled = true;
+      descSubmitBtn.innerText = "검색 중...";
+      descSubmitBtn.style.opacity = "0.7";
+      descSubmitBtn.style.cursor = "not-allowed";
+    }
+
+    if(loading){
+      loading.style.display = "flex";
+      startLoadingMessages();
+    }
+  });
+}
 
 function resetDescPage(){
   window.location.href = "/desc?action=reset_region";
@@ -6470,71 +6479,6 @@ document.getElementById("careForm").onsubmit = async function(e){
 };
 
 updateScoreBanner();
-
-function openImage(){
-    document.getElementById("imgInput").click();
-}
-
-document.getElementById("imgInput").addEventListener("change", async function(){
-  const file = this.files[0];
-  if(!file) return;
-
-  const formData = new FormData();
-  formData.append("image", file);
-
-  // 1단계: 사진 확인 누른 직후 바로 뜨는 OCR 안내박스
-  if(loading){
-    loading.style.display = "flex";
-  }
-
-  if(loadingText){
-    loadingText.innerText = "사진 속 글자를 분석하고 있습니다";
-  }
-
-  if(loadingSubText){
-    loadingSubText.innerText = "촬영한 이미지에서 사례 내용을 추출하는 중입니다.";
-  }
-
-  loadingSteps.forEach(function(step){
-    step.classList.remove("active");
-  });
-
-  try{
-    const res = await fetch("/ocr", {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await res.json();
-    const ocrText = (data.text || "").trim();
-
-    if(!ocrText){
-      if(loading){
-        loading.style.display = "none";
-      }
-
-      alert("사진에서 글자를 인식하지 못했습니다. 다시 촬영해 주세요.");
-      return;
-    }
-
-    queryInput.value = ocrText;
-
-    // 2단계: OCR 성공 후 기존 AI 검색 로딩박스로 전환
-    startLoadingMessages();
-
-    document.getElementById("descAction").value = "search";
-    searchForm.submit();
-
-  }catch(e){
-    if(loading){
-      loading.style.display = "none";
-    }
-
-    alert("이미지 인식 실패");
-  }
-});
-
-
 </script>
 
 </body>
