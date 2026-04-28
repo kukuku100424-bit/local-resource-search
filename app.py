@@ -1205,6 +1205,45 @@ body{
   transform:translateY(-3px);
   box-shadow:0 14px 32px rgba(0,0,0,0.12);
 }
+.main-menu-card{
+  background:white;
+  border:1px solid #e5e7eb;
+  border-left:8px solid #fb7185;
+  color:#111827;
+}
+
+.main-menu-card span{
+  color:#4b5563;
+}
+
+.main-menu-card .icon{
+  background:#fff1f2;
+}
+
+.main-menu-card:hover{
+  background:#fff7f8;
+  border-left-color:#f43f5e;
+}
+
+.sub-card{
+  background:white;
+  border:1px solid #e5e7eb;
+  border-left:8px solid #60a5fa;
+  color:#111827;
+}
+
+.sub-card span{
+  color:#4b5563;
+}
+
+.sub-card .icon{
+  background:#eff6ff;
+}
+
+.sub-card:hover{
+  background:#f8fbff;
+  border-left-color:#3b82f6;
+}
 
 /* 아이콘 */
 .icon{
@@ -1415,7 +1454,7 @@ body{
 <p>국민건강보험공단 통합돌봄 지원 시스템</p>
 </div>
 
-<a href="/desc" class="card">
+<a href="/desc" class="card main-menu-card">
 
 <div class="icon">🤖</div>
 
@@ -1426,7 +1465,7 @@ body{
 
 </a>
 
-<a href="/combo" class="card">
+<a href="/combo" class="card main-menu-card">
 
 <div class="icon">🔎</div>
 
@@ -1437,7 +1476,7 @@ body{
 
 </a>
 
-<a href="/care" class="card">
+<a href="/care" class="card sub-card">
 
 <div class="icon">📝</div>
 
