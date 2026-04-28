@@ -920,6 +920,7 @@ input, select{
     word-break:keep-all;   /* 🔥 핵심 */
   }
 
+
   /* 안내문 */
   .notice{
     font-size:12px;
@@ -2716,6 +2717,7 @@ function setSearchAction(){
   document.getElementById("comboAction").value = "search";
 }
 
+
 function resetDescPage(){
   window.location.href = "/combo";
 }
@@ -2738,6 +2740,37 @@ window.addEventListener("load", function(){
 </html>
 """
 
+@app.route("/ocr", methods=["POST"])
+def ocr():
+    file = request.files.get("image")
+    if not file:
+        return {"text": ""}
+
+    import base64
+    from openai import OpenAI
+    client = OpenAI()
+
+    img_bytes = file.read()
+    img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+    try:
+        res = client.responses.create(
+            model="gpt-4.1-mini",
+            input=[{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "이미지의 한글 텍스트를 그대로 추출해줘. 줄바꿈 유지."},
+                    {"type": "input_image", "image_base64": img_base64}
+                ]
+            }]
+        )
+
+        text = res.output[0].content[0].text
+        return {"text": text}
+
+    except Exception as e:
+        print("OCR 오류:", e)
+        return {"text": ""}
 
 @app.route("/desc", methods=["GET","POST"])
 def desc():
@@ -3754,6 +3787,56 @@ body{
   box-shadow:0 8px 24px rgba(0,0,0,0.08);
 }
 
+.input-wrap{
+  position:relative;
+}
+
+#voiceBtn,
+#imgBtn{
+  display:none !important;
+}
+
+@media (max-width:768px){
+  #voiceBtn,
+  #imgBtn{
+    position:absolute !important;
+    right:12px !important;
+    width:42px !important;
+    height:42px !important;
+    min-width:42px !important;
+    max-width:42px !important;
+    margin:0 !important;
+    padding:0 !important;
+    border-radius:50% !important;
+    border:none !important;
+    background:#3b82f6 !important;
+    color:white !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    box-shadow:0 4px 12px rgba(37,99,235,0.35) !important;
+    cursor:pointer !important;
+    z-index:30 !important;
+    line-height:1 !important;
+  }
+
+  #voiceBtn{
+    top:22px !important;
+    font-size:18px !important;
+  }
+
+  #imgBtn{
+    top:72px !important;
+    font-size:0 !important;
+  }
+
+  #imgBtn::before{
+    content:"📷";
+    font-size:18px;
+    line-height:1;
+  }
+}
+
 /* 텍스트 입력 */
 #queryInput{
   width:100%;
@@ -3793,6 +3876,43 @@ textarea:focus{
   border-color:#2563eb;
 }
 
+#imgBtn{
+  display:none;
+}
+
+@media (max-width:768px){
+  #imgBtn{
+    position:absolute;
+    right:12px;
+    top:108px;
+    width:42px;
+    height:42px;
+    margin:0;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:50%;
+    border:none;
+    background:#3b82f6;
+    color:white;
+    font-size:0;
+    box-shadow:0 4px 12px rgba(37,99,235,0.35);
+    cursor:pointer;
+    z-index:10;
+  }
+
+  #imgBtn::before{
+    content:"";
+    width:20px;
+    height:20px;
+    display:block;
+    background:white;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4l-1.8 2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-3.2L15 4H9zm3 14c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-2.2c1.55 0 2.8-1.25 2.8-2.8s-1.25-2.8-2.8-2.8-2.8 1.25-2.8 2.8 1.25 2.8 2.8 2.8z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 4l-1.8 2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-3.2L15 4H9zm3 14c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-2.2c1.55 0 2.8-1.25 2.8-2.8s-1.25-2.8-2.8-2.8-2.8 1.25-2.8 2.8 1.25 2.8 2.8 2.8z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+
+  
 /* 버튼 */
 button{
   width:100%;
@@ -4364,7 +4484,17 @@ button:hover{
 
 <div style="position:relative;">
 
-<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
+<div class="input-wrap">
+
+  <textarea id="queryInput" name="query" maxlength="2000"
+  placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
+
+  <button type="button" id="voiceBtn" onclick="startVoiceInput(event)">🎤</button>
+
+  <input type="file" id="imgInput" accept="image/*" style="display:none;">
+  <button type="button" onclick="openImage()" id="imgBtn">📷</button>
+
+</div>
 
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
@@ -4392,6 +4522,9 @@ transition:0.2s;
 </svg>
 
 </button>
+
+<input type="file" id="imgInput" accept="image/*" style="display:none;">
+<button type="button" onclick="openImage()" id="imgBtn">📷</button>
 
 </div>
 
@@ -4811,6 +4944,35 @@ if(searchForm){
     }
   });
 }
+
+function openImage(){
+  document.getElementById("imgInput").click();
+}
+
+document.getElementById("imgInput").addEventListener("change", async function(){
+  const file = this.files[0];
+  if(!file) return;
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  try{
+    const res = await fetch("/ocr", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    const input = document.getElementById("queryInput");
+    input.value = data.text;
+
+    document.getElementById("descSubmitBtn").click();
+
+  }catch(e){
+    alert("이미지 인식 실패");
+  }
+});
 
 function resetDescPage(){
   window.location.href = "/desc?action=reset_region";
@@ -6216,6 +6378,36 @@ document.getElementById("careForm").onsubmit = async function(e){
 };
 
 updateScoreBanner();
+
+function openImage(){
+    document.getElementById("imgInput").click();
+}
+
+document.getElementById("imgInput").addEventListener("change", async function(){
+    const file = this.files[0];
+    if(!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try{
+        const res = await fetch("/ocr", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await res.json();
+
+        const input = document.getElementById("queryInput");
+        input.value = data.text;
+
+        document.getElementById("descSubmitBtn").click();
+
+    }catch(e){
+        alert("이미지 인식 실패");
+    }
+});
+
 </script>
 
 </body>
