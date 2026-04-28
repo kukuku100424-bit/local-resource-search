@@ -3949,11 +3949,11 @@ textarea:focus{
   }
 
   #voiceBtn{
-    top:24px !important;
+    top:20px !important;
   }
 
   #imgBtn{
-    top:70px !important;
+    top:80px !important;
   }
 }
 
@@ -3965,7 +3965,7 @@ textarea:focus{
   #imgBtn{
     position:absolute;
     right:12px;
-    top:62px;
+    top:90px;
     width:42px;
     height:42px;
     margin:0;
