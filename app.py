@@ -2760,7 +2760,7 @@ def ocr():
                 "role": "user",
                 "content": [
                     {"type": "input_text", "text": "이미지의 한글 텍스트를 그대로 추출해줘. 줄바꿈 유지."},
-                    {"type": "input_image", "image_base64": img_base64}
+                    {"type": "input_image", "image_url": f"data:{file.mimetype};base64,{img_base64}"}
                 ]
             }]
         )
@@ -4967,7 +4967,15 @@ document.getElementById("imgInput").addEventListener("change", async function(){
     const data = await res.json();
 
     const input = document.getElementById("queryInput");
-    input.value = data.text;
+
+    const ocrText = (data.text || "").trim();
+
+    if(!ocrText){
+      alert("사진에서 글자를 인식하지 못했습니다. 다시 촬영해 주세요.");
+      return;
+    }
+
+    input.value = ocrText;
 
     document.getElementById("descSubmitBtn").click();
 
