@@ -1321,19 +1321,20 @@ body{
 
 @media (max-width:480px){
   .bottom-card{
-    padding:9px 10px !important;
+    padding:14px 12px !important;   /* 🔥 핵심: 9 → 14로 키움 */
     border-radius:12px !important;
   }
 
   .bottom-card img{
-    width:24px !important;
-    margin-bottom:3px !important;
+    width:28px !important;   /* 🔥 아이콘도 같이 키움 */
+    margin-bottom:5px !important;
   }
 
   .bottom-card div{
-    font-size:12.5px !important;
-    line-height:1.2 !important;
+    font-size:13.5px !important;   /* 🔥 글자 살짝 키움 */
+    line-height:1.3 !important;
   }
+}
 
   .bottom-row{
     gap:8px !important;
@@ -4987,6 +4988,22 @@ if(searchForm){
   });
 }
 
+if(searchForm){
+  searchForm.addEventListener("submit", function(){
+    if(descSubmitBtn){
+      descSubmitBtn.disabled = true;
+      descSubmitBtn.innerText = "검색 중...";
+      descSubmitBtn.style.opacity = "0.7";
+      descSubmitBtn.style.cursor = "not-allowed";
+    }
+
+    if(loading){
+      loading.style.display = "flex";
+      startLoadingMessages();
+    }
+  });
+}
+
 function openImage(){
   document.getElementById("imgInput").click();
 }
@@ -4998,16 +5015,21 @@ document.getElementById("imgInput").addEventListener("change", async function(){
   const formData = new FormData();
   formData.append("image", file);
 
-  const loadingOverlay = document.getElementById("loadingOverlay");
-  const loadingText = document.getElementById("loadingText");
-
-  if(loadingOverlay){
-    loadingOverlay.style.display = "flex";
+  if(loading){
+    loading.style.display = "flex";
   }
 
   if(loadingText){
-    loadingText.innerText = "사진 속 글자를 인식하고 있습니다...";
+    loadingText.innerText = "사진 속 글자를 분석하고 있습니다";
   }
+
+  if(loadingSubText){
+    loadingSubText.innerText = "촬영한 이미지에서 사례 내용을 추출하는 중입니다.";
+  }
+
+  loadingSteps.forEach(function(step){
+    step.classList.remove("active");
+  });
 
   try{
     const res = await fetch("/ocr", {
@@ -5016,24 +5038,33 @@ document.getElementById("imgInput").addEventListener("change", async function(){
     });
 
     const data = await res.json();
-
-    const input = document.getElementById("queryInput");
-
     const ocrText = (data.text || "").trim();
 
     if(!ocrText){
+      if(loading){
+        loading.style.display = "none";
+      }
+
       alert("사진에서 글자를 인식하지 못했습니다. 다시 촬영해 주세요.");
       return;
     }
 
-    input.value = ocrText;
+    queryInput.value = ocrText;
 
-    document.getElementById("descSubmitBtn").click();
+    startLoadingMessages();
+
+    document.getElementById("descAction").value = "search";
+    searchForm.submit();
 
   }catch(e){
+    if(loading){
+      loading.style.display = "none";
+    }
+
     alert("이미지 인식 실패");
   }
 });
+
 
 function resetDescPage(){
   window.location.href = "/desc?action=reset_region";
@@ -6445,29 +6476,64 @@ function openImage(){
 }
 
 document.getElementById("imgInput").addEventListener("change", async function(){
-    const file = this.files[0];
-    if(!file) return;
+  const file = this.files[0];
+  if(!file) return;
 
-    const formData = new FormData();
-    formData.append("image", file);
+  const formData = new FormData();
+  formData.append("image", file);
 
-    try{
-        const res = await fetch("/ocr", {
-            method: "POST",
-            body: formData
-        });
+  // 1단계: 사진 확인 누른 직후 바로 뜨는 OCR 안내박스
+  if(loading){
+    loading.style.display = "flex";
+  }
 
-        const data = await res.json();
+  if(loadingText){
+    loadingText.innerText = "사진 속 글자를 분석하고 있습니다";
+  }
 
-        const input = document.getElementById("queryInput");
-        input.value = data.text;
+  if(loadingSubText){
+    loadingSubText.innerText = "촬영한 이미지에서 사례 내용을 추출하는 중입니다.";
+  }
 
-        document.getElementById("descSubmitBtn").click();
+  loadingSteps.forEach(function(step){
+    step.classList.remove("active");
+  });
 
-    }catch(e){
-        alert("이미지 인식 실패");
+  try{
+    const res = await fetch("/ocr", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    const ocrText = (data.text || "").trim();
+
+    if(!ocrText){
+      if(loading){
+        loading.style.display = "none";
+      }
+
+      alert("사진에서 글자를 인식하지 못했습니다. 다시 촬영해 주세요.");
+      return;
     }
+
+    queryInput.value = ocrText;
+
+    // 2단계: OCR 성공 후 기존 AI 검색 로딩박스로 전환
+    startLoadingMessages();
+
+    document.getElementById("descAction").value = "search";
+    searchForm.submit();
+
+  }catch(e){
+    if(loading){
+      loading.style.display = "none";
+    }
+
+    alert("이미지 인식 실패");
+  }
 });
+
 
 </script>
 
