@@ -4491,7 +4491,7 @@ button:hover{
 
   <button type="button" id="voiceBtn" onclick="startVoiceInput(event)">🎤</button>
 
-  <input type="file" id="imgInput" accept="image/*" style="display:none;">
+  <input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none;">
   <button type="button" onclick="openImage()" id="imgBtn">📷</button>
 
 </div>
@@ -4912,6 +4912,8 @@ recognition.onresult = function(e){
   if(overlay){
     overlay.style.display = "none";
   }
+
+  document.getElementById("descSubmitBtn").click();
 };
 
 recognition.onend = function(){
