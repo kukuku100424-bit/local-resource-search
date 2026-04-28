@@ -1513,7 +1513,7 @@ body{
 <div class="icon">🔎</div>
 
 <div class="text">
-<b>통합돌봄 서비스 기관 칮기</b>
+<b>통합돌봄 서비스 기관 찾기</b>
 <span>시도, 시군구, 대분류, 중분류 등 조건으로 서비스 자원을 검색합니다.</span>
 </div>
 
@@ -4981,6 +4981,15 @@ recognition.onresult = function(e){
   if(overlay){
     overlay.style.display = "none";
   }
+
+  if(loading){
+    loading.style.display = "flex";
+  }
+
+  startLoadingMessages();
+
+  document.getElementById("descAction").value = "search";
+  searchForm.submit();
 };
 
 recognition.onend = function(){
