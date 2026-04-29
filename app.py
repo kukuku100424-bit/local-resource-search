@@ -622,7 +622,7 @@ def login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if pw == "nhis0240":  # 원하는 비밀번호
+        if pw == "1234":  # 원하는 비밀번호
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
@@ -3331,7 +3331,7 @@ def desc():
         count = len(service_results)
 
         if count == 0:
-            warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 조금 더 구체적으로 입력해 주세요."
+            warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활환경, 돌봄 필요 상황 등을 조금 더 구체적으로 입력해 주세요."
 
         elif count >= 15:
             warning_msg = "15개 이상의 서비스가 검색되었습니다.\n복합적인 서비스 연계가 필요한 대상일 수 있습니다."
