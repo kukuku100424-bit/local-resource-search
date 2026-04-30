@@ -29,6 +29,7 @@ def compress_text(s, max_len=60):
 app = Flask(__name__)
 DESC_CACHE = {}
 import datetime
+from zoneinfo import ZoneInfo
 
                            
 SUPABASE_URL = "https://iiktpwqncvwvrzytfssb.supabase.co"
@@ -41,7 +42,7 @@ SUPABASE_HEADERS = {
 }
 
 def update_visitors():
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
 
     # 🔥 로컬 테스트용
     if os.getenv("RENDER") is None:
