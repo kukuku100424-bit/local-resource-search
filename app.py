@@ -124,6 +124,10 @@ def update_visitors():
 
 app.secret_key = "super_secret_key"
 
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
 @app.before_request
 def require_login_all_pages():
     if (
