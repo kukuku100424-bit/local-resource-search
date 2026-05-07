@@ -1221,7 +1221,7 @@ body{
 .main-menu-card{
   background:white;
   border:1px solid #e5e7eb;
-  border-left:8px solid #fb7185;
+  border-left:8px solid #60a5fa;
   color:#111827;
 }
 
@@ -1236,18 +1236,18 @@ body{
 }
 
 .main-menu-card .icon{
-  background:#fff1f2;
+  background:#eff6ff;
 }
 
 .main-menu-card:hover{
-  background:#fff7f8;
-  border-left-color:#f43f5e;
+  background:#f8fbff;
+  border-left-color:#3b82f6;
 }
 
 .sub-card{
   background:white;
   border:1px solid #e5e7eb;
-  border-left:8px solid #60a5fa;
+  border-left:8px solid #fb7185;
   color:#111827;
 }
 
@@ -1256,12 +1256,12 @@ body{
 }
 
 .sub-card .icon{
-  background:#eff6ff;
+  background:#fff1f2;
 }
 
 .sub-card:hover{
-  background:#f8fbff;
-  border-left-color:#3b82f6;
+  background:#fff7f8;
+  border-left-color:#f43f5e;
 }
 
 /* 아이콘 */
