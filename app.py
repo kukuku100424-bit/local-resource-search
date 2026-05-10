@@ -2969,7 +2969,7 @@ def desc():
         if any(k in q_norm for k in ["소변줄", "유치도뇨", "도뇨줄", "폴리", "foley", "배뇨줄"]):
             extra_aliases += ["튜브관리", "유치도뇨관", "도뇨관관리", "배뇨관리"]
 
-        if any(k in q_norm for k in ["기관절개", "석션", "흡인", "루", "장루", "요루", "튜브"]):
+        if any(k in q_norm for k in ["기관절개", "기관절개관", "석션", "흡인", "장루", "요루", "튜브", "루관리", "장루관리", "요루관리"]):
             extra_aliases += ["튜브관리", "루관리", "기관절개관리", "흡인", "감염관리"]
 
         # ---- 복지용구 관련 ----
@@ -3014,6 +3014,9 @@ def desc():
 
         if any(k in q_norm for k in ["돌봄", "간병", "부축", "옆에서도움", "집에서돌봐", "일상생활도움"]):
             extra_aliases += ["요양", "방문요양", "장기요양", "신체활동지원", "일상생활지원"]
+
+        if any(k in q_norm for k in ["스마트폰", "핸드폰", "휴대폰", "휴대전화", "앱", "어플", "디지털", "비대면", "온라인"]):
+            extra_aliases += ["IoT", "IOT", "사물인터넷", "스마트기기", "돌봄기기", "AI", "비대면", "응급안전", "응급안전안심서비스", "스마트돌봄", "안전확인"]
 
         if any(k in q_norm for k in ["경사로", "문턱", "턱", "이동불편", "출입불편"]):
             extra_aliases += ["복지용구", "경사로", "이동보조", "구입"]
@@ -3200,7 +3203,7 @@ def desc():
    - 사용자가 특정 영역을 언급한 경우(예: 식사, 외출 등), 해당 영역 서비스는 추천할 수 있지만 이것만으로 direct_need=true로 처리하지 않는다.
    - direct_need=true는 반드시 '원함', '희망함', '받고 싶어함'처럼 희망 의사가 명확할 때만 표시한다.
 11. 사용자의 사례가 특정 영역(예: 식사, 이동, 주거 등)에 해당하는 경우, 그 영역의 서비스는 추천할 수 있다. 단, 직접 희망 표현이 없으면 direct_need=false이다.
-   - 다른 영역(예: 건강관리, 간호, IoT 등)은 직접 언급되지 않았다면 과도하게 확장하여 추천하지 않는다.
+   - 다른 영역(예: 건강관리, 간호 등)은 직접 언급되지 않았다면 과도하게 확장하여 추천하지 않는다. 다만 스마트폰, 휴대폰, 앱, 디지털기기, 비대면, 온라인 사용 가능성이 언급된 경우에는 IoT, 스마트돌봄, 응급안전안심서비스, AI 돌봄기기 등 디지털 기반 돌봄서비스를 검토할 수 있다.
 설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
 
 출력 형식:
@@ -3272,21 +3275,6 @@ def desc():
                     str(x.get("서비스내용", "")).strip()
                 )
             )
-
-            deduped = []
-            seen_keys = set()
-
-            for item in final_results:
-                key = (
-                    str(item.get("대분류", "")).strip(),
-                    str(item.get("중분류", "")).strip(),
-                    str(item.get("서비스내용", "")).strip()
-                )
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    deduped.append(item)
-
-            final_results = deduped
 
             if os.getenv("RENDER") is not None:
                 requests.post(
