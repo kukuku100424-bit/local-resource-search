@@ -1506,7 +1506,7 @@ body{
 
 <div class="title">
 <h1>NHIS-G 케어네비</h1>
-<p>국민건강보험공단 통합돌봄 지원 시스템</p>
+<p>통합돌봄 자원 검색 및 안내 서비스</p>
 </div>
 
 <a href="/desc" class="card main-menu-card">
@@ -1549,7 +1549,7 @@ body{
 
 <img src="/static/pdf_icon.png">
 
-<div>사업 안내</div>
+<div>통합돌봄 사업 안내</div>
 
 </a>
 
@@ -4478,6 +4478,51 @@ button:hover{
   }
 }
 
+.privacy-warning{
+  margin:12px 0 0 0;
+  padding:14px 18px;
+  border-radius:12px;
+  background:#fff1f2;
+  border:1px solid #fb7185;
+  color:#9f1239;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.65;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+
+.privacy-warning-icon{
+  flex:0 0 auto;
+  line-height:1.65;
+}
+
+.privacy-warning-text{
+  flex:1;
+  min-width:0;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+@media (max-width:480px){
+  .privacy-warning{
+    margin:12px 0 0 0;
+    padding:13px 14px;
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  .privacy-warning-icon{
+    line-height:1.6;
+  }
+
+  .privacy-warning-text{
+    line-height:1.6;
+  }
+}
+
+
 .desc-region-box{
   margin-bottom:18px;
   padding:14px 14px 12px 14px;
@@ -4802,8 +4847,8 @@ transition:0.2s;
     </div>
 
     <div style="padding:18px 20px 8px 20px;font-size:14px;line-height:1.7;color:#374151;word-break:keep-all;">
-      조건검색 화면에는 <b>대분류와 중분류만</b> 반영됩니다.<br>
-      계속 하시겠습니까?
+      조건검색에는 <b>대분류와 중분류만</b> 반영됩니다.<br>
+      소분류 등 세부 서비스 필요 시 <b>프로그램</b>에 검색해 주세요.
     </div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 20px 20px 20px;">
@@ -4989,11 +5034,6 @@ let comboGuideTargetHref = "";
 function openComboGuideModal(href){
   comboGuideTargetHref = href || "";
 
-  if(sessionStorage.getItem("comboGuideShown") === "1"){
-    window.location.href = comboGuideTargetHref;
-    return false;
-  }
-
   const modal = document.getElementById("comboGuideModal");
   if(modal){
     modal.style.display = "flex";
@@ -5009,8 +5049,6 @@ function closeComboGuideModal(){
 }
 
 function moveComboGuideModal(){
-  sessionStorage.setItem("comboGuideShown", "1");
-
   const modal = document.getElementById("comboGuideModal");
   if(modal){
     modal.style.display = "none";
@@ -5209,6 +5247,11 @@ window.addEventListener("popstate", function(e){
   <div class="tip-notice">
     <p>※ 입력한 사례와 유사한 <b class="highlight">통합돌봄 서비스를 최대 30가지</b> 추천합니다.</p>
     <p>※ 통합판정조사, 지자체 조사의 <b class="highlight">참고사항 전문</b>을 모두 입력해도 <b class="highlight">AI가 추천서비스를 안내</b>합니다.</p>
+
+    <div class="privacy-warning">
+      <span class="privacy-warning-icon">🔒</span>
+      <span class="privacy-warning-text">사례 입력 시 성명, 주민등록번호, 연락처, 주소 등 개인정보를 입력하지 마세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
+    </div>
 
 </body>
 </html>
