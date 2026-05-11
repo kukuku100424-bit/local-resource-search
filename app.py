@@ -4468,17 +4468,17 @@ button:hover{
 
 .privacy-warning{
   margin:12px 0 0 0;
-  padding:14px 18px;
+  padding:12px 18px;
   border-radius:12px;
   background:#fff1f2;
   border:1px solid #fb7185;
   color:#9f1239;
   font-size:14px;
   font-weight:700;
-  line-height:1.65;
+  line-height:1.55;
   display:flex;
-  align-items:flex-start;
-  gap:8px;
+  align-items:center;
+  gap:12px;
 }
 
 .privacy-warning-icon{
@@ -4509,7 +4509,107 @@ button:hover{
     line-height:1.6;
   }
 }
+.siren-icon{
+  width:54px;
+  height:56px;
+  flex:0 0 54px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:0;
+}
 
+.siren-svg{
+  width:54px;
+  height:56px;
+  display:block;
+}
+@media (max-width:480px){
+  .siren-icon{
+    width:48px;
+    height:50px;
+    flex-basis:48px;
+  }
+
+  .siren-svg{
+    width:48px;
+    height:50px;
+  }
+}
+
+.ray-left{
+  left:0;
+  top:9px;
+  transform:rotate(45deg);
+}
+
+.ray-right{
+  right:0;
+  top:9px;
+  transform:rotate(-45deg);
+}
+
+.ray-top{
+  left:24px;
+  top:0;
+  width:5px;
+  height:20px;
+}
+
+@keyframes sirenBlink{
+  0%, 100%{
+    background:#ef4444;
+  }
+  50%{
+    background:#dc2626;
+  }
+}
+
+@media (max-width:480px){
+  .siren-icon{
+    width:48px;
+    height:43px;
+    flex-basis:48px;
+  }
+
+  .siren-light{
+    left:12px;
+    top:11px;
+    width:24px;
+    height:25px;
+    border-width:4px;
+  }
+
+  .siren-base{
+    left:4px;
+    bottom:3px;
+    width:40px;
+    height:14px;
+    border-width:4px;
+  }
+
+  .siren-ray{
+    width:17px;
+    height:5px;
+  }
+
+  .ray-left{
+    left:0;
+    top:8px;
+  }
+
+  .ray-right{
+    right:0;
+    top:8px;
+  }
+
+  .ray-top{
+    left:22px;
+    top:0;
+    width:5px;
+    height:17px;
+  }
+}
 
 .desc-region-box{
   margin-bottom:18px;
@@ -5237,7 +5337,28 @@ window.addEventListener("popstate", function(e){
     <p>※ 통합판정조사, 지자체 조사의 <b class="highlight">참고사항 전문</b>을 모두 입력해도 <b class="highlight">AI가 추천서비스를 안내</b>합니다.</p>
 
     <div class="privacy-warning">
-      <span class="privacy-warning-icon">🔒</span>
+      <span class="privacy-warning-icon siren-icon" aria-hidden="true">
+        <svg class="siren-svg" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg">
+          <line x1="48" y1="6" x2="48" y2="20" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+          <line x1="17" y1="22" x2="28" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+          <line x1="79" y1="22" x2="68" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+
+          <path d="M28 80V62C28 48 36.8 39 48 39C59.2 39 68 48 68 62V80Z"
+                fill="#ef4444"
+                stroke="#111827"
+                stroke-width="6"
+                stroke-linejoin="round"/>
+
+          <path d="M39 42C45 44 51 56 52 80H28V62C28 52 32.5 45 39 42Z"
+                fill="rgba(255,255,255,0.18)"/>
+
+          <rect x="18" y="76" width="60" height="20" rx="10"
+                fill="#e5e7eb"
+                stroke="#111827"
+                stroke-width="6"/>
+        </svg>
+      </span>
+
       <span class="privacy-warning-text">사례 입력 시 성명, 주민등록번호, 연락처, 주소 등 개인정보를 입력하지 마세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
     </div>
 
@@ -5871,6 +5992,41 @@ CARE_HTML = """
 
 <style>
 
+.care-top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-top:12px;
+}
+
+.care-reset-button{
+  display:inline-block;
+  width:auto;
+  height:auto;
+  margin-top:0;
+  padding:8px 14px;
+  border-radius:8px;
+  background:#e5e7eb;
+  color:#111827;
+  font-size:14px;
+  font-weight:500;
+  border:none;
+  cursor:pointer;
+  box-shadow:none;
+}
+
+.care-reset-button:hover{
+  background:#d1d5db;
+}
+
+@media (max-width:480px){
+  .care-reset-button{
+    font-size:13px;
+    padding:6px 12px;
+  }
+}
+
 .highlight{
   font-weight:700;
   color:#1d4ed8;
@@ -6304,8 +6460,9 @@ CARE_HTML = """
 <body>
 <div class="container">
 
-<div class="top-bar">
+<div class="top-bar care-top-bar">
   <a href="/home" class="home-button">홈으로</a>
+  <button type="button" class="care-reset-button" onclick="resetCarePage()">초기화</button>
 </div>
 
 <h2>통합돌봄 사전조사</h2>
@@ -6421,6 +6578,8 @@ CARE_HTML = """
 </div>
 
 <script>
+
+
 function showGuide(messageHtml){
   document.getElementById("modalTitle").innerText = "안내";
   document.getElementById("r_text").innerHTML = messageHtml;
@@ -6509,6 +6668,10 @@ function getChipText(score, dementiaValue){
   }else{
     return "4점 이상";
   }
+}
+
+function resetCarePage(){
+  window.location.href = "/care";
 }
 
 function updateScoreBanner(){
