@@ -5359,7 +5359,7 @@ window.addEventListener("popstate", function(e){
         </svg>
       </span>
 
-      <span class="privacy-warning-text">사례 입력 시 성명, 주민등록번호, 연락처, 주소 등 개인정보를 입력하지 마세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
+      <span class="privacy-warning-text"> 성명, 주민등록번호 등 개인정보를 입력하지 마세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
     </div>
 
 </body>
