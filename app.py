@@ -957,6 +957,33 @@ df.columns = [
     str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
     for c in df.columns
 ]
+
+# =========================
+# 설명회용 테스트 자원 추가
+# 엑셀에는 추가하지 않고, 실행 중에만 df에 1건 추가
+# =========================
+TEST_RESOURCE = {
+    "시도": "광주광역시",
+    "시군구": "서구",
+    "대분류": "요양",
+    "중분류": "방문요양",
+    "프로그램명(사업명)": "OO방문요양",
+    "서비스제공기관명": "ㅁㅁ재가복지센터",
+    "기관연락처": "062-1234-5678",
+    "기관주소": "광주광역시 상무중앙로 114번길 14",
+    "서비스내용": "요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원",
+    "서비스설명": "노인을 대상으로 요양보호사가 가정을 방문하여 식사, 청소, 이동 도움 등 일상생활을 지원하는 방문요양 서비스",
+    "검색어": "노인, 방문요양, 요양보호사, 식사 지원, 일상생활 지원, 가정 방문, 재가복지",
+    "관리주체": "지자체",
+    "기타": "서비스단가: 월 20,000원<br>주요내용: 요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원<br>대상: 노인"
+}
+
+for col in TEST_RESOURCE.keys():
+    if col not in df.columns:
+        df[col] = ""
+
+df = pd.concat([df, pd.DataFrame([TEST_RESOURCE])], ignore_index=True)
+
 def find_col(*names):
     for name in names:
         clean_name = str(name).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
@@ -2191,13 +2218,30 @@ def detail(idx):
         })
 
     r = df.iloc[idx]
+
+    program_name = str(r.get("프로그램명(사업명)", "")).strip()
+    org_name = str(r.get("서비스제공기관명", "")).strip()
+
+    service_price = ""
+    service_content = ""
+    service_target = ""
+
+    if program_name == "OO방문요양" and org_name == "ㅁㅁ재가복지센터":
+        service_price = "월 20,000원"
+        service_content = "요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원"
+        service_target = "노인"
+
     return jsonify({
-        "프로그램명칭": str(r.get("프로그램명(사업명)", "")),
-        "서비스제공기관명": str(r.get("서비스제공기관명", "")),
+        "프로그램명칭": program_name,
+        "서비스제공기관명": org_name,
         "기관연락처": str(r.get("기관연락처", "")),
         "기관주소": str(r.get("기관주소", "")),
-        "기타": str(r.get("기타", "")),
+        "기타": "",
+        "서비스단가": service_price,
+        "주요내용": service_content,
+        "대상": service_target,
     })
+
 
 @app.route("/combo", methods=["GET","POST"])
 def combo():
@@ -2699,6 +2743,9 @@ input, select{
       <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">📞</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
+    <p id="m_price_row" style="display:none;"><b>서비스단가:</b> <span id="m_price"></span></p>
+    <p id="m_content_row" style="display:none;"><b>주요내용:</b> <span id="m_content"></span></p>
+    <p id="m_target_row" style="display:none;"><b>대상:</b> <span id="m_target"></span></p>    
     <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;display:none;"></iframe>
     <button onclick="closeModal()" class="menu-btn">닫기</button>
   </div>
@@ -2713,6 +2760,21 @@ function openDetail(idx){
       document.getElementById("m_org").innerText = d["서비스제공기관명"] || "";
       document.getElementById("m_tel").innerText = d["기관연락처"] || "";
       document.getElementById("m_addr").innerText = d["기관주소"] || "";
+      const priceRow = document.getElementById("m_price_row");
+      const contentRow = document.getElementById("m_content_row");
+      const targetRow = document.getElementById("m_target_row");
+
+      const price = d["서비스단가"] || "";
+      const content = d["주요내용"] || "";
+      const target = d["대상"] || "";
+
+      document.getElementById("m_price").innerText = price;
+      document.getElementById("m_content").innerText = content;
+      document.getElementById("m_target").innerText = target;
+
+      priceRow.style.display = price ? "block" : "none";
+      contentRow.style.display = content ? "block" : "none";
+      targetRow.style.display = target ? "block" : "none";
 
       const addr = (d["기관주소"] || "").trim();
       const mapFrame = document.getElementById("m_map");
