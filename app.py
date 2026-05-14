@@ -6099,11 +6099,34 @@ CARE_HTML = """
 }
 
 @media (max-width:480px){
-  .care-reset-button{
+  .care-top-bar{
+    display:flex;
+    justify-content:flex-start;
+    align-items:center;
+    gap:8px;
+    margin-bottom:14px;
+  }
+
+  .care-top-bar .home-button,
+  .care-top-bar .care-reset-button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:auto !important;
+    height:34px !important;
+    margin-top:0 !important;
+    padding:0 14px !important;
+    border-radius:8px;
     font-size:13px;
-    padding:6px 12px;
+    font-weight:500;
+    line-height:1;
+  }
+
+  .care-reset-button{
+    flex:0 0 auto;
   }
 }
+
 
 .highlight{
   font-weight:700;
