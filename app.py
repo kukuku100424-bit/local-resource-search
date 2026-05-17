@@ -2479,7 +2479,7 @@ h2{
 <div class="container">
 
   <div class="top-bar">
-    <a href="/home" class="home-button">⌂ 홈으로</a>
+    <a href="/home" class="home-button">홈으로</a>
     <a href="/board/write" class="home-button">글쓰기</a>
   </div>
 
@@ -2599,7 +2599,7 @@ button{
 <div class="container">
 
   <div class="top-bar">
-    <a href="/board" class="home-button">목록으로</a>
+    <a href="/home" class="home-button">⌂ 홈으로</a>
   </div>
 
   <div class="card">
@@ -2624,6 +2624,74 @@ button{
 </body>
 </html>
 """
+BOARD_SUCCESS_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>등록 완료</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.success{
+  padding:18px;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  border-radius:14px;
+  color:#1d4ed8;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.6;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  margin-top:16px;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="success">
+      의견이 등록되었습니다.<br>
+      남겨주신 내용은 관리자만 확인할 수 있습니다.
+    </div>
+    <a href="/home" class="home-button">⌂ 홈으로</a>
+  </div>
+</div>
+</body>
+</html>
+"""
+
+
 
 BOARD_VIEW_HTML = """
 <!DOCTYPE html>
@@ -2756,6 +2824,7 @@ body{
   padding:18px;
   margin-bottom:14px;
   box-shadow:0 6px 18px rgba(0,0,0,0.06);
+  cursor:pointer;
 }
 .meta{
   font-size:12px;
@@ -2814,7 +2883,7 @@ body{
 
   {% if posts %}
     {% for post in posts %}
-    <div class="card">
+    <div class="card" onclick="location.href='/board/admin/view/{{ post['id'] }}'">
       <div class="meta">
         {{ post["created_at"][:19].replace("T", " ") }}
         · 작성자: {{ post["writer"] or "미입력" }}
@@ -2822,7 +2891,7 @@ body{
       <div class="title">{{ post["title"] }}</div>
       <div class="content">{{ post["content"] }}</div>
 
-      <form method="post" action="/board/delete/{{ post['id'] }}" onsubmit="return confirm('이 글을 삭제할까요?');">
+      <form method="post" action="/board/delete/{{ post['id'] }}" onclick="event.stopPropagation();" onsubmit="return confirm('이 글을 삭제할까요?');">
         <button type="submit" class="delete-btn">삭제</button>
       </form>
     </div>
@@ -2839,27 +2908,7 @@ body{
 
 @app.route("/board")
 def board():
-    posts = []
-
-    if os.getenv("RENDER") is not None:
-        res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&is_deleted=eq.false&order=created_at.desc",
-            headers=SUPABASE_HEADERS
-        )
-        posts = res.json() if res.ok else []
-    else:
-        posts = [
-            {
-                "id": 1,
-                "created_at": "2026-05-17T00:00:00",
-                "writer": "테스트",
-                "title": "로컬 테스트 글",
-                "content": "Render 환경에서는 Supabase에 저장됩니다."
-            }
-        ]
-
-    return render_template_string(BOARD_LIST_HTML, posts=posts)
-
+    return redirect(url_for("board_write"))
 
 @app.route("/board/write", methods=["GET", "POST"])
 def board_write():
@@ -2881,36 +2930,13 @@ def board_write():
                     }
                 )
 
-        return redirect(url_for("board"))
+        return render_template_string(BOARD_SUCCESS_HTML)
 
     return render_template_string(BOARD_WRITE_HTML)
 
-
 @app.route("/board/view/<int:post_id>")
 def board_view(post_id):
-    post = None
-
-    if os.getenv("RENDER") is not None:
-        res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&id=eq.{post_id}&is_deleted=eq.false",
-            headers=SUPABASE_HEADERS
-        )
-        rows = res.json() if res.ok else []
-        post = rows[0] if rows else None
-    else:
-        post = {
-            "id": 1,
-            "created_at": "2026-05-17T00:00:00",
-            "writer": "테스트",
-            "title": "로컬 테스트 글",
-            "content": "Render 환경에서는 Supabase에 저장됩니다."
-        }
-
-    if not post:
-        return redirect(url_for("board"))
-
-    return render_template_string(BOARD_VIEW_HTML, post=post)
-
+    return redirect(url_for("board"))
 
 @app.route("/board/admin")
 def board_admin():
@@ -2935,6 +2961,34 @@ def board_admin():
 
     return render_template_string(BOARD_ADMIN_HTML, posts=posts)
 
+
+@app.route("/board/admin/view/<int:post_id>")
+def board_admin_view(post_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+
+    post = None
+
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&id=eq.{post_id}&is_deleted=eq.false",
+            headers=SUPABASE_HEADERS
+        )
+        rows = res.json() if res.ok else []
+        post = rows[0] if rows else None
+    else:
+        post = {
+            "id": 1,
+            "created_at": "2026-05-17T00:00:00",
+            "writer": "테스트",
+            "title": "로컬 테스트 글",
+            "content": "Render 환경에서는 Supabase에 저장됩니다."
+        }
+
+    if not post:
+        return redirect(url_for("board_admin"))
+
+    return render_template_string(BOARD_VIEW_HTML, post=post)
 
 @app.route("/board/delete/<int:post_id>", methods=["POST"])
 def board_delete(post_id):
@@ -3404,7 +3458,7 @@ input, select{
 <div class="container">
 
 <div class="top-bar combo-top-bar">
-  <a href="/home" class="home-button">⌂홈으로</a>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
   <button type="button" class="combo-reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
 </div>
 
@@ -5980,7 +6034,7 @@ button:hover{
 <div class="container">
 
 <div class="top-bar desc-top-bar">
-  <a href="/home" class="home-button">⌂홈으로</a>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
   <button type="button" class="reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
 </div>
 
@@ -7859,7 +7913,7 @@ CARE_HTML = """
 <div class="container">
 
 <div class="top-bar care-top-bar">
-  <a href="/home" class="home-button">⌂홈으로</a>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
   <button type="button" class="care-reset-button" onclick="resetCarePage()">↻ 다시 입력</button>
 </div>
 
@@ -8286,7 +8340,7 @@ NHIS25_HTML = """
 <div class="container">
 
 <div class="top-bar">
-  <a href="/home" class="home-button">⌂홈으로</a>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
 </div>
 
 <h2>건강보험 25시</h2>
