@@ -212,8 +212,8 @@ body{
   padding:0 12px;
   border:none;
   border-radius:999px;
-  background:rgba(255,255,255,0.88);
-  color:#1f2937;
+  background:#f3f4f6;
+  color:#6b7280;
   font-size:13px;
   font-weight:700;
   text-decoration:none;
@@ -223,7 +223,8 @@ body{
 }
 
 .admin-link:hover{
-  background:#ffffff;
+  background:#e5e7eb;
+  color:#374151;
   transform:translateY(-1px);
 }
 
@@ -847,18 +848,23 @@ input, select{
 }
 
 .home-button{
-  display:inline-block;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-  color:#111827;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:34px;
+  padding:0 13px;
+  border-radius:999px;
+  background:#f3f4f6;
+  border:1px solid #d1d5db;
+  color:#6b7280;
   text-decoration:none;
-  font-size:14px;
-  font-weight:500;
+  font-size:13px;
+  font-weight:700;
 }
 
 .home-button:hover{
-  background:#d1d5db;
+  background:#e5e7eb;
+  color:#374151;
 }
 
 /* =========================
@@ -1202,9 +1208,25 @@ body{
 }
 
 /* 타이틀 */
+/* 타이틀 */
 .title{
+  position:relative;
   text-align:center;
   margin-bottom:24px;
+}
+
+.home-admin-hidden{
+  position:absolute;
+  top:-4px;
+  right:0;
+  font-size:10px;
+  color:#cbd5e1;
+  text-decoration:none;
+  font-weight:600;
+}
+
+.home-admin-hidden:hover{
+  color:#64748b;
 }
 
 .title + .card{
@@ -1542,6 +1564,7 @@ body{
 <div class="container">
 
 <div class="title">
+<a href="/admin" class="home-admin-hidden">관리자</a>
 <h1>NHIS-G <span>케어네비</span></h1>
 <p>통합돌봄 자원 검색 및 안내 서비스</p>
 </div>
@@ -1848,17 +1871,26 @@ body{
   margin-bottom:18px;
 }
 .home-button{
-  display:inline-block;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-  color:#111827;
-  text-decoration:none;
-  font-size:14px;
-  font-weight:500;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
 }
+
 .home-button:hover{
-  background:#d1d5db;
+  background:#f9fafb !important;
+  color:#374151 !important;
 }
 .card{
   background:#ffffff;
@@ -1944,8 +1976,8 @@ h2{
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <a href="/board/admin" class="home-button">게시판</a>
-      <a href="/stats/export/visits" class="home-button">방문자 엑셀</a>
-      <a href="/stats/export/regions" class="home-button">지역클릭 엑셀</a>
+      <a href="/stats/export/visits" class="home-button">엑셀</a>
+      <a href="/stats/export/regions" class="home-button">엑셀2</a>
     </div>
   </div>
 
@@ -2253,19 +2285,24 @@ body{
   align-items:center;
   margin-bottom:16px;
 }
+
 .home-button{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  height:36px;
-  padding:0 14px;
+  height:34px;
+  padding:0 13px;
   border-radius:999px;
   background:#f3f4f6;
   border:1px solid #d1d5db;
-  color:#374151;
+  color:#6b7280;
   text-decoration:none;
-  font-size:13.5px;
+  font-size:13px;
   font-weight:700;
+}
+.home-button:hover{
+  background:#e5e7eb;
+  color:#374151;
 }
 h2{
   margin:0 0 8px 0;
@@ -2326,7 +2363,7 @@ button{
 <div class="container">
 
   <div class="top-bar">
-    <a href="/home" class="home-button">홈으로</a>
+    <a href="/stats" class="home-button">통계로</a>
   </div>
 
   <div class="card">
@@ -2362,6 +2399,317 @@ button{
 </html>
 """
 
+BOARD_LIST_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>비공개 게시판</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:760px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+.home-button:hover{
+  background:#f9fafb !important;
+  color:#374151 !important;
+}
+h2{
+  margin:0 0 16px 0;
+  font-size:24px;
+}
+.board-card{
+  background:#fff;
+  border-radius:16px;
+  padding:16px 18px;
+  margin-bottom:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+  text-decoration:none;
+  color:#111827;
+  display:block;
+}
+.board-title{
+  font-size:16px;
+  font-weight:800;
+  margin-bottom:7px;
+}
+.board-meta{
+  font-size:12px;
+  color:#6b7280;
+}
+.empty{
+  background:#fff;
+  border-radius:16px;
+  padding:24px;
+  text-align:center;
+  color:#6b7280;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/home" class="home-button">⌂ 홈으로</a>
+    <a href="/board/write" class="home-button">글쓰기</a>
+  </div>
+
+  <h2>오류제보 / 의견게시판</h2>
+
+  {% if posts %}
+    {% for post in posts %}
+      <a href="/board/view/{{ post['id'] }}" class="board-card">
+        <div class="board-title">{{ post["title"] }}</div>
+        <div class="board-meta">
+          {{ post["created_at"][:19].replace("T", " ") }}
+          · 작성자: {{ post["writer"] or "미입력" }}
+        </div>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty">등록된 글이 없습니다.</div>
+  {% endif %}
+
+</div>
+</body>
+</html>
+"""
+
+BOARD_WRITE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>글쓰기</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+h2{
+  margin:0 0 8px 0;
+  font-size:22px;
+}
+.desc{
+  margin:0 0 18px 0;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+label{
+  display:block;
+  margin-top:14px;
+  font-size:14px;
+  font-weight:700;
+}
+input, textarea{
+  width:100%;
+  box-sizing:border-box;
+  margin-top:7px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  padding:12px;
+  font-size:15px;
+  font-family:inherit;
+}
+textarea{
+  min-height:180px;
+  resize:vertical;
+  line-height:1.6;
+}
+button{
+  width:100%;
+  height:50px;
+  margin-top:18px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  font-size:16px;
+  font-weight:800;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/board" class="home-button">목록으로</a>
+  </div>
+
+  <div class="card">
+    <h2>글쓰기</h2>
+    <p class="desc">작성하신 내용은 관리자만 확인할 수 있습니다.</p>
+
+    <form method="post">
+      <label>작성자</label>
+      <input type="text" name="writer" placeholder="이름 또는 소속을 입력하세요">
+
+      <label>제목</label>
+      <input type="text" name="title" placeholder="제목을 입력하세요" required>
+
+      <label>내용</label>
+      <textarea name="content" placeholder="오류 내용이나 의견을 입력하세요" required></textarea>
+
+      <button type="submit">등록하기</button>
+    </form>
+  </div>
+
+</div>
+</body>
+</html>
+"""
+
+BOARD_VIEW_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게시글 보기</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:760px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.title{
+  font-size:22px;
+  font-weight:900;
+  margin-bottom:10px;
+}
+.meta{
+  font-size:12px;
+  color:#6b7280;
+  margin-bottom:18px;
+}
+.content{
+  font-size:15px;
+  line-height:1.8;
+  white-space:pre-wrap;
+  word-break:keep-all;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/board" class="home-button">목록으로</a>
+  </div>
+
+  <div class="card">
+    <div class="title">{{ post["title"] }}</div>
+    <div class="meta">
+      {{ post["created_at"][:19].replace("T", " ") }}
+      · 작성자: {{ post["writer"] or "미입력" }}
+    </div>
+    <div class="content">{{ post["content"] }}</div>
+  </div>
+
+</div>
+</body>
+</html>
+"""
+
 BOARD_ADMIN_HTML = """
 <!DOCTYPE html>
 <html lang="ko">
@@ -2383,23 +2731,24 @@ body{
 }
 .top-bar{
   display:flex;
-  justify-content:space-between;
+  justify-content:flex-start;
   align-items:center;
   margin-bottom:16px;
 }
 .home-button{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  height:36px;
-  padding:0 14px;
-  border-radius:999px;
-  background:#f3f4f6;
-  border:1px solid #d1d5db;
-  color:#374151;
-  text-decoration:none;
-  font-size:13.5px;
-  font-weight:700;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
 }
 .card{
   background:#fff;
@@ -2421,8 +2770,29 @@ body{
 .content{
   font-size:14px;
   line-height:1.7;
-  white-space:pre-wrap;
   word-break:keep-all;
+  margin-bottom:14px;
+
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:normal;
+}
+.delete-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:32px;
+  padding:0 12px;
+  border:none;
+  border-radius:999px;
+  background:#fee2e2;
+  color:#b91c1c;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
 }
 .empty{
   background:#fff;
@@ -2437,7 +2807,6 @@ body{
 <div class="container">
 
   <div class="top-bar">
-    <a href="/home" class="home-button">홈으로</a>
     <a href="/stats" class="home-button">통계로</a>
   </div>
 
@@ -2452,6 +2821,10 @@ body{
       </div>
       <div class="title">{{ post["title"] }}</div>
       <div class="content">{{ post["content"] }}</div>
+
+      <form method="post" action="/board/delete/{{ post['id'] }}" onsubmit="return confirm('이 글을 삭제할까요?');">
+        <button type="submit" class="delete-btn">삭제</button>
+      </form>
     </div>
     {% endfor %}
   {% else %}
@@ -2463,8 +2836,33 @@ body{
 </html>
 """
 
-@app.route("/board", methods=["GET", "POST"])
+
+@app.route("/board")
 def board():
+    posts = []
+
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&is_deleted=eq.false&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        posts = res.json() if res.ok else []
+    else:
+        posts = [
+            {
+                "id": 1,
+                "created_at": "2026-05-17T00:00:00",
+                "writer": "테스트",
+                "title": "로컬 테스트 글",
+                "content": "Render 환경에서는 Supabase에 저장됩니다."
+            }
+        ]
+
+    return render_template_string(BOARD_LIST_HTML, posts=posts)
+
+
+@app.route("/board/write", methods=["GET", "POST"])
+def board_write():
     if request.method == "POST":
         writer = (request.form.get("writer", "") or "").strip()
         title = (request.form.get("title", "") or "").strip()
@@ -2483,9 +2881,35 @@ def board():
                     }
                 )
 
-        return render_template_string(BOARD_HTML, saved=True)
+        return redirect(url_for("board"))
 
-    return render_template_string(BOARD_HTML, saved=False)
+    return render_template_string(BOARD_WRITE_HTML)
+
+
+@app.route("/board/view/<int:post_id>")
+def board_view(post_id):
+    post = None
+
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&id=eq.{post_id}&is_deleted=eq.false",
+            headers=SUPABASE_HEADERS
+        )
+        rows = res.json() if res.ok else []
+        post = rows[0] if rows else None
+    else:
+        post = {
+            "id": 1,
+            "created_at": "2026-05-17T00:00:00",
+            "writer": "테스트",
+            "title": "로컬 테스트 글",
+            "content": "Render 환경에서는 Supabase에 저장됩니다."
+        }
+
+    if not post:
+        return redirect(url_for("board"))
+
+    return render_template_string(BOARD_VIEW_HTML, post=post)
 
 
 @app.route("/board/admin")
@@ -2501,6 +2925,7 @@ def board_admin():
     else:
         posts = [
             {
+                "id": 1,
                 "created_at": "2026-05-17T00:00:00",
                 "writer": "테스트",
                 "title": "로컬 테스트 글",
@@ -2509,6 +2934,24 @@ def board_admin():
         ]
 
     return render_template_string(BOARD_ADMIN_HTML, posts=posts)
+
+
+@app.route("/board/delete/<int:post_id>", methods=["POST"])
+def board_delete(post_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+
+    if os.getenv("RENDER") is not None:
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/board_posts?id=eq.{post_id}",
+            headers=SUPABASE_HEADERS,
+            json={
+                "is_deleted": True
+            }
+        )
+
+    return redirect(url_for("board_admin"))
+
 
 @app.route("/guide")
 def guide():
@@ -2961,8 +3404,8 @@ input, select{
 <div class="container">
 
 <div class="top-bar combo-top-bar">
-  <a href="/home" class="home-button">홈으로</a>
-  <button type="button" class="combo-reset-button" onclick="resetDescPage()">다시 입력</button>
+  <a href="/home" class="home-button">⌂홈으로</a>
+  <button type="button" class="combo-reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
 </div>
 
 <div class="card">
@@ -3963,30 +4406,30 @@ DESC_HTML = """
 
 .service-table-icon-btn{
   width:auto !important;
-  height:28px !important;
-  padding:0 9px !important;
+  height:26px !important;
+  padding:0 8px !important;
   border-radius:999px;
-  border:1px solid #d1d5db;
-  background:#f3f4f6;
-  color:#374151;
-  font-size:12px;
+  border:1px solid #e5e7eb;
+  background:#ffffff;
+  color:#6b7280;
+  font-size:11.5px;
   font-weight:800;
   cursor:pointer;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:4px;
-  box-shadow:0 3px 10px rgba(15,23,42,0.08);
+  gap:3px;
+  box-shadow:none;
 }
 
 .service-table-icon-btn em{
   font-style:normal;
-  font-size:12px;
+  font-size:11.5px;
 }
 
 .service-table-icon-btn:hover{
-  background:#e5e7eb;
-  color:#111827;
+  background:#f9fafb;
+  color:#374151;
 }
 
 .service-table-modal{
@@ -5487,7 +5930,7 @@ button:hover{
   .desc-title-row .service-table-icon-btn{
     grid-column:1;
     justify-self:end;
-    margin-right:0;
+    margin-right:5px;
     margin-bottom:-8px;
     transform:translateX(0px);
     white-space:nowrap;
@@ -5537,8 +5980,8 @@ button:hover{
 <div class="container">
 
 <div class="top-bar desc-top-bar">
-  <a href="/home" class="home-button">홈으로</a>
-  <button type="button" class="reset-button" onclick="resetDescPage()">다시 입력</button>
+  <a href="/home" class="home-button">⌂홈으로</a>
+  <button type="button" class="reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
 </div>
 
 <div class="title">
@@ -5907,12 +6350,27 @@ window.addEventListener("load", function(){
 });
 
 
+let serviceTableHistoryOpen = false;
+
 function openServiceTableModal(){
-  document.getElementById("serviceTableModal").style.display = "flex";
+  const modal = document.getElementById("serviceTableModal");
+  if(modal){
+    modal.style.display = "flex";
+  }
+
+  if(!serviceTableHistoryOpen){
+    history.pushState({ modal: "serviceTable" }, "", location.href);
+    serviceTableHistoryOpen = true;
+  }
 }
 
 function closeServiceTableModal(){
-  document.getElementById("serviceTableModal").style.display = "none";
+  const modal = document.getElementById("serviceTableModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+
+  serviceTableHistoryOpen = false;
 }
 
 function closeServiceTableModalByBg(e){
@@ -5920,6 +6378,17 @@ function closeServiceTableModalByBg(e){
     closeServiceTableModal();
   }
 }
+
+window.addEventListener("popstate", function(e){
+  const modal = document.getElementById("serviceTableModal");
+
+  if(modal && modal.style.display === "flex"){
+    modal.style.display = "none";
+    serviceTableHistoryOpen = false;
+    history.pushState({ page: "desc" }, "", location.href);
+    return;
+  }
+});
 
 function setDescSearchAction(){
   document.getElementById("descAction").value = "search";
@@ -7390,8 +7859,8 @@ CARE_HTML = """
 <div class="container">
 
 <div class="top-bar care-top-bar">
-  <a href="/home" class="home-button">홈으로</a>
-  <button type="button" class="care-reset-button" onclick="resetCarePage()">다시 입력</button>
+  <a href="/home" class="home-button">⌂홈으로</a>
+  <button type="button" class="care-reset-button" onclick="resetCarePage()">↻ 다시 입력</button>
 </div>
 
 <h2>통합돌봄 사전조사</h2>
@@ -7817,7 +8286,7 @@ NHIS25_HTML = """
 <div class="container">
 
 <div class="top-bar">
-  <a href="/home" class="home-button">홈으로</a>
+  <a href="/home" class="home-button">⌂홈으로</a>
 </div>
 
 <h2>건강보험 25시</h2>
