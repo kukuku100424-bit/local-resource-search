@@ -5881,6 +5881,20 @@ button:hover{
   font-weight:900;
 }
 
+.privacy-icon.siren-icon{
+  background:#ffffff;
+  border-radius:0;
+  width:56px;
+  height:62px;
+  margin:0 auto 4px auto;
+}
+
+.privacy-icon.siren-icon .siren-svg{
+  width:56px;
+  height:62px;
+  display:block;
+}
+
 .privacy-title{
   font-size:22px;
   font-weight:900;
@@ -6003,23 +6017,39 @@ button:hover{
 <div id="privacyModal">
   <div id="privacyBox">
 
-    <div class="privacy-icon">!</div>
+    <div class="privacy-icon siren-icon">
+  <svg class="siren-svg" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg">
+    <line x1="48" y1="6" x2="48" y2="20" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+    <line x1="17" y1="22" x2="28" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+    <line x1="79" y1="22" x2="68" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+
+    <path d="M28 80V62C28 48 36.8 39 48 39C59.2 39 68 48 68 62V80Z"
+          fill="#ef4444"
+          stroke="#111827"
+          stroke-width="6"
+          stroke-linejoin="round"/>
+
+    <path d="M39 42C45 44 51 56 52 80H28V62C28 52 32.5 45 39 42Z"
+          fill="rgba(255,255,255,0.18)"/>
+
+    <rect x="18" y="76" width="60" height="20" rx="10"
+          fill="#e5e7eb"
+          stroke="#111827"
+          stroke-width="6"/>
+  </svg>
+</div>
 
     <div class="privacy-title">개인정보 유출 주의</div>
 
-    <div class="privacy-subtitle">
-      사례검색 시 개인정보 유출을 주의해주세요.
-    </div>
+<div class="privacy-subtitle">
+  ※ 개인정보 입력에 따른 책임은 사용자에게 있습니다.
+</div>
 
-    <div class="privacy-text">
-      <b>이름, 주민등록번호, 연락처, 상세주소</b> 등<br>
-      개인을 식별할 수 있는 정보는 입력하지 마세요.<br>
-      건강상태, 생활불편, 돌봄필요 상황만 입력해 주세요.
-    </div>
-
-    <div class="privacy-notice">
-      ※ 개인정보 입력으로 발생하는 책임은 사용자에게 있습니다.
-    </div>
+<div class="privacy-text">
+  <b>이름, 주민등록번호, 연락처, 상세주소</b> 등<br>
+  개인을 식별할 수 있는 정보는 입력하지 마세요.<br>
+  건강상태, 생활불편, 돌봄필요 상황만 입력해 주세요.
+</div>
 
     <label class="privacy-check">
       <input type="checkbox" id="hidePrivacyToday">
