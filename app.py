@@ -2753,8 +2753,10 @@ body{
   font-size:15px;
   line-height:1.8;
   white-space:pre-wrap;
-  word-break:keep-all;
+  word-break:break-word;
+  overflow-wrap:anywhere;
 }
+
 </style>
 </head>
 <body>
@@ -4455,7 +4457,7 @@ DESC_HTML = """
 .desc-title-row .service-table-icon-btn{
   grid-column:3;
   justify-self:end;
-  transform:translateY(24px);
+  transform:translate(-10px, 24px);
 }
 
 .service-table-icon-btn{
@@ -5986,7 +5988,7 @@ button:hover{
     justify-self:end;
     margin-right:5px;
     margin-bottom:-8px;
-    transform:translateX(0px);
+    transform:translateX(-2px);
     white-space:nowrap;
     width:auto !important;
   }
@@ -6044,7 +6046,7 @@ button:hover{
   <h2>사례별 AI 추천 서비스 찾기</h2>
   <button type="button" class="service-table-icon-btn" onclick="openServiceTableModal()" title="서비스 분류표">
   <span>📋</span>
-  <em>서비스 분류표</em>
+  <em> 분류표</em>
 </button>
 </div>
   </div>
