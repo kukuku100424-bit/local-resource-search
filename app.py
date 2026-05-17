@@ -645,7 +645,7 @@ def admin_login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if pw == "admin":
+        if pw == "qwer":
             session["is_admin"] = True
             return redirect(url_for("stats"))
         else:
@@ -2763,7 +2763,7 @@ body{
 <div class="container">
 
   <div class="top-bar">
-    <a href="/board" class="home-button">목록으로</a>
+    <a href="/board/admin" class="home-button">목록으로</a>
   </div>
 
   <div class="card">
