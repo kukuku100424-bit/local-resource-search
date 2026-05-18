@@ -128,6 +128,10 @@ app.secret_key = "super_secret_key"
 def favicon():
     return "", 204
 
+import logging
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('flask.app').setLevel(logging.ERROR)
+
 @app.before_request
 def require_login_all_pages():
     if (
@@ -732,10 +736,15 @@ body{
 </html>
 """
 
+@app.errorhandler(404)
+def handle_404(e):
+    return "", 204
+
 @app.errorhandler(Exception)
 def handle_all_errors(e):
     app.logger.exception(e)
     return render_template_string(ERROR_500_HTML), 500
+
 
 # =========================
 # 서버 오류 테스트용
@@ -3943,7 +3952,7 @@ def desc():
         if any(k in q_norm for k in ["이동변기", "간이변기", "변기", "좌변기"]):
             extra_aliases += ["복지용구", "이동변기", "배변보조", "구입"]
 
-        if any(k in q_norm for k in ["기저귀", "요실금", "패드"]):
+        if any(k in q_norm for k in ["요실금", "패드"]):
             extra_aliases += ["복지용구", "배변보조", "위생", "구입"]
 
         if any(k in q_norm for k in ["전동침대", "침대", "병원침대"]):
@@ -4036,83 +4045,30 @@ def desc():
         prompt = f"""
 너는 통합돌봄 서비스 추천 전문가다.
 
-[돌봄 사례 여부 판단]
+[돌봄 사례 판단]
+아래 조건을 모두 충족해야 추천한다. 애매하면 {{"results": []}} 반환.
+- 어르신·환자·장애인 등 돌봄 대상자가 있거나, 일상생활 어려움이 명확할 것
+- 식사·이동·위생·건강·주거·안전·정서 중 하나 이상의 구체적 어려움이 있을 것
+- 스스로 해결하기 어렵거나 도움·지원이 필요한 상황일 것
+- 단순 상태(배고픔·피곤함·통증 등)만 있거나, 책 내용·정보 나열·무관한 텍스트면 제외
 
-다음 조건을 기준으로 돌봄 사례인지 먼저 판단한다.
+[추천 방식]
+- 서비스 목록의 '서비스설명'과 '검색어'를 적극 참고한다
+- 정확한 행정용어를 쓰지 않아도 의미가 비슷하면 연결한다 (예: "씻는 것 도와줬으면" → 방문목욕, "가사일 도와줬으면" → 방문요양)
+- 의료·요양 맥락만 있으면 방역·환경소독 서비스 제외 (집 위생·악취·해충 언급 시 포함)
+- 배회·길을 잃음·귀가 어려움 → 배회감지기, 위치확인 복지용구, 인지안전지원 연결
 
-1. 돌봄 대상자
-- 어르신, 환자, 장애인 등 대상자가 명시된 경우 인정한다.
-- 대상자가 명시되지 않았더라도,
-  일상생활에서의 어려움이나 돌봄 필요 상황이 명확하면 인정할 수 있다.
-
-2. 일상생활과 관련된 어려움
-- 식사, 이동, 위생, 건강, 주거, 안전, 정서 등과 관련된
-  구체적인 불편이나 문제 상황이 있어야 한다.
-- 단순 상태(예: 배고픔, 피곤함, 통증 등)만으로는 인정하지 않는다.
-
-3. 돌봄 필요 상황
-- 도움, 지원, 관리, 연계가 필요하거나
-  스스로 해결하기 어려운 상황이어야 한다.
-- "힘들어함", "어렵다", "불편하다", "고통" 등의 표현이 있더라도
-  그것이 일상생활과 직접 관련된 경우에만 인정한다.
-
-[중요 판단 기준]
-
-- 단순 상태만 있는 경우 → 추천하지 않는다
-  (예: 배고픔, 피곤함, 아픔 등 단순 표현만 있는 경우)
-
-- 상태 + 일상생활 어려움이 함께 있는 경우 → 인정한다
-  (예: 배고파서 힘들어함, 식사 준비가 어려움 등)
-
-- 질환이나 상태(예: 관절염, 치매 등)만 있는 경우 →
-  일상생활에 영향을 줄 가능성이 있으면 제한적으로 인정할 수 있다
-
-[제외 기준]
-
-다음은 반드시 추천하지 않는다.
-
-- 책 내용, 일반 설명, 교과서 문장
-- 단순 정보 나열
-- OCR로 인식된 무관한 문장
-- 의미 없는 텍스트
-- 돌봄 대상, 어려움, 필요 상황이 없는 경우
-
-판단이 애매하면 반드시 아래와 같이 반환한다.
-
-{{"results": []}}
 [추천사유 작성]
-추천사유는 입력 사례에 실제로 적힌 내용만 근거로 쓴다.
-없는 내용을 추측하거나 억지로 만들지 않는다.
-반드시 "사례의 어려움 → 해당 서비스가 필요한 이유" 흐름으로 쓴다.
+- 사례에 실제로 적힌 내용만 근거로 쓴다 (없는 내용 추측 금지)
+- "사례의 어려움 → 서비스가 필요한 이유" 흐름으로 간결하게 작성
 
-사용자의 사례를 분석하고,
-아래 서비스 목록 전체를 검토하여
-적합한 서비스들을 폭넓게 추천하라.
-
-중요:
-- 파이썬이 미리 판단하지 않는다.
-- 반드시 서비스목록의 '서비스설명'과 '검색어'를 적극적으로 참고하고, 사용자가 정확한 행정용어를 쓰지 않아도 의미가 비슷하면 연결해서 판단한다.
-- 돌봄 사례 여부 판단을 통과한 경우에만, 실제 현장에서 함께 검토할 만한 서비스는 포함한다.
-- 예를 들어 "목욕차가 왔으면 함", "씻는 것을 도와줬으면 함" 같은 표현은 방문목욕으로 연결할 수 있어야 한다.
-- "집에 누가 와서 가사일을 도와줬으면 해", "청소나 빨래를 도와줬으면 해", "식사 준비를 도와줬으면 해" 같은 표현은 방문요양으로 적극 연결한다.
-- 사용자가 '요양', '방문요양', '방문목욕' 같은 정확한 용어를 쓰지 않아도 의미가 같으면 포함한다.
-- 단, 완전히 무관한 서비스는 제외한다.
-- "의료진 방문", "거동불편", "집에서 치료"와 같은 의료·요양 맥락만 있는 경우에는 "방역", "환경소독", "해충방제" 등 환경 관련 서비스는 제외하되, 사용자가 집 청결, 위생, 악취, 오염, 소독 필요성을 함께 언급한 경우에는 관련 환경 서비스도 포함한다.
--'길을 잃음', '배회', '집을 못 찾음', '귀가 어려움' 등은 배회감지기, 위치확인 가능한 복지용구, 인지안전 관련 지원과 연결한다.
-
-판단 원칙:
-1. 사례의 핵심 욕구를 먼저 정리한다.
-   - 건강/통증/질환
-   - 이동/거동
-   - 식사/영양
-   - 위생/청결
-   - 정서/사회적 고립
-   - 돌봄부담/가족지원
-   - 주거환경
-   - 안전
-2. 서비스설명과 검색어를 보고 사례와 의미적으로 맞는 서비스를 찾는다.
-3. 같은 사례에 대해 하나의 서비스만 고르지 말고, 함께 필요한 연관 서비스도 포함할 수 있다.
-4. 특히 아래 표현은 적극 반영한다.
+[판단 원칙]
+1. 사례의 핵심 욕구(건강/이동/식사/위생/정서/주거/안전/돌봄부담)를 먼저 정리한다
+2. 서비스설명·검색어와 의미적으로 맞는 서비스를 찾는다
+3. 연관 서비스도 함께 포함하고, 관련성 있으면 충분히 제시한다
+4. 직접 욕구 서비스 외에도 사례에 언급된 건강상태·질환·불편에 해당하는 서비스도 반드시 함께 추천한다
+   (예: '관절염으로 힘들어하며 집수리 욕구가 있음' → 집수리 관련 + 관절염 관련 재활·이동지원·방문보건도 포함)
+5. 특히 아래 표현은 적극 반영한다.
    - "집으로 와주길 원함" → 방문형 서비스 우선 고려
    - "지팡이", "워커", "보행기", "보행차", "휠체어" → 복지용구(보행보조, 대여/구입) 적극 고려
    - "안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이" → 복지용구(안전손잡이, 욕실안전, 낙상예방) 적극 고려
@@ -4120,7 +4076,7 @@ def desc():
    - "미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립", "미끄럼" → 복지용구(욕실안전, 낙상예방, 구입) 적극 고려
    - "목욕의자", "샤워의자", "목욕", "샤워" → 복지용구(목욕의자, 욕실안전, 구입) 고려
    - "이동변기", "간이변기", "변기", "좌변기" → 복지용구(배변보조, 구입) 고려
-   - "기저귀", "요실금", "패드" → 복지용구(위생, 배변보조, 구입) 고려
+   - "요실금", "패드" → 복지용구(위생, 배변보조, 구입) 고려
    - "전동침대", "침대", "병원침대" → 복지용구(전동침대, 대여) 우선 고려
    - "욕창", "욕창매트", "욕창방지", "자세변환", "체위변경" → 복지용구(욕창예방, 자세변환, 대여) 및 의료처치 함께 고려
    - "경사로", "문턱", "턱", "이동불편", "출입불편" → 복지용구(경사로, 이동보조, 구입) 고려
@@ -4134,32 +4090,35 @@ def desc():
    - "외로움", "말벗 필요", "혼자 지냄", "고립" → 정서지원, 안부확인, 돌봄연계를 우선 검토한다
    - 표현이 다르더라도 의미가 비슷하면 대표 욕구로 묶어서 판단한다
    - "다리가 저림", "다리 저림", "발 저림", "손발 저림", "찌릿함", "감각이상" → 신경증상, 통증, 재활, 기능회복, 방문보건, 이동지원 계열을 우선 검토한다
-   - "오줌을 지림", "소변을 지림", "소변 실수", "배뇨 실수", "요실금" → 배뇨관리, 위생지원, 기저귀·패드 등 복지용구, 방문보건 계열을 우선 검토한다
+   - "오줌을 지림", "소변을 지림", "소변 실수", "배뇨 실수", "요실금" → 배뇨관리, 위생지원, 패드 등 복지용구, 방문보건 계열을 우선 검토한다
    - "변을 지림", "대변 실수", "배변 실수", "배변 불편" → 배변관리, 위생지원, 복지용구, 방문보건 계열을 우선 검토한다
    - "자주 넘어진다", "휘청거린다", "낙상이 걱정된다", "균형이 불안하다" → 낙상예방, 안전지원, 보행보조 복지용구, 이동지원 계열을 우선 검토한다
    - "기억을 잘 못한다", "자꾸 깜빡한다", "약을 자주 잊는다" → 인지지원, 복약관리, 안부확인, 돌봄연계를 우선 검토한다
    - "약 챙기기 어렵다", "병원 가기 어렵다", "병원 동행이 필요하다" → 복약관리, 병원동행, 이동지원, 방문보건 계열을 우선 검토한다
    - "반찬을 못함", "식사 준비 어려움", "자주 배고파함", "잘 못 먹음", "차려 먹기 어렵다", "챙겨 먹기 어렵다" → 식사지원, 반찬지원, 영양지원 계열을 추천 대상으로 검토한다
-5. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다.
-6. 우선순위가 높은 순서대로 정렬한다.
-7. 최대 30개까지 추천한다.
-8. 가능하면 동일 유형 서비스는 중복 추천하지 말고, 서로 다른 유형의 서비스가 균형 있게 포함되도록 한다.
-9. direct_need는 수급자 또는 보호자가 특정 서비스나 도움을 직접 원한다고 표현한 경우에만 true로 표시한다.
-   - 예: '원함', '희망함', '받고 싶어함', '원한다고 함', '희망한다고 함', '지원 희망', '욕구가 있음', '원하고 있음', '희망하고 있음', '바라고 있음'
-   - 하나의 문장에서 '원함', '희망함' 등의 표현이 있을 경우, 해당 표현은 바로 앞 또는 직접 연결된 대상에만 적용된다.
-   - 예를 들어 '외출 도움을 원하고 정서적으로 고립됨'은 외출 도움만 직접 욕구이며, 정서적 고립은 상태 설명이므로 direct_need가 아니다.
-   - 사용자의 상태나 환경을 보고 조사자 또는 시스템이 필요하다고 판단한 경우는 direct_need가 아니다.
-   - 환경 문제, 건강 문제, 위생 문제, 낙상 위험, 영양 문제 등이 있어도 사용자가 해당 서비스를 직접 원한다고 표현하지 않았다면 direct_need는 false이다.
-   - direct_need는 직접 표현된 욕구와 정확히 연결되는 서비스에만 true로 표시한다.
-   - 예를 들어 '외출욕구가 있음'이면 이동지원, 외출지원, 동행지원 등 외출과 직접 관련된 서비스만 direct_need=true이다.
-   - '필요한 서비스', '필요함', '필요하다', '필요한', '필요', '식사도움 필요한', '식사도움이 필요한', '식사지원 필요한', '식사지원이 필요한', '도시락 필요한', '도시락이 필요한'은 일반적인 검색 표현이므로 direct_need=true로 처리하지 않는다.
-   - 특히 식사/영양 관련 상태 표현("반찬을 못함", "식사 준비 어려움", "자주 배고파함", "허기짐", "굶는 편", "잘 못 먹음", "영양이 부족해 보임", "차려 먹기 어렵다", "챙겨 먹기 어렵다", "기운이 없다", "체중이 준다", "식사도움 필요", "식사 도움이 필요함")은 모두 추천 판단용이며 direct_need=true로 해석하지 않는다.
-   - 벌레, 고양이, 주거 문제 등으로 방역소독이 추천될 수는 있지만, 사용자가 방역소독을 직접 원한다고 표현하지 않았다면 direct_need는 false이다.
-10. 사용자의 직접 욕구에 해당하는 서비스만 더 높은 우선순위로 배치하고, 그 외 서비스는 일반 추천으로 유지한다.
-   - 사용자가 특정 영역을 언급한 경우(예: 식사, 외출 등), 해당 영역 서비스는 추천할 수 있지만 이것만으로 direct_need=true로 처리하지 않는다.
-   - direct_need=true는 반드시 '원함', '희망함', '받고 싶어함'처럼 희망 의사가 명확할 때만 표시한다.
-11. 사용자의 사례가 특정 영역(예: 식사, 이동, 주거 등)에 해당하는 경우, 그 영역의 서비스는 추천할 수 있다. 단, 직접 희망 표현이 없으면 direct_need=false이다.
-   - 다른 영역(예: 건강관리, 간호 등)은 직접 언급되지 않았다면 과도하게 확장하여 추천하지 않는다. 다만 스마트폰, 휴대폰, 앱, 디지털기기, 비대면, 온라인 사용 가능성이 언급된 경우에는 IoT, 스마트돌봄, 응급안전안심서비스, AI 돌봄기기 등 디지털 기반 돌봄서비스를 검토할 수 있다.
+   - 스마트폰·앱·디지털기기 언급 → IoT, 스마트돌봄, 응급안전안심서비스, AI 돌봄기기 검토
+6. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다
+7. 우선순위가 높은 순서대로 정렬한다
+8. 최대 30개까지 추천한다
+9. 동일 유형 서비스는 중복 추천하지 말고 균형 있게 포함한다
+
+[direct_need 판정]
+direct_need=true 조건: 수급자·보호자가 특정 서비스나 도움을 직접 원한다고 표현한 경우에만
+- 해당 표현: '원함', '희망함', '받고 싶어함', '원한다고 함', '희망한다고 함', '지원 희망', '욕구가 있음', '욕구가 있는', '욕구 있음', '~욕구', '원하고 있음', '희망하고 있음', '바라고 있음'
+- 예: '외출 욕구가 있는 어르신' → 외출 관련 서비스 전체 direct_need=true
+- 예: '식사도움이 필요하고 외출 욕구가 있는' → 외출 관련만 true, 식사는 false- 희망 표현은 바로 앞에 연결된 대상에만 적용 (예: '외출 도움을 원하고 정서적으로 고립됨' → 외출 도움만 true, 정서 고립은 false)
+- 욕구가 연결된 중분류 안의 소분류 항목은 모두 true로 표시한다
+  (예: '외출욕구가 있음' → 이동지원 중분류의 기타·외출동행·차량지원 전부 true)
+  (예: '목욕을 원함' → 방문목욕 중분류의 모든 소분류 true)
+  (예: '식사도움을 희망' → 식사지원·가사지원·일상생활지원 등 식사 관련 중분류 전체 true)
+- 직접 욕구 표현이 특정 영역(식사, 외출, 목욕 등)에 해당하면 해당 영역의 모든 관련 서비스를 true로 표시한다
+
+direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
+- '필요한 서비스', '필요함', '필요하다', '필요한', '필요', '식사도움 필요한', '식사도움이 필요한', '식사지원 필요한', '식사지원이 필요한', '도시락 필요한', '도시락이 필요한'
+- 식사·영양 관련 상태 표현: "반찬을 못함", "식사 준비 어려움", "자주 배고파함", "허기짐", "굶는 편", "잘 못 먹음", "영양이 부족해 보임", "차려 먹기 어렵다", "챙겨 먹기 어렵다", "기운이 없다", "체중이 준다", "식사도움 필요", "식사 도움이 필요함"
+- 환경·건강·위생·낙상·영양 문제를 조사자 또는 시스템이 필요하다고 판단한 경우
+- 벌레·주거 문제 등으로 방역소독이 추천되더라도 사용자가 직접 원한다고 표현하지 않은 경우
+
 설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
 
 출력 형식:
@@ -4179,12 +4138,12 @@ def desc():
 사용자 사례:
 {query_for_ai}
 """
-
         try:
             res = client.responses.create(
                 model="gpt-4.1-mini",
                 input=prompt,
-                temperature=0
+                temperature=0,
+                timeout=90
             )
 
             if hasattr(res, "usage"):
@@ -4224,7 +4183,7 @@ def desc():
                     })
 
             # "필요함/필요하다/필요"는 희망욕구가 아니라 일반추천으로 처리
-            if re.search(r"(필요함|필요하다|필요한|필요)", query):
+            if re.search(r"(필요함|필요하다|필요한|필요)", query) and not re.search(r"(욕구|원함|희망|받고\s*싶|바라)", query):
                 for item in final_results:
                     reason_text = str(item.get("선택이유", ""))
 
@@ -4336,11 +4295,11 @@ def desc():
             service_results = filtered_results
             print("최종 service_results 개수 =", len(service_results))
             for r in service_results:
-                print("→", r.get("대분류",""), "|", r.get("중분류",""), "|", r.get("서비스내용",""))
+                print("→", r.get("대분류",""), "|", r.get("중분류",""), "|", r.get("서비스내용",""), "|", r.get("direct_need",""))
 
 
         except Exception as e:
-            cond_display.append(f"GPT 오류: {e}")
+            warning_msg = "일시적인 오류가 발생했습니다.\n잠시 후 다시 검색해 주세요."
 
 
         count = len(service_results)
@@ -5925,39 +5884,51 @@ button:hover{
 
 .grouped-result-card{
   background:#ffffff !important;
-  border:1.5px solid #94a3b8 !important;
+  border:0.5px solid #e5e7eb !important;
   border-radius:16px !important;
-  padding:20px !important;
+  padding:0 !important;
   box-shadow:none !important;
+  overflow:hidden;
   transition:none !important;
 }
 
 .grouped-result-card:hover{
-  border:1.5px solid #94a3b8 !important;
+  border:0.5px solid #e5e7eb !important;
   box-shadow:none !important;
 }
 
+.direct-need-card{
+  border:1px solid #85B7EB !important;
+}
 
 .group-card-top{
   display:flex;
   justify-content:space-between;
-  align-items:flex-start;
-  gap:14px;
-  margin-bottom:14px;
+  align-items:center;
+  padding:11px 14px 10px;
+  gap:10px;
+  border-bottom:0.5px solid #f1f5f9;
 }
 
 .group-title-area{
   flex:1;
   min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.group-title-meta{
+  font-size:10px;
+  color:#9ca3af;
+  letter-spacing:0.3px;
 }
 
 .group-title-grid{
-  display:grid;
-  grid-template-columns:auto auto auto;
-  align-items:end;
-  column-gap:7px;
-  width:max-content;
-  max-width:100%;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  flex-wrap:nowrap;
 }
 
 .group-title-col{
@@ -5965,154 +5936,134 @@ button:hover{
 }
 
 .group-title-label{
-  margin-bottom:3px;
-  font-size:10px;
-  font-weight:600;
-  color:#94a3b8;
-  letter-spacing:0.4px;
-  text-transform:uppercase;
-  line-height:1;
+  display:none;
 }
 
 .group-title-value{
-  font-size:16px;
+  font-size:15px;
   font-weight:700;
   color:#111827;
   line-height:1.35;
   letter-spacing:-0.3px;
-  word-break:keep-all;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
+.group-title-value.main-val{
+  font-size:12px;
+  font-weight:400;
+  color:#6b7280;
+}
 
 .group-title-arrow{
-  padding-bottom:1px;
-  font-size:17px;
-  font-weight:700;
-  color:#94a3b8;
-  line-height:1.4;
+  font-size:12px;
+  font-weight:400;
+  color:#d1d5db;
+  line-height:1;
+  flex-shrink:0;
 }
 
 .group-search-btn{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  height:32px;
-  padding:0 12px;
+  height:28px;
+  padding:0 10px;
+  border:0.5px solid #d1d5db;
   border-radius:999px;
-  background:transparent;
-  border:0.5px solid #93c5fd;
-  color:#2563eb;
-  text-decoration:none;
+  background:#f9fafb;
+  color:#6b7280;
   font-size:12px;
-  font-weight:600;
+  font-weight:500;
+  text-decoration:none;
   white-space:nowrap;
-  flex:0 0 auto;
-  transition:background 0.15s, border-color 0.15s;
+  flex-shrink:0;
+  cursor:pointer;
 }
-
-.group-search-btn:hover{
-  background:#eff6ff;
-  border-color:#60a5fa;
-}
-
 
 .sub-service-section{
-  margin:12px 0 14px 0;
+  padding:10px 14px 12px;
 }
 
 .sub-service-label{
+  font-size:10px;
+  font-weight:500;
+  color:#9ca3af;
+  letter-spacing:0.4px;
+  text-transform:uppercase;
   margin-bottom:7px;
-  font-size:11px;
-  font-weight:800;
-  color:#64748b;
-  line-height:1;
 }
 
 .sub-service-tabs{
   display:flex;
   flex-wrap:wrap;
-  gap:8px;
-  margin:0;
+  gap:6px;
+  margin-bottom:10px;
 }
 
 .sub-service-tab{
-  display:inline-flex !important;
-  align-items:center !important;
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
   width:auto !important;
   height:auto !important;
-  margin:0 !important;
-  padding:6px 14px !important;
-  border-radius:999px !important;
-  border:0.5px solid #dbeafe !important;
-  background:#f8fbff !important;
-  color:#3b82f6 !important;
-  font-size:13px !important;
-  font-weight:500 !important;
-  line-height:1.3 !important;
-  box-shadow:none !important;
+  margin-top:0 !important;
+  min-height:30px;
+  padding:4px 12px;
+  border-radius:999px;
+  border:0.5px solid #e5e7eb;
+  background:#f9fafb;
+  font-size:13px;
+  color:#6b7280;
   cursor:pointer;
-  transition:all 0.15s !important;
-}
-
-.sub-service-tab:hover{
-  background:#eff6ff !important;
-  border-color:#93c5fd !important;
+  white-space:normal;
+  word-break:keep-all;
+  line-height:1.4;
 }
 
 .sub-service-tab.active{
-  background:#5b8ff9 !important;
-  border-color:#5b8ff9 !important;
-  color:#ffffff !important;
-  font-weight:600 !important;
-}
-
-.sub-service-tab.direct.active{
-  background:#5b8ff9 !important;
-  border-color:#5b8ff9 !important;
-  color:#ffffff !important;
-}
-
-
-.direct-star{
-  color:#2563eb;
-  margin-right:4px;
-  font-size:13px;
-}
-
-.sub-service-tab.active .direct-star{
+  background:#185FA5;
+  border-color:#185FA5;
   color:#ffffff;
 }
 
+.sub-service-tab.direct{
+  background:#ffffff;
+  border:1.5px solid #EF9F27;
+  color:#633806;
+  font-weight:500;
+}
+
+.wish-star-sm{
+  width:11px;
+  height:11px;
+  flex-shrink:0;
+}
+
 .reason-box{
-  padding:14px 16px;
-
-  border-radius:14px;
-
-  background:#f1f3f5;
-
-  border:1px solid #dfe5ec;
-
-  border-left:4px solid #93c5fd;
-
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.7);
-
-  margin-top:10px;
+  background:#f9fafb;
+  padding:10px 12px;
+  border-left:2.5px solid #378ADD;
+  border-radius:0 8px 8px 0;
 }
 
 .reason-title{
-  margin-bottom:6px;
-  font-size:13px;
-  font-weight:900;
-  color:#334155;
+  font-size:11px;
+  font-weight:500;
+  color:#9ca3af;
+  margin-bottom:4px;
+  letter-spacing:0.3px;
+  text-transform:uppercase;
 }
 
 .reason-text{
-  font-size:14.5px;
-  line-height:1.75;
-  color:#4b5563;
+  font-size:13px;
+  color:#374151;
+  line-height:1.6;
   word-break:keep-all;
 }
+
 
 @media (max-width:480px){
   .group-card-top{
@@ -6387,7 +6338,7 @@ button:hover{
 }
 
 .normal-need-card .reason-box{
-  border-left:4px solid #94a3b8 !important;
+  border-left:2.5px solid #94a3b8 !important;
 }
 </style>
 </head>
@@ -6604,28 +6555,25 @@ transition:0.2s;
 {% if group.direct_need and not ns.direct_box_open %}
 <div class="direct-need-box">
   <div class="direct-need-title">
-    <span class="cute-star">✦</span>
+    <svg style="width:17px;height:17px;flex-shrink:0;vertical-align:-3px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
+    </svg>
     <span>희망욕구</span>
   </div>
-
 {% set ns.direct_box_open = true %}
 {% endif %}
 
 <div class="result-card grouped-result-card {% if group.direct_need %}direct-need-card{% else %}normal-need-card{% endif %}">
 
   <div class="group-card-top">
-
     <div class="group-title-area">
+      <div class="group-title-meta">대분류 · 중분류</div>
       <div class="group-title-grid">
         <div class="group-title-col">
-          <div class="group-title-label">대분류</div>
-          <div class="group-title-value">{{group["대분류"]}}</div>
+          <div class="group-title-value main-val">{{group["대분류"]}}</div>
         </div>
-
         <div class="group-title-arrow">›</div>
-
         <div class="group-title-col">
-          <div class="group-title-label">중분류</div>
           <div class="group-title-value">{{group["중분류"]}}</div>
         </div>
       </div>
@@ -6638,7 +6586,6 @@ transition:0.2s;
     >
       기관검색
     </a>
-
   </div>
 
   <div class="sub-service-section">
@@ -6652,16 +6599,16 @@ transition:0.2s;
       onclick="showReason(this, 'reason-{{group['group_id']}}-{{loop.index0}}')"
     >
       {% if item.direct_need %}
-      <span class="mini-cute-star">✦</span>
+      <svg class="wish-star-sm" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
+      </svg>
       {% endif %}
-
       {{item["서비스내용"]}}
     </button>
     {% endfor %}
     </div>
-  </div>
 
-  <div class="reason-box-wrap">
+    <div class="reason-box-wrap">
     {% for item in group["items"] %}
     <div
       id="reason-{{group['group_id']}}-{{loop.index0}}"
@@ -6672,6 +6619,7 @@ transition:0.2s;
       <div class="reason-text">{{item["선택이유"]}}</div>
     </div>
     {% endfor %}
+    </div>
   </div>
 
 </div>
@@ -6681,7 +6629,6 @@ transition:0.2s;
 {% if ns.direct_box_open %}
 </div>
 {% endif %}
-
 </div>
 
 {% endif %}
@@ -6692,13 +6639,13 @@ transition:0.2s;
   <div style="width:100%;max-width:420px;background:#ffffff;border-radius:20px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;">
     
     <div style="padding:18px 20px 12px 20px;border-bottom:1px solid #eef2f7;">
-      <div style="font-size:17px;font-weight:800;color:#111827;">조건검색 안내</div>
+      <div style="font-size:17px;font-weight:800;color:#111827;">기관검색 안내</div>
       <div style="font-size:13px;color:#6b7280;margin-top:4px;">사례기반 검색 결과 연동</div>
     </div>
 
     <div style="padding:18px 20px 8px 20px;font-size:14px;line-height:1.7;color:#374151;word-break:keep-all;">
-      조건검색에는 <b>대분류와 중분류만</b> 반영됩니다.<br>
-      소분류 등 세부 서비스 필요 시 <b>프로그램</b>에 검색해 주세요.
+      기관검색은 <b>대분류와 중분류만</b> 반영됩니다.<br>
+      소분류 등 세부 서비스 필요 시 <b>프로그램명</b>을 입력해 주세요.
     </div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 20px 20px 20px;">
@@ -7361,7 +7308,7 @@ SYNONYM_GROUPS = {
         ],
         "aliases": [
             "요실금", "배뇨장애", "배뇨관리", "위생지원",
-            "기저귀", "패드", "복지용구", "방문보건"
+            "패드", "복지용구", "방문보건"
         ]
     },
 
@@ -7474,7 +7421,7 @@ def expand_query_aliases(query: str):
     ):
         aliases.extend([
             "요실금", "배뇨장애", "배뇨관리", "위생지원",
-            "기저귀", "패드", "복지용구", "방문보건"
+            "패드", "복지용구", "방문보건"
         ])
 
     if "변" in q_norm and ("실수" in q_norm or "지리" in q_norm or "지림" in q_norm):
