@@ -142,7 +142,10 @@ def require_login_all_pages():
         if not session.get("is_admin"):
             return redirect(url_for("admin_login"))
         return None
-
+    if request.path.startswith("/board/admin"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
@@ -209,8 +212,8 @@ body{
   padding:0 12px;
   border:none;
   border-radius:999px;
-  background:rgba(255,255,255,0.88);
-  color:#1f2937;
+  background:#f3f4f6;
+  color:#6b7280;
   font-size:13px;
   font-weight:700;
   text-decoration:none;
@@ -220,7 +223,8 @@ body{
 }
 
 .admin-link:hover{
-  background:#ffffff;
+  background:#e5e7eb;
+  color:#374151;
   transform:translateY(-1px);
 }
 
@@ -641,7 +645,7 @@ def admin_login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if pw == "admin":
+        if pw == "qwer":
             session["is_admin"] = True
             return redirect(url_for("stats"))
         else:
@@ -844,18 +848,23 @@ input, select{
 }
 
 .home-button{
-  display:inline-block;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-  color:#111827;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:34px;
+  padding:0 13px;
+  border-radius:999px;
+  background:#f3f4f6;
+  border:1px solid #d1d5db;
+  color:#6b7280;
   text-decoration:none;
-  font-size:14px;
-  font-weight:500;
+  font-size:13px;
+  font-weight:700;
 }
 
 .home-button:hover{
-  background:#d1d5db;
+  background:#e5e7eb;
+  color:#374151;
 }
 
 /* =========================
@@ -1199,9 +1208,25 @@ body{
 }
 
 /* 타이틀 */
+/* 타이틀 */
 .title{
+  position:relative;
   text-align:center;
   margin-bottom:24px;
+}
+
+.home-admin-hidden{
+  position:absolute;
+  top:-4px;
+  right:0;
+  font-size:10px;
+  color:#cbd5e1;
+  text-decoration:none;
+  font-weight:600;
+}
+
+.home-admin-hidden:hover{
+  color:#64748b;
 }
 
 .title + .card{
@@ -1210,7 +1235,14 @@ body{
 
 .title h1{
   margin:0;
-  font-size:26px;
+  font-size:32px;
+  font-weight:900;
+  letter-spacing:-1px;
+  color:#111827;
+}
+
+.title h1 span{
+  color:#2563eb;
 }
 
 .title p{
@@ -1532,7 +1564,8 @@ body{
 <div class="container">
 
 <div class="title">
-<h1>NHIS-G 케어네비</h1>
+<a href="/admin" class="home-admin-hidden">관리자</a>
+<h1>NHIS-G <span>케어네비</span></h1>
 <p>통합돌봄 자원 검색 및 안내 서비스</p>
 </div>
 
@@ -1758,8 +1791,7 @@ history.pushState({ page: "home" }, "", location.href);
 
 /* 오류제보 버튼 클릭 → 모달 열기 */
 reportBtn.onclick = () => {
-  reportModal.style.display = "flex";
-  history.pushState({ modal: "report" }, "", location.href);
+  location.href = "/board";
 };
 
 function closeReport(){
@@ -1839,17 +1871,26 @@ body{
   margin-bottom:18px;
 }
 .home-button{
-  display:inline-block;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-  color:#111827;
-  text-decoration:none;
-  font-size:14px;
-  font-weight:500;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
 }
+
 .home-button:hover{
-  background:#d1d5db;
+  background:#f9fafb !important;
+  color:#374151 !important;
 }
 .card{
   background:#ffffff;
@@ -1881,6 +1922,15 @@ body{
   font-weight:800;
   color:#111827;
 }
+
+.table-scroll{
+  max-height:360px;
+  overflow-y:auto;
+  overflow-x:auto;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+}
+
 table{
   width:100%;
   border-collapse:collapse;
@@ -1925,8 +1975,9 @@ h2{
     <a href="/home" class="home-button">홈으로</a>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <a href="/stats/export/visits" class="home-button">방문자 엑셀</a>
-      <a href="/stats/export/regions" class="home-button">지역클릭 엑셀</a>
+      <a href="/board/admin" class="home-button">게시판</a>
+      <a href="/stats/export/visits" class="home-button">엑셀</a>
+      <a href="/stats/export/regions" class="home-button">엑셀2</a>
     </div>
   </div>
 
@@ -1944,8 +1995,9 @@ h2{
     </div>
   </div>
 
-  <div class="card">
+<div class="card">
     <h2>일자별 방문자수</h2>
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -1962,10 +2014,12 @@ h2{
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 
-  <div class="card">
+<div class="card">
     <h2>일자별 지역 클릭수</h2>
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -1988,6 +2042,7 @@ h2{
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 
 </div>
@@ -2198,6 +2253,761 @@ def export_stats_regions():
         download_name="일자별_지역클릭수.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+BOARD_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>비공개 게시판</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+}
+
+.home-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:34px;
+  padding:0 13px;
+  border-radius:999px;
+  background:#f3f4f6;
+  border:1px solid #d1d5db;
+  color:#6b7280;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:700;
+}
+.home-button:hover{
+  background:#e5e7eb;
+  color:#374151;
+}
+h2{
+  margin:0 0 8px 0;
+  font-size:22px;
+}
+.desc{
+  margin:0 0 18px 0;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+label{
+  display:block;
+  margin-top:14px;
+  font-size:14px;
+  font-weight:700;
+}
+input, textarea{
+  width:100%;
+  box-sizing:border-box;
+  margin-top:7px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  padding:12px;
+  font-size:15px;
+  font-family:inherit;
+}
+textarea{
+  min-height:180px;
+  resize:vertical;
+  line-height:1.6;
+}
+button{
+  width:100%;
+  height:50px;
+  margin-top:18px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  font-size:16px;
+  font-weight:800;
+  cursor:pointer;
+}
+.success{
+  padding:18px;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  border-radius:14px;
+  color:#1d4ed8;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.6;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/stats" class="home-button">통계로</a>
+  </div>
+
+  <div class="card">
+    {% if saved %}
+      <div class="success">
+        의견이 등록되었습니다.<br>
+        남겨주신 내용은 관리자만 확인할 수 있습니다.
+      </div>
+      <a href="/home" class="home-button" style="margin-top:16px;">홈으로 돌아가기</a>
+    {% else %}
+      <h2>오류제보 / 의견보내기</h2>
+      <p class="desc">
+        작성하신 내용은 공개되지 않으며 관리자만 확인할 수 있습니다.
+      </p>
+
+      <form method="post">
+        <label>작성자</label>
+        <input type="text" name="writer" placeholder="이름 또는 소속을 입력하세요">
+
+        <label>제목</label>
+        <input type="text" name="title" placeholder="제목을 입력하세요" required>
+
+        <label>내용</label>
+        <textarea name="content" placeholder="오류 내용이나 의견을 입력하세요" required></textarea>
+
+        <button type="submit">등록하기</button>
+      </form>
+    {% endif %}
+  </div>
+
+</div>
+</body>
+</html>
+"""
+
+BOARD_LIST_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>비공개 게시판</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:760px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+.home-button:hover{
+  background:#f9fafb !important;
+  color:#374151 !important;
+}
+h2{
+  margin:0 0 16px 0;
+  font-size:24px;
+}
+.board-card{
+  background:#fff;
+  border-radius:16px;
+  padding:16px 18px;
+  margin-bottom:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+  text-decoration:none;
+  color:#111827;
+  display:block;
+}
+.board-title{
+  font-size:16px;
+  font-weight:800;
+  margin-bottom:7px;
+}
+.board-meta{
+  font-size:12px;
+  color:#6b7280;
+}
+.empty{
+  background:#fff;
+  border-radius:16px;
+  padding:24px;
+  text-align:center;
+  color:#6b7280;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/home" class="home-button">홈으로</a>
+    <a href="/board/write" class="home-button">글쓰기</a>
+  </div>
+
+  <h2>오류제보 / 의견게시판</h2>
+
+  {% if posts %}
+    {% for post in posts %}
+      <a href="/board/view/{{ post['id'] }}" class="board-card">
+        <div class="board-title">{{ post["title"] }}</div>
+        <div class="board-meta">
+          {{ post["created_at"][:19].replace("T", " ") }}
+          · 작성자: {{ post["writer"] or "미입력" }}
+        </div>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty">등록된 글이 없습니다.</div>
+  {% endif %}
+
+</div>
+</body>
+</html>
+"""
+
+BOARD_WRITE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>글쓰기</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+h2{
+  margin:0 0 8px 0;
+  font-size:22px;
+}
+.desc{
+  margin:0 0 18px 0;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+label{
+  display:block;
+  margin-top:14px;
+  font-size:14px;
+  font-weight:700;
+}
+input, textarea{
+  width:100%;
+  box-sizing:border-box;
+  margin-top:7px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  padding:12px;
+  font-size:15px;
+  font-family:inherit;
+}
+textarea{
+  min-height:180px;
+  resize:vertical;
+  line-height:1.6;
+}
+button{
+  width:100%;
+  height:50px;
+  margin-top:18px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  font-size:16px;
+  font-weight:800;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/home" class="home-button">⌂ 홈으로</a>
+  </div>
+
+  <div class="card">
+    <h2>글쓰기</h2>
+    <p class="desc">작성하신 내용은 관리자만 확인할 수 있습니다.</p>
+
+    <form method="post">
+      <label>작성자</label>
+      <input type="text" name="writer" placeholder="이름 또는 소속을 입력하세요">
+
+      <label>제목</label>
+      <input type="text" name="title" placeholder="제목을 입력하세요" required>
+
+      <label>내용</label>
+      <textarea name="content" placeholder="오류 내용이나 의견을 입력하세요" required></textarea>
+
+      <button type="submit">등록하기</button>
+    </form>
+  </div>
+
+</div>
+</body>
+</html>
+"""
+BOARD_SUCCESS_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>등록 완료</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.success{
+  padding:18px;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  border-radius:14px;
+  color:#1d4ed8;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.6;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  margin-top:16px;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="success">
+      의견이 등록되었습니다.<br>
+      남겨주신 내용은 관리자만 확인할 수 있습니다.
+    </div>
+    <a href="/home" class="home-button">⌂ 홈으로</a>
+  </div>
+</div>
+</body>
+</html>
+"""
+
+
+
+BOARD_VIEW_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게시글 보기</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:760px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.title{
+  font-size:22px;
+  font-weight:900;
+  margin-bottom:10px;
+}
+.meta{
+  font-size:12px;
+  color:#6b7280;
+  margin-bottom:18px;
+}
+.content{
+  font-size:15px;
+  line-height:1.8;
+  white-space:pre-wrap;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/board/admin" class="home-button">목록으로</a>
+  </div>
+
+  <div class="card">
+    <div class="title">{{ post["title"] }}</div>
+    <div class="meta">
+      {{ post["created_at"][:19].replace("T", " ") }}
+      · 작성자: {{ post["writer"] or "미입력" }}
+    </div>
+    <div class="content">{{ post["content"] }}</div>
+  </div>
+
+</div>
+</body>
+</html>
+"""
+
+BOARD_ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게시판 관리자</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:900px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  margin-bottom:16px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:34px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+}
+.card{
+  background:#fff;
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:14px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.06);
+  cursor:pointer;
+}
+.meta{
+  font-size:12px;
+  color:#6b7280;
+  margin-bottom:8px;
+}
+.title{
+  font-size:17px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+.content{
+  font-size:14px;
+  line-height:1.7;
+  word-break:keep-all;
+  margin-bottom:14px;
+
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:normal;
+}
+.delete-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:32px;
+  padding:0 12px;
+  border:none;
+  border-radius:999px;
+  background:#fee2e2;
+  color:#b91c1c;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+}
+.empty{
+  background:#fff;
+  border-radius:16px;
+  padding:22px;
+  color:#6b7280;
+  text-align:center;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/stats" class="home-button">통계로</a>
+  </div>
+
+  <h2>비공개 게시판 관리</h2>
+
+  {% if posts %}
+    {% for post in posts %}
+    <div class="card" onclick="location.href='/board/admin/view/{{ post['id'] }}'">
+      <div class="meta">
+        {{ post["created_at"][:19].replace("T", " ") }}
+        · 작성자: {{ post["writer"] or "미입력" }}
+      </div>
+      <div class="title">{{ post["title"] }}</div>
+      <div class="content">{{ post["content"] }}</div>
+
+      <form method="post" action="/board/delete/{{ post['id'] }}" onclick="event.stopPropagation();" onsubmit="return confirm('이 글을 삭제할까요?');">
+        <button type="submit" class="delete-btn">삭제</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">등록된 글이 없습니다.</div>
+  {% endif %}
+
+</div>
+</body>
+</html>
+"""
+
+
+@app.route("/board")
+def board():
+    return redirect(url_for("board_write"))
+
+@app.route("/board/write", methods=["GET", "POST"])
+def board_write():
+    if request.method == "POST":
+        writer = (request.form.get("writer", "") or "").strip()
+        title = (request.form.get("title", "") or "").strip()
+        content = (request.form.get("content", "") or "").strip()
+
+        if title and content:
+            if os.getenv("RENDER") is not None:
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/board_posts",
+                    headers=SUPABASE_HEADERS,
+                    json={
+                        "writer": writer,
+                        "title": title,
+                        "content": content,
+                        "ip": request.remote_addr
+                    }
+                )
+
+        return render_template_string(BOARD_SUCCESS_HTML)
+
+    return render_template_string(BOARD_WRITE_HTML)
+
+@app.route("/board/view/<int:post_id>")
+def board_view(post_id):
+    return redirect(url_for("board"))
+
+@app.route("/board/admin")
+def board_admin():
+    posts = []
+
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&is_deleted=eq.false&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        posts = res.json() if res.ok else []
+    else:
+        posts = [
+            {
+                "id": 1,
+                "created_at": "2026-05-17T00:00:00",
+                "writer": "테스트",
+                "title": "로컬 테스트 글",
+                "content": "Render 환경에서는 Supabase에 저장됩니다."
+            }
+        ]
+
+    return render_template_string(BOARD_ADMIN_HTML, posts=posts)
+
+
+@app.route("/board/admin/view/<int:post_id>")
+def board_admin_view(post_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+
+    post = None
+
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&id=eq.{post_id}&is_deleted=eq.false",
+            headers=SUPABASE_HEADERS
+        )
+        rows = res.json() if res.ok else []
+        post = rows[0] if rows else None
+    else:
+        post = {
+            "id": 1,
+            "created_at": "2026-05-17T00:00:00",
+            "writer": "테스트",
+            "title": "로컬 테스트 글",
+            "content": "Render 환경에서는 Supabase에 저장됩니다."
+        }
+
+    if not post:
+        return redirect(url_for("board_admin"))
+
+    return render_template_string(BOARD_VIEW_HTML, post=post)
+
+@app.route("/board/delete/<int:post_id>", methods=["POST"])
+def board_delete(post_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+
+    if os.getenv("RENDER") is not None:
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/board_posts?id=eq.{post_id}",
+            headers=SUPABASE_HEADERS,
+            json={
+                "is_deleted": True
+            }
+        )
+
+    return redirect(url_for("board_admin"))
+
 
 @app.route("/guide")
 def guide():
@@ -2450,6 +3260,45 @@ COMBO_HTML = """
   margin-top:12px;
 }
 
+.combo-top-bar .home-button,
+.combo-top-bar .combo-reset-button{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  width:auto !important;
+  height:36px !important;
+  margin:0 !important;
+  padding:0 15px !important;
+
+  border-radius:999px !important;
+  background:#f3f4f6 !important;
+  color:#6b7280 !important;
+  border:1px solid #d1d5db !important;
+
+  font-size:13.5px !important;
+  font-weight:700 !important;
+  line-height:1 !important;
+  text-decoration:none !important;
+
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(15,23,42,0.10);
+}
+
+.combo-top-bar .home-button:hover,
+.combo-top-bar .combo-reset-button:hover{
+  background:#e5e7eb !important;
+  color:#374151 !important;
+}
+
+@media (max-width:480px){
+  .combo-top-bar .home-button,
+  .combo-top-bar .combo-reset-button{
+    height:34px !important;
+    padding:0 13px !important;
+    font-size:13px !important;
+  }
+}
+
 .combo-reset-button{
   display:inline-block;
   width:auto;
@@ -2458,7 +3307,7 @@ COMBO_HTML = """
   padding:8px 14px;
   border-radius:8px;
   background:#e5e7eb;
-  color:#111827;
+  color:#6b7280;
   font-size:14px;
   font-weight:500;
   border:none;
@@ -2611,8 +3460,8 @@ input, select{
 <div class="container">
 
 <div class="top-bar combo-top-bar">
-  <a href="/home" class="home-button">홈으로</a>
-  <button type="button" class="combo-reset-button" onclick="resetDescPage()">초기화</button>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
+  <button type="button" class="combo-reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
 </div>
 
 <div class="card">
@@ -2897,6 +3746,35 @@ def ocr():
         print("OCR 오류:", e)
         return {"text": ""}
 
+def build_grouped_service_results(service_results):
+    grouped_service_results = []
+    group_map = {}
+
+    for item in service_results:
+        main_cat = str(item.get("대분류", "")).strip()
+        middle_cat = str(item.get("중분류", "")).strip()
+        key = main_cat + "|" + middle_cat
+
+        if key not in group_map:
+            group_id = "group_" + str(len(grouped_service_results))
+
+            group_map[key] = {
+                "group_id": group_id,
+                "대분류": main_cat,
+                "중분류": middle_cat,
+                "direct_need": False,
+                "items": []
+            }
+
+            grouped_service_results.append(group_map[key])
+
+        if item.get("direct_need"):
+            group_map[key]["direct_need"] = True
+
+        group_map[key]["items"].append(item)
+
+    return grouped_service_results
+
 @app.route("/desc", methods=["GET","POST"])
 def desc():
     query = (request.values.get("query", "") or "").strip()
@@ -2975,6 +3853,7 @@ def desc():
                     cond_display=cond_display,
                     count=count,
                     service_results=service_results,
+                                 grouped_service_results=build_grouped_service_results(service_results),
                     warning_msg=warning_msg,
                     selected_sido=selected_sido,
                     selected_sigungu=selected_sigungu,
@@ -3000,6 +3879,7 @@ def desc():
                 cond_display=cond_display,
                 count=count,
                 service_results=service_results,
+                          grouped_service_results=build_grouped_service_results(service_results),
                 warning_msg=warning_msg,
                 selected_sido=selected_sido,
                 selected_sigungu=selected_sigungu,
@@ -3143,6 +4023,7 @@ def desc():
                 cond_display=cond_display,
                 count=count,
                 service_results=service_results,
+                          grouped_service_results=build_grouped_service_results(service_results),
                 warning_msg=warning_msg,
                 selected_sido=selected_sido,
                 selected_sigungu=selected_sigungu,
@@ -3342,6 +4223,14 @@ def desc():
                         "direct_need": bool(r.get("direct_need", False))
                     })
 
+            # "필요함/필요하다/필요"는 희망욕구가 아니라 일반추천으로 처리
+            if re.search(r"(필요함|필요하다|필요한|필요)", query):
+                for item in final_results:
+                    reason_text = str(item.get("선택이유", ""))
+
+                    if "필요" in reason_text and not re.search(r"(원함|희망|받고\s*싶|받고싶)", reason_text):
+                        item["direct_need"] = False
+
             final_results.sort(
                 key=lambda x: (
                     0 if x.get("direct_need") else 1,
@@ -3486,6 +4375,7 @@ def desc():
         cond_display=cond_display,
         count=count,
         service_results=service_results,
+             grouped_service_results=build_grouped_service_results(service_results),
         warning_msg=warning_msg,
         selected_sido=selected_sido,
         selected_sigungu=selected_sigungu,
@@ -3549,6 +4439,200 @@ DESC_HTML = """
 
 .top-bar{
   margin-bottom:35px;
+}
+
+.desc-top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:28px;
+}
+
+.desc-top-bar .home-button,
+.desc-top-bar .reset-button{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  width:auto !important;
+  height:36px !important;
+  margin:0 !important;
+  padding:0 15px !important;
+
+  border:none !important;
+  border-radius:999px !important;
+  background:#f3f4f6 !important;
+   color:#6b7280 !important;
+  border:1px solid #d1d5db !important;
+  backdrop-filter:none;
+
+  font-size:13.5px !important;
+  font-weight:700 !important;
+  line-height:1 !important;
+  text-decoration:none !important;
+
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(15,23,42,0.10);
+}
+
+.desc-top-bar .home-button:hover,
+.desc-top-bar .reset-button:hover{
+  background:#e5e7eb !important;
+  color:#374151 !important;
+}
+
+.desc-title-row{
+  width:100%;
+  max-width:680px;
+  margin:0 auto 18px auto;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+}
+
+.desc-title-row h2{
+  grid-column:2;
+  margin:0;
+}
+
+.desc-title-row .service-table-icon-btn{
+  grid-column:3;
+  justify-self:end;
+  transform:translate(-10px, 24px);
+}
+
+.service-table-icon-btn{
+  width:auto !important;
+  height:26px !important;
+  padding:0 8px !important;
+  border-radius:999px;
+  border:1px solid #e5e7eb;
+  background:#ffffff;
+  color:#6b7280;
+  font-size:11.5px;
+  font-weight:600;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  box-shadow:none;
+}
+
+.service-table-icon-btn em{
+  font-style:normal;
+  font-size:11.5px;
+}
+
+.service-table-icon-btn:hover{
+  background:#f9fafb;
+  color:#374151;
+}
+
+.service-table-modal{
+  display:none;
+  position:fixed !important;
+  inset:0 !important;
+  z-index:99999 !important;
+  background:rgba(15,23,42,0.58) !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:18px !important;
+}
+
+.service-table-box{
+  width:100%;
+  max-width:820px;
+  max-height:86vh;
+  background:#ffffff;
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 18px 50px rgba(0,0,0,0.28);
+  display:flex;
+  flex-direction:column;
+}
+
+.service-table-header{
+  height:48px;
+  padding:0 16px;
+  background:#f8fafc;
+  border-bottom:1px solid #e5e7eb;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size:15px;
+  font-weight:800;
+  color:#111827;
+}
+
+.service-table-close{
+  width:34px !important;
+  height:34px !important;
+  padding:0 !important;
+  border:none !important;
+  border-radius:999px !important;
+  background:transparent !important;
+  color:#374151 !important;
+  font-size:22px !important;
+  font-weight:800 !important;
+  line-height:1 !important;
+  box-shadow:none !important;
+  cursor:pointer;
+}
+
+.service-table-body{
+  padding:14px;
+  overflow:auto;
+}
+
+.service-table-body img{
+  width:100%;
+  display:block;
+  border-radius:12px;
+  margin-bottom:14px;
+  border:1px solid #e5e7eb;
+}
+
+.service-table-body img:last-child{
+  margin-bottom:0;
+}
+
+@media (max-width:480px){
+  .service-table-box{
+    max-height:88vh;
+    border-radius:14px;
+  }
+
+  .service-table-header{
+    height:44px;
+    font-size:14px;
+  }
+}
+
+@media (max-width:480px){
+  .desc-title-row{
+    gap:6px;
+    margin-bottom:14px;
+  }
+
+  .service-table-icon-btn{
+    width:28px;
+    height:28px;
+    font-size:13px;
+  }
+}
+@media (max-width:480px){
+  .desc-top-bar{
+    gap:8px;
+    margin-bottom:20px;
+  }
+
+  .desc-top-bar .home-button,
+  .desc-top-bar .reset-button{
+    height:34px !important;
+    padding:0 13px !important;
+    font-size:13px !important;
+  }
 }
 
 .home-button,
@@ -4768,56 +5852,628 @@ button:hover{
 .direct-need-box{
   margin:14px 0 18px 0;
   padding:14px;
-  border:2px solid #3b82f6;
+
+  background:#eef4ff;
+
+  border:2px solid #5b8ff9;
+
   border-radius:16px;
-  background:#eff6ff;
 }
 
 .direct-need-title{
-  display:inline-block;
-  margin-bottom:10px;
-  padding:6px 12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+
+  height:32px;
+  padding:0 14px 0 10px;
+
   border-radius:999px;
-  background:#2563eb;
-  color:#ffffff;
-  font-size:13px;
+
+  background:#ffffff;
+  border:1px solid #93c5fd;
+
+  color:#2563eb;
+
+  font-size:12px;
   font-weight:800;
   line-height:1;
+  margin-bottom:16px;
+}
+
+.cute-star{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:17px;
+  height:17px;
+  margin-right:0px;
+  color:#f59e0b;
+  font-size:15px;
+  font-weight:900;
+  line-height:1;
+  text-shadow:0 1px 2px rgba(180,83,9,0.25);
+  transform:rotate(-8deg);
+}
+
+.mini-cute-star{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  height:auto;
+  margin-right:4px;
+  color:#f59e0b;
+  font-size:12px;
+  font-weight:900;
+  line-height:1;
+  text-shadow:0 1px 2px rgba(180,83,9,0.25);
+  vertical-align:0;
+  transform:rotate(-8deg);
 }
 
 .direct-need-card{
-  border:1px solid #bfdbfe;
-  background:#ffffff;
+  border:1px solid #bfdbfe !important;
+  background:#ffffff !important;
+  margin-bottom:14px !important;
+}
+
+.direct-need-card:last-child{
+  margin-bottom:0 !important;
+}
+
+.grouped-result-card{
+  background:#ffffff !important;
+  border:1.5px solid #94a3b8 !important;
+  border-radius:16px !important;
+  padding:20px !important;
+  box-shadow:none !important;
+  transition:none !important;
+}
+
+.grouped-result-card:hover{
+  border:1.5px solid #94a3b8 !important;
+  box-shadow:none !important;
+}
+
+
+.group-card-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  margin-bottom:14px;
+}
+
+.group-title-area{
+  flex:1;
+  min-width:0;
+}
+
+.group-title-grid{
+  display:grid;
+  grid-template-columns:auto auto auto;
+  align-items:end;
+  column-gap:7px;
+  width:max-content;
+  max-width:100%;
+}
+
+.group-title-col{
+  min-width:0;
+}
+
+.group-title-label{
+  margin-bottom:3px;
+  font-size:10px;
+  font-weight:600;
+  color:#94a3b8;
+  letter-spacing:0.4px;
+  text-transform:uppercase;
+  line-height:1;
+}
+
+.group-title-value{
+  font-size:16px;
+  font-weight:700;
+  color:#111827;
+  line-height:1.35;
+  letter-spacing:-0.3px;
+  word-break:keep-all;
+}
+
+
+.group-title-arrow{
+  padding-bottom:1px;
+  font-size:17px;
+  font-weight:700;
+  color:#94a3b8;
+  line-height:1.4;
+}
+
+.group-search-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:32px;
+  padding:0 12px;
+  border-radius:999px;
+  background:transparent;
+  border:0.5px solid #93c5fd;
+  color:#2563eb;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:600;
+  white-space:nowrap;
+  flex:0 0 auto;
+  transition:background 0.15s, border-color 0.15s;
+}
+
+.group-search-btn:hover{
+  background:#eff6ff;
+  border-color:#60a5fa;
+}
+
+
+.sub-service-section{
+  margin:12px 0 14px 0;
+}
+
+.sub-service-label{
+  margin-bottom:7px;
+  font-size:11px;
+  font-weight:800;
+  color:#64748b;
+  line-height:1;
+}
+
+.sub-service-tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:0;
+}
+
+.sub-service-tab{
+  display:inline-flex !important;
+  align-items:center !important;
+  width:auto !important;
+  height:auto !important;
+  margin:0 !important;
+  padding:6px 14px !important;
+  border-radius:999px !important;
+  border:0.5px solid #dbeafe !important;
+  background:#f8fbff !important;
+  color:#3b82f6 !important;
+  font-size:13px !important;
+  font-weight:500 !important;
+  line-height:1.3 !important;
+  box-shadow:none !important;
+  cursor:pointer;
+  transition:all 0.15s !important;
+}
+
+.sub-service-tab:hover{
+  background:#eff6ff !important;
+  border-color:#93c5fd !important;
+}
+
+.sub-service-tab.active{
+  background:#5b8ff9 !important;
+  border-color:#5b8ff9 !important;
+  color:#ffffff !important;
+  font-weight:600 !important;
+}
+
+.sub-service-tab.direct.active{
+  background:#5b8ff9 !important;
+  border-color:#5b8ff9 !important;
+  color:#ffffff !important;
+}
+
+
+.direct-star{
+  color:#2563eb;
+  margin-right:4px;
+  font-size:13px;
+}
+
+.sub-service-tab.active .direct-star{
+  color:#ffffff;
+}
+
+.reason-box{
+  padding:14px 16px;
+
+  border-radius:14px;
+
+  background:#f1f3f5;
+
+  border:1px solid #dfe5ec;
+
+  border-left:4px solid #93c5fd;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7);
+
+  margin-top:10px;
+}
+
+.reason-title{
+  margin-bottom:6px;
+  font-size:13px;
+  font-weight:900;
+  color:#334155;
+}
+
+.reason-text{
+  font-size:14.5px;
+  line-height:1.75;
+  color:#4b5563;
+  word-break:keep-all;
 }
 
 @media (max-width:480px){
-  .direct-need-box{
-    margin:12px 0 16px 0;
-    padding:12px;
-    border-radius:14px;
+  .group-card-top{
+    flex-direction:row;
+    align-items:flex-start;
+    gap:10px;
   }
 
+  .group-title-area{
+    flex:1;
+    min-width:0;
+  }
+
+  .group-search-btn{
+    align-self:flex-start;
+    margin-top:2px;
+  }
+
+  .group-title-value{
+    font-size:16px;
+    font-weight:750;
+  }
+
+  .sub-service-tab{
+    font-size:12.5px !important;
+    padding:7px 11px !important;
+  }
+
+  .direct-need-box{
+  margin:14px 0 18px 0;
+  padding:14px;
+
+  background:#eef4ff;
+
+  border:2px solid #5b8ff9;
+
+  border-radius:16px;
+}
+
   .direct-need-title{
-    font-size:12px;
-    padding:6px 10px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+
+  height:32px;
+  padding:0 14px 0 10px;
+
+  border-radius:999px;
+
+  background:#ffffff;
+  border:1px solid #93c5fd;
+
+  color:#2563eb;
+
+  font-size:12px;
+  font-weight:800;
+  line-height:1;
+ margin-bottom:16px;
+}
+
+  .cute-star{
+  width:auto;
+  height:auto;
+  margin-right:0;
+  font-size:11px;
+}
+}
+
+
+/* ===== 개인정보 입력 주의 팝업 ===== */
+#privacyModal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.48);
+  z-index:9999;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+}
+
+#privacyBox{
+  width:100%;
+  max-width:390px;
+  background:#ffffff;
+  border-radius:24px;
+  padding:30px 24px 24px 24px;
+  text-align:center;
+  box-shadow:0 20px 50px rgba(0,0,0,0.22);
+}
+
+.privacy-icon{
+  width:46px;
+  height:46px;
+  margin:0 auto 14px auto;
+  border-radius:50%;
+  background:#fee2e2;
+  color:#dc2626;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:28px;
+  font-weight:900;
+}
+
+.privacy-icon.siren-icon{
+  background:#ffffff;
+  border-radius:0;
+  width:56px;
+  height:62px;
+  margin:0 auto 4px auto;
+}
+
+.privacy-icon.siren-icon .siren-svg{
+  width:56px;
+  height:62px;
+  display:block;
+}
+
+.privacy-title{
+  font-size:22px;
+  font-weight:900;
+  color:#111827;
+  margin-bottom:8px;
+}
+
+.privacy-subtitle{
+  font-size:14px;
+  color:#6b7280;
+  line-height:1.55;
+  margin-bottom:18px;
+  word-break:keep-all;
+}
+
+.privacy-text{
+  font-size:14px;
+  line-height:1.7;
+  color:#374151;
+  word-break:keep-all;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:16px 15px;
+  margin-bottom:14px;
+}
+
+.privacy-text b{
+  color:#dc2626;
+}
+
+.privacy-notice{
+  margin:8px 0 12px 0;
+  color:#6b7280;
+  font-size:12px;
+  line-height:1.45;
+  word-break:keep-all;
+}
+
+.privacy-check{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin:12px 0 18px 0;
+  font-size:13px;
+  color:#4b5563;
+  cursor:pointer;
+}
+
+.privacy-check input{
+  width:16px;
+  height:16px;
+  margin:0;
+}
+
+.privacy-confirm{
+  width:100%;
+  height:48px;
+  border:none;
+  border-radius:14px;
+  background:#2563eb;
+  color:#ffffff;
+  font-size:15px;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(37,99,235,0.22);
+}
+
+@media (max-width:480px){
+  #privacyBox{
+    max-width:360px;
+    padding:28px 22px 22px 22px;
+    border-radius:22px;
+  }
+
+  .privacy-title{
+    font-size:21px;
+  }
+
+  .privacy-text,
+  .privacy-subtitle{
+    font-size:13px;
   }
 }
 
+@media (max-width:480px){
+
+  .desc-title-row{
+    width:100%;
+    max-width:380px;
+    grid-template-columns:1fr;
+    justify-items:center;
+    row-gap:8px;
+    margin-bottom:4px;
+  }
+
+  .desc-title-row h2{
+    grid-column:1;
+    margin-bottom:0;
+  }
+
+  .desc-title-row .service-table-icon-btn{
+    grid-column:1;
+    justify-self:end;
+    margin-right:5px;
+    margin-bottom:-8px;
+    transform:translateX(-2px);
+    white-space:nowrap;
+    width:auto !important;
+  }
+
+}
+/* ===== 일반욕구 카드 색상 분리 ===== */
+
+.normal-need-card{
+  border:1.5px solid #94a3b8 !important;
+}
+
+.normal-need-card:hover{
+  border:1.5px solid #94a3b8 !important;
+  box-shadow:none !important;
+}
+
+.normal-need-card .sub-service-tab.active{
+  background:#64748b !important;
+  border-color:#64748b !important;
+  color:#ffffff !important;
+}
+
+.normal-need-card .group-search-btn{
+  border-color:#cbd5e1 !important;
+  color:#475569 !important;
+}
+
+.normal-need-card .group-search-btn:hover{
+  background:#f1f5f9 !important;
+  border-color:#94a3b8 !important;
+  color:#334155 !important;
+}
+
+.normal-need-card .sub-service-tab{
+  border-color:#cbd5e1 !important;
+  background:#ffffff !important;
+  color:#475569 !important;
+}
+
+.normal-need-card .sub-service-tab:hover{
+  background:#f1f5f9 !important;
+  border-color:#94a3b8 !important;
+  color:#334155 !important;
+}
+
+.normal-need-card .reason-box{
+  border-left:4px solid #94a3b8 !important;
+}
 </style>
 </head>
 
 <body>
 
+<!-- ===== 개인정보 입력 주의 팝업 ===== -->
+<div id="privacyModal">
+  <div id="privacyBox">
+
+    <div class="privacy-icon siren-icon">
+  <svg class="siren-svg" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg">
+    <line x1="48" y1="6" x2="48" y2="20" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+    <line x1="17" y1="22" x2="28" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+    <line x1="79" y1="22" x2="68" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+
+    <path d="M28 80V62C28 48 36.8 39 48 39C59.2 39 68 48 68 62V80Z"
+          fill="#ef4444"
+          stroke="#111827"
+          stroke-width="6"
+          stroke-linejoin="round"/>
+
+    <path d="M39 42C45 44 51 56 52 80H28V62C28 52 32.5 45 39 42Z"
+          fill="rgba(255,255,255,0.18)"/>
+
+    <rect x="18" y="76" width="60" height="20" rx="10"
+          fill="#e5e7eb"
+          stroke="#111827"
+          stroke-width="6"/>
+  </svg>
+</div>
+
+    <div class="privacy-title">개인정보 유출 주의</div>
+
+<div class="privacy-subtitle">
+  ※ 개인정보 입력에 따른 책임은 사용자에게 있습니다.
+</div>
+
+<div class="privacy-text">
+  <b>이름, 주민등록번호, 연락처, 상세주소</b> 등<br>
+  개인정보 입력 시 주의해 주세요.<br>
+  건강, 환경 등 돌봄필요 상황만 입력해 주세요.
+</div>
+
+    <label class="privacy-check">
+      <input type="checkbox" id="hidePrivacyToday">
+      오늘 하루 보지 않기
+    </label>
+
+    <button type="button" class="privacy-confirm" onclick="closePrivacyModal()">
+      확인
+    </button>
+
+  </div>
+</div>
+
 <div class="container">
 
 <div class="top-bar desc-top-bar">
-  <a href="/home" class="home-button">홈으로</a>
-  <button type="button" class="reset-button" onclick="resetDescPage()">초기화</button>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
+  <button type="button" class="reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
 </div>
 
 <div class="title">
   <div class="title-row">
-    <h2>사례별 AI 추천 서비스 찾기</h2>
+    <div class="desc-title-row">
+  <h2>사례별 AI 추천 서비스 찾기</h2>
+  <button type="button" class="service-table-icon-btn" onclick="openServiceTableModal()" title="서비스 분류표">
+  <span>📋</span>
+  <em> 분류표</em>
+</button>
+</div>
+  </div>
+</div>
+
+<div id="serviceTableModal" class="service-table-modal" onclick="closeServiceTableModalByBg(event)">
+  <div class="service-table-box">
+    <div class="service-table-header">
+      <span>서비스 분류표</span>
+      <button type="button" class="service-table-close" onclick="closeServiceTableModal()">×</button>
+    </div>
+
+    <div class="service-table-body">
+      <img src="/static/service_table_1.png" alt="서비스 분류표 1">
+      <img src="/static/service_table_2.png" alt="서비스 분류표 2">
+    </div>
   </div>
 </div>
 
@@ -4938,55 +6594,86 @@ transition:0.2s;
 
 {% set ns = namespace(direct_box_open=false) %}
 
-{% for r in service_results %}
+{% for group in grouped_service_results|default([]) %}
 
-{% if not r.direct_need and ns.direct_box_open %}
+{% if not group.direct_need and ns.direct_box_open %}
 </div>
 {% set ns.direct_box_open = false %}
 {% endif %}
 
-{% if r.direct_need and not ns.direct_box_open %}
+{% if group.direct_need and not ns.direct_box_open %}
 <div class="direct-need-box">
-  <div class="direct-need-title">희망욕구</div>
+  <div class="direct-need-title">
+    <span class="cute-star">✦</span>
+    <span>희망욕구</span>
+  </div>
+
 {% set ns.direct_box_open = true %}
 {% endif %}
 
-<div class="result-card {% if r.direct_need %}direct-need-card{% endif %}">
+<div class="result-card grouped-result-card {% if group.direct_need %}direct-need-card{% else %}normal-need-card{% endif %}">
 
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px;">
+  <div class="group-card-top">
 
-    <div style="font-weight:800; font-size:17px; line-height:1.5; flex:1; color:#111827;">
-      {{loop.index}}. {{r["대분류"]}} > {{r["중분류"]}} > {{r["서비스내용"]}}
+    <div class="group-title-area">
+      <div class="group-title-grid">
+        <div class="group-title-col">
+          <div class="group-title-label">대분류</div>
+          <div class="group-title-value">{{group["대분류"]}}</div>
+        </div>
+
+        <div class="group-title-arrow">›</div>
+
+        <div class="group-title-col">
+          <div class="group-title-label">중분류</div>
+          <div class="group-title-value">{{group["중분류"]}}</div>
+        </div>
+      </div>
     </div>
 
     <a
-      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{r['대분류']|urlencode}}&middle_category={{r['중분류']|urlencode}}&from_desc=1"
+      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{group['대분류']|urlencode}}&middle_category={{group['중분류']|urlencode}}&from_desc=1"
       onclick="return openComboGuideModal(this.href);"
-      style="
-        display:inline-block;
-        padding:9px 13px;
-        border-radius:10px;
-        background:#eff6ff;
-        border:1px solid #bfdbfe;
-        color:#1d4ed8;
-        text-decoration:none;
-        font-size:13px;
-        font-weight:600;
-        white-space:nowrap;
-        flex:0 0 auto;
-      "
+      class="group-search-btn"
     >
       기관검색
     </a>
 
   </div>
 
-  <div style="font-size:15px; line-height:1.75; color:#6b7280;">
-    <p style="margin:0 0 8px 0;"><b>대분류:</b> {{r["대분류"]}}</p>
-    <p style="margin:0 0 8px 0;"><b>중분류:</b> {{r["중분류"]}}</p>
-    <p style="margin:0 0 8px 0;"><b>소분류:</b> {{r["서비스내용"]}}</p>
-    <p style="margin:0;"><b>추천 이유:</b> {{r["선택이유"]}}</p>
+  <div class="sub-service-section">
+    <div class="sub-service-label">소분류</div>
+
+    <div class="sub-service-tabs">
+    {% for item in group["items"] %}
+    <button
+      type="button"
+      class="sub-service-tab {% if loop.first %}active{% endif %} {% if item.direct_need %}direct{% endif %}"
+      onclick="showReason(this, 'reason-{{group['group_id']}}-{{loop.index0}}')"
+    >
+      {% if item.direct_need %}
+      <span class="mini-cute-star">✦</span>
+      {% endif %}
+
+      {{item["서비스내용"]}}
+    </button>
+    {% endfor %}
+    </div>
   </div>
+
+  <div class="reason-box-wrap">
+    {% for item in group["items"] %}
+    <div
+      id="reason-{{group['group_id']}}-{{loop.index0}}"
+      class="reason-box"
+      style="{% if not loop.first %}display:none;{% endif %}"
+    >
+      <div class="reason-title">추천 이유</div>
+      <div class="reason-text">{{item["선택이유"]}}</div>
+    </div>
+    {% endfor %}
+  </div>
+
 </div>
 
 {% endfor %}
@@ -5161,6 +6848,46 @@ window.addEventListener("load", function(){
 });
 
 
+let serviceTableHistoryOpen = false;
+
+function openServiceTableModal(){
+  const modal = document.getElementById("serviceTableModal");
+  if(modal){
+    modal.style.display = "flex";
+  }
+
+  if(!serviceTableHistoryOpen){
+    history.pushState({ modal: "serviceTable" }, "", location.href);
+    serviceTableHistoryOpen = true;
+  }
+}
+
+function closeServiceTableModal(){
+  const modal = document.getElementById("serviceTableModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+
+  serviceTableHistoryOpen = false;
+}
+
+function closeServiceTableModalByBg(e){
+  if(e.target.id === "serviceTableModal"){
+    closeServiceTableModal();
+  }
+}
+
+window.addEventListener("popstate", function(e){
+  const modal = document.getElementById("serviceTableModal");
+
+  if(modal && modal.style.display === "flex"){
+    modal.style.display = "none";
+    serviceTableHistoryOpen = false;
+    history.pushState({ page: "desc" }, "", location.href);
+    return;
+  }
+});
+
 function setDescSearchAction(){
   document.getElementById("descAction").value = "search";
 }
@@ -5219,6 +6946,29 @@ function moveComboGuideModal(){
 
   if(comboGuideTargetHref){
     window.location.href = comboGuideTargetHref;
+  }
+}
+
+function showReason(btn, targetId){
+  const card = btn.closest(".result-card");
+  if(!card) return;
+
+  const tabs = card.querySelectorAll(".sub-service-tab");
+  const reasons = card.querySelectorAll(".reason-box");
+
+  tabs.forEach(function(tab){
+    tab.classList.remove("active");
+  });
+
+  reasons.forEach(function(reason){
+    reason.style.display = "none";
+  });
+
+  btn.classList.add("active");
+
+  const target = document.getElementById(targetId);
+  if(target){
+    target.style.display = "block";
   }
 }
 
@@ -5402,6 +7152,35 @@ window.addEventListener("load", function(){
 window.addEventListener("popstate", function(e){
   if (e.state && e.state.page === "desc-root") {
     window.location.replace("/desc");
+  }
+});
+
+function getPrivacyTodayKey(){
+  const d = new Date();
+  return "privacy_hide_" + d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate();
+}
+
+function closePrivacyModal(){
+  const modal = document.getElementById("privacyModal");
+  const check = document.getElementById("hidePrivacyToday");
+
+  if(check && check.checked){
+    localStorage.setItem(getPrivacyTodayKey(), "Y");
+  }
+
+  if(modal){
+    modal.style.display = "none";
+  }
+}
+
+window.addEventListener("load", function(){
+  const modal = document.getElementById("privacyModal");
+  if(!modal) return;
+
+  if(localStorage.getItem(getPrivacyTodayKey()) === "Y"){
+    modal.style.display = "none";
+  }else{
+    modal.style.display = "flex";
   }
 });
 
@@ -5906,6 +7685,7 @@ def make_no_result_response(query, results, cond_display, count, service_results
         cond_display=cond_display,
         count=count,
         service_results=service_results,
+             grouped_service_results=build_grouped_service_results(service_results),
         warning_msg=warning_msg,
         found_sido=found_sido,
         found_sigungu=found_sigungu
@@ -6078,6 +7858,45 @@ CARE_HTML = """
   margin-top:12px;
 }
 
+.care-top-bar .home-button,
+.care-top-bar .care-reset-button{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  width:auto !important;
+  height:36px !important;
+  margin:0 !important;
+  padding:0 15px !important;
+
+  border-radius:999px !important;
+  background:#f3f4f6 !important;
+   color:#6b7280 !important;
+  border:1px solid #d1d5db !important;
+
+  font-size:13.5px !important;
+  font-weight:700 !important;
+  line-height:1 !important;
+  text-decoration:none !important;
+
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(15,23,42,0.10);
+}
+
+.care-top-bar .home-button:hover,
+.care-top-bar .care-reset-button:hover{
+  background:#e5e7eb !important;
+  color:#374151 !important;
+}
+
+@media (max-width:480px){
+  .care-top-bar .home-button,
+  .care-top-bar .care-reset-button{
+    height:34px !important;
+    padding:0 13px !important;
+    font-size:13px !important;
+  }
+}
+
 .care-reset-button{
   display:inline-block;
   width:auto;
@@ -6086,7 +7905,7 @@ CARE_HTML = """
   padding:8px 14px;
   border-radius:8px;
   background:#e5e7eb;
-  color:#111827;
+   color:#6b7280;
   font-size:14px;
   font-weight:500;
   border:none;
@@ -6562,8 +8381,8 @@ CARE_HTML = """
 <div class="container">
 
 <div class="top-bar care-top-bar">
-  <a href="/home" class="home-button">홈으로</a>
-  <button type="button" class="care-reset-button" onclick="resetCarePage()">초기화</button>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
+  <button type="button" class="care-reset-button" onclick="resetCarePage()">↻ 다시 입력</button>
 </div>
 
 <h2>통합돌봄 사전조사</h2>
@@ -6989,7 +8808,7 @@ NHIS25_HTML = """
 <div class="container">
 
 <div class="top-bar">
-  <a href="/home" class="home-button">홈으로</a>
+  <a href="/home" class="home-button">⌂ 홈으로</a>
 </div>
 
 <h2>건강보험 25시</h2>
