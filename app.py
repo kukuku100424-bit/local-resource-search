@@ -4074,7 +4074,11 @@ def desc():
    - "안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이" → 복지용구(안전손잡이, 욕실안전, 낙상예방) 적극 고려
    - "도구가 필요함", "보조도구 필요", "이동 도구 필요" → 복지용구(지팡이, 보행기, 휠체어 등)를 적극 우선 검토한다
    - "미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립", "미끄럼" → 복지용구(욕실안전, 낙상예방, 구입) 적극 고려
-   - "목욕의자", "샤워의자", "목욕", "샤워" → 복지용구(목욕의자, 욕실안전, 구입) 고려
+   - "목욕의자", "샤워의자" → 복지용구(목욕의자, 욕실안전, 구입) 고려
+   - 방문목욕 소분류 판단 기준 (매우 중요):
+     · "차량", "목욕차", "차가 와서" 등 차량 방문 표현 → 반드시 "차량내 목욕"만 선택
+     · "집에서", "가정에서", "가정내" 등 가정 방문 표현 → 반드시 "가정내 목욕"만 선택
+     · 그 외 일반 목욕 표현("목욕이 필요", "목욕 도움" 등) → "차량내 목욕"과 "가정내 목욕" 둘 다 선택
    - "이동변기", "간이변기", "변기", "좌변기" → 복지용구(배변보조, 구입) 고려
    - "요실금", "패드" → 복지용구(위생, 배변보조, 구입) 고려
    - "전동침대", "침대", "병원침대" → 복지용구(전동침대, 대여) 우선 고려
@@ -4211,6 +4215,134 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                         "search_type": "desc"
                     }
                 )
+
+            # ======================
+            # [규칙 1] 기초사정 자동 포함
+            # 같은 중분류 안에 다른 소분류가 이미 검색된 경우,
+            # "기초사정"이 service_df에 존재하면 무조건 함께 포함
+            # ======================
+            existing_keys = set(
+                (str(item.get("대분류", "")).strip(),
+                 str(item.get("중분류", "")).strip(),
+                 str(item.get("서비스내용", "")).strip())
+                for item in final_results
+            )
+            middle_cats_in_results = set(k[1] for k in existing_keys)
+
+            for _, srow in service_df.iterrows():
+                s_main = str(srow.get("대분류", "")).strip()
+                s_mid  = str(srow.get("중분류", "")).strip()
+                s_sub  = str(srow.get("서비스내용", "")).strip()
+                if s_sub == "기초사정" and s_mid in middle_cats_in_results:
+                    if (s_main, s_mid, s_sub) not in existing_keys:
+                        final_results.append({
+                            "대분류": s_main,
+                            "중분류": s_mid,
+                            "서비스내용": s_sub,
+                            "선택이유": "해당 중분류 검색 시 기초사정이 함께 포함됩니다.",
+                            "direct_need": False
+                        })
+                        existing_keys.add((s_main, s_mid, s_sub))
+
+            # ======================
+            # [규칙 1-2] 목욕 키워드 있으면 방문목욕 소분류 강제 포함
+            # AI가 방문목욕을 추천 안 해도, 쿼리에 목욕 관련 단어 있으면 강제 추가
+            # ======================
+            q_norm_bath_pre = query.replace(" ", "").lower()
+            has_bath_keyword = any(k in q_norm_bath_pre for k in [
+                "목욕", "씻기", "씻겨", "샤워", "목욕도움", "목욕지원"
+            ])
+            if has_bath_keyword:
+                is_car_bath_pre = any(k in q_norm_bath_pre for k in [
+                    "차량목욕", "목욕차", "차가와서", "차로목욕",
+                    "차량으로목욕", "차가오는", "차량이와서", "차량"
+                ])
+                is_home_bath_pre = any(k in q_norm_bath_pre for k in [
+                    "집에서목욕", "가정에서목욕", "가정내목욕",
+                    "집에서씻", "가정방문목욕", "집에서하는목욕", "가정에서", "집에서"
+                ])
+
+                # 기존에 AI가 추가한 방문목욕 소분류를 전부 제거하고 새로 통제
+                final_results = [
+                    item for item in final_results
+                    if not (str(item.get("대분류","")).strip() == "요양"
+                            and str(item.get("중분류","")).strip() == "방문목욕")
+                ]
+                existing_keys = set(
+                    (str(item.get("대분류","")).strip(),
+                     str(item.get("중분류","")).strip(),
+                     str(item.get("서비스내용","")).strip())
+                    for item in final_results
+                )
+
+                for _, srow in service_df.iterrows():
+                    s_main = str(srow.get("대분류", "")).strip()
+                    s_mid  = str(srow.get("중분류", "")).strip()
+                    s_sub  = str(srow.get("서비스내용", "")).strip()
+                    if s_main != "요양" or s_mid != "방문목욕":
+                        continue
+                    if is_car_bath_pre and not is_home_bath_pre:
+                        if "차량" not in s_sub:
+                            continue
+                    # 그 외(가정 명시 또는 일반 목욕): 둘 다 포함
+                    if (s_main, s_mid, s_sub) not in existing_keys:
+                        final_results.append({
+                            "대분류": s_main,
+                            "중분류": s_mid,
+                            "서비스내용": s_sub,
+                            "선택이유": "목욕 관련 욕구로 방문목욕 서비스가 포함됩니다.",
+                            "direct_need": False
+                        })
+                        existing_keys.add((s_main, s_mid, s_sub))
+
+            # ======================
+            # [규칙 2] 요양 대분류 → 해당 중분류 소분류 전체 포함
+            # 검색 결과에 "요양" 대분류가 있으면,
+            # 그 중분류의 모든 소분류를 service_df에서 자동 추가
+            # 단, "방문목욕" 중분류는 쿼리 문맥에 따라 구분
+            # ======================
+            lt_middles_in_results = set(
+                str(item.get("중분류", "")).strip()
+                for item in final_results
+                if str(item.get("대분류", "")).strip() == "요양"
+            )
+
+            if lt_middles_in_results:
+                q_norm_bath = query.replace(" ", "").lower()
+
+                for _, srow in service_df.iterrows():
+                    s_main = str(srow.get("대분류", "")).strip()
+                    s_mid  = str(srow.get("중분류", "")).strip()
+                    s_sub  = str(srow.get("서비스내용", "")).strip()
+
+                    if s_main != "요양":
+                        continue
+                    if s_mid not in lt_middles_in_results:
+                        continue
+
+                    # 방문목욕은 규칙1-2에서 이미 처리 → 여기선 제외
+                    if s_mid == "방문목욕":
+                        continue
+
+                    if (s_main, s_mid, s_sub) not in existing_keys:
+                        final_results.append({
+                            "대분류": s_main,
+                            "중분류": s_mid,
+                            "서비스내용": s_sub,
+                            "선택이유": "장기요양 서비스 검색 시 해당 중분류의 전체 소분류가 포함됩니다.",
+                            "direct_need": False
+                        })
+                        existing_keys.add((s_main, s_mid, s_sub))
+
+            # 추가 후 다시 정렬
+            final_results.sort(
+                key=lambda x: (
+                    0 if x.get("direct_need") else 1,
+                    str(x.get("대분류", "")).strip(),
+                    str(x.get("중분류", "")).strip(),
+                    str(x.get("서비스내용", "")).strip()
+                )
+            )
 
             if wound_context:
                 wound_filtered = []
