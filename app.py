@@ -1273,21 +1273,14 @@ body{
 .card{
   display:flex;
   align-items:center;
-  gap:16px;
-
+  gap:14px;
   background:white;
-
-  padding:16px;
-
-  border-radius:16px;
-
-  margin-bottom:10px;
-
-  box-shadow:0 8px 20px rgba(0,0,0,0.08);
-
+  padding:13px 16px;
+  border-radius:14px;
+  margin-bottom:9px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.07);
   text-decoration:none;
   color:inherit;
-
   transition:0.18s;
 }
 
@@ -1330,6 +1323,10 @@ body{
 
 .sub-card span{
   color:#4b5563;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
 }
 
 .sub-card .icon{
@@ -1343,18 +1340,15 @@ body{
 
 /* 아이콘 */
 .icon{
-  width:50px;
-  height:50px;
-
-  border-radius:14px;
-
+  width:44px;
+  height:44px;
+  flex-shrink:0;
+  border-radius:12px;
   background:#e8f1ff;
-
   display:flex;
   align-items:center;
   justify-content:center;
-
-  font-size:24px;
+  font-size:22px;
 }
 
 /* 텍스트 */
@@ -1363,12 +1357,13 @@ body{
 }
 
 .text b{
-  font-size:16px;
+  font-size:14.5px;
   display:block;
+  margin-bottom:2px;
 }
 
 .text span{
-  font-size:13px;
+  font-size:12px;
   color:#6b7280;
 }
 
@@ -1381,21 +1376,13 @@ body{
 }
 .bottom-card{
   flex:1;
-
   background:white;
-
-  border-radius:14px;
-
-  padding:16px;
-
+  border-radius:12px;
+  padding:11px 10px;
   text-align:center;
-
   text-decoration:none;
-
   color:#111827;
-
-  box-shadow:0 6px 16px rgba(0,0,0,0.08);
-
+  box-shadow:0 4px 12px rgba(0,0,0,0.07);
   transition:0.15s;
 }
 
@@ -1404,12 +1391,12 @@ body{
 }
 
 .bottom-card img{
-  width:30px;
-  margin-bottom:6px;
+  width:26px;
+  margin-bottom:4px;
 }
 
 .bottom-card div{
-  font-size:14px;
+  font-size:13px;
 }
 
 /* 모바일 */
@@ -1417,34 +1404,50 @@ body{
 
 .main-menu-card,
 .sub-card{
-  min-height:60px !important;
+  height:65px !important;
+  min-height:0 !important;
+  padding:0 12px !important;
+  align-items:center !important;
+  box-sizing:border-box !important;
+}
+.main-menu-card .icon,
+.sub-card .icon{
+  width:40px !important;
+  height:40px !important;
+  flex-shrink:0 !important;
+  font-size:19px !important;
+}
+.main-menu-card .text b,
+.sub-card .text b{
+  font-size:13px !important;
+  margin-bottom:1px !important;
+}
+.main-menu-card .text span,
+.sub-card .text span{
+  font-size:11px !important;
+  -webkit-line-clamp:1 !important;
+  display:-webkit-box !important;
+  -webkit-box-orient:vertical !important;
+  overflow:hidden !important;
 }
 
 .bottom-card{
   flex:1;
-
   background:white;
-
   border-radius:14px;
-
-  padding:6px 10px;
-
-  min-height:54px;
-
+  height:65px !important;
+  min-height:0 !important;
+  padding:0 10px !important;
+  box-sizing:border-box !important;
   text-align:center;
-
   text-decoration:none;
-
   color:#111827;
-
   box-shadow:0 6px 16px rgba(0,0,0,0.08);
-
   transition:0.15s;
-
-  display:flex;
-  flex-direction:column;
-  justify-content:center;   /* 👈 이거 핵심 */
-  align-items:center;       /* 👈 이거 추가 */
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center !important;
+  align-items:center !important;
 }
 
 .bottom-card img{
@@ -1456,8 +1459,8 @@ body{
   }
 
 .card{
-  padding:8px 12px !important;
-  min-height:60px !important;
+  padding:10px 12px !important;
+  margin-bottom:8px !important;
 }
 
   .icon{
@@ -1620,6 +1623,16 @@ body{
 
 </a>
 
+<a href="/survey" class="card sub-card">
+
+<div class="icon">📋</div>
+
+<div class="text">
+<b>통합돌봄 지자체(자체/연계) 조사</b>
+<span>지자체 자체조사 및 연계조사 서식을 작성합니다.</span>
+</div>
+
+</a>
 
 <div class="bottom-row">
 
@@ -1641,22 +1654,7 @@ body{
 
 </div>
 
-<div style="text-align:center; margin:8px 0 4px 0;">
-  <a href="/survey" style="
-    display:inline-flex;
-    align-items:center;
-    gap:5px;
-    height:28px;
-    padding:0 12px;
-    border-radius:999px;
-    background:#f1f5f9;
-    border:1px solid #cbd5e1;
-    color:#64748b;
-    font-size:11px;
-    font-weight:600;
-    text-decoration:none;
-  ">🧪 지자체 조사표 (테스트)</a>
-</div>
+
 
 <img src="/static/bottom.png" class="bottom-img">
 <div class="bottom-footer">
@@ -9027,1078 +9025,689 @@ SURVEY_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>지자체 자체조사 서식</title>
-<script>
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-window._pdfLibsReady = false;
-Promise.all([
-  loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"),
-  loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
-]).then(() => { window._pdfLibsReady = true; })
-.catch(() => { window._pdfLibsReady = false; });
-</script>
+<title>지자체 조사 서식</title>
 <style>
 *{ box-sizing:border-box; margin:0; padding:0; }
-
-body{
-  background:#f4f6fb;
-  font-family:'Pretendard', sans-serif;
-  color:#111827;
-  font-size:13px;
-}
-
-.page-wrap{
-  max-width:860px;
-  margin:0 auto;
-  padding:20px 16px 60px 16px;
-  min-width:0;
-  word-break:keep-all;
-}
-
-.top-bar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:16px;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
-.home-btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  height:34px;
-  padding:0 14px;
-  border-radius:999px;
-  background:#f3f4f6;
-  border:1px solid #d1d5db;
-  color:#6b7280;
-  text-decoration:none;
-  font-size:13px;
-  font-weight:700;
-}
-
-.btn-group{
-  display:flex;
-  gap:8px;
-}
-
-.print-btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  height:34px;
-  padding:0 16px;
-  border-radius:999px;
-  background:#6e9fc5;
-  border:1px solid #5a8db5;
-  color:#ffffff;
-  font-size:13px;
-  font-weight:700;
-  cursor:pointer;
-  box-shadow:0 2px 8px rgba(110,159,197,0.25);
-  transition:all .15s ease;
-}
-.print-btn:hover{
-  background:#5a8db5;
-  transform:translateY(-1px);
-}
-/* 모바일에서는 출력 버튼 숨김 */
-@media (max-width:768px){
-  .pc-only{ display:none !important; }
-}
-
-.reset-btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  height:34px;
-  padding:0 14px;
-  border-radius:999px;
-  background:#f3f4f6;
-  border:1px solid #d1d5db;
-  color:#6b7280;
-  font-size:13px;
-  font-weight:700;
-  cursor:pointer;
-}
-
-/* 서식 카드 */
-.form-card{
-  background:#ffffff;
-  border-radius:16px;
-  padding:28px 24px;
-  box-shadow:0 6px 18px rgba(0,0,0,0.07);
-  overflow-x:auto;
-}
-
-.form-title{
-  text-align:center;
-  font-size:20px;
-  font-weight:900;
-  margin-bottom:22px;
-  letter-spacing:-0.3px;
-}
-
-/* 섹션 헤더 */
-.section-header{
-  background:#6e9fc5;
-  color:#ffffff;
-  font-size:13px;
-  font-weight:700;
-  padding:6px 10px;
-  border-radius:4px;
-  margin:18px 0 10px 0;
-}
-
-/* 테이블 */
-.form-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-bottom:4px;
-}
-
-.form-table th,
-.form-table td{
-  border:1px solid #d1d5db;
-  padding:7px 10px;
-  vertical-align:middle;
-  line-height:1.5;
-}
-
-.form-table th{
-  background:#f8fafc;
-  font-weight:700;
-  text-align:center;
-  white-space:nowrap;
-  min-width:72px;
-}
-
-.form-table td{
-  color:#374151;
-}
-
-/* 입력 요소 */
-.form-table input[type=text],
-.form-table input[type=date],
-.form-table select{
-  width:100%;
-  border:none;
-  border-bottom:1px solid #94a3b8;
-  padding:2px 4px;
-  font-size:13px;
-  font-family:inherit;
-  background:transparent;
-  outline:none;
-}
-
-.form-table input[type=text]:focus,
-.form-table input[type=date]:focus{
-  border-bottom-color:#2563eb;
-}
-
-/* 라디오/체크박스 그룹 */
-.radio-group,
-.check-group{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px 16px;
-  align-items:center;
-}
-
-.radio-group label,
-.check-group label{
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
-  cursor:pointer;
-  white-space:nowrap;
-  font-size:12.5px;
-}
-
-.radio-group input,
-.check-group input{
-  width:auto;
-  border:none;
-  border-bottom:none;
-  flex-shrink:0;
-}
-
-/* 기타 텍스트 인라인 */
-.etc-input{
-  display:inline-block;
-  width:80px;
-  border:none !important;
-  border-bottom:1px solid #94a3b8 !important;
-  padding:0 4px !important;
-  font-size:12.5px;
-  font-family:inherit;
-  background:transparent;
-  outline:none;
-  vertical-align:middle;
-}
-
-/* ADL 테이블 */
-.adl-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-bottom:4px;
-}
-
-.adl-table th,
-.adl-table td{
-  border:1px solid #d1d5db;
-  padding:6px 8px;
-  text-align:center;
-  font-size:12px;
-  vertical-align:middle;
-}
-
-.adl-table th{
-  background:#f8fafc;
-  font-weight:700;
-}
-
-.adl-table td:first-child{
-  text-align:left;
-  font-size:12px;
-}
-
-/* textarea */
-.form-textarea{
-  width:100%;
-  border:1px solid #d1d5db;
-  border-radius:6px;
-  padding:8px;
-  font-size:13px;
-  font-family:inherit;
-  resize:vertical;
-  min-height:60px;
-  outline:none;
-}
-
-.form-textarea:focus{
-  border-color:#2563eb;
-}
-
-/* 서비스 유형별 테이블 */
-.service-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-bottom:8px;
-}
-
-.service-table th,
-.service-table td{
-  border:1px solid #d1d5db;
-  padding:8px;
-  text-align:center;
-  font-size:12.5px;
-}
-
-.service-table th{
-  background:#f8fafc;
-  font-weight:700;
-}
-
-/* 인쇄 */
+body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+.page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
+.home-btn{ display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 16px; border-radius:999px; background:#f3f4f6; border:1px solid #d1d5db; color:#6b7280; text-decoration:none; font-size:13px; font-weight:700; }
+.home-btn:hover{ background:#e5e7eb; }
+.btn-group{ display:flex; gap:10px; }
+.print-btn{ display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 18px; border-radius:999px; background:#6e9fc5; border:1px solid #5a8db5; color:#fff; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(110,159,197,0.25); transition:all .15s; }
+.print-btn:hover{ background:#5a8db5; transform:translateY(-1px); }
+.reset-btn{ display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 16px; border-radius:999px; background:#f3f4f6; border:1px solid #d1d5db; color:#6b7280; font-size:13px; font-weight:700; cursor:pointer; }
+.reset-btn:hover{ background:#e5e7eb; }
+.tab-bar{ display:flex; gap:4px; border-bottom:2px solid #6e9fc5; padding-top:4px; }
+.tab-btn{ padding:9px 20px; font-size:13px; font-weight:700; border:1px solid #d1d5db; border-bottom:none; background:#eef4f9; color:#6b7280; cursor:pointer; border-radius:8px 8px 0 0; transition:all .15s; }
+.tab-btn.active{ background:#6e9fc5; color:#fff; border-color:#6e9fc5; }
+.tab-btn:hover:not(.active){ background:#d6e8f4; color:#374151; }
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; }
+.form-card{ background:#fff; border-radius:0 16px 16px 16px; padding:28px 24px; box-shadow:0 6px 18px rgba(0,0,0,0.07); overflow-x:auto; }
+.form-title{ text-align:center; font-size:18px; font-weight:900; margin-bottom:20px; letter-spacing:-0.3px; border:2px solid #111827; padding:8px 0; }
+.section-header{ background:#6e9fc5; color:#fff; font-size:13px; font-weight:700; padding:6px 10px; border-radius:4px; margin:18px 0 8px 0; }
+.form-table{ width:100%; border-collapse:collapse; margin-bottom:4px; }
+.form-table th,.form-table td{ border:1px solid #d1d5db; padding:7px 10px; vertical-align:middle; line-height:1.5; }
+.form-table th{ background:#f8fafc; font-weight:700; text-align:center; white-space:nowrap; min-width:72px; }
+.form-table td{ color:#374151; }
+.form-table input[type=text],.form-table input[type=date],.form-table select{ width:100%; border:none; border-bottom:1px solid #94a3b8; padding:2px 4px; font-size:13px; font-family:inherit; background:transparent; outline:none; }
+.form-table input[type=text]:focus,.form-table input[type=date]:focus{ border-bottom-color:#2563eb; }
+.radio-group,.check-group{ display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
+.radio-group label,.check-group label{ display:inline-flex; align-items:center; gap:3px; cursor:pointer; white-space:nowrap; font-size:12.5px; }
+.radio-group input,.check-group input{ width:auto; border:none; border-bottom:none; flex-shrink:0; }
+.etc-input{ display:inline-block; width:80px; border:none !important; border-bottom:1px solid #94a3b8 !important; padding:0 4px !important; font-size:12.5px; font-family:inherit; background:transparent; outline:none; vertical-align:middle; }
+.adl-table{ width:100%; border-collapse:collapse; margin-bottom:4px; }
+.adl-table th,.adl-table td{ border:1px solid #d1d5db; padding:6px 8px; text-align:center; font-size:12px; vertical-align:middle; }
+.adl-table th{ background:#f8fafc; font-weight:700; }
+.adl-table td:first-child{ text-align:left; }
+.form-textarea{ width:100%; border:1px solid #d1d5db; border-radius:6px; padding:8px; font-size:13px; font-family:inherit; resize:vertical; min-height:60px; outline:none; }
+.form-textarea:focus{ border-color:#2563eb; }
+.service-table{ width:100%; border-collapse:collapse; margin-bottom:8px; }
+.service-table th,.service-table td{ border:1px solid #d1d5db; padding:8px; text-align:center; font-size:12.5px; }
+.service-table th{ background:#f8fafc; font-weight:700; }
+.relay-note{ font-size:11px; color:#6b7280; margin-top:6px; line-height:1.6; }
 @media print{
   body{ background:white; }
-  .top-bar{ display:none; }
+  .top-bar,.tab-bar{ display:none !important; }
   .page-wrap{ padding:0; }
-  .form-card{
-    box-shadow:none;
-    border-radius:0;
-    padding:10px;
-  }
+  .form-card{ box-shadow:none; border-radius:0; padding:10px; }
+  .tab-panel{ display:none !important; }
+  .tab-panel.print-target{ display:block !important; }
   .section-header{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
-
-/* 테이블 overflow 스크롤 래퍼 */
-.table-scroll{
-  width:100%;
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
-}
-
 @media (max-width:600px){
-  .page-wrap{ padding:12px 8px 60px 8px; }
-  .form-card{ padding:14px 10px; }
-  .form-title{ font-size:16px; }
-  .form-table th{
-    min-width:52px;
-    font-size:11.5px;
-    padding:6px 6px;
-    white-space:normal;
-    word-break:keep-all;
-  }
-  .form-table td{ font-size:11.5px; padding:6px 6px; }
-  .radio-group, .check-group{ gap:6px 10px; }
-  .radio-group label,
-  .check-group label{ font-size:11.5px; }
-  .adl-table th,
-  .adl-table td{ font-size:11px; padding:4px 5px; }
-  .section-header{ font-size:12px; padding:5px 8px; }
-  .top-bar{ flex-direction:row; flex-wrap:wrap; }
-  .btn-group{ flex-wrap:nowrap; }
-  .home-btn, .reset-btn, .print-btn{ height:30px; font-size:12px; padding:0 10px; }
+  .page-wrap{ padding:10px 6px 60px 6px; }
+  .form-card{ padding:12px 8px; }
+  .form-title{ font-size:14px; padding:6px 0; }
+  .tab-btn{ padding:7px 11px; font-size:11.5px; }
+  .form-table,.adl-table,.service-table{ table-layout:fixed; width:100%; word-break:keep-all; overflow-wrap:break-word; }
+  .form-table th{ min-width:0; font-size:11px; padding:5px 4px; white-space:normal; word-break:keep-all; }
+  .form-table td{ font-size:11px; padding:5px 4px; word-break:keep-all; }
+  .radio-group,.check-group{ gap:5px 8px; }
+  .radio-group label,.check-group label{ font-size:11px; white-space:normal; }
+  .adl-table th,.adl-table td{ font-size:10px; padding:4px 3px; }
+  .service-table th,.service-table td{ font-size:10px; padding:4px 3px; }
+  .section-header{ font-size:11.5px; padding:5px 8px; }
+  .top-bar{ flex-wrap:wrap; gap:6px; }
+  .home-btn,.reset-btn,.print-btn{ height:30px; font-size:11.5px; padding:0 10px; }
+  .etc-input{ width:56px !important; font-size:11px; }
+  .adl-table thead tr th:nth-child(n+5),.adl-table tbody tr td:nth-child(n+5){ display:none; }
+  .adl-table thead tr th:first-child{ width:50%; }
 }
 </style>
 </head>
 <body>
-
 <div class="page-wrap">
 
-  <div class="top-bar">
-    <a href="/home" class="home-btn">⌂ 홈으로</a>
+  <div class="top-bar" id="gt-topbar">
+    <a href="/home" class="home-btn">&#8962; 홈으로</a>
     <div class="btn-group">
-      <button type="button" class="reset-btn" onclick="resetForm()">↻ 초기화</button>
-      <button type="button" class="print-btn pc-only" onclick="window.print()">🖨️ 출력</button>
-      <button type="button" class="print-btn" onclick="savePDF(this)">📄 PDF 저장</button>
+      <button type="button" class="reset-btn" id="gt-reset" onclick="resetForm()">&#8635; 초기화</button>
+      <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
     </div>
+  </div>
+
+  <div class="tab-bar" id="gt-tabs">
+    <button class="tab-btn active" onclick="switchTab('self')" id="tab-self">지자체 자체조사</button>
+    <button class="tab-btn" onclick="switchTab('relay')" id="tab-relay">지자체 연계조사</button>
   </div>
 
   <div class="form-card">
-    <div class="form-title">지자체 자체조사 서식</div>
 
-    <!-- ■ 대상자 기본사항 -->
-    <div class="section-header">■ 대상자 기본사항</div>
-    <table class="form-table">
-      <tr>
-        <th>성명</th>
-        <td><input type="text" name="name"></td>
-        <th>성별</th>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="gender" value="남"> 남</label>
-            <label><input type="radio" name="gender" value="여"> 여</label>
+    <!-- ══ 탭1: 자체조사 ══ -->
+    <div class="tab-panel active" id="panel-self">
+      <div class="form-title" id="gt-title">지자체 자체조사 서식</div>
+      <div class="section-header" id="gt-section">&#9632; 대상자 기본사항</div>
+      <table class="form-table">
+        <tr>
+          <th>성명</th><td><input type="text" name="s_name"></td>
+          <th>성별</th>
+          <td><div class="radio-group"><label><input type="radio" name="s_gender" value="남"> 남</label><label><input type="radio" name="s_gender" value="여"> 여</label></div></td>
+          <th>연령</th>
+          <td><input type="text" name="s_age" style="width:40px"> 만 <input type="text" name="s_age_d" style="width:28px"> 세</td>
+          <th>생년월일</th><td><input type="text" name="s_birth"></td>
+        </tr>
+        <tr><th>주소</th><td colspan="7"><input type="text" name="s_address"></td></tr>
+        <tr><th>실거주지</th><td colspan="7"><input type="text" name="s_real_addr"></td></tr>
+        <tr>
+          <th rowspan="2">연락처</th>
+          <td colspan="3">자택: <input type="text" name="s_tel_home" class="etc-input" style="width:120px"></td>
+          <td colspan="4">핸드폰: <input type="text" name="s_tel_mobile" class="etc-input" style="width:120px"></td>
+        </tr>
+        <tr><td colspan="7">비상연락처: <input type="text" name="s_tel_emg" class="etc-input" style="width:150px"> (관계: <input type="text" name="s_tel_rel" class="etc-input" style="width:70px">)</td></tr>
+        <tr><th>주수발자</th><td colspan="7"><div class="check-group">
+          <label><input type="checkbox" name="s_care" value="없음"> 없음</label>
+          <label><input type="checkbox" name="s_care" value="배우자"> 배우자</label>
+          <label><input type="checkbox" name="s_care" value="자녀"> 자녀(며느리·사위 포함)</label>
+          <label><input type="checkbox" name="s_care" value="손자녀"> 손자녀</label>
+          <label><input type="checkbox" name="s_care" value="친인척"> 친인척</label>
+          <label><input type="checkbox" name="s_care" value="친구이웃"> 친구·이웃</label>
+          <label><input type="checkbox" name="s_care" value="사적간병인"> 사적 간병인</label>
+          <label><input type="checkbox" name="s_care" value="공적서비스"> 공적서비스 돌봄제공자</label>
+          <label><input type="checkbox" name="s_care" value="형제자매"> 형제·자매</label>
+          <label><input type="checkbox" name="s_care" value="자원봉사자"> 자원봉사자</label>
+          <label><input type="checkbox" name="s_care" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+        </div></td></tr>
+        <tr><th>가구형태</th><td colspan="7"><div class="radio-group">
+          <label><input type="radio" name="s_hh" value="독거"> 독거</label>
+          <label><input type="radio" name="s_hh" value="비독거부부"> 비독거(부부)</label>
+          <label><input type="radio" name="s_hh" value="노부모"> 노부모</label>
+          <label><input type="radio" name="s_hh" value="자녀"> 자녀</label>
+          <label><input type="radio" name="s_hh" value="조손"> 조손</label>
+          <label><input type="radio" name="s_hh" value="형제자매"> 형제자매</label>
+          <label><input type="radio" name="s_hh" value="장애인가구"> 장애인가구</label>
+          <label><input type="radio" name="s_hh" value="다문화가구"> 다문화가구</label>
+          <label><input type="radio" name="s_hh" value="친척지인"> 친척·지인</label>
+          <label><input type="radio" name="s_hh" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+        </div></td></tr>
+        <tr><th>사회보장수급권</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;">
+            <label style="font-weight:600;"><input type="checkbox" name="s_wf" value="국민기초"> 국민기초생활보장제도</label>
+            <span style="color:#6b7280;">(</span>
+            <label><input type="checkbox" name="s_wf_sub" value="생계급여"> 생계급여</label>
+            <label><input type="checkbox" name="s_wf_sub" value="의료급여"> 의료급여</label>
+            <label><input type="checkbox" name="s_wf_sub" value="주거급여"> 주거급여</label>
+            <span style="color:#6b7280;">)</span>
+            <label><input type="checkbox" name="s_wf" value="차상위"> 차상위</label>
+            <label><input type="checkbox" name="s_wf" value="일반보훈"> 일반(보훈)</label>
           </div>
-        </td>
-        <th>연령</th>
-        <td><input type="text" name="age" style="width:50px"> 만 <input type="text" name="age_detail" style="width:30px"> 세</td>
-        <th>생년월일</th>
-        <td><input type="text" name="birth"></td>
-      </tr>
-      <tr>
-        <th>주소</th>
-        <td colspan="7"><input type="text" name="address"></td>
-      </tr>
-      <tr>
-        <th>실거주지</th>
-        <td colspan="7"><input type="text" name="real_address"></td>
-      </tr>
-      <tr>
-        <th rowspan="2">연락처</th>
-        <td colspan="3">자택: <input type="text" name="tel_home" class="etc-input" style="width:120px"></td>
-        <td colspan="4">핸드폰: <input type="text" name="tel_mobile" class="etc-input" style="width:120px"></td>
-      </tr>
-      <tr>
-        <td colspan="7">비상연락처: <input type="text" name="tel_emergency" class="etc-input" style="width:160px"> (관계: <input type="text" name="tel_relation" class="etc-input" style="width:80px">)</td>
-      </tr>
-      <tr>
-        <th>주수발자</th>
-        <td colspan="7">
-          <div class="check-group">
-            <label><input type="checkbox" name="care_person" value="없음"> 없음</label>
-            <label><input type="checkbox" name="care_person" value="배우자"> 배우자</label>
-            <label><input type="checkbox" name="care_person" value="자녀"> 자녀(며느리·사위 포함)</label>
-            <label><input type="checkbox" name="care_person" value="손자녀"> 손자녀</label>
-            <label><input type="checkbox" name="care_person" value="친인척"> 친인척</label>
-            <label><input type="checkbox" name="care_person" value="친구이웃"> 친구·이웃</label>
-            <label><input type="checkbox" name="care_person" value="사적간병인"> 사적 간병인</label>
-            <label><input type="checkbox" name="care_person" value="공적서비스"> 공적서비스 돌봄제공자(요양보호사 등)</label>
-            <label><input type="checkbox" name="care_person" value="형제자매"> 형제·자매</label>
-            <label><input type="checkbox" name="care_person" value="자원봉사자"> 자원봉사자</label>
-            <label><input type="checkbox" name="care_person" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+          <label><input type="checkbox" name="s_wf" value="기초연금"> 기초연금</label>
+          <label><input type="checkbox" name="s_wf" value="일반가구"> 일반가구</label>
+        </div></td></tr>
+        <tr><th>대상자 유형</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;">
+            <label style="font-weight:600;"><input type="checkbox" name="s_tt" value="장기요양재가"> 장기요양 재가급여자</label>
+            <label><input type="checkbox" name="s_tg" value="1등급"> 1등급</label><label><input type="checkbox" name="s_tg" value="2등급"> 2등급</label>
+            <label><input type="checkbox" name="s_tg" value="3등급"> 3등급</label><label><input type="checkbox" name="s_tg" value="4등급"> 4등급</label>
+            <label><input type="checkbox" name="s_tg" value="5등급"> 5등급</label><label><input type="checkbox" name="s_tg" value="인지등급"> 인지등급</label>
           </div>
-        </td>
-      </tr>
-      <tr>
-        <th>가구형태</th>
-        <td colspan="7">
-          <div class="radio-group">
-            <label><input type="radio" name="household" value="독거"> 독거</label>
-            <label><input type="radio" name="household" value="비독거부부"> 비독거(부부)</label>
-            <label><input type="radio" name="household" value="노부모"> 노부모</label>
-            <label><input type="radio" name="household" value="자녀"> 자녀</label>
-            <label><input type="radio" name="household" value="조손"> 조손</label>
-            <label><input type="radio" name="household" value="형제자매"> 형제자매</label>
-            <label><input type="radio" name="household" value="장애인가구"> 장애인가구</label>
-            <label><input type="radio" name="household" value="다문화가구"> 다문화가구</label>
-            <label><input type="radio" name="household" value="친척지인"> 친척·지인</label>
-            <label><input type="radio" name="household" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;">
+            <label style="font-weight:600;"><input type="checkbox" name="s_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
+            <label><input type="checkbox" name="s_tt" value="기각각하"> 기각·각하</label>
+            <label><input type="checkbox" name="s_tt" value="등급판정신청중"> 장기요양 등급판정 신청 중</label>
           </div>
-        </td>
-      </tr>
-      <tr>
-        <th>사회보장수급권</th>
-        <td colspan="7">
-          <div class="check-group" style="flex-direction:column; align-items:flex-start; gap:6px;">
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px;">
-              <label style="font-weight:600;"><input type="checkbox" name="welfare" value="국민기초생활보장"> 국민기초생활보장제도</label>
-              <span style="color:#6b7280; margin-right:2px;">(</span>
-              <label><input type="checkbox" name="welfare_sub" value="생계급여"> 생계급여</label>
-              <label><input type="checkbox" name="welfare_sub" value="의료급여"> 의료급여</label>
-              <label><input type="checkbox" name="welfare_sub" value="주거급여"> 주거급여</label>
-              <span style="color:#6b7280;">)</span>
-              <label><input type="checkbox" name="welfare" value="차상위"> 차상위</label>
-              <label><input type="checkbox" name="welfare" value="일반보훈"> 일반(보훈)</label>
-            </div>
-            <label><input type="checkbox" name="welfare" value="기초연금"> 기초연금</label>
-            <label><input type="checkbox" name="welfare" value="일반가구"> 일반가구</label>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;">
+            <label style="font-weight:600;"><input type="checkbox" name="s_tt" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label>
+            <span style="color:#6b7280;">(</span><label><input type="checkbox" name="s_tc" value="일반돌봄군"> 일반돌봄군</label>
+            <label><input type="checkbox" name="s_tc" value="중점돌봄군"> 중점돌봄군</label><span style="color:#6b7280;">)</span>
+            <label><input type="checkbox" name="s_tt" value="퇴원예정자"> 퇴원(예정)자</label>
+            <span style="color:#6b7280;">(</span><label><input type="checkbox" name="s_td" value="의료기관연계"> 의료기관 연계</label>
+            <label><input type="checkbox" name="s_td" value="지역사회발굴"> 지역사회 발굴</label><span style="color:#6b7280;">)</span>
           </div>
-        </td>
-      </tr>
-      <tr>
-        <th>대상자 유형</th>
-        <td colspan="7">
-          <div class="check-group" style="flex-direction:column; align-items:flex-start; gap:6px;">
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px;">
-              <label style="font-weight:600;"><input type="checkbox" name="target_type" value="장기요양재가"> 장기요양 재가급여자</label>
-              <label><input type="checkbox" name="target_grade" value="1등급"> 1등급</label>
-              <label><input type="checkbox" name="target_grade" value="2등급"> 2등급</label>
-              <label><input type="checkbox" name="target_grade" value="3등급"> 3등급</label>
-              <label><input type="checkbox" name="target_grade" value="4등급"> 4등급</label>
-              <label><input type="checkbox" name="target_grade" value="5등급"> 5등급</label>
-              <label><input type="checkbox" name="target_grade" value="인지등급"> 인지등급</label>
-            </div>
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px;">
-              <label style="font-weight:600;"><input type="checkbox" name="target_type" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
-              <label><input type="checkbox" name="target_type" value="기각각하"> 기각·각하</label>
-              <label><input type="checkbox" name="target_type" value="등급판정신청중"> 장기요양 등급판정 신청 중</label>
-            </div>
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px;">
-              <label style="font-weight:600;"><input type="checkbox" name="target_type" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label>
-              <span style="color:#6b7280;">(</span>
-              <label><input type="checkbox" name="target_care" value="일반돌봄군"> 일반돌봄군</label>
-              <label><input type="checkbox" name="target_care" value="중점돌봄군"> 중점돌봄군</label>
-              <span style="color:#6b7280;">)</span>
-              <label><input type="checkbox" name="target_type" value="퇴원예정자"> 퇴원(예정)자</label>
-              <span style="color:#6b7280;">(</span>
-              <label><input type="checkbox" name="target_discharge" value="의료기관연계"> 의료기관 연계</label>
-              <label><input type="checkbox" name="target_discharge" value="지역사회발굴"> 지역사회 발굴</label>
-              <span style="color:#6b7280;">)</span>
-            </div>
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px;">
-              <label style="font-weight:600;"><input type="checkbox" name="target_type" value="장애등록"> 장애등록·정도</label>
-              <span style="color:#6b7280;">(</span>
-              <label><input type="checkbox" name="target_disability" value="심한장애"> 심한 장애</label>
-              <label><input type="checkbox" name="target_disability" value="심하지않은장애"> 심하지 않은 장애</label>
-              <span style="color:#6b7280;">)</span>
-            </div>
-            <label><input type="checkbox" name="target_type" value="기타"> 기타(<input type="text" class="etc-input" style="width:100px">)</label>
-            <label><input type="checkbox" name="target_type" value="해당없음"> 해당 없음</label>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;">
+            <label style="font-weight:600;"><input type="checkbox" name="s_tt" value="장애등록"> 장애등록·정도</label>
+            <span style="color:#6b7280;">(</span>
+            <label><input type="checkbox" name="s_tdi" value="심한장애"> 심한 장애</label>
+            <label><input type="checkbox" name="s_tdi" value="심하지않은장애"> 심하지 않은 장애</label>
+            <span style="color:#6b7280;">)</span>
           </div>
-        </td>
-      </tr>
-      <tr>
-        <th>현재 이용중인 서비스</th>
-        <td colspan="7">
-          <div class="check-group">
-            <label><input type="checkbox" name="current_service" value="없음"> 없음</label>
-            <label><input type="checkbox" name="current_service" value="있음"> 있음</label>
-            <label><input type="checkbox" name="current_service" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label>
-            <label><input type="checkbox" name="current_service" value="치매안심센터"> 치매안심센터</label>
-            <label><input type="checkbox" name="current_service" value="급식도시락반찬"> 급식 및 도시락 반찬</label>
-            <label><input type="checkbox" name="current_service" value="활동보조"> 활동보조</label>
-            <label><input type="checkbox" name="current_service" value="말벗"> 말벗</label>
-            <label><input type="checkbox" name="current_service" value="보건사업"> 보건사업</label>
-            <label><input type="checkbox" name="current_service" value="주거개선사업"> 주거개선사업</label>
-            <label><input type="checkbox" name="current_service" value="건강운동교실"> 건강운동교실</label>
-            <label><input type="checkbox" name="current_service" value="목욕이미용"> 목욕·이미용</label>
-            <label><input type="checkbox" name="current_service" value="이동지원"> 이동지원</label>
-            <label><input type="checkbox" name="current_service" value="노인일자리사업"> 노인일자리 사업</label>
-            <label><input type="checkbox" name="current_service" value="무료진료연계"> 무료진료연계</label>
-            <label><input type="checkbox" name="current_service" value="가사간병방문도움"> 가사간병방문도움</label>
-            <label><input type="checkbox" name="current_service" value="여가문화교육"> 여가, 문화, 교육</label>
-            <label><input type="checkbox" name="current_service" value="기타"> 기타(<input type="text" class="etc-input" style="width:100px">)</label>
-          </div>
-        </td>
-      </tr>
-    </table>
+          <label><input type="checkbox" name="s_tt" value="기타"> 기타(<input type="text" class="etc-input" style="width:100px">)</label>
+          <label><input type="checkbox" name="s_tt" value="해당없음"> 해당 없음</label>
+        </div></td></tr>
+        <tr><th>현재 이용중인 서비스</th><td colspan="7"><div class="check-group">
+          <label><input type="checkbox" name="s_cs" value="없음"> 없음</label>
+          <label><input type="checkbox" name="s_cs" value="있음"> 있음</label>
+          <label><input type="checkbox" name="s_cs" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label>
+          <label><input type="checkbox" name="s_cs" value="치매안심센터"> 치매안심센터</label>
+          <label><input type="checkbox" name="s_cs" value="급식도시락반찬"> 급식 및 도시락 반찬</label>
+          <label><input type="checkbox" name="s_cs" value="활동보조"> 활동보조</label>
+          <label><input type="checkbox" name="s_cs" value="말벗"> 말벗</label>
+          <label><input type="checkbox" name="s_cs" value="보건사업"> 보건사업</label>
+          <label><input type="checkbox" name="s_cs" value="주거개선사업"> 주거개선사업</label>
+          <label><input type="checkbox" name="s_cs" value="건강운동교실"> 건강운동교실</label>
+          <label><input type="checkbox" name="s_cs" value="목욕이미용"> 목욕·이미용</label>
+          <label><input type="checkbox" name="s_cs" value="이동지원"> 이동지원</label>
+          <label><input type="checkbox" name="s_cs" value="노인일자리사업"> 노인일자리 사업</label>
+          <label><input type="checkbox" name="s_cs" value="무료진료연계"> 무료진료연계</label>
+          <label><input type="checkbox" name="s_cs" value="가사간병방문도움"> 가사간병방문도움</label>
+          <label><input type="checkbox" name="s_cs" value="여가문화교육"> 여가, 문화, 교육</label>
+          <label><input type="checkbox" name="s_cs" value="기타"> 기타(<input type="text" class="etc-input" style="width:80px">)</label>
+        </div></td></tr>
+      </table>
 
-    <!-- ■ 주거환경상태 -->
-    <div class="section-header">■ 주거환경상태 <span style="font-weight:400; font-size:11px;">(※ 현장조사 시 조사자가 확인 / 병원조사인 경우 생략 가능)</span></div>
-    <table class="form-table">
-      <tr>
-        <th>생활방식</th>
-        <td colspan="5">
-          <div class="radio-group">
-            <label><input type="radio" name="lifestyle" value="단독보행"> 단독보행</label>
-            <label><input type="radio" name="lifestyle" value="클러치사용"> 클러치사용</label>
-            <label><input type="radio" name="lifestyle" value="좌식생활"> 좌식생활</label>
-            <label><input type="radio" name="lifestyle" value="휠체어사용"> 휠체어사용</label>
-            <label><input type="radio" name="lifestyle" value="와상생활"> 와상생활</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <th>주거상태</th>
-        <td colspan="2">
-          <div class="radio-group">
-            <label><input type="radio" name="housing_state" value="노후"> 노후</label>
-            <label><input type="radio" name="housing_state" value="보통"> 보통</label>
-            <label><input type="radio" name="housing_state" value="양호"> 양호</label>
-          </div>
-        </td>
-        <th>인터넷가능여부<br>(스마트폰 포함)</th>
-        <td colspan="2">
-          <div class="radio-group">
-            <label><input type="radio" name="internet" value="가능"> 가능</label>
-            <label><input type="radio" name="internet" value="불가능"> 불가능</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <th>주택형태</th>
-        <td colspan="5">
-          <div class="radio-group">
-            <label><input type="radio" name="house_type" value="단독주택"> 단독주택</label>
-            <label><input type="radio" name="house_type" value="아파트"> 아파트</label>
-            <label><input type="radio" name="house_type" value="연립주택"> 연립주택</label>
-            <label><input type="radio" name="house_type" value="다가구주택"> 다가구주택</label>
-            <label><input type="radio" name="house_type" value="비주택"> 비주택</label>
-            <label><input type="radio" name="house_type" value="기타"> 기타(<input type="text" class="etc-input">)</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <th>주거지상태</th>
-        <td colspan="5">
-          <div class="radio-group">
-            <label><input type="radio" name="house_floor" value="지하"> 지하</label>
-            <label><input type="radio" name="house_floor" value="1층"> 1층</label>
-            <label><input type="radio" name="house_floor" value="2층이상"> 2층이상 (계단 □ / 승강기 □)</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <th>난방형태</th>
-        <td colspan="5">
-          <div class="radio-group">
-            <label><input type="radio" name="heating" value="가스보일러"> 가스보일러</label>
-            <label><input type="radio" name="heating" value="연탄보일러"> 연탄보일러</label>
-            <label><input type="radio" name="heating" value="기름보일러"> 기름보일러</label>
-            <label><input type="radio" name="heating" value="아궁이"> 아궁이(연탄/장작)</label>
-            <label><input type="radio" name="heating" value="난방없음"> 난방없음</label>
-            <label><input type="radio" name="heating" value="기타"> 기타(<input type="text" class="etc-input">)</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <th>화장실형태</th>
-        <td colspan="5">
-          <div class="radio-group">
-            <label><input type="radio" name="toilet" value="공용"> 공용</label>
-            <label><input type="radio" name="toilet" value="전용"> 전용</label>
-            <label><input type="radio" name="toilet" value="수세식"> 수세식</label>
-            <label><input type="radio" name="toilet" value="재래식"> 재래식</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <th rowspan="3">주요<br>주거환경</th>
-        <td>조명</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="lighting" value="양호"> 양호</label>
-            <label><input type="radio" name="lighting" value="불량"> 불량</label>
-          </div>
-        </td>
-        <td>문턱여부(현관, 방, 화장실)</td>
-        <td colspan="2">
-          <div class="radio-group">
-            <label><input type="radio" name="threshold" value="양호"> 양호</label>
-            <label><input type="radio" name="threshold" value="불량"> 불량</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>계단(계단난간위치)</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="stair" value="양호"> 양호</label>
-            <label><input type="radio" name="stair" value="불량"> 불량</label>
-          </div>
-        </td>
-        <td>집안의 안전손잡이</td>
-        <td colspan="2">
-          <div class="radio-group">
-            <label><input type="radio" name="handle" value="양호"> 양호</label>
-            <label><input type="radio" name="handle" value="불량"> 불량</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="4"><input type="text" name="housing_etc" placeholder="기타 특이사항"></td>
-      </tr>
-    </table>
+      <div class="section-header">&#9632; 주거환경상태 <span style="font-weight:400;font-size:11px;">(현장조사 시 조사자가 확인 / 병원조사인 경우 생략 가능)</span></div>
+      <table class="form-table">
+        <tr><th>생활방식</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_ls" value="단독보행"> 단독보행</label>
+          <label><input type="radio" name="s_ls" value="클러치사용"> 클러치사용</label>
+          <label><input type="radio" name="s_ls" value="좌식생활"> 좌식생활</label>
+          <label><input type="radio" name="s_ls" value="휠체어사용"> 휠체어사용</label>
+          <label><input type="radio" name="s_ls" value="와상생활"> 와상생활</label>
+        </div></td></tr>
+        <tr>
+          <th>주거상태</th>
+          <td colspan="2"><div class="radio-group"><label><input type="radio" name="s_hs" value="노후"> 노후</label><label><input type="radio" name="s_hs" value="보통"> 보통</label><label><input type="radio" name="s_hs" value="양호"> 양호</label></div></td>
+          <th>인터넷가능여부<br>(스마트폰 포함)</th>
+          <td colspan="2"><div class="radio-group"><label><input type="radio" name="s_net" value="가능"> 가능</label><label><input type="radio" name="s_net" value="불가능"> 불가능</label></div></td>
+        </tr>
+        <tr><th>주택형태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_ht" value="단독주택"> 단독주택</label>
+          <label><input type="radio" name="s_ht" value="아파트"> 아파트</label>
+          <label><input type="radio" name="s_ht" value="연립주택"> 연립주택</label>
+          <label><input type="radio" name="s_ht" value="다가구주택"> 다가구주택</label>
+          <label><input type="radio" name="s_ht" value="비주택"> 비주택</label>
+          <label><input type="radio" name="s_ht" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+        </div></td></tr>
+        <tr><th>주거지상태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_hf" value="지하"> 지하</label>
+          <label><input type="radio" name="s_hf" value="1층"> 1층</label>
+          <label><input type="radio" name="s_hf" value="2층이상"> 2층이상 (계단 &#9633; / 승강기 &#9633;)</label>
+        </div></td></tr>
+        <tr><th>난방형태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_heat" value="가스보일러"> 가스보일러</label>
+          <label><input type="radio" name="s_heat" value="연탄보일러"> 연탄보일러</label>
+          <label><input type="radio" name="s_heat" value="기름보일러"> 기름보일러</label>
+          <label><input type="radio" name="s_heat" value="아궁이"> 아궁이(연탄/장작)</label>
+          <label><input type="radio" name="s_heat" value="난방없음"> 난방없음</label>
+          <label><input type="radio" name="s_heat" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+        </div></td></tr>
+        <tr><th>화장실형태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_tlt" value="공용"> 공용</label>
+          <label><input type="radio" name="s_tlt" value="전용"> 전용</label>
+          <label><input type="radio" name="s_tlt" value="수세식"> 수세식</label>
+          <label><input type="radio" name="s_tlt" value="재래식"> 재래식</label>
+        </div></td></tr>
+        <tr>
+          <th rowspan="3">주요<br>주거환경</th>
+          <td>조명</td><td><div class="radio-group"><label><input type="radio" name="s_light" value="양호"> 양호</label><label><input type="radio" name="s_light" value="불량"> 불량</label></div></td>
+          <td>문턱여부(현관, 방, 화장실)</td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_thr" value="양호"> 양호</label><label><input type="radio" name="s_thr" value="불량"> 불량</label></div></td>
+        </tr>
+        <tr>
+          <td>계단(계단난간위치)</td><td><div class="radio-group"><label><input type="radio" name="s_stair" value="양호"> 양호</label><label><input type="radio" name="s_stair" value="불량"> 불량</label></div></td>
+          <td>집안의 안전손잡이</td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_hdl" value="양호"> 양호</label><label><input type="radio" name="s_hdl" value="불량"> 불량</label></div></td>
+        </tr>
+        <tr><td colspan="4"><input type="text" name="s_house_etc" placeholder="기타 특이사항"></td></tr>
+      </table>
 
-    <!-- ■ 일상생활기능 (ADL) -->
-    <div class="section-header">■ 일상생활기능 (ADL)</div>
-    <table class="adl-table">
-      <thead>
-        <tr>
-          <th style="width:30%">구분</th>
-          <th>완전자립</th>
-          <th>부분도움</th>
-          <th>완전도움</th>
-          <th style="width:30%">구분</th>
-          <th>완전자립</th>
-          <th>부분도움</th>
-          <th>완전도움</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>옷 입기 (옷 꺼내기, 단추·지퍼·벨트 채우기)</td>
-          <td><input type="radio" name="adl_dress" value="완전자립"></td>
-          <td><input type="radio" name="adl_dress" value="부분도움"></td>
-          <td><input type="radio" name="adl_dress" value="완전도움"></td>
-          <td>누웠다 일어나 방 밖으로 나가기</td>
-          <td><input type="radio" name="adl_move" value="완전자립"></td>
-          <td><input type="radio" name="adl_move" value="부분도움"></td>
-          <td><input type="radio" name="adl_move" value="완전도움"></td>
-        </tr>
-        <tr>
-          <td>세수, 양치질, 머리감기</td>
-          <td><input type="radio" name="adl_wash" value="완전자립"></td>
-          <td><input type="radio" name="adl_wash" value="부분도움"></td>
-          <td><input type="radio" name="adl_wash" value="완전도움"></td>
-          <td>화장실 출입과 대소변 후 닦고 옷 입기</td>
-          <td><input type="radio" name="adl_toilet" value="완전자립"></td>
-          <td><input type="radio" name="adl_toilet" value="부분도움"></td>
-          <td><input type="radio" name="adl_toilet" value="완전도움"></td>
-        </tr>
-        <tr>
-          <td>목욕 또는 샤워하기 (욕조 드나들기, 때밀기, 샤워)</td>
-          <td><input type="radio" name="adl_bath" value="완전자립"></td>
-          <td><input type="radio" name="adl_bath" value="부분도움"></td>
-          <td><input type="radio" name="adl_bath" value="완전도움"></td>
-          <td>대소변 조절하기</td>
-          <td><input type="radio" name="adl_excrete" value="완전자립"></td>
-          <td><input type="radio" name="adl_excrete" value="부분도움"></td>
-          <td><input type="radio" name="adl_excrete" value="완전도움"></td>
-        </tr>
-        <tr>
-          <td>차려 놓은 음식먹기</td>
-          <td><input type="radio" name="adl_eat" value="완전자립"></td>
-          <td><input type="radio" name="adl_eat" value="부분도움"></td>
-          <td><input type="radio" name="adl_eat" value="완전도움"></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-        </tr>
-      </tbody>
-    </table>
+      <div class="section-header">&#9632; 일상생활기능 (ADL)</div>
+      <table class="adl-table">
+        <thead><tr>
+          <th style="width:30%">구분</th><th>완전자립</th><th>부분도움</th><th>완전도움</th>
+          <th style="width:30%">구분</th><th>완전자립</th><th>부분도움</th><th>완전도움</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>옷 입기</td>
+            <td><input type="radio" name="s_adl_dress" value="완전자립"></td><td><input type="radio" name="s_adl_dress" value="부분도움"></td><td><input type="radio" name="s_adl_dress" value="완전도움"></td>
+            <td>누웠다 일어나 방 밖으로 나가기</td>
+            <td><input type="radio" name="s_adl_move" value="완전자립"></td><td><input type="radio" name="s_adl_move" value="부분도움"></td><td><input type="radio" name="s_adl_move" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>세수, 양치질, 머리감기</td>
+            <td><input type="radio" name="s_adl_wash" value="완전자립"></td><td><input type="radio" name="s_adl_wash" value="부분도움"></td><td><input type="radio" name="s_adl_wash" value="완전도움"></td>
+            <td>화장실 출입과 대소변 후 옷 입기</td>
+            <td><input type="radio" name="s_adl_toilet" value="완전자립"></td><td><input type="radio" name="s_adl_toilet" value="부분도움"></td><td><input type="radio" name="s_adl_toilet" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>목욕 또는 샤워하기</td>
+            <td><input type="radio" name="s_adl_bath" value="완전자립"></td><td><input type="radio" name="s_adl_bath" value="부분도움"></td><td><input type="radio" name="s_adl_bath" value="완전도움"></td>
+            <td>대소변 조절하기</td>
+            <td><input type="radio" name="s_adl_exc" value="완전자립"></td><td><input type="radio" name="s_adl_exc" value="부분도움"></td><td><input type="radio" name="s_adl_exc" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>차려 놓은 음식먹기</td>
+            <td><input type="radio" name="s_adl_eat" value="완전자립"></td><td><input type="radio" name="s_adl_eat" value="부분도움"></td><td><input type="radio" name="s_adl_eat" value="완전도움"></td>
+            <td></td><td></td><td></td><td></td>
+          </tr>
+        </tbody>
+      </table>
 
-    <!-- ■ 도구적 일상생활기능 (IADL) -->
-    <div class="section-header">■ 도구적 일상생활기능 (IADL)</div>
-    <table class="adl-table">
-      <thead>
-        <tr>
-          <th style="width:30%">구분</th>
-          <th>완전자립</th>
-          <th>부분도움</th>
-          <th>완전도움</th>
-          <th style="width:30%">구분</th>
-          <th>완전자립</th>
-          <th>부분도움</th>
-          <th>완전도움</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>몸단장 (빗질, 화장, 면도 등)</td>
-          <td><input type="radio" name="iadl_groom" value="완전자립"></td>
-          <td><input type="radio" name="iadl_groom" value="부분도움"></td>
-          <td><input type="radio" name="iadl_groom" value="완전도움"></td>
-          <td>금전 관리 (용돈, 통장관리, 재산관리)</td>
-          <td><input type="radio" name="iadl_money" value="완전자립"></td>
-          <td><input type="radio" name="iadl_money" value="부분도움"></td>
-          <td><input type="radio" name="iadl_money" value="완전도움"></td>
-        </tr>
-        <tr>
-          <td>집안일 (실내청소, 집안정돈 등)</td>
-          <td><input type="radio" name="iadl_clean" value="완전자립"></td>
-          <td><input type="radio" name="iadl_clean" value="부분도움"></td>
-          <td><input type="radio" name="iadl_clean" value="완전도움"></td>
-          <td>근거리 외출하기 (가까운 거리 걸어서)</td>
-          <td><input type="radio" name="iadl_outing" value="완전자립"></td>
-          <td><input type="radio" name="iadl_outing" value="부분도움"></td>
-          <td><input type="radio" name="iadl_outing" value="완전도움"></td>
-        </tr>
-        <tr>
-          <td>식사준비 (음식재료준비, 요리 등)</td>
-          <td><input type="radio" name="iadl_meal" value="완전자립"></td>
-          <td><input type="radio" name="iadl_meal" value="부분도움"></td>
-          <td><input type="radio" name="iadl_meal" value="완전도움"></td>
-          <td>물건 구매 결정, 돈 지불, 거스름돈 받기</td>
-          <td><input type="radio" name="iadl_shop" value="완전자립"></td>
-          <td><input type="radio" name="iadl_shop" value="부분도움"></td>
-          <td><input type="radio" name="iadl_shop" value="완전도움"></td>
-        </tr>
-        <tr>
-          <td>빨래 (세탁후 널어말리기 포함)</td>
-          <td><input type="radio" name="iadl_laundry" value="완전자립"></td>
-          <td><input type="radio" name="iadl_laundry" value="부분도움"></td>
-          <td><input type="radio" name="iadl_laundry" value="완전도움"></td>
-          <td>전화 걸고 받기</td>
-          <td><input type="radio" name="iadl_phone" value="완전자립"></td>
-          <td><input type="radio" name="iadl_phone" value="부분도움"></td>
-          <td><input type="radio" name="iadl_phone" value="완전도움"></td>
-        </tr>
-        <tr>
-          <td>제시간에 정해진 양의 약 챙겨 먹기</td>
-          <td><input type="radio" name="iadl_meds" value="완전자립"></td>
-          <td><input type="radio" name="iadl_meds" value="부분도움"></td>
-          <td><input type="radio" name="iadl_meds" value="완전도움"></td>
-          <td>교통수단 이용하기 (대중교통, 개인 차)</td>
-          <td><input type="radio" name="iadl_transport" value="완전자립"></td>
-          <td><input type="radio" name="iadl_transport" value="부분도움"></td>
-          <td><input type="radio" name="iadl_transport" value="완전도움"></td>
-        </tr>
-      </tbody>
-    </table>
+      <div class="section-header">&#9632; 인지기능 (MMSE)</div>
+      <table class="form-table"><tr><td colspan="2"><div class="radio-group">
+        <label><input type="radio" name="s_mmse" value="정상"> &#9312; 정상(24점 이상)</label>
+        <label><input type="radio" name="s_mmse" value="경도인지장애"> &#9313; 경도인지장애(18~23점)</label>
+        <label><input type="radio" name="s_mmse" value="치매의심"> &#9314; 치매 의심(17점 이하)</label>
+        <label><input type="radio" name="s_mmse" value="미실시"> &#9315; 미실시</label>
+      </div></td></tr></table>
 
-    <!-- ■ 식사기능 -->
-    <div class="section-header">■ 식사기능</div>
-    <table class="form-table">
-      <tr>
-        <td>1) 하루에 몇 끼니를 챙겨드십니까?(간식 제외)</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="meal_count" value="1끼"> ① 1끼</label>
-            <label><input type="radio" name="meal_count" value="2끼"> ② 2끼</label>
-            <label><input type="radio" name="meal_count" value="3끼"> ③ 3끼</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>2) 음식 씹는 기능</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="chew" value="씹기어려움"> ① 씹기 어려움</label>
-            <label><input type="radio" name="chew" value="부드러운음식"> ② 부드러운 음식을 잘 씹는다</label>
-            <label><input type="radio" name="chew" value="어떤음식이든"> ③ 어떤 음식이든지 잘 씹는다</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>3) 음식을 삼키는 기능 (연하곤란, 사레들림 등)</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="swallow" value="삼키기어려움"> ① 삼키기 어려움</label>
-            <label><input type="radio" name="swallow" value="부드러운음식"> ② 부드러운 음식을 잘 삼킨다</label>
-            <label><input type="radio" name="swallow" value="어떤음식이든"> ③ 어떤 음식이든지 잘 삼킨다</label>
-          </div>
-        </td>
-      </tr>
-    </table>
+      <div class="section-header">&#9632; 의사소통 및 행동변화</div>
+      <table class="form-table">
+        <tr><td>1) 의사소통</td><td><div class="radio-group"><label><input type="radio" name="s_comm" value="가능"> &#9312; 가능</label><label><input type="radio" name="s_comm" value="불가능"> &#9313; 불가능</label></div></td></tr>
+        <tr><td>2) 문제행동 여부</td><td><div class="radio-group"><label><input type="radio" name="s_beh" value="없음"> &#9312; 없음</label><label><input type="radio" name="s_beh" value="있음"> &#9313; 있음</label></div></td></tr>
+      </table>
 
-    <!-- ■ 인지심리기능 -->
-    <div class="section-header">■ 인지심리기능</div>
-    <table class="form-table">
-      <tr>
-        <td>1) 단기 기억력</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="memory" value="정상"> ① 정상</label>
-            <label><input type="radio" name="memory" value="이상있음"> ② 이상 있음</label>
-            <label><input type="radio" name="memory" value="확인불가"> ③ 확인 불가</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>2) 일상생활 시에 관한 의사결정을 할 수 있는 인식 기술</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="decision" value="스스로판단"> ① 스스로 일관성 있고 합리적인 의사결정을 함</label>
-            <label><input type="radio" name="decision" value="새로운상황어려움"> ② 새로운 상황에서만 의사결정의 어려움이 있음</label>
-            <label><input type="radio" name="decision" value="다소손상"> ③ 인식기술이 다소 손상됨</label>
-            <label><input type="radio" name="decision" value="심하게손상"> ④ 인식기술이 심하게 손상됨</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2"><b>우울정도</b></td>
-      </tr>
-      <tr>
-        <td>(1) 2주 이상 거의 매일 하루 종일 슬프거나, 공허하거나 우울하게 지낸 적이 있습니까?</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="depression1" value="예"> ① 예</label>
-            <label><input type="radio" name="depression1" value="아니오"> ② 아니오</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>(2) 2주 이상 거의 매일 하루 종일 일이나 취미 혹은 평소에 좋아하는 것들 대부분 흥미를 잃어버린 적이 있습니까?</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="depression2" value="예"> ① 예</label>
-            <label><input type="radio" name="depression2" value="아니오"> ② 아니오</label>
-          </div>
-        </td>
-      </tr>
-    </table>
+      <div class="section-header">&#9632; 건강상태</div>
+      <table class="form-table">
+        <tr><td>1) 정기적으로 방문하는 병원이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_hosp1" value="예"> &#9312; 예</label><label><input type="radio" name="s_hosp1" value="아니오"> &#9313; 아니오</label></div></td></tr>
+        <tr><td>2) (최근 1년) 아프면 병원에 가지 못하고 참았던 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_hosp2" value="예"> &#9312; 예(2-1번으로)</label><label><input type="radio" name="s_hosp2" value="아니오"> &#9313; 아니오(3번으로)</label></div></td></tr>
+        <tr><td style="padding-left:20px;">2-1) 병원에 가지 못한 이유</td><td><div class="check-group">
+          <label><input type="checkbox" name="s_hr" value="경제적어려움"> &#9312; 경제적 어려움</label>
+          <label><input type="checkbox" name="s_hr" value="거동불편"> &#9313; 거동이 불편해서</label>
+          <label><input type="checkbox" name="s_hr" value="의료정보부족"> &#9314; 의료정보 부족</label>
+          <label><input type="checkbox" name="s_hr" value="병원예약어려움"> &#9315; 병원 예약이 어려워서</label>
+          <label><input type="checkbox" name="s_hr" value="증상가벼움"> &#9316; 증상이 가벼워서</label>
+          <label><input type="checkbox" name="s_hr" value="기타"> &#9317; 기타(<input type="text" class="etc-input">)</label>
+        </div></td></tr>
+        <tr><td>3) 다른 사람이 병원에서 약을 처방받아준 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_prx" value="예"> &#9312; 예</label><label><input type="radio" name="s_prx" value="아니오"> &#9313; 아니오</label></div></td></tr>
+        <tr><td>4) 기타 통증 및 불편 사항</td><td><div class="radio-group"><label><input type="radio" name="s_pain" value="없음"> &#9312; 없음</label><label><input type="radio" name="s_pain" value="다소있음"> &#9313; 다소 있음</label><label><input type="radio" name="s_pain" value="매우심함"> &#9314; 매우 심함</label></div></td></tr>
+        <tr><td>5) 병명 및 복용 중인 약</td><td>병명: <input type="text" name="s_disease" class="etc-input" style="width:180px">&nbsp;복용약: <input type="text" name="s_meds" class="etc-input" style="width:180px"></td></tr>
+      </table>
 
-    <!-- ■ 병의원 이용 -->
-    <div class="section-header">■ 병의원 이용</div>
-    <table class="form-table">
-      <tr>
-        <td>1) 정기적으로 방문하는 병원이 있습니까?</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="hospital_regular" value="예"> ① 예</label>
-            <label><input type="radio" name="hospital_regular" value="아니오"> ② 아니오</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>2) (최근 1년) 아프면 병원에 가지 못하고 참았던 적이 있습니까?</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="hospital_miss" value="예2-1번"> ① 예(2-1번으로 이동)</label>
-            <label><input type="radio" name="hospital_miss" value="아니오3번"> ② 아니오(3번으로 이동)</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding-left:20px;">2-1) 병원에 가지 못한 이유는 무엇입니까?</td>
-        <td>
-          <div class="check-group">
-            <label><input type="checkbox" name="hospital_reason" value="경제적어려움"> ① 경제적 어려움</label>
-            <label><input type="checkbox" name="hospital_reason" value="거동불편"> ② 거동이 불편해서</label>
-            <label><input type="checkbox" name="hospital_reason" value="의료정보부족"> ③ 의료정보 부족</label>
-            <label><input type="checkbox" name="hospital_reason" value="병원예약어려움"> ④ 병원 예약이 어려워서</label>
-            <label><input type="checkbox" name="hospital_reason" value="증상가벼움"> ⑤ 증상이 가벼워서</label>
-            <label><input type="checkbox" name="hospital_reason" value="기타"> ⑥ 기타(<input type="text" class="etc-input">)</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>3) 다른 사람이 병원에서 약을 처방받아준 적이 있습니까?</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="proxy_meds" value="예"> ① 예</label>
-            <label><input type="radio" name="proxy_meds" value="아니오"> ② 아니오</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>4) 기타 통증 및 불편 사항</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="pain" value="없음"> ① 없음</label>
-            <label><input type="radio" name="pain" value="다소있음"> ② 다소 있음</label>
-            <label><input type="radio" name="pain" value="매우심함"> ③ 매우 심함</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>5) 병명 및 복용 중인 약(지자체 조사인 경우 생략 가능)</td>
-        <td>
-          병명: <input type="text" name="disease" class="etc-input" style="width:200px">
-          &nbsp; 복용약: <input type="text" name="meds" class="etc-input" style="width:200px">
-        </td>
-      </tr>
-    </table>
+      <div class="section-header">&#9632; 이동자원</div>
+      <table class="form-table">
+        <tr><td>1) 누군가의 도움 없이 실외 보행에 어려움이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_mob1" value="예"> &#9312; 예</label><label><input type="radio" name="s_mob1" value="아니오"> &#9313; 아니오</label></div></td></tr>
+        <tr><td>2) 기존 이동지원서비스 수혜여부</td><td><div class="radio-group"><label><input type="radio" name="s_mob2" value="예"> &#9312; 예</label><label><input type="radio" name="s_mob2" value="아니오"> &#9313; 아니오</label></div></td></tr>
+      </table>
 
-    <!-- ■ 이동자원 -->
-    <div class="section-header">■ 이동자원</div>
-    <table class="form-table">
-      <tr>
-        <td>1) 누군가의 도움 없이 실외 보행에 어려움이 있습니까?</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="mobility1" value="예"> ① 예</label>
-            <label><input type="radio" name="mobility1" value="아니오"> ② 아니오</label>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td>2) 기존 이동지원서비스 수혜여부</td>
-        <td>
-          <div class="radio-group">
-            <label><input type="radio" name="mobility2" value="예"> ① 예</label>
-            <label><input type="radio" name="mobility2" value="아니오"> ② 아니오</label>
-          </div>
-        </td>
-      </tr>
-    </table>
+      <div class="section-header">&#9632; 서비스 유형별 필요여부 <span style="font-weight:400;font-size:11px;">(조사자가 종합적으로 판단)</span></div>
+      <table class="service-table">
+        <thead><tr><th>보건의료</th><th>건강관리·예방</th><th>장기요양</th><th>일상생활돌봄</th><th>주거복지</th><th>기타</th></tr></thead>
+        <tbody><tr>
+          <td><input type="checkbox" name="s_sn" value="보건의료"></td><td><input type="checkbox" name="s_sn" value="건강관리예방"></td>
+          <td><input type="checkbox" name="s_sn" value="장기요양"></td><td><input type="checkbox" name="s_sn" value="일상생활돌봄"></td>
+          <td><input type="checkbox" name="s_sn" value="주거복지"></td><td><input type="checkbox" name="s_sn" value="기타"></td>
+        </tr></tbody>
+      </table>
 
-    <!-- ■ 서비스 유형별 필요여부 -->
-    <div class="section-header">■ 서비스 유형별 필요여부 <span style="font-weight:400; font-size:11px;">(조사자가 종합적으로 판단)</span></div>
-    <table class="service-table">
-      <thead>
+      <div class="section-header">&#9632; 주요 욕구</div>
+      <table class="service-table">
+        <thead><tr><th>일상생활기능</th><th>인지심리기능</th><th>의료적욕구</th><th>주거환경</th></tr></thead>
+        <tbody><tr>
+          <td><textarea class="form-textarea" name="s_n_adl" style="min-height:50px;"></textarea></td>
+          <td><textarea class="form-textarea" name="s_n_cog" style="min-height:50px;"></textarea></td>
+          <td><textarea class="form-textarea" name="s_n_med" style="min-height:50px;"></textarea></td>
+          <td><textarea class="form-textarea" name="s_n_hsg" style="min-height:50px;"></textarea></td>
+        </tr></tbody>
+      </table>
+
+      <div class="section-header">&#9632; 종합의견</div>
+      <textarea class="form-textarea" name="s_opinion" style="min-height:80px;" placeholder="조사담당자가 대상자의 현재 생활현황 및 필요 서비스 내용을 종합적으로 기입합니다."></textarea>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+        <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 초기화</button>
+        <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+      </div>
+    </div><!-- /panel-self -->
+
+    <!-- ══ 탭2: 연계조사 ══ -->
+    <div class="tab-panel" id="panel-relay">
+      <div class="form-title">통합(종합)판정조사 관련 지자체 연계조사 서식</div>
+      <div class="section-header">&#9632; 대상자 기본사항</div>
+      <table class="form-table">
         <tr>
-          <th>보건의료</th>
-          <th>건강관리·예방</th>
-          <th>장기요양</th>
-          <th>일상생활돌봄</th>
-          <th>주거복지</th>
-          <th>기타</th>
+          <th>성명</th><td><input type="text" name="r_name"></td>
+          <th>성별</th>
+          <td><div class="radio-group"><label><input type="radio" name="r_gender" value="남"> 남</label><label><input type="radio" name="r_gender" value="여"> 여</label></div></td>
+          <th>연령</th>
+          <td><input type="text" name="r_age" style="width:40px"> 만 <input type="text" name="r_age_d" style="width:28px"> 세</td>
+          <th>생년월일</th><td><input type="text" name="r_birth"></td>
         </tr>
-      </thead>
-      <tbody>
+        <tr><th>주소</th><td colspan="7"><input type="text" name="r_address"></td></tr>
+        <tr><th>실거주지</th><td colspan="7"><input type="text" name="r_real_addr"></td></tr>
         <tr>
-          <td><input type="checkbox" name="service_need" value="보건의료"></td>
-          <td><input type="checkbox" name="service_need" value="건강관리예방"></td>
-          <td><input type="checkbox" name="service_need" value="장기요양"></td>
-          <td><input type="checkbox" name="service_need" value="일상생활돌봄"></td>
-          <td><input type="checkbox" name="service_need" value="주거복지"></td>
-          <td><input type="checkbox" name="service_need" value="기타"></td>
+          <th rowspan="2">연락처</th>
+          <td colspan="3">자택: <input type="text" name="r_tel_home" class="etc-input" style="width:120px"></td>
+          <td colspan="4">핸드폰: <input type="text" name="r_tel_mobile" class="etc-input" style="width:120px"></td>
         </tr>
-      </tbody>
-    </table>
+        <tr><td colspan="7">비상연락처: <input type="text" name="r_tel_emg" class="etc-input" style="width:150px"> (관계: <input type="text" name="r_tel_rel" class="etc-input" style="width:70px">)</td></tr>
+        <tr><th>주수발자</th><td colspan="7"><div class="check-group">
+          <label><input type="checkbox" name="r_care" value="없음"> 없음</label>
+          <label><input type="checkbox" name="r_care" value="배우자"> 배우자</label>
+          <label><input type="checkbox" name="r_care" value="자녀"> 자녀(며느리·사위 포함)</label>
+          <label><input type="checkbox" name="r_care" value="손자녀"> 손자녀</label>
+          <label><input type="checkbox" name="r_care" value="친인척"> 친인척</label>
+          <label><input type="checkbox" name="r_care" value="친구이웃"> 친구·이웃</label>
+          <label><input type="checkbox" name="r_care" value="사적간병인"> 사적 간병인</label>
+          <label><input type="checkbox" name="r_care" value="공적서비스"> 공적서비스 돌봄제공자</label>
+          <label><input type="checkbox" name="r_care" value="형제자매"> 형제·자매</label>
+          <label><input type="checkbox" name="r_care" value="자원봉사자"> 자원봉사자</label>
+          <label><input type="checkbox" name="r_care" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+        </div></td></tr>
+        <tr><th>가구형태</th><td colspan="7"><div class="radio-group">
+          <label><input type="radio" name="r_hh" value="독거"> 독거</label>
+          <label><input type="radio" name="r_hh" value="비독거부부"> 비독거(부부)</label>
+          <label><input type="radio" name="r_hh" value="노부모"> 노부모</label>
+          <label><input type="radio" name="r_hh" value="자녀"> 자녀</label>
+          <label><input type="radio" name="r_hh" value="조손"> 조손</label>
+          <label><input type="radio" name="r_hh" value="형제자매"> 형제자매</label>
+          <label><input type="radio" name="r_hh" value="장애인가구"> 장애인가구</label>
+          <label><input type="radio" name="r_hh" value="다문화가구"> 다문화가구</label>
+          <label><input type="radio" name="r_hh" value="친척지인"> 친척·지인</label>
+          <label><input type="radio" name="r_hh" value="기타"> 기타(<input type="text" class="etc-input">)</label>
+        </div></td></tr>
+        <tr><th>사회보장수급권</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:5px;">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label style="font-weight:600;"><input type="checkbox" name="r_wf" value="국민기초"> 국민기초생활보장제도</label>
+            <span style="color:#6b7280;">(</span>
+            <label><input type="checkbox" name="r_wf_sub" value="생계급여"> 생계급여</label>
+            <label><input type="checkbox" name="r_wf_sub" value="의료급여"> 의료급여</label>
+            <label><input type="checkbox" name="r_wf_sub" value="주거급여"> 주거급여</label>
+            <span style="color:#6b7280;">)</span>
+            <label><input type="checkbox" name="r_wf" value="차상위"> 차상위</label>
+            <label><input type="checkbox" name="r_wf" value="일반보훈"> 일반(보훈)</label>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span>주수입원:</span>
+            <label><input type="checkbox" name="r_inc" value="공적지원"> 공적지원(사적지원/가족지원)</label>
+            <label><input type="checkbox" name="r_inc" value="근로수입"> 근로수입</label>
+            <label><input type="checkbox" name="r_inc" value="기타"> 기타(<input type="text" class="etc-input" style="width:80px">)</label>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span>본인부담 가능여부:</span>
+            <label><input type="radio" name="r_copay" value="부담가능"> 부담가능</label>
+            <label><input type="radio" name="r_copay" value="일부부담가능"> 일부 부담가능</label>
+            <label><input type="radio" name="r_copay" value="부담어려움"> 부담어려움</label>
+          </div>
+        </div></td></tr>
+        <tr><th>대상자 유형</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:5px;">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="r_tt" value="해당없음"> 해당없음</label>
+            <label style="font-weight:600;"><input type="checkbox" name="r_tt" value="장기요양재가"> 장기요양 재가급여자</label>
+            <span style="color:#6b7280;">(</span>
+            <label><input type="checkbox" name="r_tg" value="1등급"> 1등급</label><label><input type="checkbox" name="r_tg" value="2등급"> 2등급</label>
+            <label><input type="checkbox" name="r_tg" value="3등급"> 3등급</label><label><input type="checkbox" name="r_tg" value="4등급"> 4등급</label>
+            <label><input type="checkbox" name="r_tg" value="5등급"> 5등급</label><label><input type="checkbox" name="r_tg" value="인지등급"> 인지등급</label>
+            <span style="color:#6b7280;">)</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="r_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
+            <label><input type="checkbox" name="r_tt" value="기각각하"> 기각·각하</label>
+            <label><input type="checkbox" name="r_tt" value="등급판정신청중"> 장기요양 등급판정 신청 중</label>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="r_tt" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label>
+            <span style="color:#6b7280;">(</span><label><input type="checkbox" name="r_tc" value="일반돌봄군"> 일반돌봄군</label>
+            <label><input type="checkbox" name="r_tc" value="중점돌봄군"> 중점돌봄군</label><span style="color:#6b7280;">)</span>
+            <label><input type="checkbox" name="r_tt" value="퇴원예정자"> 퇴원(예정)자</label>
+            <span style="color:#6b7280;">(</span><label><input type="checkbox" name="r_td" value="의료기관연계"> 의료기관 연계</label>
+            <label><input type="checkbox" name="r_td" value="지역사회발굴"> 지역사회 발굴</label><span style="color:#6b7280;">)</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="r_tt" value="장애등록"> 장애등록·정도</label>
+            <span style="color:#6b7280;">(</span>
+            <label><input type="checkbox" name="r_tdi" value="심한장애"> 심한 장애</label>
+            <label><input type="checkbox" name="r_tdi" value="심하지않은장애"> 심하지 않은 장애</label>
+            <span style="color:#6b7280;">)</span>
+          </div>
+          <label><input type="checkbox" name="r_tt" value="기타"> 기타(<input type="text" class="etc-input" style="width:120px">)</label>
+        </div></td></tr>
+        <tr><th>현재 이용중인 서비스</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:5px;">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="r_sv" value="없음"> 없음</label>
+            <label><input type="checkbox" name="r_sv" value="있음"> 있음</label>
+            <span style="color:#6b7280;">— 필요서비스 이용 사유 (사용확인):</span>
+            <input type="text" name="r_sv_confirm" class="etc-input" style="width:130px">
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="r_svd" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label>
+            <label><input type="checkbox" name="r_svd" value="치매안심센터"> 치매안심센터</label>
+            <label><input type="checkbox" name="r_svd" value="급식도시락반찬"> 급식 및 도시락 반찬</label>
+            <label><input type="checkbox" name="r_svd" value="활동보조"> 활동보조</label>
+            <label><input type="checkbox" name="r_svd" value="말벗"> 말벗</label>
+            <label><input type="checkbox" name="r_svd" value="보건사업"> 보건사업</label>
+            <label><input type="checkbox" name="r_svd" value="주거개선사업"> 주거개선사업</label>
+            <label><input type="checkbox" name="r_svd" value="건강운동교실"> 건강운동교실</label>
+            <label><input type="checkbox" name="r_svd" value="목욕이미용"> 목욕·이미용</label>
+            <label><input type="checkbox" name="r_svd" value="이동지원"> 이동지원</label>
+            <label><input type="checkbox" name="r_svd" value="노인일자리사업"> 노인일자리 사업</label>
+            <label><input type="checkbox" name="r_svd" value="무료진료연계"> 무료진료연계</label>
+            <label><input type="checkbox" name="r_svd" value="가사간병방문도움"> 가사간병방문도움</label>
+            <label><input type="checkbox" name="r_svd" value="여가문화교육"> 여가, 문화, 교육</label>
+            <label><input type="checkbox" name="r_svd" value="기타"> 기타(<input type="text" class="etc-input" style="width:80px">)</label>
+          </div>
+        </div></td></tr>
+        <tr><th>희망서비스</th><td colspan="7"><input type="text" name="r_wish" placeholder="희망하는 서비스를 기입하세요"></td></tr>
+      </table>
 
-    <!-- ■ 주요 욕구 -->
-    <div class="section-header">■ 주요 욕구</div>
-    <table class="service-table">
-      <thead>
-        <tr>
-          <th>일상생활기능</th>
-          <th>인지심리기능</th>
-          <th>의료적욕구</th>
-          <th>주거환경</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><textarea class="form-textarea" name="need_adl" style="min-height:50px;"></textarea></td>
-          <td><textarea class="form-textarea" name="need_cognitive" style="min-height:50px;"></textarea></td>
-          <td><textarea class="form-textarea" name="need_medical" style="min-height:50px;"></textarea></td>
-          <td><textarea class="form-textarea" name="need_housing" style="min-height:50px;"></textarea></td>
-        </tr>
-      </tbody>
-    </table>
+      <div class="section-header">&#9632; 서비스 유형별 필요여부 <span style="font-weight:400;font-size:11px;">(조사자가 종합적으로 판단)</span></div>
+      <table class="service-table">
+        <thead><tr><th>보건의료</th><th>건강관리·예방</th><th>장기요양</th><th>일상생활돌봄</th><th>주거복지</th><th>기타</th></tr></thead>
+        <tbody><tr>
+          <td><input type="checkbox" name="r_sn" value="보건의료"></td><td><input type="checkbox" name="r_sn" value="건강관리예방"></td>
+          <td><input type="checkbox" name="r_sn" value="장기요양"></td><td><input type="checkbox" name="r_sn" value="일상생활돌봄"></td>
+          <td><input type="checkbox" name="r_sn" value="주거복지"></td><td><input type="checkbox" name="r_sn" value="기타"></td>
+        </tr></tbody>
+      </table>
 
-    <!-- ■ 종합의견 -->
-    <div class="section-header">■ 종합의견</div>
-    <textarea class="form-textarea" name="opinion" style="min-height:80px;" placeholder="지자체 자체조사를 수행한 담당자가 대상자(보호자)의 현재 생활현황 및 필요로 하는 서비스 내용, 조사결과 대상자에게 제공되어야 할 서비스 내용(조사자 판단)을 종합적으로 기입합니다."></textarea>
-    <p style="font-size:11px; color:#6b7280; margin-top:6px;">※ 지자체 자체조사를 수행한 담당자가 대상자(보호자)의 현재 생활현황 및 필요로 하는 서비스 내용, 조사결과 대상자에게 제공되어야 할 서비스 내용(조사자 판단)을 종합적으로 기입합니다.</p>
+      <div class="section-header">&#9632; 종합의견</div>
+      <textarea class="form-textarea" name="r_opinion" style="min-height:80px;" placeholder="조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함"></textarea>
+      <p class="relay-note">&#10071; 조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함</p>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+        <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 초기화</button>
+        <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+      </div>
+    </div><!-- /panel-relay -->
 
-    <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
-      <button type="button" class="reset-btn" onclick="resetForm()">↻ 초기화</button>
-      <button type="button" class="print-btn pc-only" onclick="window.print()">🖨️ 출력</button>
-      <button type="button" class="print-btn" onclick="savePDF(this)">📄 PDF 저장</button>
-    </div>
-
-  </div>
-</div>
+  </div><!-- /form-card -->
+</div><!-- /page-wrap -->
 
 <script>
-function resetForm(){
-  if(!confirm("입력한 내용을 모두 초기화하시겠습니까?")) return;
-  document.querySelectorAll("input[type=radio], input[type=checkbox]").forEach(function(el){
-    el.checked = false;
-  });
-  document.querySelectorAll("input[type=text], input[type=date], textarea").forEach(function(el){
-    el.value = "";
-  });
+var currentTab = 'self';
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+function resetForm() {
+  if (!confirm("입력한 내용을 모두 초기화하시겠습니까?")) return;
+  var panel = document.getElementById('panel-' + currentTab);
+  panel.querySelectorAll("input[type=radio], input[type=checkbox]").forEach(function(el){ el.checked = false; });
+  panel.querySelectorAll("input[type=text], input[type=date], textarea").forEach(function(el){ el.value = ""; });
+}
+function doPrint() {
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('print-target'); });
+  document.getElementById('panel-' + currentTab).classList.add('print-target');
+  window.print();
 }
 
-async function savePDF(btn) {
-  // 라이브러리 로드 대기 (최대 5초)
-  let waited = 0;
-  while (!window._pdfLibsReady && waited < 50) {
-    await new Promise(r => setTimeout(r, 100));
-    waited++;
+/* ── 은행 앱 스타일 가이드 (한 화면에 전체 표시) ── */
+var GUIDE_ITEMS = [
+  {
+    target: 'gt-tabs',
+    title: '조사 유형 전환',
+    mobileTitle: '조사 종류 전환',
+    text: '탭을 눌러 <b>자체조사</b>와 <b>연계조사</b> 서식을 전환할 수 있어요.',
+    forceLeft: true
+  },
+  {
+    target: 'gt-section',
+    title: '대상자 기본사항 입력',
+    text: '성명·주소 등은 <b>직접 타이핑</b>, 주수발자·가구형태 등은 <b>체크박스·라디오</b>로 선택하세요.',
+    forceLeft: true
+  },
+  {
+    target: 'gt-print',
+    title: '출력 / PDF 저장',
+    text: '입력 완료 후 이 버튼으로 <b>현재 탭 서식을 출력하거나 PDF로 저장</b>할 수 있어요.'
   }
+];
 
-  // 라이브러리 로드 실패 시 인쇄 대화상자로 대체
-  if (!window.jspdf || !window.html2canvas) {
-    if (confirm("PDF 라이브러리를 불러오지 못했습니다.\n브라우저 인쇄(Ctrl+P)로 PDF 저장하시겠습니까?")) {
-      window.print();
-    }
-    return;
-  }
+function guideStart() {
+  if (sessionStorage.getItem('sg_done')) return;
 
-  btn.disabled = true;
-  btn.textContent = "변환 중...";
+  var isMobile = window.innerWidth < 600;
+  var vw = window.innerWidth;
 
-  try {
-    const { jsPDF } = window.jspdf;
-    const target = document.querySelector(".form-card");
+  /* 스크롤을 맨 위로 → fixed 좌표와 getBoundingClientRect 일치 */
+  window.scrollTo(0, 0);
 
-    // 버튼 영역 잠깐 숨기기
-    const btnAreas = document.querySelectorAll(".top-bar, [style*='justify-content:flex-end']");
-    btnAreas.forEach(el => el.style.visibility = "hidden");
+  /* 어두운 오버레이 */
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.62);';
+  document.body.appendChild(overlay);
 
-    const canvas = await window.html2canvas(target, {
-      scale: 2,
-      useCORS: true,
-      scrollY: -window.scrollY,
-      windowWidth: target.scrollWidth,
-      logging: false
+  var bubbles = [];
+  /* 말풍선 너비: 모바일은 화면의 52%, PC는 230px */
+  var bubbleW = isMobile ? Math.min(Math.floor(vw * 0.52), 210) : 230;
+
+  GUIDE_ITEMS.forEach(function(item, i) {
+    var el = document.getElementById(item.target);
+    if (!el) return;
+
+    var pad = isMobile ? 4 : 6;
+    var r = el.getBoundingClientRect();
+
+    /* 하이라이트 테두리 */
+    var hl = document.createElement('div');
+    hl.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(37,99,235,0.55);',
+      'top:'+(r.top-pad)+'px;left:'+(r.left-pad)+'px;',
+      'width:'+(r.width+pad*2)+'px;height:'+(r.height+pad*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl);
+    bubbles.push(hl);
+
+    /* 말풍선 */
+    var fs      = isMobile ? '11px'          : '12px';
+    var fsTitle = isMobile ? '11.5px'        : '12.5px';
+    var pd      = isMobile ? '9px 11px 8px'  : '13px 16px 12px';
+    var bubble  = document.createElement('div');
+    bubble.style.cssText = [
+      'position:fixed;z-index:10000;background:#fff;border-radius:11px;',
+      'padding:'+pd+';width:'+bubbleW+'px;',
+      'box-shadow:0 5px 20px rgba(0,0,0,0.22);',
+      'font-family:inherit;pointer-events:none;',
+      'visibility:hidden;left:-9999px;top:0;'
+    ].join('');
+    bubble.innerHTML =
+      '<div style="font-size:'+fsTitle+';font-weight:700;color:#1d4ed8;margin-bottom:4px;">&#128161; '+(isMobile && item.mobileTitle ? item.mobileTitle : item.title)+'</div>'+
+      '<div style="font-size:'+fs+';color:#374151;line-height:1.6;word-break:keep-all;">'+item.text+'</div>'+
+      '<div id="ga'+i+'" style="position:absolute;width:0;height:0;'+
+        'border-left:8px solid transparent;border-right:8px solid transparent;'+
+        'border-bottom:8px solid #fff;top:-8px;left:20px;"></div>';
+    document.body.appendChild(bubble);
+    bubbles.push(bubble);
+
+    requestAnimationFrame(function() {
+      var bh     = bubble.offsetHeight;
+      var margin = isMobile ? 6 : 10;
+      var arrowH = 8;
+
+      /* 꼬리가 요소 중앙을 정확히 가리키도록 left 계산 */
+      var targetMidX = r.left + r.width / 2;
+      var arrowLeft, bubbleLeft;
+      if (item.forceLeft && isMobile) {
+        bubbleLeft = margin;
+        arrowLeft  = Math.max(10, Math.min(targetMidX - bubbleLeft - 8, bubbleW - 26));
+        if (isMobile) arrowLeft = 14;
+      } else {
+        arrowLeft  = 20;
+        bubbleLeft = Math.max(margin, Math.min(targetMidX - arrowLeft - 8, vw - bubbleW - margin));
+        arrowLeft  = Math.max(10, Math.min(targetMidX - bubbleLeft - 8, bubbleW - 26));
+      }
+
+      /* 기본: 요소 아래 */
+      var bubbleTop = r.bottom + pad + arrowH + 2;
+      var arrowUp   = true;
+
+      /* 아래 공간 부족 → 위로 */
+      if (bubbleTop + bh + 70 > window.innerHeight) {
+        bubbleTop = r.top - pad - arrowH - bh - 2;
+        arrowUp   = false;
+      }
+
+      var arrowEl = document.getElementById('ga'+i);
+      if (arrowEl) {
+        if (arrowUp) {
+          arrowEl.style.cssText =
+            'position:absolute;width:0;height:0;'+
+            'border-left:8px solid transparent;border-right:8px solid transparent;'+
+            'border-bottom:8px solid #fff;top:-8px;bottom:auto;left:'+arrowLeft+'px;';
+        } else {
+          arrowEl.style.cssText =
+            'position:absolute;width:0;height:0;'+
+            'border-left:8px solid transparent;border-right:8px solid transparent;'+
+            'border-top:8px solid #fff;bottom:-8px;top:auto;left:'+arrowLeft+'px;';
+        }
+      }
+
+      bubble.style.top  = bubbleTop  + 'px';
+      bubble.style.left = bubbleLeft + 'px';
+      bubble.style.visibility = 'visible';
     });
+  });
 
-    btnAreas.forEach(el => el.style.visibility = "");
+  /* 확인 버튼 */
+  var confirmBtn = document.createElement('button');
+  confirmBtn.textContent = '확인';
+  confirmBtn.style.cssText = [
+    'position:fixed;z-index:10001;',
+    'left:50%;transform:translateX(-50%);bottom:18%;',
+    'background:#2563eb;color:#fff;border:none;',
+    'border-radius:10px;',
+    'padding:'+(isMobile?'10px 40px':'11px 52px')+';',
+    'font-size:'+(isMobile?'13px':'14px')+';font-weight:700;cursor:pointer;',
+    'box-shadow:0 4px 16px rgba(37,99,235,0.35);white-space:nowrap;'
+  ].join('');
+  document.body.appendChild(confirmBtn);
+  bubbles.push(confirmBtn);
 
-    const pageW = 210; // A4 mm
-    const pageH = 297;
-    const margin = 10;
-    const contentW = pageW - margin * 2;
-    const contentH = pageH - margin * 2;
-
-    // 전체 이미지를 mm로 환산한 총 높이
-    const totalImgH = (canvas.height * contentW) / canvas.width;
-    // 페이지 한 장에 해당하는 canvas 픽셀 높이
-    const pageCanvasPx = Math.floor((contentH / totalImgH) * canvas.height);
-
-    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-
-    let srcY = 0;
-    let isFirst = true;
-
-    while (srcY < canvas.height) {
-      const slicePx = Math.min(pageCanvasPx, canvas.height - srcY);
-      if (slicePx <= 0) break;
-
-      // 슬라이스 캔버스
-      const sliceCanvas = document.createElement("canvas");
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = slicePx;
-      const ctx = sliceCanvas.getContext("2d");
-      ctx.drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
-
-      const printH = (slicePx / canvas.height) * totalImgH;
-      const sliceData = sliceCanvas.toDataURL("image/jpeg", 0.92);
-
-      if (!isFirst) pdf.addPage();
-      pdf.addImage(sliceData, "JPEG", margin, margin, contentW, printH);
-
-      srcY += slicePx;
-      isFirst = false;
-    }
-
-    // 파일명: 성명이 있으면 포함
-    const nameEl = document.querySelector("input[name=name]");
-    const nameVal = nameEl && nameEl.value.trim() ? nameEl.value.trim() : "";
-    const today = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const filename = "지자체자체조사" + (nameVal ? "_" + nameVal : "") + "_" + today + ".pdf";
-
-    pdf.save(filename);
-  } catch(e) {
-    alert("PDF 변환 중 오류가 발생했습니다.\n" + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "PDF 저장";
+  function closeGuide() {
+    bubbles.forEach(function(b){ b.remove(); });
+    overlay.remove();
+    sessionStorage.setItem('sg_done', '1');
   }
-}
-</script>
 
+  confirmBtn.addEventListener('click', function(e){ e.stopPropagation(); closeGuide(); });
+  overlay.addEventListener('click', closeGuide);
+}
+
+window.addEventListener('load', function() { setTimeout(guideStart, 300); });
+</script>
 </body>
 </html>
 """
