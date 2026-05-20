@@ -9314,7 +9314,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
         <tr>
           <th>주거상태</th>
           <td colspan="2"><div class="radio-group"><label><input type="radio" name="s_hs" value="노후"> 노후</label><label><input type="radio" name="s_hs" value="보통"> 보통</label><label><input type="radio" name="s_hs" value="양호"> 양호</label></div></td>
-          <th>인터넷가능여부<br>(스마트폰 포함)</th>
+          <th>인터넷<br>가능여부<br><span style="font-size:10px;">(스마트폰<br>포함)</span></th>
           <td colspan="2"><div class="radio-group"><label><input type="radio" name="s_net" value="가능"> 가능</label><label><input type="radio" name="s_net" value="불가능"> 불가능</label></div></td>
         </tr>
         <tr><th>주택형태</th><td colspan="5"><div class="radio-group">
@@ -9703,11 +9703,7 @@ function resetForm() {
 function doPrint() {
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('print-target'); });
   document.getElementById('panel-' + currentTab).classList.add('print-target');
-  // 사파리 대응: focus 후 약간의 딜레이를 두고 print 호출
-  window.focus();
-  setTimeout(function(){
-    window.print();
-  }, 100);
+  window.print();
 }
 
 /* 페이지 로드 시 상태 복원 */
@@ -9748,6 +9744,10 @@ function guideStart() {
   var overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.62);';
   document.body.appendChild(overlay);
+
+  /* 가이드 떠있는 동안 스크롤 막기 */
+  var prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
 
   var bubbles = [];
   /* 말풍선 너비: 모바일은 화면의 52%, PC는 230px */
@@ -9860,6 +9860,7 @@ function guideStart() {
   function closeGuide() {
     bubbles.forEach(function(b){ b.remove(); });
     overlay.remove();
+    document.body.style.overflow = prevOverflow;
     sessionStorage.setItem('sg_done', '1');
   }
 
