@@ -9302,7 +9302,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
         </div></td></tr>
       </table>
 
-      <div class="section-header">&#9632; 주거환경상태 <span style="font-weight:400;font-size:11px;">(현장조사 시 조사자가 확인 / 병원조사인 경우 생략 가능)</span></div>
+      <div class="section-header">&#9632; 주거환경상태<br><span style="font-weight:400;font-size:11px;">(현장조사 시 조사자가 확인 / 병원조사인 경우 생략 가능)</span></div>
       <table class="form-table">
         <tr><th>생활방식</th><td colspan="5"><div class="radio-group">
           <label><input type="radio" name="s_ls" value="단독보행"> 단독보행</label>
@@ -9328,7 +9328,8 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
         <tr><th>주거지<br>상태</th><td colspan="5"><div class="radio-group">
           <label><input type="radio" name="s_hf" value="지하"> 지하</label>
           <label><input type="radio" name="s_hf" value="1층"> 1층</label>
-          <label><input type="radio" name="s_hf" value="2층이상"> 2층이상 (계단 &#9633; / 승강기 &#9633;)</label>
+          <label><input type="radio" name="s_hf" value="2층이상"> 2층이상</label>
+          <label style="white-space:nowrap;">(계단 <input type="checkbox" name="s_hf_stair" value="계단" style="width:auto;border:none;border-bottom:none;"> / 승강기 <input type="checkbox" name="s_hf_elev" value="승강기" style="width:auto;border:none;border-bottom:none;">)</label>
         </div></td></tr>
         <tr><th>난방형태</th><td colspan="5"><div class="radio-group">
           <label><input type="radio" name="s_heat" value="가스보일러"> 가스보일러</label>
@@ -9350,8 +9351,8 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
           <td>문턱여부(현관, 방, 화장실)</td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_thr" value="양호"> 양호</label><label><input type="radio" name="s_thr" value="불량"> 불량</label></div></td>
         </tr>
         <tr>
-          <td>계단(난간위치)</td><td><div class="radio-group"><label><input type="radio" name="s_stair" value="양호"> 양호</label><label><input type="radio" name="s_stair" value="불량"> 불량</label></div></td>
-          <td>집안의 안전손잡이</td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_hdl" value="양호"> 양호</label><label><input type="radio" name="s_hdl" value="불량"> 불량</label></div></td>
+          <td><span style="white-space:nowrap;">계단(난간위치)</span></td><td><div class="radio-group"><label><input type="radio" name="s_stair" value="양호"> 양호</label><label><input type="radio" name="s_stair" value="불량"> 불량</label></div></td>
+          <td><span style="white-space:nowrap;">집안의 안전손잡이</span></td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_hdl" value="양호"> 양호</label><label><input type="radio" name="s_hdl" value="불량"> 불량</label></div></td>
         </tr>
         <tr><td colspan="4"><input type="text" name="s_house_etc" placeholder="기타 특이사항"></td></tr>
       </table>
@@ -9417,10 +9418,10 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
         </div></td></tr>
         <tr><td>3) 다른 사람이 병원에서 약을 처방받아준 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_prx" value="예"> &#9312; 예</label><label><input type="radio" name="s_prx" value="아니오"> &#9313; 아니오</label></div></td></tr>
         <tr><td>4) 기타 통증 및 불편 사항</td><td><div class="radio-group"><label><input type="radio" name="s_pain" value="없음"> &#9312; 없음</label><label><input type="radio" name="s_pain" value="다소있음"> &#9313; 다소 있음</label><label><input type="radio" name="s_pain" value="매우심함"> &#9314; 매우 심함</label></div></td></tr>
-        <tr><td>5) 병명 및 복용 중인 약</td><td>병명: <input type="text" name="s_disease" class="etc-input" style="width:180px">&nbsp;복용약: <input type="text" name="s_meds" class="etc-input" style="width:180px"></td></tr>
+        <tr><td>5) 병명 및 복용 중인 약</td><td>병명: <input type="text" name="s_disease" class="etc-input" style="width:180px"><br>복용약: <input type="text" name="s_meds" class="etc-input" style="width:180px"></td></tr>
       </table>
 
-      <div class="section-header">&#9632; 이동자원</div>
+      <div class="section-header">&#9632; 이동지원</div>
       <table class="form-table">
         <tr><td>1) 누군가의 도움 없이 실외 보행에 어려움이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_mob1" value="예"> &#9312; 예</label><label><input type="radio" name="s_mob1" value="아니오"> &#9313; 아니오</label></div></td></tr>
         <tr><td>2) 기존 이동지원서비스 수혜여부</td><td><div class="radio-group"><label><input type="radio" name="s_mob2" value="예"> &#9312; 예</label><label><input type="radio" name="s_mob2" value="아니오"> &#9313; 아니오</label></div></td></tr>
@@ -9428,7 +9429,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 
       <div class="section-header">&#9632; 서비스 유형별 필요여부 <span style="font-weight:400;font-size:11px;">(조사자가 종합적으로 판단)</span></div>
       <table class="service-table">
-        <thead><tr><th>보건의료</th><th>건강관리·예방</th><th>장기요양</th><th>일상생활돌봄</th><th>주거복지</th><th>기타</th></tr></thead>
+        <thead><tr><th>보건의료</th><th>건강관리·예방</th><th>장기요양</th><th style="white-space:nowrap;">일상생활<br>돌봄</th><th>주거복지</th><th>기타</th></tr></thead>
         <tbody><tr>
           <td><input type="checkbox" name="s_sn" value="보건의료"></td><td><input type="checkbox" name="s_sn" value="건강관리예방"></td>
           <td><input type="checkbox" name="s_sn" value="장기요양"></td><td><input type="checkbox" name="s_sn" value="일상생활돌봄"></td>
@@ -9511,6 +9512,8 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
             <label><input type="checkbox" name="r_wf_sub" value="주거급여"> 주거급여</label>
             <span style="color:#6b7280;">)</span>
             </span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;">
             <label><input type="checkbox" name="r_wf" value="차상위"> 차상위</label>
             <label><input type="checkbox" name="r_wf" value="일반보훈"> 일반(보훈)</label>
           </div>
@@ -9522,6 +9525,8 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <span>본인부담 가능여부:</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <label><input type="radio" name="r_copay" value="부담가능"> 부담가능</label>
             <label><input type="radio" name="r_copay" value="일부부담가능"> 일부 부담가능</label>
             <label><input type="radio" name="r_copay" value="부담어려움"> 부담어려움</label>
@@ -9531,9 +9536,9 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <label><input type="checkbox" name="r_tt" value="해당없음"> 해당없음</label>
             <label><input type="checkbox" name="r_tt" value="장기요양재가"> 장기요양 재가급여자</label>
-            <span style="display:inline-flex;flex-wrap:nowrap;align-items:center;gap:2px;"><span style="color:#6b7280;">(</span><label><input type="checkbox" name="r_tg" value="1등급"> 1등급</label><label><input type="checkbox" name="r_tg" value="2등급"> 2등급</label>
-            <label><input type="checkbox" name="r_tg" value="3등급"> 3등급</label><label><input type="checkbox" name="r_tg" value="4등급"> 4등급</label>
-            <label><input type="checkbox" name="r_tg" value="5등급"> 5등급</label><label><input type="checkbox" name="r_tg" value="인지등급"> 인지등급</label><span style="color:#6b7280;">)</span></span>
+            <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px;font-size:10px;"><span style="color:#6b7280;">(</span><label style="font-size:10px;"><input type="checkbox" name="r_tg" value="1등급"> 1등급</label><label style="font-size:10px;"><input type="checkbox" name="r_tg" value="2등급"> 2등급</label>
+            <label style="font-size:10px;"><input type="checkbox" name="r_tg" value="3등급"> 3등급</label><label style="font-size:10px;"><input type="checkbox" name="r_tg" value="4등급"> 4등급</label>
+            <label style="font-size:10px;"><input type="checkbox" name="r_tg" value="5등급"> 5등급</label><label style="font-size:10px;"><input type="checkbox" name="r_tg" value="인지등급"> 인지등급</label><span style="color:#6b7280;">)</span></span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <label><input type="checkbox" name="r_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
@@ -9559,6 +9564,8 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <label><input type="checkbox" name="r_sv" value="없음"> 없음</label>
             <label><input type="checkbox" name="r_sv" value="있음"> 있음</label>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <span style="color:#6b7280;">— 필요서비스 이용 사유 (사용확인):</span>
             <input type="text" name="r_sv_confirm" class="etc-input" style="width:130px">
           </div>
@@ -9585,7 +9592,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 
       <div class="section-header">&#9632; 서비스 유형별 필요여부 <span style="font-weight:400;font-size:11px;">(조사자가 종합적으로 판단)</span></div>
       <table class="service-table">
-        <thead><tr><th>보건의료</th><th>건강관리·예방</th><th>장기요양</th><th>일상생활돌봄</th><th>주거복지</th><th>기타</th></tr></thead>
+        <thead><tr><th>보건의료</th><th>건강관리·예방</th><th>장기요양</th><th style="white-space:nowrap;">일상생활<br>돌봄</th><th>주거복지</th><th>기타</th></tr></thead>
         <tbody><tr>
           <td><input type="checkbox" name="r_sn" value="보건의료"></td><td><input type="checkbox" name="r_sn" value="건강관리예방"></td>
           <td><input type="checkbox" name="r_sn" value="장기요양"></td><td><input type="checkbox" name="r_sn" value="일상생활돌봄"></td>
