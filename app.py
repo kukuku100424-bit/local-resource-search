@@ -9355,7 +9355,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
         <tr>
           <th rowspan="3">주요<br>주거환경</th>
           <td>조명</td><td><div class="radio-group"><label><input type="radio" name="s_light" value="양호"> 양호</label><label><input type="radio" name="s_light" value="불량"> 불량</label></div></td>
-          <td>문턱여부(현관, 방, 화장실)</td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_thr" value="양호"> 양호</label><label><input type="radio" name="s_thr" value="불량"> 불량</label></div></td>
+          <td><span style="display:inline;" class="th-internet-pc">문턱여부(현관, 방, 화장실)</span><span class="th-internet-mo" style="font-size:11px;">문턱여부<br><span style="font-size:10px;">(현관, 방,<br>화장실)</span></span></td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_thr" value="양호"> 양호</label><label><input type="radio" name="s_thr" value="불량"> 불량</label></div></td>
         </tr>
         <tr>
           <td><span style="display:inline;" class="th-internet-pc">계단(난간위치)</span><span class="th-internet-mo" style="font-size:11px;">계단<br><span style="font-size:10px;">(난간위치)</span></span></td><td><div class="radio-group"><label><input type="radio" name="s_stair" value="양호"> 양호</label><label><input type="radio" name="s_stair" value="불량"> 불량</label></div></td>
