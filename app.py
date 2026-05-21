@@ -3207,7 +3207,6 @@ def combo():
 
     return render_template_string(
         COMBO_HTML,
-        style=BASE_STYLE,
         sido=sido,
         sigungu=sigungu,
         main_category=main_category,
@@ -3236,390 +3235,238 @@ COMBO_HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>통합돌봄 서비스 기관 찾기</title>
-<style>{{style}}</style>
 <style>
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+.page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
 
-.result h3{
-  margin:18px 0 8px 0;
-  font-size:18px;
-  font-weight:800;
-  color:#111827;
+/* ── 상단 바 ── */
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
+.home-btn{ display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 16px; border-radius:999px; background:#f3f4f6; border:1px solid #d1d5db; color:#6b7280; text-decoration:none; font-size:13px; font-weight:700; }
+.home-btn:hover{ background:#e5e7eb; }
+.btn-group{ display:flex; gap:10px; }
+.reset-btn{ display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 16px; border-radius:999px; background:#f3f4f6; border:1px solid #d1d5db; color:#6b7280; font-size:13px; font-weight:700; cursor:pointer; }
+.reset-btn:hover{ background:#e5e7eb; }
+
+/* ── 폼 카드 ── */
+.form-card{ background:#fff; border-radius:16px; padding:28px 24px; box-shadow:0 6px 18px rgba(0,0,0,0.07); overflow-x:auto; }
+.form-title{ text-align:center; font-size:18px; font-weight:900; margin-bottom:20px; letter-spacing:-0.3px; border:2px solid #111827; padding:8px 0; }
+.section-header{ background:#6e9fc5; color:#fff; font-size:13px; font-weight:700; padding:6px 10px; border-radius:4px; margin:18px 0 8px 0; }
+.section-header:first-of-type{ margin-top:0; }
+
+/* ── 폼 입력 ── */
+label.field-label{ display:block; margin-top:12px; font-size:13px; font-weight:700; color:#374151; margin-bottom:4px; }
+label.field-label:first-of-type{ margin-top:8px; }
+.field-select, .field-input{
+  width:100%; padding:10px 12px; border-radius:8px; border:1px solid #d1d5db; font-size:14px; font-family:inherit; background:#fff; color:#111827; outline:none; box-sizing:border-box;
+}
+.field-select:focus, .field-input:focus{ border-color:#6e9fc5; box-shadow:0 0 0 2px rgba(110,159,197,0.15); }
+.section-desc{ font-size:12px; color:#6b7280; margin-bottom:6px; line-height:1.5; }
+
+/* ── 검색 버튼 ── */
+.submit-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#6e9fc5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(110,159,197,0.25); transition:all .15s; }
+.submit-btn:hover{ background:#5a8db5; transform:translateY(-1px); }
+
+/* ── 결과 영역 ── */
+.result-card{ margin-top:18px; background:#fff; border-radius:16px; padding:22px 20px; box-shadow:0 6px 18px rgba(0,0,0,0.07); }
+.result-card h3{ margin:18px 0 8px 0; font-size:16px; font-weight:800; color:#111827; }
+.result-card h3:first-child{ margin-top:0; }
+.result-count{ font-size:14px; font-weight:700; margin-bottom:12px; }
+
+.combo-warning{ margin:10px 0 14px 0; padding:12px 16px; border-radius:10px; background:#eef4f9; border:1px solid #b8d4e8; color:#3b6d8f; font-size:13px; line-height:1.65; display:flex; align-items:flex-start; gap:8px; }
+
+.manager-badge{ display:inline-block; padding:4px 12px; border-radius:999px; background:#dbeafe; color:#1d4ed8; font-size:12px; font-weight:900; letter-spacing:0.3px; margin:14px 0 8px 0; }
+.manager-badge[data-type="공단"]{ background:#fce7f3; color:#be185d; }
+
+.item{ display:flex; align-items:flex-start; gap:6px; padding:7px 0; cursor:pointer; line-height:1.6; color:#111827; font-size:13px; }
+.item:hover{ color:#6e9fc5; }
+.item-bullet{ flex:0 0 auto; }
+.item-text{ flex:1; min-width:0; white-space:normal; word-break:keep-all; overflow-wrap:break-word; }
+
+/* ── 모달 ── */
+.modal-overlay{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:999; }
+.modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; }
+.modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
+.modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
+.modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#6e9fc5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+.modal-btn:hover{ background:#5a8db5; }
+
+/* ── 카피라이트 ── */
+.copyright{ text-align:right; margin-top:22px; margin-bottom:6px; padding:0 12px; }
+.copyright-line{ width:44px; height:2px; margin:0 0 12px auto; border-radius:999px; background:linear-gradient(135deg,#93c5fd,#6e9fc5); opacity:0.9; }
+.copyright-main{ font-size:12.5px; color:#9ca3af; line-height:1.5; font-weight:500; word-break:keep-all; letter-spacing:0.2px; }
+.copyright-sub{ margin-top:4px; font-size:15px; color:#374151; font-weight:600; letter-spacing:-0.2px; }
+.copyright-sub span{ color:#6e9fc5; font-weight:800; }
+
+@media (min-width:768px){
+  #tel_link{ display:none !important; }
 }
 
-.manager-badge{
-  display:inline-block;
-  padding:4px 12px;
-  border-radius:999px;
-  background:#dbeafe;
-  color:#1d4ed8;
-  font-size:13px;
-  font-weight:900;
-  letter-spacing:0.3px;
-
-  margin:14px 0 10px 0;   /* 🔥 위아래 간격 늘림 */
+/* ── 인쇄 ── */
+@media print{
+  body{ background:white; }
+  .top-bar{ display:none !important; }
+  .page-wrap{ padding:0; }
+  .form-card,.result-card{ box-shadow:none; border-radius:0; padding:10px; }
 }
 
-.manager-badge[data-type="공단"]{
-  background:#fce7f3;
-  color:#be185d;
-}
-
-.item{
-  display:flex;
-  align-items:flex-start;
-  gap:6px;
-  padding:8px 0;
-  cursor:pointer;
-  line-height:1.6;
-  color:#111827;
-}
-
-
-.combo-top-bar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  margin-top:12px;
-}
-
-.combo-top-bar .home-button,
-.combo-top-bar .combo-reset-button{
-  display:inline-flex !important;
-  align-items:center;
-  justify-content:center;
-  width:auto !important;
-  height:36px !important;
-  margin:0 !important;
-  padding:0 15px !important;
-
-  border-radius:999px !important;
-  background:#f3f4f6 !important;
-  color:#6b7280 !important;
-  border:1px solid #d1d5db !important;
-
-  font-size:13.5px !important;
-  font-weight:700 !important;
-  line-height:1 !important;
-  text-decoration:none !important;
-
-  cursor:pointer;
-  box-shadow:0 4px 14px rgba(15,23,42,0.10);
-}
-
-.combo-top-bar .home-button:hover,
-.combo-top-bar .combo-reset-button:hover{
-  background:#e5e7eb !important;
-  color:#374151 !important;
-}
-
-@media (max-width:480px){
-  .combo-top-bar .home-button,
-  .combo-top-bar .combo-reset-button{
-    height:34px !important;
-    padding:0 13px !important;
-    font-size:13px !important;
-  }
-}
-
-.combo-reset-button{
-  display:inline-block;
-  width:auto;
-  height:auto;
-  margin-top:0;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-  color:#6b7280;
-  font-size:14px;
-  font-weight:500;
-  border:none;
-  cursor:pointer;
-  flex:0 0 auto;
-}
-
-.combo-reset-button:hover{
-  background:#d1d5db;
-}
-
-@media (max-width:480px){
-  .combo-reset-button{
-    font-size:13px;
-    padding:6px 12px;
-  }
-}
-
-.combo-warning{
-  margin:18px 0 16px 0;
-  padding:14px 20px;
-  border-radius:12px;
-  background:#fff7ed;
-  border:1px solid #fdba74;
-  color:#9a3412;
-  font-size:14px;
-  line-height:1.7;
-
-  display:flex;
-  align-items:flex-start;
-  gap:8px;
-}
-
-@media (max-width:480px){
-  .combo-warning{
-    font-size:13px;
-    line-height:1.65;
-    padding:13px 14px;
-  }
-}
-
-
-input, select{
-  width:100%;
-  padding:12px;
-  border-radius:8px;
-  border:1px solid #d1d5db;
-  font-size:14px;
-  box-sizing:border-box;
-}
-
-@media (max-width:480px){
-  input, select{
-    height:44px;
-    font-size:15px;
-  }
-}
-
-@media (min-width: 768px) {
-  #tel_link {
-    display: none !important;
-  }
-}
-
-.section-box{
-  margin-top:18px;
-  padding:16px;
-  background:#f8fafc;
-  border:1px solid #e5e7eb;
-  border-radius:12px;
-}
-
-.section-title{
-  font-size:16px;
-  font-weight:700;
-  margin-bottom:8px;
-  color:#111827;
-}
-
-.section-desc{
-  font-size:12px;
-  color:#6b7280;
-  margin-bottom:8px;
-  line-height:1.5;
-}
-
-/* ===== 카피라이트 ===== */
-.copyright{
-  text-align:right;   /* 🔥 핵심 */
-  margin-top:22px;
-  margin-bottom:6px;
-  padding:0 12px;
-}
-
-.copyright-line{
-  width:44px;
-  height:2px;
-  margin:0 0 12px auto;   /* 🔥 오른쪽 정렬 */
-  border-radius:999px;
-  background:linear-gradient(135deg,#93c5fd,#2563eb);
-  opacity:0.9;
-}
-
-.copyright-main{
-  font-size:12.5px;
-  color:#9ca3af;
-  line-height:1.5;
-  font-weight:500;
-  word-break:keep-all;
-  letter-spacing:0.2px;
-}
-
-.copyright-sub{
-  margin-top:4px;
-  font-size:15px;
-  color:#374151;
-  font-weight:600;
-  letter-spacing:-0.2px;
-}
-
-.copyright-sub span{
-  color:#2563eb;
-  font-weight:800;
-}
-
-@media (max-width:480px){
-  .copyright{
-    margin-top:18px;
-    margin-bottom:4px;
-    padding:0 8px;
-  }
-
-  .copyright-line{
-    margin-bottom:10px;
-  }
-
-  .copyright-main{
-    font-size:11.5px;
-    line-height:1.45;
-  }
-
-  .copyright-sub{
-    margin-top:3px;
-    font-size:13px;
-  }
+/* ── 모바일 ── */
+@media (max-width:600px){
+  .page-wrap{ padding:10px 6px 60px 6px; }
+  .form-card{ padding:14px 10px; }
+  .result-card{ padding:14px 10px; }
+  .form-title{ font-size:14px; padding:6px 0; }
+  .top-bar{ flex-wrap:wrap; gap:6px; }
+  .home-btn,.reset-btn{ height:30px; font-size:11.5px; padding:0 10px; }
+  .section-header{ font-size:11.5px; padding:5px 8px; }
+  .field-select,.field-input{ height:42px; font-size:14px; }
+  .combo-warning{ font-size:12px; line-height:1.6; padding:10px 12px; }
+  .copyright{ margin-top:18px; margin-bottom:4px; padding:0 8px; }
+  .copyright-line{ margin-bottom:10px; }
+  .copyright-main{ font-size:11.5px; line-height:1.45; }
+  .copyright-sub{ margin-top:3px; font-size:13px; }
 }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="page-wrap">
 
-<div class="top-bar combo-top-bar">
-  <a href="/home" class="home-button">⌂ 홈으로</a>
-  <button type="button" class="combo-reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
-</div>
-
-<div class="card">
-<h2>통합돌봄 서비스 기관 찾기</h2>
-
-<form method="post">
-<input type="hidden" name="action" id="comboAction" value="">
-
-<div class="section-box">
-  <div class="section-title">지역조건</div>
-  <div class="section-desc">시도와 시군구를 선택하여 지역 기준으로 검색합니다.</div>
-
-  <label>시도</label>
-  <select name="sido" onchange="handleSidoChange(this.form)">
-    <option value="">전체</option>
-    {% if sido and sido not in sido_options %}
-    <option value="{{sido}}" selected>{{sido}}</option>
-    {% endif %}
-    {% for s in sido_options %}
-    <option value="{{s}}" {% if s==sido %}selected{% endif %}>{{s}}</option>
-    {% endfor %}
-  </select>
-
-  <label>시군구</label>
-  <select name="sigungu">
-    <option value="">전체</option>
-    {% for g in sigungu_options %}
-    <option value="{{g}}" {% if g==sigungu %}selected{% endif %}>{{g}}</option>
-    {% endfor %}
-  </select>
-</div>
-
-
-<div class="section-box">
-  <div class="section-title">상세 조건</div>
-  <div class="section-desc">대분류와 중분류(선택형), 프로그램과 기관명(서술형)으로 검색합니다.</div>
-
-<label>대분류</label>
-<select name="main_category" onchange="handleMainCategoryChange(this.form)">
-  <option value="">전체</option>
-  {% if main_category and main_category not in main_category_options %}
-  <option value="{{main_category}}" selected>{{main_category}}</option>
-  {% endif %}
-  {% for c in main_category_options %}
-  <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
-  {% endfor %}
-</select>
-
-
-<label>중분류</label>
-<select name="middle_category">
-  <option value="">전체</option>
-  {% if middle_category and middle_category not in middle_category_options %}
-  <option value="{{middle_category}}" selected>{{middle_category}}</option>
-  {% endif %}
-  {% for c in middle_category_options %}
-  <option value="{{c}}" {% if c==middle_category %}selected{% endif %}>{{c}}</option>
-  {% endfor %}
-</select>
-
-<label>관리주체</label>
-<select name="manager">
-  <option value="">전체</option>
-  {% for m in manager_options %}
-  <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
-  {% endfor %}
-</select>
-
-  <label>프로그램</label>
-  <input type="text" name="program_kw" value="{{program_kw}}" placeholder="프로그램명 포함 검색">
-
-  <label>기관명</label>
-  <input type="text" name="org_kw" value="{{org_kw}}" placeholder="기관명 포함 검색">
-</div>
-
-<button type="submit" class="menu-btn" onclick="setSearchAction()">검색하기</button>
-
-</form>
-
-{% if show_results %}
-<div class="result" id="desc-result">
-
-<p><b>총 {{count}}건이 조회되었습니다.</b></p>
-
-<div class="combo-warning">
-  <span style="flex:0 0 auto;">⚠️</span>
-  <div style="flex:1; word-break:keep-all;">
-    서비스 제공기관 정보는 현재 운영 중인 기관이며,
-    실제 정보와 차이가 있을 수 있으니 정확한 사항은 해당 기관에 직접 확인하시기 바랍니다.
+  <div class="top-bar">
+    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <div class="btn-group">
+      <button type="button" class="reset-btn" onclick="resetDescPage()">&#8635; 다시 입력</button>
+    </div>
   </div>
+
+  <div class="form-card">
+    <div class="form-title">통합돌봄 서비스 기관 찾기</div>
+
+    <form method="post">
+    <input type="hidden" name="action" id="comboAction" value="">
+
+    <div class="section-header">&#9632; 지역 조건</div>
+    <div class="section-desc">시도와 시군구를 선택하여 지역 기준으로 검색합니다.</div>
+
+    <label class="field-label">시도</label>
+    <select name="sido" class="field-select" onchange="handleSidoChange(this.form)">
+      <option value="">전체</option>
+      {% if sido and sido not in sido_options %}
+      <option value="{{sido}}" selected>{{sido}}</option>
+      {% endif %}
+      {% for s in sido_options %}
+      <option value="{{s}}" {% if s==sido %}selected{% endif %}>{{s}}</option>
+      {% endfor %}
+    </select>
+
+    <label class="field-label">시군구</label>
+    <select name="sigungu" class="field-select">
+      <option value="">전체</option>
+      {% for g in sigungu_options %}
+      <option value="{{g}}" {% if g==sigungu %}selected{% endif %}>{{g}}</option>
+      {% endfor %}
+    </select>
+
+    <div class="section-header" style="margin-top:22px;">&#9632; 상세 조건</div>
+    <div class="section-desc">대분류와 중분류(선택형), 프로그램과 기관명(서술형)으로 검색합니다.</div>
+
+    <label class="field-label">대분류</label>
+    <select name="main_category" class="field-select" onchange="handleMainCategoryChange(this.form)">
+      <option value="">전체</option>
+      {% if main_category and main_category not in main_category_options %}
+      <option value="{{main_category}}" selected>{{main_category}}</option>
+      {% endif %}
+      {% for c in main_category_options %}
+      <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
+      {% endfor %}
+    </select>
+
+    <label class="field-label">중분류</label>
+    <select name="middle_category" class="field-select">
+      <option value="">전체</option>
+      {% if middle_category and middle_category not in middle_category_options %}
+      <option value="{{middle_category}}" selected>{{middle_category}}</option>
+      {% endif %}
+      {% for c in middle_category_options %}
+      <option value="{{c}}" {% if c==middle_category %}selected{% endif %}>{{c}}</option>
+      {% endfor %}
+    </select>
+
+    <label class="field-label">관리주체</label>
+    <select name="manager" class="field-select">
+      <option value="">전체</option>
+      {% for m in manager_options %}
+      <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
+      {% endfor %}
+    </select>
+
+    <label class="field-label">프로그램</label>
+    <input type="text" name="program_kw" class="field-input" value="{{program_kw}}" placeholder="프로그램명 포함 검색">
+
+    <label class="field-label">기관명</label>
+    <input type="text" name="org_kw" class="field-input" value="{{org_kw}}" placeholder="기관명 포함 검색">
+
+    <button type="submit" class="submit-btn" onclick="setSearchAction()">검색하기</button>
+
+    </form>
+  </div>
+
+  {% if show_results %}
+  <div class="result-card" id="desc-result">
+
+    <p class="result-count">총 {{count}}건이 조회되었습니다.</p>
+
+    <div class="combo-warning">
+      <span style="flex:0 0 auto;">&#9888;&#65039;</span>
+      <div style="flex:1; word-break:keep-all;">
+        서비스 제공기관 정보는 현재 운영 중인 기관이며,
+        실제 정보와 차이가 있을 수 있으니 정확한 사항은 해당 기관에 직접 확인하시기 바랍니다.
+      </div>
+    </div>
+
+    {% if count == 0 %}
+    <p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
+    {% endif %}
+
+    {% for region, manager_groups in results.items() %}
+    <h3>&#128205; {{region}}</h3>
+
+    {% for manager_name in sorted_managers_by_region[region] %}
+    {% set items = manager_groups[manager_name] %}
+
+    <div class="manager-badge" data-type="{{manager_name}}">{{manager_name}}</div>
+
+    {% for r in items %}
+    <div class="item" onclick="openDetail({{r['index']}})">
+      <span class="item-bullet">-</span>
+      <span class="item-text">{{r['label']}}</span>
+    </div>
+    {% endfor %}
+
+    {% endfor %}
+    {% endfor %}
+
+  </div>
+  {% endif %}
+
 </div>
 
-{% if count == 0 %}
-<p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
-{% endif %}
-
-
-{% for region, manager_groups in results.items() %}
-<h3>📍 {{region}}</h3>
-
-{% for manager_name in sorted_managers_by_region[region] %}
-{% set items = manager_groups[manager_name] %}
-
-<div class="manager-badge" data-type="{{manager_name}}">{{manager_name}}</div>
-
-{% for r in items %}
-<div class="item" onclick="openDetail({{r['index']}})">
-  <span class="item-bullet">-</span>
-  <span class="item-text">{{r['label']}}</span>
-</div>
-{% endfor %}
-
-{% endfor %}
-{% endfor %}
-
-</div>
-{% endif %}
-</div>
-
-<div id="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);">
-  <div style="background:white;margin:0% auto;padding:20px;width:90%;max-width:520px;border-radius:10px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+<!-- 상세 모달 -->
+<div id="modal" class="modal-overlay">
+  <div class="modal-box">
     <h3 id="m_title"></h3>
     <p style="margin:0 0 14px 0; line-height:1.6;">
       <b>기관명:</b> <span id="m_org" style="white-space:normal; word-break:keep-all;"></span>
     </p>
     <p>
       <b>기관 연락처:</b> <span id="m_tel"></span>
-      <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">📞</a>
+      <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">&#128222;</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
     <p id="m_price_row" style="display:none;"><b>서비스단가:</b> <span id="m_price"></span></p>
     <p id="m_content_row" style="display:none;"><b>주요내용:</b> <span id="m_content"></span></p>
-    <p id="m_target_row" style="display:none;"><b>대상:</b> <span id="m_target"></span></p>    
+    <p id="m_target_row" style="display:none;"><b>대상:</b> <span id="m_target"></span></p>
     <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;display:none;"></iframe>
-    <button onclick="closeModal()" class="menu-btn">닫기</button>
+    <button onclick="closeModal()" class="modal-btn">닫기</button>
   </div>
 </div>
 
@@ -3702,7 +3549,6 @@ function setSearchAction(){
 function resetDescPage(){
   window.location.href = "/combo";
 }
-
 
 window.addEventListener("load", function(){
   const resultBox = document.getElementById("desc-result");
@@ -8116,7 +7962,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
   <div class="top-bar">
     <a href="/home" class="home-btn">&#8962; 홈으로</a>
     <div class="btn-group">
-      <button type="button" class="reset-btn" onclick="resetCarePage()">&#8635; 다시 입력</button>
+      <button type="button" id="gt-reset" class="reset-btn" onclick="resetCarePage()">&#8635; 다시 입력</button>
     </div>
   </div>
 
@@ -8138,6 +7984,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 
     <form id="careForm">
 
+      <div id="gt-dementia">
       <div class="section-header">&#9632; 치매 관련 약 복용 여부</div>
       <div class="dementia-box">
         <b>치매 관련 약을 복용 중이십니까?</b>
@@ -8146,8 +7993,9 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
           <label><input type="radio" name="dementia" value="n"> 아니오</label>
         </div>
       </div>
+      </div>
 
-      <div class="section-header">&#9632; 일상생활 수행능력(ADL) 조사</div>
+      <div id="gt-adl" class="section-header">&#9632; 일상생활 수행능력(ADL) 조사</div>
       <div id="adlSection">
         {% for i,q in questions %}
         <div class="question-box">
@@ -8402,6 +8250,221 @@ document.getElementById("careForm").onsubmit = async function(e){
 /* 페이지 로드 시 상태 복원 */
 restoreCareState();
 updateScoreBanner();
+
+/* ── 사전조사 가이드 (한 화면에 전체 표시) ── */
+function careGuideStart() {
+  if (sessionStorage.getItem('cg_done')) return;
+
+  var isMobile = window.innerWidth < 600;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+
+  window.scrollTo(0, 0);
+
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.62);';
+  document.body.appendChild(overlay);
+
+  var prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+
+  var bubbles = [];
+
+  /* ── 공통 헬퍼: 하이라이트 ── */
+  function addHighlight(elId) {
+    var el = document.getElementById(elId);
+    if (!el) return null;
+    var pad = isMobile ? 4 : 6;
+    var r = el.getBoundingClientRect();
+    var hl = document.createElement('div');
+    hl.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(37,99,235,0.55);',
+      'top:'+(r.top-pad)+'px;left:'+(r.left-pad)+'px;',
+      'width:'+(r.width+pad*2)+'px;height:'+(r.height+pad*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl);
+    bubbles.push(hl);
+    return r;
+  }
+
+  /* ── 공통 헬퍼: 말풍선 만들기 ── */
+  function makeBubble(title, text, w) {
+    var fs      = isMobile ? '10.5px' : '12px';
+    var fsTitle = isMobile ? '11px'   : '12.5px';
+    var bpd     = isMobile ? '8px 10px 7px' : '13px 16px 12px';
+    var b = document.createElement('div');
+    b.style.cssText = [
+      'position:fixed;z-index:10000;background:#fff;border-radius:11px;',
+      'padding:'+bpd+';width:'+w+'px;',
+      'box-shadow:0 5px 20px rgba(0,0,0,0.22);',
+      'font-family:inherit;pointer-events:none;'
+    ].join('');
+    b.innerHTML =
+      '<div style="font-size:'+fsTitle+';font-weight:700;color:#1d4ed8;margin-bottom:4px;">&#128161; '+title+'</div>'+
+      '<div style="font-size:'+fs+';color:#374151;line-height:1.55;word-break:keep-all;">'+text+'</div>';
+    document.body.appendChild(b);
+    bubbles.push(b);
+    return b;
+  }
+
+  /* ── 공통 헬퍼: 화살표 ── */
+  function addArrow(bubble, dir, posFromEdge) {
+    var arrow = document.createElement('div');
+    arrow.style.position = 'absolute';
+    arrow.style.width = '0';
+    arrow.style.height = '0';
+    if (dir === 'left') {
+      /* 화살표가 말풍선 왼쪽에서 왼쪽으로 뾰족 → 왼쪽의 타겟을 가리킴 */
+      arrow.style.borderTop = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid transparent';
+      arrow.style.borderRight = '8px solid #fff';
+      arrow.style.left = '-8px';
+      arrow.style.top = posFromEdge + 'px';
+    } else if (dir === 'right') {
+      /* 화살표가 말풍선 오른쪽에서 오른쪽으로 뾰족 → 오른쪽의 타겟을 가리킴 */
+      arrow.style.borderTop = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid transparent';
+      arrow.style.borderLeft = '8px solid #fff';
+      arrow.style.right = '-8px';
+      arrow.style.top = posFromEdge + 'px';
+    } else if (dir === 'up') {
+      /* 화살표가 말풍선 위에서 위로 뾰족 → 위의 타겟을 가리킴 */
+      arrow.style.borderLeft = '8px solid transparent';
+      arrow.style.borderRight = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid #fff';
+      arrow.style.top = '-8px';
+      arrow.style.left = posFromEdge + 'px';
+    } else if (dir === 'down') {
+      arrow.style.borderLeft = '8px solid transparent';
+      arrow.style.borderRight = '8px solid transparent';
+      arrow.style.borderTop = '8px solid #fff';
+      arrow.style.bottom = '-8px';
+      arrow.style.left = posFromEdge + 'px';
+    }
+    bubble.appendChild(arrow);
+  }
+
+  /* ========================================
+     ① 치매약 복약 여부 — 말풍선을 타겟의 오른쪽 반에 배치, 꼬리는 왼쪽 옆면
+     ======================================== */
+  var r1 = addHighlight('gt-dementia');
+  if (r1) {
+    var bw1 = isMobile ? Math.min(Math.floor(vw * 0.48), 195) : 230;
+    var b1 = makeBubble('치매약 복약 여부', '치매약을 복약하고 있는지 여부를 <b>먼저 체크</b>해 주세요.', bw1);
+    requestAnimationFrame(function(){
+      var bh1 = b1.offsetHeight;
+      /* 가로: 타겟 오른쪽 절반 영역에 배치 (화면 안에 들어오게 clamp) */
+      var bubbleLeft = Math.min(r1.left + r1.width * 0.55, vw - bw1 - 6);
+      bubbleLeft = Math.max(6, bubbleLeft);
+      /* 세로: 타겟 세로 중앙 */
+      var bubbleTop = Math.max(6, r1.top + r1.height/2 - bh1/2);
+      if (bubbleTop + bh1 > vh - 60) bubbleTop = vh - 60 - bh1;
+      b1.style.top = bubbleTop + 'px';
+      b1.style.left = bubbleLeft + 'px';
+      /* 꼬리: 왼쪽 옆면 → 타겟 왼쪽 부분을 가리킴 */
+      var arrowTop = Math.max(8, Math.min(r1.top + r1.height/2 - bubbleTop - 8, bh1 - 24));
+      addArrow(b1, 'left', arrowTop);
+    });
+  }
+
+  /* ========================================
+     ② ADL 조사 — 섹션헤더 + 1~2번 문항까지 큰 하이라이트
+     ======================================== */
+  var adlHeader = document.getElementById('gt-adl');
+  var adlQuestions = document.querySelectorAll('#adlSection .question-box');
+  var r2 = null;
+  if (adlHeader && adlQuestions.length >= 2) {
+    var rH = adlHeader.getBoundingClientRect();
+    var rQ2 = adlQuestions[1].getBoundingClientRect(); /* 2번 문항 */
+    /* 헤더 top ~ 2번 문항 bottom 을 합친 영역 */
+    var pad2 = isMobile ? 4 : 6;
+    var unionTop = Math.min(rH.top, rQ2.top);
+    var unionBottom = Math.max(rH.bottom, rQ2.bottom);
+    var unionLeft = Math.min(rH.left, rQ2.left);
+    var unionRight = Math.max(rH.right, rQ2.right);
+    r2 = { top: unionTop, bottom: unionBottom, left: unionLeft, right: unionRight,
+           width: unionRight - unionLeft, height: unionBottom - unionTop };
+    var hl2 = document.createElement('div');
+    hl2.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(37,99,235,0.55);',
+      'top:'+(r2.top-pad2)+'px;left:'+(r2.left-pad2)+'px;',
+      'width:'+(r2.width+pad2*2)+'px;height:'+(r2.height+pad2*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl2);
+    bubbles.push(hl2);
+  }
+  if (r2) {
+    var bw2 = isMobile ? Math.min(Math.floor(vw * 0.48), 195) : 230;
+    var b2 = makeBubble('ADL 조사', '일상생활 수행능력(ADL) 항목에서 <b>해당하는 항목을 눌러</b> 주세요.', bw2);
+    requestAnimationFrame(function(){
+      var bh2 = b2.offsetHeight;
+      /* 가로: 타겟 왼쪽 절반 영역에 배치 */
+      var bubbleLeft = Math.max(6, r2.left + r2.width * 0.45 - bw2);
+      /* 세로: 타겟 세로 중앙 */
+      var bubbleTop = Math.max(6, r2.top + r2.height/2 - bh2/2);
+      if (bubbleTop + bh2 > vh - 60) bubbleTop = vh - 60 - bh2;
+      b2.style.top = bubbleTop + 'px';
+      b2.style.left = bubbleLeft + 'px';
+      /* 꼬리: 오른쪽 옆면 → 타겟 오른쪽 부분을 가리킴 */
+      var arrowTop = Math.max(8, Math.min(r2.top + r2.height/2 - bubbleTop - 8, bh2 - 24));
+      addArrow(b2, 'right', arrowTop);
+    });
+  }
+
+  /* ========================================
+     ③ 다시 입력 — 말풍선을 타겟 아래에
+     ======================================== */
+  var r3 = addHighlight('gt-reset');
+  if (r3) {
+    var bw3 = isMobile ? Math.min(Math.floor(vw * 0.48), 190) : 220;
+    var b3 = makeBubble('다시 입력', '체크를 초기화하고 싶을 경우 이 버튼을 눌러주세요.', bw3);
+    requestAnimationFrame(function(){
+      var bh3 = b3.offsetHeight;
+      var bubbleTop = r3.bottom + 10;
+      if (bubbleTop + bh3 > vh - 60) bubbleTop = r3.top - bh3 - 10;
+      var bubbleLeft = Math.max(4, Math.min(r3.left + r3.width/2 - bw3/2, vw - bw3 - 4));
+      b3.style.top = bubbleTop + 'px';
+      b3.style.left = bubbleLeft + 'px';
+      var arrowLeft = Math.max(10, Math.min(r3.left + r3.width/2 - bubbleLeft - 8, bw3 - 26));
+      if (bubbleTop > r3.bottom) {
+        addArrow(b3, 'up', arrowLeft);
+      } else {
+        addArrow(b3, 'down', arrowLeft);
+      }
+    });
+  }
+
+  /* 확인 버튼 */
+  var confirmBtn = document.createElement('button');
+  confirmBtn.textContent = '확인';
+  confirmBtn.style.cssText = [
+    'position:fixed;z-index:10001;',
+    'left:50%;transform:translateX(-50%);bottom:18%;',
+    'background:#2563eb;color:#fff;border:none;',
+    'border-radius:10px;',
+    'padding:'+(isMobile?'10px 40px':'11px 52px')+';',
+    'font-size:'+(isMobile?'13px':'14px')+';font-weight:700;cursor:pointer;',
+    'box-shadow:0 4px 16px rgba(37,99,235,0.35);white-space:nowrap;'
+  ].join('');
+  document.body.appendChild(confirmBtn);
+  bubbles.push(confirmBtn);
+
+  function closeGuide() {
+    bubbles.forEach(function(b){ b.remove(); });
+    overlay.remove();
+    document.body.style.overflow = prevOverflow;
+    sessionStorage.setItem('cg_done', '1');
+  }
+
+  confirmBtn.addEventListener('click', function(e){ e.stopPropagation(); closeGuide(); });
+  overlay.addEventListener('click', closeGuide);
+}
+
+window.addEventListener('load', function() { setTimeout(careGuideStart, 300); });
 </script>
 
 </body>
