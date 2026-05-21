@@ -7991,660 +7991,208 @@ CARE_HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>통합돌봄 사전조사</title>
-<style>{{style}}</style>
-
 <style>
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+.page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
 
-.care-top-bar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  margin-top:12px;
+/* ── 상단 바 ── */
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
+.home-btn{ display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 16px; border-radius:999px; background:#f3f4f6; border:1px solid #d1d5db; color:#6b7280; text-decoration:none; font-size:13px; font-weight:700; }
+.home-btn:hover{ background:#e5e7eb; }
+.btn-group{ display:flex; gap:10px; }
+.reset-btn{ display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 16px; border-radius:999px; background:#f3f4f6; border:1px solid #d1d5db; color:#6b7280; font-size:13px; font-weight:700; cursor:pointer; }
+.reset-btn:hover{ background:#e5e7eb; }
+
+/* ── 폼 카드 ── */
+.form-card{ background:#fff; border-radius:16px; padding:28px 24px; box-shadow:0 6px 18px rgba(0,0,0,0.07); overflow-x:auto; }
+.form-title{ text-align:center; font-size:18px; font-weight:900; margin-bottom:20px; letter-spacing:-0.3px; border:2px solid #111827; padding:8px 0; }
+.section-header{ background:#6e9fc5; color:#fff; font-size:13px; font-weight:700; padding:6px 10px; border-radius:4px; margin:18px 0 8px 0; }
+.section-header:first-of-type{ margin-top:0; }
+
+/* ── 치매 박스 ── */
+.dementia-box{ background:linear-gradient(135deg,#eef4f9,#e8f1fa); padding:16px 18px; border-radius:12px; margin-bottom:16px; border:1px solid #b8d4e8; }
+.dementia-box b{ font-size:13.5px; display:block; margin-bottom:10px; }
+.dementia-options{ display:flex; width:100%; align-items:center; justify-content:space-between; gap:0; }
+.dementia-options label{ flex:1; display:flex; justify-content:center; align-items:center; gap:6px; white-space:nowrap; margin:0; font-size:13px; cursor:pointer; }
+.dementia-options input[type=radio]{ width:auto !important; margin:0; flex:0 0 auto; transform:scale(1.1); border:revert; padding:revert; border-radius:revert; }
+
+/* ── 질문 박스 ── */
+.question-box{ background:#f8fafc; padding:18px; border-radius:12px; margin-bottom:10px; border:1px solid #e5e7eb; transition:0.18s ease; }
+.question-box.active{ border:2px solid #6e9fc5; background:#f0f7fc; box-shadow:0 6px 18px rgba(110,159,197,0.12); }
+.question-title{ display:block; font-size:13.5px; line-height:1.6; word-break:keep-all; overflow-wrap:break-word; padding-left:22px; text-indent:-22px; }
+.options{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+.options label{ display:flex; align-items:center; gap:8px; cursor:pointer; line-height:1.5; font-size:12.5px; }
+.options input[type=radio]{ width:auto !important; flex:0 0 auto; transform:scale(1.05); border:revert; padding:revert; border-radius:revert; }
+
+/* ── 검사 버튼 ── */
+.submit-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#6e9fc5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(110,159,197,0.25); transition:all .15s; }
+.submit-btn:hover{ background:#5a8db5; transform:translateY(-1px); }
+
+/* ── 점수 배너 ── */
+.score-banner{ position:fixed; top:100px; right:80px; z-index:998; width:132px; padding:14px 12px; border-radius:22px; background:rgba(255,255,255,0.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(191,219,254,0.95); box-shadow:0 18px 38px rgba(37,99,235,0.18); text-align:center; transition:all 0.2s ease; }
+.score-banner.disabled{ opacity:0.62; transform:scale(0.98); }
+.score-badge{ width:72px; height:72px; margin:0 auto 10px auto; border-radius:50%; background:linear-gradient(135deg,#6e9fc5,#93c5e7); display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; box-shadow:0 10px 22px rgba(110,159,197,0.28); }
+.score-badge-label{ font-size:10px; opacity:0.92; line-height:1; margin-bottom:4px; }
+.score-value{ font-size:28px; font-weight:800; line-height:1; }
+.score-meta{ display:none; }
+.score-progress-wrap{ width:100%; height:8px; background:#e5edf9; border-radius:999px; overflow:hidden; margin-bottom:3px; }
+.score-progress-bar{ height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg,#93c5e7,#6e9fc5); transition:width 0.22s ease; }
+.score-status{ font-size:11px; color:#1e3a5e; line-height:1.45; word-break:keep-all; min-height:34px; font-weight:600; }
+.score-chip{ margin-top:8px; display:inline-block; padding:5px 8px; border-radius:999px; font-size:10px; font-weight:700; background:#eef4f9; color:#6e9fc5; }
+
+/* 상태별 색감 */
+.score-banner.state-low .score-badge{ background:linear-gradient(135deg,#22c55e,#4ade80); box-shadow:0 10px 22px rgba(34,197,94,0.24); }
+.score-banner.state-low .score-progress-bar{ background:linear-gradient(90deg,#86efac,#22c55e); }
+.score-banner.state-low .score-status{ color:#166534; }
+.score-banner.state-low .score-chip{ background:#f0fdf4; color:#16a34a; }
+
+.score-banner.state-mid .score-badge{ background:linear-gradient(135deg,#f59e0b,#fbbf24); box-shadow:0 10px 22px rgba(245,158,11,0.24); }
+.score-banner.state-mid .score-progress-bar{ background:linear-gradient(90deg,#fde68a,#f59e0b); }
+.score-banner.state-mid .score-status{ color:#92400e; }
+.score-banner.state-mid .score-chip{ background:#fffbeb; color:#d97706; }
+
+.score-banner.state-high .score-badge{ background:linear-gradient(135deg,#ef4444,#f87171); box-shadow:0 10px 22px rgba(239,68,68,0.24); }
+.score-banner.state-high .score-progress-bar{ background:linear-gradient(90deg,#fca5a5,#ef4444); }
+.score-banner.state-high .score-status{ color:#991b1b; }
+.score-banner.state-high .score-chip{ background:#fef2f2; color:#dc2626; }
+
+.score-banner.state-dementia .score-badge{ background:linear-gradient(135deg,#7c3aed,#a78bfa); box-shadow:0 10px 22px rgba(124,58,237,0.24); }
+.score-banner.state-dementia .score-progress-bar{ background:linear-gradient(90deg,#c4b5fd,#7c3aed); width:100% !important; }
+.score-banner.state-dementia .score-status{ color:#5b21b6; }
+.score-banner.state-dementia .score-chip{ background:#f5f3ff; color:#7c3aed; }
+
+/* ── 결과 안내 박스 ── */
+.guide-box{ margin-top:16px; padding:14px 18px; border-radius:12px; background:#fff7ed; border:1px solid #fdba74; color:#9a3412; font-size:13px; line-height:1.7; display:flex; align-items:flex-start; gap:8px; }
+
+/* ── 모달 ── */
+.modal-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; padding-top:6vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+.modal-box{ background:white; margin:0 auto; position:absolute; top:8%; left:0; right:0; padding:18px 22px 22px 22px; width:92%; max-width:460px; border-radius:14px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.15); }
+.modal-result-area{ background:#eef4f9; border-radius:10px; padding:14px; margin-bottom:18px; }
+.modal-result-area p{ font-size:18px; line-height:1.6; margin:0; }
+.modal-criteria{ text-align:left; font-size:13px; line-height:1.6; color:#444; background:#fafafa; padding:14px; border-radius:8px; }
+.modal-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#6e9fc5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+.modal-btn:hover{ background:#5a8db5; }
+
+/* ── 인쇄 ── */
+@media print{
+  body{ background:white; }
+  .top-bar,.score-banner{ display:none !important; }
+  .page-wrap{ padding:0; }
+  .form-card{ box-shadow:none; border-radius:0; padding:10px; }
 }
 
-.care-top-bar .home-button,
-.care-top-bar .care-reset-button{
-  display:inline-flex !important;
-  align-items:center;
-  justify-content:center;
-  width:auto !important;
-  height:36px !important;
-  margin:0 !important;
-  padding:0 15px !important;
+/* ── 모바일 ── */
+@media (max-width:600px){
+  .page-wrap{ padding:10px 6px 60px 6px; }
+  .form-card{ padding:14px 10px; }
+  .form-title{ font-size:14px; padding:6px 0; }
+  .top-bar{ flex-wrap:wrap; gap:6px; justify-content:flex-start; }
+  .btn-group{ margin-left:0; }
+  .home-btn,.reset-btn{ height:30px; font-size:11.5px; padding:0 10px; }
+  .section-header{ font-size:11.5px; padding:5px 8px; }
+  .question-title{ font-size:12.5px; line-height:1.55; padding-left:18px; text-indent:-18px; }
+  .options label{ font-size:11.5px; }
+  .dementia-box{ padding:12px 14px; }
+  .dementia-box b{ font-size:12.5px; }
+  .dementia-options label{ font-size:12px; }
 
-  border-radius:999px !important;
-  background:#f3f4f6 !important;
-   color:#6b7280 !important;
-  border:1px solid #d1d5db !important;
+  .score-banner{ position:fixed; top:10px; right:10px; width:85px; padding:8px 6px; border-radius:16px; z-index:10; }
+  .score-badge{ width:44px; height:44px; }
+  .score-value{ font-size:18px; }
+  .score-meta{ font-size:9px; }
+  .score-status{ font-size:10px; line-height:1.2; min-height:20px; }
+  .score-chip{ font-size:10px; padding:3px 6px; }
 
-  font-size:13.5px !important;
-  font-weight:700 !important;
-  line-height:1 !important;
-  text-decoration:none !important;
-
-  cursor:pointer;
-  box-shadow:0 4px 14px rgba(15,23,42,0.10);
+  .modal-overlay{ padding-top:0 !important; }
+  .modal-box{ top:2% !important; }
 }
-
-.care-top-bar .home-button:hover,
-.care-top-bar .care-reset-button:hover{
-  background:#e5e7eb !important;
-  color:#374151 !important;
-}
-
-@media (max-width:480px){
-  .care-top-bar .home-button,
-  .care-top-bar .care-reset-button{
-    height:34px !important;
-    padding:0 13px !important;
-    font-size:13px !important;
-  }
-}
-
-.care-reset-button{
-  display:inline-block;
-  width:auto;
-  height:auto;
-  margin-top:0;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-   color:#6b7280;
-  font-size:14px;
-  font-weight:500;
-  border:none;
-  cursor:pointer;
-  box-shadow:none;
-}
-
-.care-reset-button:hover{
-  background:#d1d5db;
-}
-
-@media (max-width:480px){
-  .care-top-bar{
-    display:flex;
-    justify-content:flex-start;
-    align-items:center;
-    gap:8px;
-    margin-bottom:14px;
-  }
-
-  .care-top-bar .home-button,
-  .care-top-bar .care-reset-button{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    width:auto !important;
-    height:34px !important;
-    margin-top:0 !important;
-    padding:0 14px !important;
-    border-radius:8px;
-    font-size:13px;
-    font-weight:500;
-    line-height:1;
-  }
-
-  .care-reset-button{
-    flex:0 0 auto;
-  }
-}
-
-
-.highlight{
-  font-weight:700;
-  color:#1d4ed8;
-}
-.desc-warning{
-  margin-top:14px;
-  padding:14px 18px;
-  border-radius:12px;
-  background:#fff7ed;
-  border:1px solid #fdba74;
-  color:#9a3412;
-  font-size:14px;
-  line-height:1.7;
-
-  display:flex;
-  align-items:flex-start;
-  gap:8px;
-}
-
-.ai-model-wrap{
-  margin-top:10px;
-  display:flex;
-  justify-content:center;
-}
-
-.ai-model-badge{
-  display:inline-flex;
-  flex-direction:column;
-  align-items:center;
-  gap:4px;
-  padding:8px 14px;
-  border-radius:14px;
-  background:#f8fafc;
-  border:1px solid #e5e7eb;
-}
-
-.ai-model-top{
-  display:flex;
-  align-items:center;
-  gap:7px;
-  font-size:13px;
-  font-weight:700;
-  color:#111827;
-  line-height:1.2;
-}
-
-.ai-logo{
-  width:9px;
-  height:9px;
-  object-fit:contain;
-  opacity:0.9;
-}
-
-.ai-model-icon{
-  width:10px;
-  height:10px;
-  border-radius:50%;
-  background:#2563eb;
-  box-shadow:0 0 0 3px rgba(37,99,235,0.12);
-  flex:0 0 auto;
-}
-
-.ai-model-sub{
-  font-size:11px;
-  color:#6b7280;
-  line-height:1.2;
-  letter-spacing:0.2px;
-}
-
-.ai-model-label{
-  margin-top:6px;
-  font-size:12px;
-  color:#6b7280;
-  letter-spacing:0.3px;
-
-  display:inline-block;
-  padding:4px 10px;
-  border-radius:999px;
-
-  background:linear-gradient(135deg,#e0f2fe,#dbeafe);
-  border:1px solid #bfdbfe;
-
-  font-weight:600;
-}
-
-.dementia-options{
-  display:flex;
-  width:100%;
-  align-items:center;
-  justify-content:space-between;
-  gap:0;
-}
-
-.dementia-options label{
-  flex:1;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:6px;
-  white-space:nowrap;
-  margin:0;
-}
-
-.dementia-options input[type=radio]{
-  width:auto !important;
-  margin:0;
-  flex:0 0 auto;
-  transform:scale(1.1);
-}
-
-/* ====== 사전조사 전용 스타일 ====== */
-
-.top-bar{
-  margin-bottom:20px;
-}
-
-.home-button{
-  display:inline-block;
-  padding:8px 14px;
-  border-radius:8px;
-  background:#e5e7eb;
-  color:#111827;
-  text-decoration:none;
-  font-size:14px;
-  font-weight:500;
-}
-
-.home-button:hover{
-  background:#d1d5db;
-}
-
-.pc-br{
-  display:inline;
-}
-
-@media (max-width:480px){
-  .pc-br{
-    display:none;
-  }
-}
-
-.options{
-  margin-top:12px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-.options label{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  cursor:pointer;
-  line-height:1.5;
-}
-
-.options input[type=radio]{
-  width:auto !important;
-  flex:0 0 auto;
-  transform:scale(1.1);
-}
-
-.question-box{
-  background:#f5faff;
-  padding:22px;
-  border-radius:16px;
-  margin-top:18px;
-  box-shadow:0 8px 24px rgba(15, 23, 42, 0.06);
-  border:1px solid #dbeafe;
-  transition:0.18s ease;
-}
-
-.question-title{
-  display:block;
-  font-size:16px;
-  line-height:1.6;
-  word-break:keep-all;
-  overflow-wrap:break-word;
-  padding-left:26px;
-  text-indent:-26px;
-}
-
-@media (max-width:480px){
-  .question-title{
-    font-size:15px;
-    line-height:1.55;
-    padding-left:19px;
-    text-indent:-19px;
-  }
-}
-
-.question-box.active{
-  border:2px solid #2563eb;
-  background:#eef6ff;
-  box-shadow:0 12px 28px rgba(37,99,235,0.12);
-}
-
-.dementia-box{
-  background:linear-gradient(135deg,#fff7ed,#fff1f2);
-  padding:18px;
-  border-radius:14px;
-  margin-top:15px;
-  border:1px solid #fed7aa;
-  box-shadow:0 6px 18px rgba(251,146,60,0.08);
-}
-
-.dementia-options{
-  display:flex;
-  width:100%;
-  align-items:center;
-  justify-content:space-between;
-  gap:0;
-  margin-top:10px;
-}
-
-/* ====== 예쁜 점수 배너 ====== */
-.score-banner{
-  position:fixed;
-  top:100px;
-  right:80px;
-  z-index:998;
-  width:132px;
-  padding:14px 12px;
-  border-radius:22px;
-  background:rgba(255,255,255,0.92);
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
-  border:1px solid rgba(191,219,254,0.95);
-  box-shadow:0 18px 38px rgba(37,99,235,0.18);
-  text-align:center;
-  transition:all 0.2s ease;
-}
-
-.score-banner.disabled{
-  opacity:0.62;
-  transform:scale(0.98);
-}
-
-.score-badge{
-  width:72px;
-  height:72px;
-  margin:0 auto 10px auto;
-  border-radius:50%;
-  background:linear-gradient(135deg,#2563eb,#60a5fa);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  color:white;
-  box-shadow:0 10px 22px rgba(37,99,235,0.28);
-}
-
-.score-badge-label{
-  font-size:10px;
-  opacity:0.92;
-  line-height:1;
-  margin-bottom:4px;
-}
-
-.score-value{
-  font-size:28px;
-  font-weight:800;
-  line-height:1;
-}
-
-.score-meta{
-  display:none;   /* 🔥 이걸로 완전히 숨김 */
-}
-
-.score-progress-wrap{
-  width:100%;
-  height:8px;
-  background:#e5edf9;
-  border-radius:999px;
-  overflow:hidden;
-  margin-bottom:3px;
-}
-
-.score-progress-bar{
-  height:100%;
-  width:0%;
-  border-radius:999px;
-  background:linear-gradient(90deg,#60a5fa,#2563eb);
-  transition:width 0.22s ease;
-}
-
-.score-status{
-  font-size:11px;
-  color:#1e3a8a;
-  line-height:1.45;
-  word-break:keep-all;
-  min-height:34px;
-  font-weight:600;
-}
-
-.score-chip{
-  margin-top:8px;
-  display:inline-block;
-  padding:5px 8px;
-  border-radius:999px;
-  font-size:10px;
-  font-weight:700;
-  background:#eff6ff;
-  color:#2563eb;
-}
-
-/* ===== 상태별 색감 ===== */
-.score-banner.state-low .score-badge{
-  background:linear-gradient(135deg,#22c55e,#4ade80);
-  box-shadow:0 10px 22px rgba(34,197,94,0.24);
-}
-.score-banner.state-low .score-progress-bar{
-  background:linear-gradient(90deg,#86efac,#22c55e);
-}
-.score-banner.state-low .score-status{
-  color:#166534;
-}
-.score-banner.state-low .score-chip{
-  background:#f0fdf4;
-  color:#16a34a;
-}
-
-.score-banner.state-mid .score-badge{
-  background:linear-gradient(135deg,#f59e0b,#fbbf24);
-  box-shadow:0 10px 22px rgba(245,158,11,0.24);
-}
-.score-banner.state-mid .score-progress-bar{
-  background:linear-gradient(90deg,#fde68a,#f59e0b);
-}
-.score-banner.state-mid .score-status{
-  color:#92400e;
-}
-.score-banner.state-mid .score-chip{
-  background:#fffbeb;
-  color:#d97706;
-}
-
-.score-banner.state-high .score-badge{
-  background:linear-gradient(135deg,#ef4444,#f87171);
-  box-shadow:0 10px 22px rgba(239,68,68,0.24);
-}
-.score-banner.state-high .score-progress-bar{
-  background:linear-gradient(90deg,#fca5a5,#ef4444);
-}
-.score-banner.state-high .score-status{
-  color:#991b1b;
-}
-.score-banner.state-high .score-chip{
-  background:#fef2f2;
-  color:#dc2626;
-}
-
-.score-banner.state-dementia .score-badge{
-  background:linear-gradient(135deg,#7c3aed,#a78bfa);
-  box-shadow:0 10px 22px rgba(124,58,237,0.24);
-}
-.score-banner.state-dementia .score-progress-bar{
-  background:linear-gradient(90deg,#c4b5fd,#7c3aed);
-  width:100% !important;
-}
-.score-banner.state-dementia .score-status{
-  color:#5b21b6;
-}
-.score-banner.state-dementia .score-chip{
-  background:#f5f3ff;
-  color:#7c3aed;
-}
-
-@media (max-width:480px){
-  .dementia-options{
-    width:100%;
-    gap:0;
-  }
-}
-
-@media (max-width:480px){
-
-  #resultModal{
-    padding-top:0 !important;
-  }
-
-  #resultModal > div{
-    top:2% !important;
-  }
-
-  .score-banner{
-    position:fixed;
-    top:10px;
-    right:10px;
-    
-    width:85px;
-    padding:8px 6px;
-    border-radius:16px;
-
-    z-index:10;
-  }
-
-  #careForm{
-    padding-bottom:160px;
-  }
-
-  .score-badge{
-    width:44px;
-    height:44px;
-  }
-
-  .score-value{
-    font-size:18px;
-  }
-
-  .score-meta{
-    font-size:9px;
-  }
-
-}
-
-.score-status{
-  font-size:10px;
-  line-height:1.2;
-  min-height:20px;   /* 🔥 높이 줄이기 */
-}
-
-.score-chip{
-  font-size:10px;
-  padding:3px 6px;
-}}
-
 </style>
 </head>
 
 <body>
-<div class="container">
+<div class="page-wrap">
 
-<div class="top-bar care-top-bar">
-  <a href="/home" class="home-button">⌂ 홈으로</a>
-  <button type="button" class="care-reset-button" onclick="resetCarePage()">↻ 다시 입력</button>
-</div>
-
-<h2>통합돌봄 사전조사</h2>
-
-<div id="scoreBanner" class="score-banner disabled">
-  <div class="score-badge">
-    <div class="score-badge-label">점수</div>
-    <div id="scoreValue" class="score-value">0</div>
-  </div>
-
-  <div class="score-meta">
-    응답 <span id="answeredCount">0</span>/7 · 최대 14점
-  </div>
-
-  <div class="score-progress-wrap">
-    <div id="scoreProgressBar" class="score-progress-bar"></div>
-  </div>
-
-  <div id="scoreStatus" class="score-status">치매 여부를 먼저 선택하세요</div>
-  <div id="scoreChip" class="score-chip">사전 확인 필요</div>
-</div>
-
-<form id="careForm">
-  <div class="dementia-box">
-    <b>치매 관련 약 복용 여부</b>
-
-    <div class="dementia-options">
-      <label>
-        <input type="radio" name="dementia" value="y">
-        예
-      </label>
-
-      <label>
-        <input type="radio" name="dementia" value="n">
-        아니오
-      </label>
+  <div class="top-bar">
+    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <div class="btn-group">
+      <button type="button" class="reset-btn" onclick="resetCarePage()">&#8635; 다시 입력</button>
     </div>
   </div>
 
-  <div id="adlSection">
-    {% for i,q in questions %}
-    <div class="question-box">
-      <b class="question-title">{{i+1}}) {{q}}</b>
+  <div class="form-card">
+    <div class="form-title">통합돌봄 사전조사</div>
 
-      <div class="options">
-        <label>
-          <input type="radio" name="q{{i}}" value="0">
-          도움 없이 혼자서 수행 가능 (0점)
-        </label>
-
-        <label>
-          <input type="radio" name="q{{i}}" value="1">
-          보조도구(지팡이 등)를 잡고 수행 가능 (1점)
-        </label>
-
-        <label>
-          <input type="radio" name="q{{i}}" value="2">
-          타인이 도와줘야 수행 가능 (2점)
-        </label>
+    <div id="scoreBanner" class="score-banner disabled">
+      <div class="score-badge">
+        <div class="score-badge-label">점수</div>
+        <div id="scoreValue" class="score-value">0</div>
       </div>
+      <div class="score-meta">응답 <span id="answeredCount">0</span>/7 · 최대 14점</div>
+      <div class="score-progress-wrap">
+        <div id="scoreProgressBar" class="score-progress-bar"></div>
+      </div>
+      <div id="scoreStatus" class="score-status">치매 여부를 먼저 선택하세요</div>
+      <div id="scoreChip" class="score-chip">사전 확인 필요</div>
     </div>
-    {% endfor %}
 
-    <button type="submit" class="menu-btn">검사하기</button>
+    <form id="careForm">
+
+      <div class="section-header">&#9632; 치매 관련 약 복용 여부</div>
+      <div class="dementia-box">
+        <b>치매 관련 약을 복용 중이십니까?</b>
+        <div class="dementia-options">
+          <label><input type="radio" name="dementia" value="y"> 예</label>
+          <label><input type="radio" name="dementia" value="n"> 아니오</label>
+        </div>
+      </div>
+
+      <div class="section-header">&#9632; 일상생활 수행능력(ADL) 조사</div>
+      <div id="adlSection">
+        {% for i,q in questions %}
+        <div class="question-box">
+          <b class="question-title">{{i+1}}) {{q}}</b>
+          <div class="options">
+            <label><input type="radio" name="q{{i}}" value="0"> 도움 없이 혼자서 수행 가능 (0점)</label>
+            <label><input type="radio" name="q{{i}}" value="1"> 보조도구(지팡이 등)를 잡고 수행 가능 (1점)</label>
+            <label><input type="radio" name="q{{i}}" value="2"> 타인이 도와줘야 수행 가능 (2점)</label>
+          </div>
+        </div>
+        {% endfor %}
+
+        <button type="submit" class="submit-btn">검사하기</button>
+      </div>
+
+    </form>
   </div>
-</form>
 
 </div>
 
-<div id="resultModal"
-     style="display:none;position:fixed;inset:0;
-            background:rgba(0,0,0,.5);z-index:999;
-            padding-top:6vh; overflow:auto; -webkit-overflow-scrolling:touch;">
-
-  <div style="background:white;
-            margin:0 auto;
-            position:absolute;
-            top:8%;
-            left:0;
-            right:0;
-            padding:18px 22px 22px 22px;
-            width:92%;
-            max-width:460px;
-            border-radius:14px;
-            text-align:center;
-            box-shadow:0 10px 25px rgba(0,0,0,0.15)">
+<!-- 결과 모달 -->
+<div id="resultModal" class="modal-overlay">
+  <div class="modal-box">
     <h3 id="modalTitle" style="margin-top:0;margin-bottom:12px;">사전조사 결과 안내</h3>
-
-    <div style="background:#f4f8ff;border-radius:10px;padding:14px;margin-bottom:18px">
-      <p id="r_text" style="font-size:18px;line-height:1.6;margin:0"></p>
+    <div class="modal-result-area">
+      <p id="r_text"></p>
     </div>
-
-    <div style="text-align:left;font-size:14px;line-height:1.6;color:#444;
-                background:#fafafa;padding:14px;border-radius:8px">
+    <div class="modal-criteria">
       <b>통합돌봄 지원 기준</b><br><br>
-
       ① 치매약 복약 중인 경우<br>
       → 일상생활 수행능력과 관계없이 통합돌봄 지원 대상<br><br>
-
       ② 일상생활수행능력(ADL) 점수 기준<br>
       • 0~1점 : 지자체 사업 안내 후 종결<br>
       • 2~3점 : 지자체 자체조사 후 지원 검토<br>
       • 4점 이상 : 통합판정조사 대상<br><br>
-
-      <span style="font-size:12px;color:#666;">
+      <span style="font-size:11px;color:#666;">
         ※ 본 결과는 통합돌봄 서비스 안내를 위한 참고용 사전조사입니다.<br>
         최종 지원 여부는 지자체 및 공단의 추가 조사 후 결정됩니다.
       </span>
     </div>
-
-    <button onclick="closeModal()" class="menu-btn" style="margin-top:22px">확인</button>
+    <button onclick="closeModal()" class="modal-btn">확인</button>
   </div>
 </div>
 
 <script>
-
-
 function showGuide(messageHtml){
   document.getElementById("modalTitle").innerText = "안내";
   document.getElementById("r_text").innerHTML = messageHtml;
@@ -8665,9 +8213,7 @@ function getCurrentScore(){
   let score = 0;
   for(let i=0; i<7; i++){
     const checked = document.querySelector('input[name="q'+i+'"]:checked');
-    if(checked){
-      score += Number(checked.value);
-    }
+    if(checked){ score += Number(checked.value); }
   }
   return score;
 }
@@ -8676,63 +8222,33 @@ function getAnsweredCount(){
   let count = 0;
   for(let i=0; i<7; i++){
     const checked = document.querySelector('input[name="q'+i+'"]:checked');
-    if(checked){
-      count += 1;
-    }
+    if(checked){ count += 1; }
   }
   return count;
 }
 
 function getBannerState(score, dementiaValue){
-  if(!dementiaValue){
-    return "disabled";
-  }
-  if(dementiaValue === "y"){
-    return "state-dementia";
-  }
-  if(score <= 1){
-    return "state-low";
-  }else if(score <= 3){
-    return "state-mid";
-  }else{
-    return "state-high";
-  }
+  if(!dementiaValue) return "disabled";
+  if(dementiaValue === "y") return "state-dementia";
+  if(score <= 1) return "state-low";
+  else if(score <= 3) return "state-mid";
+  else return "state-high";
 }
 
 function getScoreStatusText(score, dementiaValue){
-  if(!dementiaValue){
-    return "치매 여부를 먼저 선택하세요";
-  }
-
-  if(dementiaValue === "y"){
-    return "치매약 복용으로 별도 조사 없이 대상입니다";
-  }
-
-  if(score <= 1){
-    return "지자체 사업 안내 후 종결 구간입니다";
-  }else if(score <= 3){
-    return "지자체 자체조사 대상 구간입니다";
-  }else{
-    return "통합판정조사 대상 구간입니다";
-  }
+  if(!dementiaValue) return "치매 여부를 먼저 선택하세요";
+  if(dementiaValue === "y") return "치매약 복용으로 별도 조사 없이 대상입니다";
+  if(score <= 1) return "지자체 사업 안내 후 종결 구간입니다";
+  else if(score <= 3) return "지자체 자체조사 대상 구간입니다";
+  else return "통합판정조사 대상 구간입니다";
 }
 
 function getChipText(score, dementiaValue){
-  if(!dementiaValue){
-    return "사전 확인 필요";
-  }
-
-  if(dementiaValue === "y"){
-    return "치매약 복용";
-  }
-
-  if(score <= 1){
-    return "0~1점";
-  }else if(score <= 3){
-    return "2~3점";
-  }else{
-    return "4점 이상";
-  }
+  if(!dementiaValue) return "사전 확인 필요";
+  if(dementiaValue === "y") return "치매약 복용";
+  if(score <= 1) return "0~1점";
+  else if(score <= 3) return "2~3점";
+  else return "4점 이상";
 }
 
 function resetCarePage(){
@@ -8759,23 +8275,16 @@ function updateScoreBanner(){
   scoreChip.innerText = getChipText(score, dementiaValue);
 
   let progress = Math.min((score / 14) * 100, 100);
-  if(dementiaValue === "y"){
-    progress = 100;
-  }
+  if(dementiaValue === "y") progress = 100;
   scoreProgressBar.style.width = progress + "%";
 
   banner.classList.remove("disabled","state-low","state-mid","state-high","state-dementia");
-
   const nextState = getBannerState(score, dementiaValue);
-
-  if(nextState === "disabled"){
-    banner.classList.add("disabled");
-  }else{
-    banner.classList.add(nextState);
-  }
+  if(nextState === "disabled") banner.classList.add("disabled");
+  else banner.classList.add(nextState);
 }
 
-/* ── 사전조사 상태 저장/복원 (뒤로가기 후 유지) ── */
+/* ── 상태 저장/복원 ── */
 var CARE_STORAGE_KEY = "care_form_state";
 
 function saveCareState(){
@@ -8834,9 +8343,7 @@ document.querySelectorAll('#adlSection .options input[type="radio"]').forEach(ra
     }
 
     const box = this.closest(".question-box");
-    if(box){
-      box.classList.add("active");
-    }
+    if(box) box.classList.add("active");
 
     updateScoreBanner();
     saveCareState();
@@ -8869,9 +8376,7 @@ document.getElementById("careForm").onsubmit = async function(e){
     return;
   }
 
-  if(dementia.value === "y"){
-    return;
-  }
+  if(dementia.value === "y") return;
 
   for(let i=0; i<7; i++){
     const checked = document.querySelector('input[name="q'+i+'"]:checked');
@@ -8907,7 +8412,6 @@ updateScoreBanner();
 def care():
     return render_template_string(
         CARE_HTML,
-        style=BASE_STYLE,
         questions=list(enumerate(CARE_QUESTIONS))
     )
 
