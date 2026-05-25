@@ -4660,39 +4660,26 @@ DESC_HTML = """
   margin:0 !important;
   padding:0 15px !important;
 
-  border:none !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
   border-radius:8px !important;
+  color:#6b7280 !important;
   backdrop-filter:none;
 
   font-size:13px !important;
-  font-weight:500 !important;
+  font-weight:600 !important;
   line-height:1 !important;
   text-decoration:none !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
 
   cursor:pointer;
   transition:all .15s;
 }
 
-.desc-top-bar .home-button{
-  background:#ffffff !important;
-  border:1px solid #e5e7eb !important;
-  color:#6b7280 !important;
-}
-
-.desc-top-bar .reset-button{
-  background:#ffffff !important;
-  border:1px solid #e5e7eb !important;
-  color:#6b7280 !important;
-}
-
-.desc-top-bar .home-button:hover{
+.desc-top-bar .home-button:hover,
+.desc-top-bar .reset-button:hover{
   background:#f3f4f6 !important;
   color:#374151 !important;
-}
-
-.desc-top-bar .reset-button:hover{
-  background:#4a6cd4 !important;
-  color:#fff !important;
 }
 
 .desc-title-row{
