@@ -4457,6 +4457,15 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                 })
 
             # ======================
+            # ======================
+            # [후처리] 목욕 키워드만 있을 때 주거환경개선 제외
+            # ======================
+            if has_bath_keyword:
+                final_results = [
+                    item for item in final_results
+                    if str(item.get("중분류", "")).strip() != "주거환경개선"
+                ]
+
             # 복지용구 대여/구입 후처리
             # 쿼리에 휠체어·침대·욕조 등 대여 품목 명시 없으면 복지용구 대여 제거
             # ======================
@@ -6574,12 +6583,6 @@ button:hover{
   box-shadow:none !important;
 }
 
-.normal-need-card .sub-service-tab.active{
-  background:#64748b !important;
-  border-color:#64748b !important;
-  color:#ffffff !important;
-}
-
 .normal-need-card .group-search-btn{
   border-color:#cbd5e1 !important;
   color:#475569 !important;
@@ -6601,6 +6604,12 @@ button:hover{
   background:#f1f5f9 !important;
   border-color:#94a3b8 !important;
   color:#334155 !important;
+}
+
+.normal-need-card .sub-service-tab.active{
+  background:#64748b !important;
+  border-color:#64748b !important;
+  color:#ffffff !important;
 }
 
 .normal-need-card .reason-box{
