@@ -12,6 +12,11 @@ load_dotenv()
 
 from openai import OpenAI
 import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders
 
 def make_cache_key(text):
     text = str(text or "")
@@ -4168,6 +4173,7 @@ def desc():
    - "병원 가기 어렵다", "병원 동행이 필요하다", "통원이 어렵다" → 병원동행, 이동지원, 방문보건 계열을 우선 검토한다
    - "반찬을 못함", "식사 준비 어려움", "자주 배고파함", "잘 못 먹음", "차려 먹기 어렵다", "챙겨 먹기 어렵다" → 식사지원, 반찬지원, 영양지원 계열을 추천 대상으로 검토한다
    - 스마트폰·앱·디지털기기 언급 → IoT, 스마트돌봄, 응급안전안심서비스, AI 돌봄기기 검토
+   - 입력에 "치매", "인지저하", "기억력 저하", "배회", "인지기능", "알츠하이머" 등이 직접 언급되지 않으면 치매 관련 서비스는 추천하지 않는다
 6. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다
 7. 우선순위가 높은 순서대로 정렬한다
 8. 최대 30개까지 추천한다
@@ -8627,10 +8633,10 @@ function careGuideStart() {
   var adlHeader = document.getElementById('gt-adl');
   var adlQuestions = document.querySelectorAll('#adlSection .question-box');
   var r2 = null;
-  if (adlHeader && adlQuestions.length >= 2) {
+  if (adlHeader && adlQuestions.length >= 3) {
     var rH = adlHeader.getBoundingClientRect();
-    var rQ2 = adlQuestions[1].getBoundingClientRect(); /* 2번 문항 */
-    /* 헤더 top ~ 2번 문항 bottom 을 합친 영역 */
+    var rQ2 = adlQuestions[2].getBoundingClientRect(); /* 3번 문항 */
+    /* 헤더 top ~ 3번 문항 bottom 을 합친 영역 */
     var pad2 = isMobile ? 4 : 6;
     var unionTop = Math.min(rH.top, rQ2.top);
     var unionBottom = Math.max(rH.bottom, rQ2.bottom);
@@ -8906,6 +8912,7 @@ SURVEY_HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>지자체 조사 서식</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 *{ box-sizing:border-box; margin:0; padding:0; }
 body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
@@ -9006,8 +9013,9 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
   <div class="top-bar" id="gt-topbar">
     <a href="/home" class="home-btn">&#8962; 홈으로</a>
     <div class="btn-group">
-      <button type="button" class="reset-btn" id="gt-reset" onclick="resetForm()">&#8635; 다시 입력</button>
+      <button type="button" class="print-btn" id="gt-email" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
       <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+      <button type="button" class="reset-btn" id="gt-reset" onclick="resetForm()">&#8635; 다시 입력</button>
     </div>
   </div>
 
@@ -9552,6 +9560,116 @@ function doPrint() {
   window.print();
 }
 
+/* ── 메일 보내기 팝업 ── */
+function openEmailPopup() {
+  var existing = document.getElementById('emailModal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'emailModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = [
+    '<div style="background:#fff;border-radius:14px;padding:28px 24px 22px;width:90%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.18);font-family:inherit;">',
+    '  <h3 style="margin:0 0 6px;font-size:16px;color:#1f2937;">&#9993; 메일로 보내기</h3>',
+    '  <p style="margin:0 0 18px;font-size:12.5px;color:#6b7280;line-height:1.5;">현재 탭의 서식을 PDF로 변환하여<br>입력한 이메일 주소로 발송합니다.</p>',
+    '  <input type="email" id="emailInput" placeholder="수신자 이메일 주소" ',
+    '    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:16px;">',
+    '  <div id="emailStatus" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;"></div>',
+    '  <div style="display:flex;gap:8px;justify-content:flex-end;">',
+    '    <button onclick="closeEmailPopup()" style="padding:8px 18px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;">취소</button>',
+    '    <button id="emailSendBtn" onclick="sendEmailPDF()" style="padding:8px 18px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">발송</button>',
+    '  </div>',
+    '</div>'
+  ].join('');
+  document.body.appendChild(modal);
+  modal.querySelector('#emailInput').focus();
+}
+
+function closeEmailPopup() {
+  var m = document.getElementById('emailModal');
+  if (m) m.remove();
+}
+
+function sendEmailPDF() {
+  var emailVal = document.getElementById('emailInput').value.trim();
+  if (!emailVal) {
+    showEmailStatus('이메일 주소를 입력해주세요.', false);
+    return;
+  }
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(emailVal)) {
+    showEmailStatus('올바른 이메일 형식이 아닙니다.', false);
+    return;
+  }
+
+  var btn = document.getElementById('emailSendBtn');
+  btn.disabled = true;
+  btn.textContent = '발송 중...';
+  btn.style.opacity = '0.6';
+  showEmailStatus('PDF를 생성하고 메일을 발송 중입니다...', null);
+
+  /* 현재 탭 패널을 html2pdf로 실제 PDF 변환 후 서버로 전송 */
+  var panel = document.getElementById('panel-' + currentTab);
+
+  var opt = {
+    margin:       [8, 6, 8, 6],
+    filename:     'survey_form.pdf',
+    image:        { type: 'jpeg', quality: 0.95 },
+    html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(panel).outputPdf('blob').then(function(pdfBlob) {
+    var formData = new FormData();
+    formData.append('to_email', emailVal);
+    formData.append('pdf_file', pdfBlob, 'survey_form.pdf');
+
+    fetch('/send_email_pdf', {
+      method: 'POST',
+      body: formData
+    })
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      btn.disabled = false;
+      btn.textContent = '발송';
+      btn.style.opacity = '1';
+      showEmailStatus(data.message, data.success);
+      if (data.success) {
+        setTimeout(closeEmailPopup, 2000);
+      }
+    })
+    .catch(function(err){
+      btn.disabled = false;
+      btn.textContent = '발송';
+      btn.style.opacity = '1';
+      showEmailStatus('네트워크 오류가 발생했습니다.', false);
+    });
+  }).catch(function(err){
+    btn.disabled = false;
+    btn.textContent = '발송';
+    btn.style.opacity = '1';
+    showEmailStatus('PDF 생성 중 오류가 발생했습니다.', false);
+  });
+}
+
+function showEmailStatus(msg, success) {
+  var st = document.getElementById('emailStatus');
+  st.style.display = 'block';
+  st.textContent = msg;
+  if (success === true) {
+    st.style.background = '#ecfdf5';
+    st.style.color = '#065f46';
+    st.style.border = '1px solid #6ee7b7';
+  } else if (success === false) {
+    st.style.background = '#fef2f2';
+    st.style.color = '#991b1b';
+    st.style.border = '1px solid #fca5a5';
+  } else {
+    st.style.background = '#eff6ff';
+    st.style.color = '#1e40af';
+    st.style.border = '1px solid #93c5fd';
+  }
+}
+
 /* 페이지 로드 시 상태 복원 */
 restoreSurveyState();
 
@@ -9652,28 +9770,30 @@ function guideStart() {
      ① 조사 유형 전환 (탭바) — 말풍선 아래에 여유 있게
      ======================================== */
   var r1 = addHighlight('gt-tabs');
+  var b1 = null;
   if (r1) {
-    var bw1 = isMobile ? Math.min(Math.floor(vw * 0.52), 210) : 230;
-    var b1 = makeBubble('조사 유형 전환', '탭을 눌러 <b>자체조사</b>와 <b>연계조사</b> 서식을 전환할 수 있어요.', bw1);
-    requestAnimationFrame(function(){
-      var bh1 = b1.offsetHeight;
-      var gap1 = isMobile ? 14 : 20;
-      var bubbleTop = r1.bottom + gap1;
-      if (bubbleTop + bh1 > vh - 80) bubbleTop = r1.top - bh1 - gap1;
-      var bubbleLeft = Math.max(6, Math.min(r1.left, vw - bw1 - 6));
-      b1.style.top = bubbleTop + 'px';
-      b1.style.left = bubbleLeft + 'px';
-      var arrowLeft = Math.max(10, Math.min(r1.left + r1.width/2 - bubbleLeft - 8, bw1 - 26));
-      if (bubbleTop > r1.bottom) {
-        addArrow(b1, 'up', arrowLeft);
-      } else {
-        addArrow(b1, 'down', arrowLeft);
-      }
-    });
+    var bw1 = isMobile ? Math.min(Math.floor(vw * 0.72), 260) : 230;
+    b1 = makeBubble('조사 유형 전환', '탭을 눌러 <b>자체조사</b>와 <b>연계조사</b> 서식을 전환할 수 있어요.', bw1);
+    if (!isMobile) {
+      /* PC: 기존 로직 그대로 */
+      requestAnimationFrame(function(){
+        var bh1 = b1.offsetHeight;
+        var gap1 = 20;
+        var bubbleTop = r1.bottom + gap1;
+        if (bubbleTop + bh1 > vh - 80) bubbleTop = r1.top - bh1 - gap1;
+        var bubbleLeft = Math.max(6, Math.min(r1.left, vw - bw1 - 6));
+        b1.style.top = bubbleTop + 'px';
+        b1.style.left = bubbleLeft + 'px';
+        var arrowLeft = Math.max(10, Math.min(r1.left + r1.width/2 - bubbleLeft - 8, bw1 - 26));
+        if (bubbleTop > r1.bottom) { addArrow(b1, 'up', arrowLeft); }
+        else { addArrow(b1, 'down', arrowLeft); }
+      });
+    }
+    /* 모바일은 b3 배치 완료 후 아래에서 처리 */
   }
 
   /* ========================================
-     ② 대상자 기본사항 — 섹션헤더 + 테이블 상단 일부만 하이라이트
+     ② 대상자 기본사항 — 전체 영역 하이라이트
      말풍선을 오른쪽에 배치
      ======================================== */
   var sectionEl = document.getElementById('gt-section-wrap');
@@ -9681,8 +9801,7 @@ function guideStart() {
   if (sectionEl) {
     var pad2 = isMobile ? 4 : 6;
     var fullR = sectionEl.getBoundingClientRect();
-    /* 전체 영역이 아닌 상단 일부만 하이라이트 (최대 200px 높이) */
-    var hlHeight = Math.min(fullR.height, isMobile ? 120 : 180);
+    var hlHeight = fullR.height;
     r2 = { top: fullR.top, bottom: fullR.top + hlHeight, left: fullR.left, right: fullR.right,
            width: fullR.width, height: hlHeight };
     var hl2 = document.createElement('div');
@@ -9698,51 +9817,94 @@ function guideStart() {
   }
   if (r2) {
     var bw2 = isMobile ? Math.min(Math.floor(vw * 0.52), 210) : 230;
-    var b2 = makeBubble('대상자 기본사항 입력', '성명·주소 등은 <b>직접 타이핑</b>, 주수발자·가구형태 등은 <b>체크박스·라디오</b>로 선택하세요.', bw2);
+    var b2 = makeBubble('대상자 기본사항 등 입력', '성명·주소 등은 <b>직접 타이핑</b>, 주수발자·가구형태 등은 <b>체크박스·라디오</b>로 선택하세요.', bw2);
     requestAnimationFrame(function(){
       var bh2 = b2.offsetHeight;
-      /* 세로: 하이라이트 세로 중앙 */
-      var bubbleTop = Math.max(6, r2.top + r2.height/2 - bh2/2);
-      if (bubbleTop + bh2 > vh - 80) bubbleTop = vh - 80 - bh2;
-      /* 가로: PC는 오른쪽, 모바일은 하이라이트 아래 */
-      if (isMobile) {
-        var bubbleLeft = Math.max(6, r2.left);
-        b2.style.top = (r2.bottom + 14) + 'px';
-        b2.style.left = bubbleLeft + 'px';
-        var arrowLeft = Math.max(10, Math.min(r2.left + r2.width/2 - bubbleLeft - 8, bw2 - 26));
-        addArrow(b2, 'up', arrowLeft);
-      } else {
-        var bubbleLeft = Math.min(r2.right + 16, vw - bw2 - 6);
-        bubbleLeft = Math.max(6, bubbleLeft);
-        b2.style.top = bubbleTop + 'px';
-        b2.style.left = bubbleLeft + 'px';
-        var arrowTop = Math.max(8, Math.min(r2.top + r2.height/2 - bubbleTop - 8, bh2 - 24));
-        addArrow(b2, 'left', arrowTop);
-      }
+      /* 화면에 보이는 영역의 세로 중앙에 배치 (요소가 화면보다 길 수 있으므로) */
+      var visTop = Math.max(r2.top, 0);
+      var visBottom = Math.min(r2.bottom, vh);
+      var visMid = (visTop + visBottom) / 2;
+      var bubbleTop = Math.max(6, visMid - bh2/2 - 100);
+      if (bubbleTop + bh2 > vh - 40) bubbleTop = vh - 40 - bh2;
+      /* PC·모바일 공통: 하이라이트 가로 중앙에 배치 */
+      var bubbleLeft = Math.max(6, r2.left + r2.width/2 - bw2/2);
+      if (bubbleLeft + bw2 > vw - 6) bubbleLeft = vw - bw2 - 6;
+      b2.style.top = bubbleTop + 'px';
+      b2.style.left = bubbleLeft + 'px';
     });
   }
 
   /* ========================================
-     ③ 출력/PDF 저장 — 말풍선을 타겟 아래에
+     ③ 상단 버튼 그룹 (메일보내기 · 출력/PDF · 다시입력)
+     — 3개 버튼을 하나로 묶어 하이라이트, 말풍선 1개로 안내
      ======================================== */
-  var r3 = addHighlight('gt-print');
+  var btnGroupEl = document.querySelector('.btn-group');
+  var r3 = null;
+  if (btnGroupEl) {
+    var pad3 = isMobile ? 4 : 6;
+    var bgR = btnGroupEl.getBoundingClientRect();
+    r3 = { top: bgR.top, bottom: bgR.bottom, left: bgR.left, right: bgR.right,
+           width: bgR.width, height: bgR.height };
+    var hl3 = document.createElement('div');
+    hl3.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(91,126,229,0.45);',
+      'top:'+(r3.top-pad3)+'px;left:'+(r3.left-pad3)+'px;',
+      'width:'+(r3.width+pad3*2)+'px;height:'+(r3.height+pad3*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl3);
+    bubbles.push(hl3);
+  }
   if (r3) {
-    var bw3 = isMobile ? Math.min(Math.floor(vw * 0.48), 190) : 220;
-    var b3 = makeBubble('출력 / PDF 저장', '입력 완료 후 이 버튼으로 <b>현재 탭 서식을 출력하거나 PDF로 저장</b>할 수 있어요.', bw3);
+    var bw3 = isMobile ? Math.min(Math.floor(vw * 0.72), 260) : 260;
+    var b3 = makeBubble('상단 버튼 안내',
+      '<b>메일 보내기</b> : 서식을 PDF로 변환하여 이메일 발송<br>' +
+      '<b>출력 / PDF 저장</b> : 현재 탭 서식을 인쇄하거나 PDF로 저장<br>' +
+      '<b>다시 입력</b> : 입력 내용을 초기화', bw3);
     requestAnimationFrame(function(){
       var bh3 = b3.offsetHeight;
       var gap3 = isMobile ? 14 : 20;
-      var bubbleTop = r3.bottom + gap3;
-      if (bubbleTop + bh3 > vh - 80) bubbleTop = r3.top - bh3 - gap3;
-      /* PC: 버튼 근처, 모바일: 화면 안에 */
-      var bubbleLeft = Math.max(6, Math.min(r3.left + r3.width/2 - bw3/2, vw - bw3 - 6));
-      b3.style.top = bubbleTop + 'px';
-      b3.style.left = bubbleLeft + 'px';
-      var arrowLeft = Math.max(10, Math.min(r3.left + r3.width/2 - bubbleLeft - 8, bw3 - 26));
-      if (bubbleTop > r3.bottom) {
-        addArrow(b3, 'up', arrowLeft);
+
+      if (isMobile) {
+        /* ── 모바일 전용: b3(우측) / b1(좌측) 완전 분리 배치 ──
+           좌우 절반씩 차지하므로 가로로 겹쳐도 시각적으로 구분됨 */
+        var halfW = Math.floor((vw - 18) / 2);
+
+        /* b3: 상단 버튼 안내 → 우측 고정, r3 우측 끝 가리킴 */
+        var left3 = vw - halfW - 6;
+        var top3  = r3.bottom + gap3;
+        b3.style.width = halfW + 'px';
+        b3.style.top   = top3 + 'px';
+        b3.style.left  = left3 + 'px';
+        addArrow(b3, 'up', Math.max(10, Math.min(
+          Math.round(r3.right) - left3 - 16, halfW - 26
+        )));
+
+        /* b1: 조사 유형 전환 → 좌측 고정, r1 바로 아래에 붙임 (밀림 없음) */
+        if (b1 && r1) {
+          var top1  = r1.bottom + gap3;
+          var left1 = 6;
+          b1.style.width = halfW + 'px';
+          b1.style.top   = top1 + 'px';
+          b1.style.left  = left1 + 'px';
+          addArrow(b1, 'up', Math.max(10, Math.min(
+            Math.round(r1.left) - left1 + 12, halfW - 26
+          )));
+        }
       } else {
-        addArrow(b3, 'down', arrowLeft);
+        /* PC: 기존처럼 바로 아래에 말풍선 + 화살표 */
+        var bubbleLeft = Math.max(6, Math.min(r3.left + r3.width/2 - bw3/2, vw - bw3 - 6));
+        var bubbleTop3 = r3.bottom + gap3;
+        if (bubbleTop3 + bh3 > vh - 80) bubbleTop3 = r3.top - bh3 - gap3;
+        b3.style.top = bubbleTop3 + 'px';
+        b3.style.left = bubbleLeft + 'px';
+        var arrowLeft3 = Math.max(10, Math.min(r3.left + r3.width/2 - bubbleLeft - 8, bw3 - 26));
+        if (bubbleTop3 > r3.bottom) {
+          addArrow(b3, 'up', arrowLeft3);
+        } else {
+          addArrow(b3, 'down', arrowLeft3);
+        }
       }
     });
   }
@@ -9778,6 +9940,50 @@ window.addEventListener('load', function() { setTimeout(guideStart, 300); });
 </body>
 </html>
 """
+
+@app.route("/send_email_pdf", methods=["POST"])
+@login_required
+def send_email_pdf():
+    """클라이언트에서 생성한 PDF를 메일로 전송"""
+    try:
+        to_email = request.form.get("to_email", "").strip()
+        if not to_email:
+            return jsonify({"success": False, "message": "수신 이메일 주소를 입력해주세요."})
+
+        pdf_file = request.files.get("pdf_file")
+        if not pdf_file:
+            return jsonify({"success": False, "message": "PDF 파일이 전송되지 않았습니다."})
+
+        gmail_user = os.getenv("GMAIL_USER", "")
+        gmail_app_pw = os.getenv("GMAIL_APP_PASSWORD", "")
+        if not gmail_user or not gmail_app_pw:
+            return jsonify({"success": False, "message": "메일 설정이 되어있지 않습니다. 관리자에게 문의하세요."})
+
+        pdf_bytes = pdf_file.read()
+
+        msg = MIMEMultipart()
+        msg["From"] = gmail_user
+        msg["To"] = to_email
+        msg["Subject"] = "통합돌봄 지자체 조사 서식"
+
+        body = MIMEText("통합돌봄 지자체 조사 서식 PDF를 첨부합니다.\n\n※ 본 메일은 케어네비 시스템에서 자동 발송되었습니다.", "plain", "utf-8")
+        msg.attach(body)
+
+        part = MIMEBase("application", "pdf")
+        part.set_payload(pdf_bytes)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename="survey_form.pdf")
+        msg.attach(part)
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_app_pw)
+            server.sendmail(gmail_user, to_email, msg.as_string())
+
+        return jsonify({"success": True, "message": f"{to_email}로 메일이 발송되었습니다."})
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"메일 발송 중 오류가 발생했습니다: {str(e)}"})
+
 
 @app.route("/survey")
 @login_required
