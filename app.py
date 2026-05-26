@@ -3761,7 +3761,7 @@ function comboGuideStart() {
   confirmBtn.textContent = '확인';
   confirmBtn.style.cssText = [
     'position:fixed;z-index:10001;',
-    'left:50%;transform:translateX(-50%);bottom:18%;',
+    'left:50%;transform:translateX(-50%);bottom:50%;',
     'background:#5b7ee5;color:#fff;border:none;',
     'border-radius:10px;',
     'padding:'+(isMobile?'10px 40px':'11px 52px')+';',
@@ -8663,7 +8663,9 @@ function careGuideStart() {
       /* 가로: 타겟 왼쪽 절반 영역에 배치 */
       var bubbleLeft = Math.max(6, r2.left + r2.width * 0.45 - bw2);
       /* 세로: 타겟 세로 중앙 */
-      var bubbleTop = Math.max(6, r2.top + r2.height/2 - bh2/2);
+      var bubbleTop = isMobile
+              ? Math.max(6, r2.top + 100)
+              : Math.max(6, r2.top + r2.height/2 - bh2/2);
       if (bubbleTop + bh2 > vh - 60) bubbleTop = vh - 60 - bh2;
       b2.style.top = bubbleTop + 'px';
       b2.style.left = bubbleLeft + 'px';
@@ -9314,9 +9316,13 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 
       <div class="section-header">&#9632; 종합의견</div>
       <textarea class="form-textarea" name="s_opinion" style="min-height:80px;" placeholder="조사담당자가 대상자의 현재 생활현황 및 필요 서비스 내용을 종합적으로 기입합니다."></textarea>
-      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
-        <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
-        <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;">
+        <a href="/home" class="home-btn">&#8962; 홈으로</a>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
+          <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+          <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
+        </div>
       </div>
     </div><!-- /panel-self -->
 
@@ -9485,9 +9491,13 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
       <div class="section-header">&#9632; 종합의견</div>
       <textarea class="form-textarea" name="r_opinion" style="min-height:80px;" placeholder="조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함"></textarea>
       <p class="relay-note" style="display:flex;gap:0.3em;align-items:flex-start;"><span style="flex-shrink:0;">&#10071;</span><span>조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함</span></p>
-      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
-        <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
-        <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;">
+        <a href="/home" class="home-btn">&#8962; 홈으로</a>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
+          <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+          <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
+        </div>
       </div>
     </div><!-- /panel-relay -->
 
