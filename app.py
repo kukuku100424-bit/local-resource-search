@@ -9014,7 +9014,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
     <a href="/home" class="home-btn">&#8962; 홈으로</a>
     <div class="btn-group">
       <button type="button" class="print-btn" id="gt-email" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
-      <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+      <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력/pdf 저장</button>
       <button type="button" class="reset-btn" id="gt-reset" onclick="resetForm()">&#8635; 다시 입력</button>
     </div>
   </div>
