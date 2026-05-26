@@ -3763,7 +3763,7 @@ function comboGuideStart() {
   confirmBtn.textContent = '확인';
   confirmBtn.style.cssText = [
     'position:fixed;z-index:10001;',
-    'left:50%;transform:translateX(-50%);bottom:34%;',
+    'left:50%;transform:translateX(-50%);bottom:24%;',
     'background:#5b7ee5;color:#fff;border:none;',
     'border-radius:10px;',
     'padding:'+(isMobile?'10px 40px':'11px 52px')+';',
