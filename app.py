@@ -1906,6 +1906,7 @@ body{
   align-items:center;
   margin-bottom:18px;
 }
+
 .home-button{
   display:inline-flex !important;
   align-items:center !important;
@@ -3261,6 +3262,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 
 /* ── 상단 바 ── */
 .top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
+.bottom-action-bar{ margin-top:20px; margin-bottom:0; }
 .home-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; text-decoration:none; font-size:13px; font-weight:600; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
 .home-btn:hover{ background:#f3f4f6; color:#374151; }
 .btn-group{ display:flex; gap:10px; }
@@ -9316,14 +9318,14 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 
       <div class="section-header">&#9632; 종합의견</div>
       <textarea class="form-textarea" name="s_opinion" style="min-height:80px;" placeholder="조사담당자가 대상자의 현재 생활현황 및 필요 서비스 내용을 종합적으로 기입합니다."></textarea>
-      <div style="margin-top:20px;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;">
-        <a href="/home" class="home-btn">&#8962; 홈으로</a>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
-          <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
-          <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
-        </div>
-      </div>
+      <div class="top-bar bottom-action-bar">
+  <a href="/home" class="home-btn">&#8962; 홈으로</a>
+  <div class="btn-group">
+    <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
+    <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+    <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
+  </div>
+</div>
     </div><!-- /panel-self -->
 
     <!-- ══ 탭2: 연계조사 ══ -->
