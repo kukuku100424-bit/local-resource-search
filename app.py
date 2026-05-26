@@ -8993,8 +8993,36 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
   .adl-table th,.adl-table td{ font-size:10px; padding:4px 3px; }
   .service-table th,.service-table td{ font-size:10px; padding:4px 3px; }
   .section-header{ font-size:11.5px; padding:5px 8px; }
-  .top-bar{ flex-wrap:wrap; gap:6px; }
-  .home-btn,.reset-btn,.print-btn{ height:30px; font-size:11px; padding:0 10px; }
+  .top-bar{
+    flex-wrap:nowrap !important;
+    gap:5px !important;
+    align-items:center !important;
+  }
+
+.btn-group{
+  display:flex !important;
+  gap:5px !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+}
+
+  .home-btn,
+  .reset-btn,
+  .print-btn{
+    height:30px !important;
+    font-size:10.5px !important;
+    padding:0 6px !important;
+    white-space:nowrap !important;
+  }
+
+  .home-btn{
+    flex:0 0 auto !important;
+  }
+
+  .btn-group .print-btn,
+.btn-group .reset-btn{
+  flex:0 0 auto !important;
+}
   .etc-input{ width:56px !important; font-size:11px; }
   .adl-table thead tr th:nth-child(n+5),.adl-table tbody tr td:nth-child(n+5){ display:none; }
   .adl-table thead tr th:first-child{ width:50%; }
@@ -9014,7 +9042,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
     <a href="/home" class="home-btn">&#8962; 홈으로</a>
     <div class="btn-group">
       <button type="button" class="print-btn" id="gt-email" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
-      <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력/pdf 저장</button>
+      <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력 / pdf 저장</button>
       <button type="button" class="reset-btn" id="gt-reset" onclick="resetForm()">&#8635; 다시 입력</button>
     </div>
   </div>
