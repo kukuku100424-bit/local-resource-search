@@ -1615,24 +1615,13 @@ body{
 
 </a>
 
-<a href="/care" class="card sub-card">
-
-<div class="icon">📝</div>
-
-<div class="text">
-<b>통합돌봄 사전조사</b>
-<span>일상생활 수행능력(ADL) 기반 사전조사를 진행합니다.</span>
-</div>
-
-</a>
-
 <a href="/survey" class="card sub-card">
 
 <div class="icon">📋</div>
 
 <div class="text">
-<b>통합돌봄 지자체(자체/연계) 조사</b>
-<span>지자체 자체조사 및 연계조사 서식을 작성합니다.</span>
+<b>통합돌봄 지자체(사전/자체/연계) 조사</b>
+<span>사전조사, 자체조사, 연계조사를 진행하고 저장합니다.</span>
 </div>
 
 </a>
@@ -4262,7 +4251,8 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                         "중분류": row.get("중분류", ""),
                         "서비스내용": row.get("서비스내용", ""),
                         "선택이유": r.get("선택이유", ""),
-                        "direct_need": bool(r.get("direct_need", False))
+                        "direct_need": bool(r.get("direct_need", False)),
+                        "_ai_picked": True
                     })
 
             # direct_need 기준: AI가 판단한 값 그대로 사용
@@ -4280,6 +4270,7 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     0 if x.get("direct_need") else 1,
                     str(x.get("대분류", "")).strip(),
                     str(x.get("중분류", "")).strip(),
+                    0 if x.get("_ai_picked") else 1,
                     str(x.get("서비스내용", "")).strip()
                 )
             )
@@ -4321,7 +4312,8 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                             "중분류": s_mid,
                             "서비스내용": s_sub,
                             "선택이유": f"{s_mid} 서비스 제공 전 기초사정을 통해 대상자의 상태와 필요를 파악하는 것이 필요함",
-                            "direct_need": False
+                            "direct_need": False,
+                            "_ai_picked": False
                         })
                         existing_keys.add((s_main, s_mid, s_sub))
 
@@ -4377,7 +4369,8 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                             "중분류": s_mid,
                             "서비스내용": s_sub,
                             "선택이유": f"방문목욕 서비스 제공 시 {s_sub}을 통해 대상자의 목욕 지원이 필요함",
-                            "direct_need": is_bath_direct
+                            "direct_need": is_bath_direct,
+                            "_ai_picked": False
                         })
                         existing_keys.add((s_main, s_mid, s_sub))
 
@@ -4416,7 +4409,8 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                             "중분류": s_mid,
                             "서비스내용": s_sub,
                             "선택이유": f"{s_mid} 서비스를 이용하는 경우 {s_sub}도 함께 검토할 수 있음",
-                            "direct_need": False
+                            "direct_need": False,
+                            "_ai_picked": False
                         })
                         existing_keys.add((s_main, s_mid, s_sub))
 
@@ -4426,6 +4420,7 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     0 if x.get("direct_need") else 1,
                     str(x.get("대분류", "")).strip(),
                     str(x.get("중분류", "")).strip(),
+                    0 if x.get("_ai_picked") else 1,
                     str(x.get("서비스내용", "")).strip()
                 )
             )
@@ -4462,7 +4457,8 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     "대분류": "보건의료",
                     "중분류": "방문진료",
                     "서비스내용": "감염관리",
-                    "선택이유": "의료처치(욕창, 루, 튜브관리 등)가 필요한 경우 감염관리도 함께 검토가 필요함"
+                    "선택이유": "의료처치(욕창, 루, 튜브관리 등)가 필요한 경우 감염관리도 함께 검토가 필요함",
+                    "_ai_picked": False
                 })
 
             # ======================
@@ -4550,6 +4546,9 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
             print("==================")
 
             service_results = filtered_results
+            # _ai_picked는 정렬용 내부 플래그이므로 결과에서 제거
+            for item in service_results:
+                item.pop("_ai_picked", None)
             print("최종 service_results 개수 =", len(service_results))
             for r in service_results:
                 print("→", r.get("대분류",""), "|", r.get("중분류",""), "|", r.get("서비스내용",""), "|", r.get("direct_need",""))
@@ -8963,6 +8962,7 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 @media print{
   body{ background:white; }
   .top-bar,.tab-bar{ display:none !important; }
+  .score-banner,.care-modal-overlay{ display:none !important; }
   .page-wrap{ padding:0; }
   .form-card{ box-shadow:none; border-radius:0; padding:10px; }
   .tab-panel{ display:none !important; }
@@ -9037,6 +9037,76 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
   .th-internet-mo input[type=checkbox]{ margin:0 !important; padding:0 !important; vertical-align:middle !important; }
 
 }
+
+/* ── 사전조사 전용 스타일 ── */
+.dementia-box{ background:linear-gradient(135deg,#eef2ff,#e0e7ff); padding:16px 18px; border-radius:12px; margin-bottom:16px; border:1px solid #c7d2fe; }
+.dementia-options{ display:flex; width:100%; align-items:center; justify-content:space-between; gap:0; }
+.dementia-options label{ flex:1; display:flex; justify-content:center; align-items:center; gap:6px; white-space:nowrap; margin:0; font-size:13px; cursor:pointer; }
+.dementia-options input[type=radio]{ width:auto !important; margin:0; flex:0 0 auto; transform:scale(1.1); border:revert; padding:revert; border-radius:revert; }
+.question-box{ background:#f8fafc; padding:18px; border-radius:12px; margin-bottom:10px; border:1px solid #e5e7eb; transition:0.18s ease; }
+.question-box.active{ border:2px solid #5b7ee5; background:#eef2ff; box-shadow:0 6px 18px rgba(75,110,220,0.12); }
+.question-title{ display:block; font-size:13.5px; line-height:1.6; word-break:keep-all; overflow-wrap:break-word; padding-left:22px; text-indent:-22px; }
+.options{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+.options label{ display:flex; align-items:center; gap:8px; cursor:pointer; line-height:1.5; font-size:12.5px; }
+.options input[type=radio]{ width:auto !important; flex:0 0 auto; transform:scale(1.05); border:revert; padding:revert; border-radius:revert; }
+.guide-box{ display:flex; }
+
+/* ── 점수 배너 ── */
+.score-banner{ position:fixed; top:100px; right:80px; z-index:998; width:132px; padding:14px 12px; border-radius:22px; background:rgba(255,255,255,0.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(191,219,254,0.95); box-shadow:0 18px 38px rgba(75,110,220,0.18); text-align:center; transition:all 0.2s ease; }
+.score-banner.disabled{ opacity:0.62; transform:scale(0.98); }
+.score-banner.hidden-banner{ display:none !important; }
+.score-badge{ width:72px; height:72px; margin:0 auto 10px auto; border-radius:50%; background:linear-gradient(135deg,#5b7ee5,#a5b4fc); display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; box-shadow:0 10px 22px rgba(75,110,220,0.28); }
+.score-badge-label{ font-size:10px; opacity:0.92; line-height:1; margin-bottom:4px; }
+.score-value-text{ font-size:28px; font-weight:800; line-height:1; }
+.score-meta{ display:none; }
+.score-progress-wrap{ width:100%; height:8px; background:#eef2ff; border-radius:999px; overflow:hidden; margin-bottom:3px; }
+.score-progress-bar{ height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg,#a5b4fc,#5b7ee5); transition:width 0.22s ease; }
+.score-status{ font-size:11px; color:#2d3a6e; line-height:1.45; word-break:keep-all; min-height:34px; font-weight:600; }
+.score-chip{ margin-top:8px; display:inline-block; padding:5px 8px; border-radius:999px; font-size:10px; font-weight:700; background:#eef2ff; color:#5b7ee5; }
+
+.score-banner.state-low .score-badge{ background:linear-gradient(135deg,#22c55e,#4ade80); box-shadow:0 10px 22px rgba(34,197,94,0.24); }
+.score-banner.state-low .score-progress-bar{ background:linear-gradient(90deg,#86efac,#22c55e); }
+.score-banner.state-low .score-status{ color:#166534; }
+.score-banner.state-low .score-chip{ background:#f0fdf4; color:#16a34a; }
+
+.score-banner.state-mid .score-badge{ background:linear-gradient(135deg,#f59e0b,#fbbf24); box-shadow:0 10px 22px rgba(245,158,11,0.24); }
+.score-banner.state-mid .score-progress-bar{ background:linear-gradient(90deg,#fde68a,#f59e0b); }
+.score-banner.state-mid .score-status{ color:#92400e; }
+.score-banner.state-mid .score-chip{ background:#fffbeb; color:#d97706; }
+
+.score-banner.state-high .score-badge{ background:linear-gradient(135deg,#ef4444,#f87171); box-shadow:0 10px 22px rgba(239,68,68,0.24); }
+.score-banner.state-high .score-progress-bar{ background:linear-gradient(90deg,#fca5a5,#ef4444); }
+.score-banner.state-high .score-status{ color:#991b1b; }
+.score-banner.state-high .score-chip{ background:#fef2f2; color:#dc2626; }
+
+.score-banner.state-dementia .score-badge{ background:linear-gradient(135deg,#7c3aed,#a78bfa); box-shadow:0 10px 22px rgba(124,58,237,0.24); }
+.score-banner.state-dementia .score-progress-bar{ background:linear-gradient(90deg,#c4b5fd,#7c3aed); width:100% !important; }
+.score-banner.state-dementia .score-status{ color:#5b21b6; }
+.score-banner.state-dementia .score-chip{ background:#f5f3ff; color:#7c3aed; }
+
+/* ── 사전조사 결과 모달 ── */
+.care-modal-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; padding-top:6vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+.care-modal-box{ background:white; margin:0 auto; position:absolute; top:8%; left:0; right:0; padding:18px 22px 22px 22px; width:92%; max-width:460px; border-radius:14px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.15); }
+.care-modal-result-area{ background:#eef2ff; border-radius:10px; padding:14px; margin-bottom:18px; }
+.care-modal-result-area p{ font-size:18px; line-height:1.6; margin:0; }
+.care-modal-criteria{ text-align:left; font-size:13px; line-height:1.6; color:#444; background:#fafafa; padding:14px; border-radius:8px; }
+.care-modal-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+
+@media (max-width:600px){
+  .score-banner{ position:fixed; top:80px; right:10px; width:85px; padding:8px 6px; border-radius:16px; z-index:10; }
+  .score-badge{ width:44px; height:44px; }
+  .score-value-text{ font-size:18px; }
+  .score-meta{ font-size:9px; }
+  .score-status{ font-size:10px; line-height:1.2; min-height:20px; }
+  .score-chip{ font-size:10px; padding:3px 6px; }
+  .question-title{ font-size:12.5px; line-height:1.55; padding-left:18px; text-indent:-18px; }
+  .options label{ font-size:11.5px; }
+  .dementia-box{ padding:12px 14px; }
+  .dementia-options label{ font-size:12px; }
+  .care-modal-overlay{ padding-top:0 !important; }
+  .care-modal-box{ top:2% !important; }
+}
+
 </style>
 </head>
 <body>
@@ -9052,14 +9122,66 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
   </div>
 
   <div class="tab-bar" id="gt-tabs">
-    <button class="tab-btn active" onclick="switchTab('self')" id="tab-self">지자체 자체조사</button>
-    <button class="tab-btn" onclick="switchTab('relay')" id="tab-relay">지자체 연계조사</button>
+    <button class="tab-btn active" onclick="switchTab('care')" id="tab-care">사전조사</button>
+    <button class="tab-btn" onclick="switchTab('self')" id="tab-self">자체조사</button>
+    <button class="tab-btn" onclick="switchTab('relay')" id="tab-relay">연계조사</button>
   </div>
 
   <div class="form-card">
 
+    <!-- ══ 탭0: 사전조사 ══ -->
+    <div class="tab-panel active" id="panel-care">
+      <div class="form-title">통합돌봄 사전조사</div>
+
+      <div id="scoreBanner" class="score-banner disabled">
+        <div class="score-badge">
+          <div class="score-badge-label">점수</div>
+          <div id="scoreValue" class="score-value">0</div>
+        </div>
+        <div class="score-meta">응답 <span id="answeredCount">0</span>/7 · 최대 14점</div>
+        <div class="score-progress-wrap">
+          <div id="scoreProgressBar" class="score-progress-bar"></div>
+        </div>
+        <div id="scoreStatus" class="score-status">치매 여부를 먼저 선택하세요</div>
+        <div id="scoreChip" class="score-chip">사전 확인 필요</div>
+      </div>
+
+      <form id="careForm">
+        <div id="gt-dementia">
+        <div class="section-header">&#9632; 치매 관련 약 복용 여부</div>
+        <div class="dementia-box">
+          <b style="font-size:13.5px;display:block;margin-bottom:10px;">치매 관련 약을 복용 중이십니까?</b>
+          <div class="dementia-options">
+            <label><input type="radio" name="dementia" value="y"> 예</label>
+            <label><input type="radio" name="dementia" value="n"> 아니오</label>
+          </div>
+        </div>
+        </div>
+
+        <div id="gt-adl" class="section-header">&#9632; 일상생활 수행능력(ADL) 조사</div>
+        <div id="adlSection">
+          {% for i,q in questions %}
+          <div class="question-box">
+            <b class="question-title">{{i+1}}) {{q}}</b>
+            <div class="options">
+              <label><input type="radio" name="q{{i}}" value="0"> 도움 없이 혼자서 수행 가능 (0점)</label>
+              <label><input type="radio" name="q{{i}}" value="1"> 보조도구(지팡이 등)를 잡고 수행 가능 (1점)</label>
+              <label><input type="radio" name="q{{i}}" value="2"> 타인이 도와줘야 수행 가능 (2점)</label>
+            </div>
+          </div>
+          {% endfor %}
+
+          <button type="submit" class="submit-btn" style="margin-top:18px;width:100%;height:44px;border:none;border-radius:10px;background:#5b7ee5;color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(75,110,220,0.25);">검사하기</button>
+        </div>
+      </form>
+
+      <!-- 결과 안내 박스 영역 -->
+      <div id="careGuideBox" class="guide-box" style="display:none;margin-top:16px;padding:14px 18px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:13px;line-height:1.7;align-items:flex-start;gap:8px;"></div>
+
+    </div><!-- /panel-care -->
+
     <!-- ══ 탭1: 자체조사 ══ -->
-    <div class="tab-panel active" id="panel-self">
+    <div class="tab-panel" id="panel-self">
       <div class="form-title" id="gt-title">지자체 자체조사 서식</div>
       <div id="gt-section-wrap">
       <div class="section-header" id="gt-section">&#9632; 대상자 기본사항</div>
@@ -9504,10 +9626,35 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
     </div><!-- /panel-relay -->
 
   </div><!-- /form-card -->
+
+<!-- 사전조사 결과 모달 -->
+<div id="careResultModal" class="care-modal-overlay">
+  <div class="care-modal-box">
+    <h3 id="careModalTitle" style="margin-top:0;margin-bottom:12px;">사전조사 결과 안내</h3>
+    <div class="care-modal-result-area">
+      <p id="care_r_text"></p>
+    </div>
+    <div class="care-modal-criteria">
+      <b>통합돌봄 지원 기준</b><br><br>
+      ① 치매약 복약 중인 경우<br>
+      → 일상생활 수행능력과 관계없이 통합돌봄 지원 대상<br><br>
+      ② 일상생활수행능력(ADL) 점수 기준<br>
+      • 0~1점 : 지자체 사업 안내 후 종결<br>
+      • 2~3점 : 지자체 자체조사 후 지원 검토<br>
+      • 4점 이상 : 통합판정조사 대상<br><br>
+      <span style="font-size:11px;color:#666;">
+        ※ 본 결과는 통합돌봄 서비스 안내를 위한 참고용 사전조사입니다.<br>
+        최종 지원 여부는 지자체 및 공단의 추가 조사 후 결정됩니다.
+      </span>
+    </div>
+    <button onclick="closeCareModal()" class="care-modal-btn">확인</button>
+  </div>
+</div>
+
 </div><!-- /page-wrap -->
 
 <script>
-var currentTab = 'self';
+var currentTab = 'care';
 var SURVEY_STORAGE_KEY = 'survey_form_state';
 
 function switchTab(tab) {
@@ -9516,9 +9663,229 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
   document.getElementById('panel-' + tab).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
+
+  /* 채점배너: 사전조사 탭에서만 표시 */
+  var banner = document.getElementById('scoreBanner');
+  if(banner){
+    if(tab === 'care'){
+      banner.classList.remove('hidden-banner');
+    } else {
+      banner.classList.add('hidden-banner');
+    }
+  }
 }
 
-/* ── 서식 상태 저장 ── */
+/* ══════════════════════════════════
+   사전조사 로직
+   ══════════════════════════════════ */
+function showCareGuide(messageHtml){
+  document.getElementById("careModalTitle").innerText = "안내";
+  document.getElementById("care_r_text").innerHTML = messageHtml;
+  document.getElementById("careResultModal").style.display = "block";
+}
+
+function showCareResult(title, messageText){
+  document.getElementById("careModalTitle").innerText = title;
+  document.getElementById("care_r_text").innerText = messageText;
+  document.getElementById("careResultModal").style.display = "block";
+}
+
+function closeCareModal(){
+  document.getElementById("careResultModal").style.display = "none";
+}
+
+function getCurrentScore(){
+  var score = 0;
+  for(var i=0; i<7; i++){
+    var checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){ score += Number(checked.value); }
+  }
+  return score;
+}
+
+function getAnsweredCount(){
+  var count = 0;
+  for(var i=0; i<7; i++){
+    var checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){ count += 1; }
+  }
+  return count;
+}
+
+function getBannerState(score, dementiaValue){
+  if(!dementiaValue) return "disabled";
+  if(dementiaValue === "y") return "state-dementia";
+  if(score <= 1) return "state-low";
+  else if(score <= 3) return "state-mid";
+  else return "state-high";
+}
+
+function getScoreStatusText(score, dementiaValue){
+  if(!dementiaValue) return "치매 여부를 먼저 선택하세요";
+  if(dementiaValue === "y") return "치매약 복용으로 별도 조사 없이 대상입니다";
+  if(score <= 1) return "지자체 사업 안내 후 종결 구간입니다";
+  else if(score <= 3) return "지자체 자체조사 대상 구간입니다";
+  else return "통합판정조사 대상 구간입니다";
+}
+
+function getChipText(score, dementiaValue){
+  if(!dementiaValue) return "사전 확인 필요";
+  if(dementiaValue === "y") return "치매약 복용";
+  if(score <= 1) return "0~1점";
+  else if(score <= 3) return "2~3점";
+  else return "4점 이상";
+}
+
+function updateScoreBanner(){
+  var banner = document.getElementById("scoreBanner");
+  var scoreValue = document.getElementById("scoreValue");
+  var answeredCount = document.getElementById("answeredCount");
+  var scoreStatus = document.getElementById("scoreStatus");
+  var scoreChip = document.getElementById("scoreChip");
+  var scoreProgressBar = document.getElementById("scoreProgressBar");
+  var dementia = document.querySelector('input[name="dementia"]:checked');
+
+  var score = getCurrentScore();
+  var answered = getAnsweredCount();
+  var dementiaValue = dementia ? dementia.value : "";
+
+  scoreValue.innerText = score;
+  answeredCount.innerText = answered;
+  scoreStatus.innerText = getScoreStatusText(score, dementiaValue);
+  scoreChip.innerText = getChipText(score, dementiaValue);
+
+  var progress = Math.min((score / 14) * 100, 100);
+  if(dementiaValue === "y") progress = 100;
+  scoreProgressBar.style.width = progress + "%";
+
+  banner.classList.remove("disabled","state-low","state-mid","state-high","state-dementia");
+  var nextState = getBannerState(score, dementiaValue);
+  if(nextState === "disabled") banner.classList.add("disabled");
+  else banner.classList.add(nextState);
+}
+
+/* 사전조사 상태 저장/복원 키 */
+var CARE_STORAGE_KEY = "care_form_state";
+
+function saveCareState(){
+  var state = {};
+  var dementia = document.querySelector('input[name="dementia"]:checked');
+  state.dementia = dementia ? dementia.value : null;
+  state.adl = {};
+  for(var i=0;i<7;i++){
+    var r = document.querySelector('input[name="q'+i+'"]:checked');
+    state.adl[i] = r ? r.value : null;
+  }
+  try{ sessionStorage.setItem(CARE_STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+function restoreCareState(){
+  var raw;
+  try{ raw = sessionStorage.getItem(CARE_STORAGE_KEY); }catch(e){}
+  if(!raw) return;
+  var state;
+  try{ state = JSON.parse(raw); }catch(e){ return; }
+
+  if(state.dementia){
+    var dr = document.querySelector('input[name="dementia"][value="'+state.dementia+'"]');
+    if(dr){
+      dr.checked = true;
+      if(state.dementia === "y"){
+        document.getElementById("adlSection").style.opacity = "0.4";
+      }
+    }
+  }
+
+  for(var i=0;i<7;i++){
+    if(state.adl && state.adl[i]){
+      var ar = document.querySelector('input[name="q'+i+'"][value="'+state.adl[i]+'"]');
+      if(ar){
+        ar.checked = true;
+        var box = ar.closest(".question-box");
+        if(box) box.classList.add("active");
+      }
+    }
+  }
+
+  updateScoreBanner();
+}
+
+/* 치매 선택 안 했는데 ADL 누르면 차단 */
+document.querySelectorAll('#adlSection .options input[type="radio"]').forEach(function(radio){
+  radio.addEventListener("change", function(){
+    var dementia = document.querySelector('input[name="dementia"]:checked');
+
+    if(!dementia){
+      this.checked = false;
+      showCareGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를<br> 선택해주세요.");
+      updateScoreBanner();
+      return;
+    }
+
+    var box = this.closest(".question-box");
+    if(box) box.classList.add("active");
+
+    updateScoreBanner();
+    saveCareState();
+  });
+});
+
+/* 치매 선택 처리 */
+document.querySelectorAll('input[name="dementia"]').forEach(function(radio){
+  radio.addEventListener("change", function(){
+    if(this.value === "y"){
+      document.getElementById("adlSection").style.opacity = "0.4";
+      showCareGuide("치매약을 복약 중인 경우 일상생활 수행능력과 관계없이 <b>통합돌봄 대상</b>입니다.");
+    }else{
+      document.getElementById("adlSection").style.opacity = "1";
+    }
+
+    updateScoreBanner();
+    saveCareState();
+  });
+});
+
+/* 검사하기 클릭 시 */
+document.getElementById("careForm").onsubmit = async function(e){
+  e.preventDefault();
+
+  var dementia = document.querySelector('input[name="dementia"]:checked');
+
+  if(!dementia){
+    showCareGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를 선택해주세요.");
+    return;
+  }
+
+  if(dementia.value === "y") return;
+
+  for(var i=0; i<7; i++){
+    var checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(!checked){
+      showCareGuide((i+1) + "번 문항을 선택해주세요.");
+      return;
+    }
+  }
+
+  var formData = new FormData(this);
+
+  var res = await fetch("/care_check",{
+    method:"POST",
+    body:formData
+  });
+
+  var data = await res.json();
+
+  updateScoreBanner();
+  showCareResult("사전조사 결과 안내", data.result + "\\n총점: " + data.score);
+};
+
+/* 사전조사 상태 복원 */
+restoreCareState();
+updateScoreBanner();
+
+/* ══════════════════════════════════
+   서식(자체/연계) 상태 저장/복원
+   ══════════════════════════════════ */
 function saveSurveyState(){
   var state = { tab: currentTab, self: {}, relay: {} };
   ['self','relay'].forEach(function(tabName){
@@ -9543,7 +9910,7 @@ function restoreSurveyState(){
   var state;
   try{ state = JSON.parse(raw); }catch(e){ return; }
 
-  if(state.tab && state.tab !== 'self'){
+  if(state.tab && state.tab !== 'care'){
     switchTab(state.tab);
   }
 
@@ -9581,6 +9948,19 @@ document.addEventListener('input', function(e){
 
 function resetForm() {
   if (!confirm("입력한 내용을 모두 초기화하시겠습니까?")) return;
+
+  if(currentTab === 'care'){
+    /* 사전조사 탭 초기화 */
+    var carePanel = document.getElementById('panel-care');
+    carePanel.querySelectorAll("input[type=radio], input[type=checkbox]").forEach(function(el){ el.checked = false; });
+    carePanel.querySelectorAll("input[type=text], input[type=date], textarea").forEach(function(el){ el.value = ""; });
+    carePanel.querySelectorAll(".question-box").forEach(function(el){ el.classList.remove("active"); });
+    document.getElementById("adlSection").style.opacity = "1";
+    try{ sessionStorage.removeItem(CARE_STORAGE_KEY); }catch(e){}
+    updateScoreBanner();
+    return;
+  }
+
   var panel = document.getElementById('panel-' + currentTab);
   panel.querySelectorAll("input[type=radio], input[type=checkbox]").forEach(function(el){ el.checked = false; });
   panel.querySelectorAll("input[type=text], input[type=date], textarea").forEach(function(el){ el.value = ""; });
@@ -9813,7 +10193,7 @@ function guideStart() {
   var b1 = null;
   if (r1) {
     var bw1 = isMobile ? Math.min(Math.floor(vw * 0.72), 260) : 230;
-    b1 = makeBubble('조사 유형 전환', '탭을 눌러 <b>자체조사</b>와 <b>연계조사</b> 서식을 전환할 수 있어요.', bw1);
+    b1 = makeBubble('조사 유형 전환', '탭을 눌러 <b>사전조사</b>, <b>자체조사</b>, <b>연계조사</b> 서식을 전환할 수 있어요.', bw1);
     if (!isMobile) {
       /* PC: 기존 로직 그대로 */
       requestAnimationFrame(function(){
@@ -9830,48 +10210,6 @@ function guideStart() {
       });
     }
     /* 모바일은 b3 배치 완료 후 아래에서 처리 */
-  }
-
-  /* ========================================
-     ② 대상자 기본사항 — 전체 영역 하이라이트
-     말풍선을 오른쪽에 배치
-     ======================================== */
-  var sectionEl = document.getElementById('gt-section-wrap');
-  var r2 = null;
-  if (sectionEl) {
-    var pad2 = isMobile ? 4 : 6;
-    var fullR = sectionEl.getBoundingClientRect();
-    var hlHeight = fullR.height;
-    r2 = { top: fullR.top, bottom: fullR.top + hlHeight, left: fullR.left, right: fullR.right,
-           width: fullR.width, height: hlHeight };
-    var hl2 = document.createElement('div');
-    hl2.style.cssText = [
-      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
-      'border:2px solid rgba(255,255,255,0.9);',
-      'box-shadow:0 0 0 3px rgba(91,126,229,0.45);',
-      'top:'+(r2.top-pad2)+'px;left:'+(r2.left-pad2)+'px;',
-      'width:'+(r2.width+pad2*2)+'px;height:'+(r2.height+pad2*2)+'px;'
-    ].join('');
-    document.body.appendChild(hl2);
-    bubbles.push(hl2);
-  }
-  if (r2) {
-    var bw2 = isMobile ? Math.min(Math.floor(vw * 0.52), 210) : 230;
-    var b2 = makeBubble('대상자 기본사항 등 입력', '성명·주소 등은 <b>직접 타이핑</b>, 주수발자·가구형태 등은 <b>체크박스·라디오</b>로 선택하세요.', bw2);
-    requestAnimationFrame(function(){
-      var bh2 = b2.offsetHeight;
-      /* 화면에 보이는 영역의 세로 중앙에 배치 (요소가 화면보다 길 수 있으므로) */
-      var visTop = Math.max(r2.top, 0);
-      var visBottom = Math.min(r2.bottom, vh);
-      var visMid = (visTop + visBottom) / 2;
-      var bubbleTop = Math.max(6, visMid - bh2/2 - 100);
-      if (bubbleTop + bh2 > vh - 40) bubbleTop = vh - 40 - bh2;
-      /* PC·모바일 공통: 하이라이트 가로 중앙에 배치 */
-      var bubbleLeft = Math.max(6, r2.left + r2.width/2 - bw2/2);
-      if (bubbleLeft + bw2 > vw - 6) bubbleLeft = vw - bw2 - 6;
-      b2.style.top = bubbleTop + 'px';
-      b2.style.left = bubbleLeft + 'px';
-    });
   }
 
   /* ========================================
@@ -10028,10 +10366,10 @@ def send_email_pdf():
 @app.route("/survey")
 @login_required
 def survey():
-    from flask import make_response
-    resp = make_response(SURVEY_HTML)
-    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
-    return resp
+    return render_template_string(
+        SURVEY_HTML,
+        questions=list(enumerate(CARE_QUESTIONS))
+    )
 
 @app.route("/nhis25")
 @login_required
