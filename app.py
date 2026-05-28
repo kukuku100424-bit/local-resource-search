@@ -10135,12 +10135,15 @@ function sendEmailPDF() {
     })
     .then(function(res){ return res.json(); })
     .then(function(data){
-      btn.disabled = false;
-      btn.textContent = '발송';
-      btn.style.opacity = '1';
       showEmailStatus(data.message, data.success);
       if (data.success) {
-        setTimeout(closeEmailPopup, 2000);
+        btn.textContent = '발송 완료';
+        btn.style.background = '#22c55e';
+        setTimeout(closeEmailPopup, 1500);
+      } else {
+        btn.disabled = false;
+        btn.textContent = '발송';
+        btn.style.opacity = '1';
       }
     })
     .catch(function(err){
