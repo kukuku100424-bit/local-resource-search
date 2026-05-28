@@ -10030,9 +10030,17 @@ function sendEmailPDF() {
   /* 현재 탭 패널을 html2pdf로 실제 PDF 변환 후 서버로 전송 */
   var panel = document.getElementById('panel-' + currentTab);
 
+  /* 탭별 파일명 접두어 + 날짜시간 */
+  var tabLabels = { care: '사전조사', self: '자체조사', relay: '연계조사' };
+  var now = new Date();
+  var pad2 = function(n){ return n < 10 ? '0'+n : ''+n; };
+  var dateStr = now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate())
+              + '_' + pad2(now.getHours()) + pad2(now.getMinutes());
+  var pdfFileName = (tabLabels[currentTab] || '조사서식') + '_' + dateStr + '.pdf';
+
   var opt = {
     margin:       [8, 6, 8, 6],
-    filename:     'survey_form.pdf',
+    filename:     pdfFileName,
     image:        { type: 'jpeg', quality: 0.95 },
     html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -10041,7 +10049,8 @@ function sendEmailPDF() {
   html2pdf().set(opt).from(panel).outputPdf('blob').then(function(pdfBlob) {
     var formData = new FormData();
     formData.append('to_email', emailVal);
-    formData.append('pdf_file', pdfBlob, 'survey_form.pdf');
+    formData.append('pdf_file', pdfBlob, pdfFileName);
+    formData.append('pdf_filename', pdfFileName);
 
     fetch('/send_email_pdf', {
       method: 'POST',
@@ -10339,6 +10348,12 @@ def send_email_pdf():
 
         pdf_bytes = pdf_file.read()
 
+        # 클라이언트에서 보낸 파일명 사용 (없으면 기본값)
+        pdf_filename = request.form.get("pdf_filename", "").strip()
+        if not pdf_filename:
+            now_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
+            pdf_filename = f"조사서식_{now_kst.strftime('%Y%m%d_%H%M')}.pdf"
+
         msg = MIMEMultipart()
         msg["From"] = gmail_user
         msg["To"] = to_email
@@ -10350,7 +10365,7 @@ def send_email_pdf():
         part = MIMEBase("application", "pdf")
         part.set_payload(pdf_bytes)
         encoders.encode_base64(part)
-        part.add_header("Content-Disposition", "attachment", filename="survey_form.pdf")
+        part.add_header("Content-Disposition", "attachment", filename=pdf_filename)
         msg.attach(part)
 
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
