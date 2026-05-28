@@ -9107,6 +9107,26 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
   .care-modal-box{ top:2% !important; }
 }
 
+/* ── 개인정보 비활성화 스타일 ── */
+.personal-disabled{
+  background:#f3f4f6 !important;
+  color:#9ca3af !important;
+  cursor:not-allowed;
+  position:relative;
+}
+.personal-disabled input,
+.personal-disabled select{
+  background:#f3f4f6 !important;
+  color:#9ca3af !important;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+.personal-disabled label{
+  color:#9ca3af !important;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+
 </style>
 </head>
 <body>
@@ -9187,21 +9207,21 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
       <div class="section-header" id="gt-section">&#9632; 대상자 기본사항</div>
       <table class="form-table">
         <tr>
-          <th>성명</th><td class="td-name"><input type="text" name="s_name"></td>
+          <th>성명</th><td class="td-name personal-disabled"><input type="text" name="s_name" disabled></td>
           <th class="th-gender">성별</th>
-          <td class="td-gender"><div class="radio-group"><label><input type="radio" name="s_gender" value="남"> 남</label><label><input type="radio" name="s_gender" value="여"> 여</label></div></td>
+          <td class="td-gender personal-disabled"><div class="radio-group"><label><input type="radio" name="s_gender" value="남" disabled> 남</label><label><input type="radio" name="s_gender" value="여" disabled> 여</label></div></td>
           <th class="age-th">연령</th>
-          <td class="age-td">만<input type="text" name="s_age_d" class="age-input">&thinsp;세</td>
-          <th class="th-birth">생년<br>월일</th><td class="td-birth"><input type="text" name="s_birth"></td>
+          <td class="age-td personal-disabled">만<input type="text" name="s_age_d" class="age-input" disabled>&thinsp;세</td>
+          <th class="th-birth">생년<br>월일</th><td class="td-birth personal-disabled"><input type="text" name="s_birth" disabled></td>
         </tr>
-        <tr><th>주소</th><td colspan="7"><input type="text" name="s_address"></td></tr>
-        <tr><th>실거주지</th><td colspan="7"><input type="text" name="s_real_addr"></td></tr>
+        <tr><th>주소</th><td colspan="7" class="personal-disabled"><input type="text" name="s_address" disabled></td></tr>
+        <tr><th>실거주지</th><td colspan="7" class="personal-disabled"><input type="text" name="s_real_addr" disabled></td></tr>
         <tr>
           <th rowspan="2">연락처</th>
-          <td colspan="3">자택: <input type="text" name="s_tel_home" class="etc-input" style="width:120px"></td>
-          <td colspan="4">핸드폰: <input type="text" name="s_tel_mobile" class="etc-input" style="width:120px"></td>
+          <td colspan="3" class="personal-disabled">자택: <input type="text" name="s_tel_home" class="etc-input" style="width:120px" disabled></td>
+          <td colspan="4" class="personal-disabled">핸드폰: <input type="text" name="s_tel_mobile" class="etc-input" style="width:120px" disabled></td>
         </tr>
-        <tr><td colspan="7">비상연락처: <input type="text" name="s_tel_emg" class="etc-input" style="width:150px"> (관계: <input type="text" name="s_tel_rel" class="etc-input" style="width:70px">)</td></tr>
+        <tr><td colspan="7" class="personal-disabled">비상연락처: <input type="text" name="s_tel_emg" class="etc-input" style="width:150px" disabled> (관계: <input type="text" name="s_tel_rel" class="etc-input" style="width:70px" disabled>)</td></tr>
         <tr><th>주수<br>발자</th><td colspan="7"><div class="check-group">
           <label><input type="checkbox" name="s_care" value="없음"> 없음</label>
           <label><input type="checkbox" name="s_care" value="배우자"> 배우자</label>
@@ -9456,21 +9476,21 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
       <div class="section-header">&#9632; 대상자 기본사항</div>
       <table class="form-table">
         <tr>
-          <th>성명</th><td class="td-name"><input type="text" name="r_name"></td>
+          <th>성명</th><td class="td-name personal-disabled"><input type="text" name="r_name" disabled></td>
           <th class="th-gender">성별</th>
-          <td class="td-gender"><div class="radio-group"><label><input type="radio" name="r_gender" value="남"> 남</label><label><input type="radio" name="r_gender" value="여"> 여</label></div></td>
+          <td class="td-gender personal-disabled"><div class="radio-group"><label><input type="radio" name="r_gender" value="남" disabled> 남</label><label><input type="radio" name="r_gender" value="여" disabled> 여</label></div></td>
           <th class="age-th">연령</th>
-          <td class="age-td">만<input type="text" name="r_age_d" class="age-input">&thinsp;세</td>
-          <th class="th-birth">생년<br>월일</th><td class="td-birth"><input type="text" name="r_birth"></td>
+          <td class="age-td personal-disabled">만<input type="text" name="r_age_d" class="age-input" disabled>&thinsp;세</td>
+          <th class="th-birth">생년<br>월일</th><td class="td-birth personal-disabled"><input type="text" name="r_birth" disabled></td>
         </tr>
-        <tr><th>주소</th><td colspan="7"><input type="text" name="r_address"></td></tr>
-        <tr><th>실거주지</th><td colspan="7"><input type="text" name="r_real_addr"></td></tr>
+        <tr><th>주소</th><td colspan="7" class="personal-disabled"><input type="text" name="r_address" disabled></td></tr>
+        <tr><th>실거주지</th><td colspan="7" class="personal-disabled"><input type="text" name="r_real_addr" disabled></td></tr>
         <tr>
           <th rowspan="2">연락처</th>
-          <td colspan="3">자택: <input type="text" name="r_tel_home" class="etc-input" style="width:120px"></td>
-          <td colspan="4">핸드폰: <input type="text" name="r_tel_mobile" class="etc-input" style="width:120px"></td>
+          <td colspan="3" class="personal-disabled">자택: <input type="text" name="r_tel_home" class="etc-input" style="width:120px" disabled></td>
+          <td colspan="4" class="personal-disabled">핸드폰: <input type="text" name="r_tel_mobile" class="etc-input" style="width:120px" disabled></td>
         </tr>
-        <tr><td colspan="7">비상연락처: <input type="text" name="r_tel_emg" class="etc-input" style="width:150px"> (관계: <input type="text" name="r_tel_rel" class="etc-input" style="width:70px">)</td></tr>
+        <tr><td colspan="7" class="personal-disabled">비상연락처: <input type="text" name="r_tel_emg" class="etc-input" style="width:150px" disabled> (관계: <input type="text" name="r_tel_rel" class="etc-input" style="width:70px" disabled>)</td></tr>
         <tr><th>주수<br>발자</th><td colspan="7"><div class="check-group">
           <label><input type="checkbox" name="r_care" value="없음"> 없음</label>
           <label><input type="checkbox" name="r_care" value="배우자"> 배우자</label>
@@ -9656,6 +9676,51 @@ body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; fo
 <script>
 var currentTab = 'care';
 var SURVEY_STORAGE_KEY = 'survey_form_state';
+
+/* ── 개인정보 비활성 셀 클릭 시 안내 팝업 ── */
+document.addEventListener('click', function(e){
+  var cell = e.target.closest('.personal-disabled');
+  if(cell){
+    e.preventDefault();
+    e.stopPropagation();
+    showPersonalBlockAlert();
+  }
+}, true);
+
+function showPersonalBlockAlert(){
+  var existing = document.getElementById('personalBlockToast');
+  if(existing) existing.remove();
+
+  var toast = document.createElement('div');
+  toast.id = 'personalBlockToast';
+  toast.style.cssText = [
+    'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10020;',
+    'background:#fff;border-radius:14px;padding:32px 28px 24px;width:88%;max-width:340px;',
+    'box-shadow:0 12px 40px rgba(0,0,0,0.22);text-align:center;font-family:inherit;',
+    'animation:fadeInToast 0.2s ease;'
+  ].join('');
+  toast.innerHTML = [
+    '<div style="font-size:32px;margin-bottom:12px;">🔒</div>',
+    '<div style="font-size:15px;font-weight:700;color:#1f2937;line-height:1.6;margin-bottom:8px;">',
+    '개인정보 보호를 위해<br>해당 항목은 입력이 제한됩니다.</div>',
+    '<div style="font-size:12.5px;color:#6b7280;line-height:1.5;margin-bottom:20px;">',
+    '성명·연락처 등 민감정보는<br>본 시스템에서 수집하지 않습니다.</div>',
+    '<button onclick="this.parentElement.remove()" ',
+    'style="padding:9px 36px;border:none;border-radius:8px;background:#5b7ee5;color:#fff;',
+    'font-size:13px;font-weight:600;cursor:pointer;">확인</button>'
+  ].join('');
+  document.body.appendChild(toast);
+
+  /* 바깥 클릭 시 닫기 */
+  setTimeout(function(){
+    document.addEventListener('click', function handler(ev){
+      if(!toast.contains(ev.target)){
+        toast.remove();
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 100);
+}
 
 function switchTab(tab) {
   currentTab = tab;
@@ -9985,6 +10050,14 @@ function openEmailPopup() {
   var existing = document.getElementById('emailModal');
   if (existing) existing.remove();
 
+  /* 기본 파일명 생성 */
+  var tabLabels = { care: '사전조사', self: '자체조사', relay: '연계조사' };
+  var now = new Date();
+  var pad2 = function(n){ return n < 10 ? '0'+n : ''+n; };
+  var dateStr = now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate())
+              + '_' + pad2(now.getHours()) + pad2(now.getMinutes());
+  var defaultFileName = (tabLabels[currentTab] || '조사서식') + '_' + dateStr;
+
   var modal = document.createElement('div');
   modal.id = 'emailModal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
@@ -9992,8 +10065,15 @@ function openEmailPopup() {
     '<div style="background:#fff;border-radius:14px;padding:28px 24px 22px;width:90%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.18);font-family:inherit;">',
     '  <h3 style="margin:0 0 6px;font-size:16px;color:#1f2937;">&#9993; 메일로 보내기</h3>',
     '  <p style="margin:0 0 18px;font-size:12.5px;color:#6b7280;line-height:1.5;">현재 탭의 서식을 PDF로 변환하여<br>입력한 이메일 주소로 발송합니다.</p>',
+    '  <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">수신자 이메일</label>',
     '  <input type="email" id="emailInput" placeholder="수신자 이메일 주소" ',
-    '    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:16px;">',
+    '    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:12px;">',
+    '  <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">첨부 파일명</label>',
+    '  <div style="display:flex;align-items:center;gap:0;margin-bottom:16px;">',
+    '    <input type="text" id="pdfFileNameInput" value="' + defaultFileName + '" ',
+    '      style="flex:1;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px 0 0 8px;font-size:13px;outline:none;box-sizing:border-box;">',
+    '    <span style="padding:10px 12px;background:#f3f4f6;border:1.5px solid #d1d5db;border-left:none;border-radius:0 8px 8px 0;font-size:13px;color:#6b7280;white-space:nowrap;">.pdf</span>',
+    '  </div>',
     '  <div id="emailStatus" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;"></div>',
     '  <div style="display:flex;gap:8px;justify-content:flex-end;">',
     '    <button onclick="closeEmailPopup()" style="padding:8px 18px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;">취소</button>',
@@ -10030,13 +10110,10 @@ function sendEmailPDF() {
   /* 현재 탭 패널을 html2pdf로 실제 PDF 변환 후 서버로 전송 */
   var panel = document.getElementById('panel-' + currentTab);
 
-  /* 탭별 파일명 접두어 + 날짜시간 */
-  var tabLabels = { care: '사전조사', self: '자체조사', relay: '연계조사' };
-  var now = new Date();
-  var pad2 = function(n){ return n < 10 ? '0'+n : ''+n; };
-  var dateStr = now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate())
-              + '_' + pad2(now.getHours()) + pad2(now.getMinutes());
-  var pdfFileName = (tabLabels[currentTab] || '조사서식') + '_' + dateStr + '.pdf';
+  /* 사용자가 입력한 파일명 사용 */
+  var fileNameInput = document.getElementById('pdfFileNameInput');
+  var pdfFileName = (fileNameInput ? fileNameInput.value.trim() : '') || '조사서식';
+  if(!pdfFileName.endsWith('.pdf')) pdfFileName += '.pdf';
 
   var opt = {
     margin:       [8, 6, 8, 6],
