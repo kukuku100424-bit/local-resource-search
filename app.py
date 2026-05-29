@@ -4521,6 +4521,27 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     )
                 ]
 
+            # ======================
+            # [후처리] "기관" 글자 오탐 방지 — 방문진료·방문간호 제거
+            # 검색어에 "기관"이 포함되어 있지만 실제 의료처치 키워드가 없을 때
+            # AI가 "기관절개" 맥락으로 오해하여 방문진료·방문간호를 추천하는 것을 제거
+            # ======================
+            real_medical_keywords = [
+                "기관절개", "기관절개관", "석션", "흡인", "콧줄", "비위관", "위관",
+                "경관급식", "소변줄", "도뇨줄", "유치도뇨", "장루", "요루", "복막투석",
+                "욕창", "상처", "드레싱", "감염", "의료처치", "튜브"
+            ]
+            q_norm_medical = query.replace(" ", "")
+            has_real_medical = any(k in q_norm_medical for k in real_medical_keywords)
+
+            if "기관" in q_norm_medical and not has_real_medical:
+                final_results = [
+                    item for item in final_results
+                    if not (
+                        str(item.get("중분류", "")).strip() in ("방문진료", "방문간호")
+                    )
+                ]
+
             filtered_results = final_results
 
 
