@@ -3831,6 +3831,7 @@ def ocr():
 def build_grouped_service_results(service_results):
     grouped_service_results = []
     group_map = {}
+    seen_sub = {}  # key -> set of 서비스내용 (소분류 중복 방지)
 
     for item in service_results:
         main_cat = str(item.get("대분류", "")).strip()
@@ -3839,7 +3840,6 @@ def build_grouped_service_results(service_results):
 
         if key not in group_map:
             group_id = "group_" + str(len(grouped_service_results))
-
             group_map[key] = {
                 "group_id": group_id,
                 "대분류": main_cat,
@@ -3847,13 +3847,17 @@ def build_grouped_service_results(service_results):
                 "direct_need": False,
                 "items": []
             }
-
+            seen_sub[key] = set()
             grouped_service_results.append(group_map[key])
 
         if item.get("direct_need"):
             group_map[key]["direct_need"] = True
 
-        group_map[key]["items"].append(item)
+        # 같은 소분류(서비스내용)가 이미 있으면 건너뜀 (중복 방지)
+        sub = str(item.get("서비스내용", "")).strip()
+        if sub not in seen_sub[key]:
+            seen_sub[key].add(sub)
+            group_map[key]["items"].append(item)
 
     return grouped_service_results
 
@@ -6154,6 +6158,48 @@ button:hover{
   margin-bottom:16px;
 }
 
+
+.direct-need-tooltip-wrap{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+}
+.direct-need-tooltip-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#93c5fd;
+  color:#1e40af;
+  font-size:11px;
+  font-weight:800;
+  cursor:default;
+  flex-shrink:0;
+  user-select:none;
+}
+.direct-need-tooltip-box{
+  display:none;
+  position:absolute;
+  left:24px;
+  top:50%;
+  transform:translateY(-50%);
+  background:#1e3a8a;
+  color:#fff;
+  font-size:12px;
+  font-weight:500;
+  line-height:1.55;
+  padding:8px 12px;
+  border-radius:8px;
+  white-space:nowrap;
+  z-index:999;
+  box-shadow:0 4px 14px rgba(0,0,0,0.18);
+  pointer-events:none;
+}
+.direct-need-tooltip-wrap:hover .direct-need-tooltip-box{
+  display:block;
+}
 .cute-star{
   display:inline-flex;
   align-items:center;
@@ -6867,11 +6913,17 @@ transition:0.2s;
 
 {% if group.direct_need and not ns.direct_box_open %}
 <div class="direct-need-box">
-  <div class="direct-need-title">
-    <svg style="width:17px;height:17px;flex-shrink:0;vertical-align:-3px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
-    </svg>
-    <span>직접욕구</span>
+  <div style="display:flex;align-items:center;gap:7px;margin-bottom:16px;">
+    <div class="direct-need-title" style="margin-bottom:0;">
+      <svg style="width:17px;height:17px;flex-shrink:0;vertical-align:-3px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
+      </svg>
+      <span>직접욕구</span>
+    </div>
+    <div class="direct-need-tooltip-wrap">
+      <span class="direct-need-tooltip-icon">?</span>
+      <div class="direct-need-tooltip-box">대상자·보호자의 희망욕구와 담당자 판단 필요 서비스가 모두 포함되었습니다.</div>
+    </div>
   </div>
 {% set ns.direct_box_open = true %}
 {% endif %}
@@ -10431,6 +10483,22 @@ function guideStart() {
   confirmBtn.addEventListener('click', function(e){ e.stopPropagation(); closeGuide(); });
   overlay.addEventListener('click', closeGuide);
 }
+
+
+// 직접욕구 툴팁 — 모바일 탭 지원
+document.querySelectorAll('.direct-need-tooltip-icon').forEach(function(icon){
+  icon.addEventListener('click', function(e){
+    e.stopPropagation();
+    var box = icon.parentElement.querySelector('.direct-need-tooltip-box');
+    if(!box) return;
+    var visible = box.style.display === 'block';
+    document.querySelectorAll('.direct-need-tooltip-box').forEach(function(b){ b.style.display='none'; });
+    box.style.display = visible ? 'none' : 'block';
+  });
+});
+document.addEventListener('click', function(){
+  document.querySelectorAll('.direct-need-tooltip-box').forEach(function(b){ b.style.display='none'; });
+});
 
 window.addEventListener('load', function() { setTimeout(guideStart, 300); });
 </script>
