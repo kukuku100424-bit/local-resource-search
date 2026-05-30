@@ -201,7 +201,7 @@ LOGIN_HTML = """
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>케어네비 로그인</title>
 
 <style>
@@ -1233,11 +1233,10 @@ body{
 .container{
   max-width:700px;
   margin:auto;
-  padding:10px 20px 20px 20px;
+  padding:calc(28px + env(safe-area-inset-top)) 20px 20px 20px;
 
-  position:relative;   /* 🔥 이거 추가 */
+  position:relative;
 }
-
 /* 타이틀 */
 /* 타이틀 */
 .title{
@@ -1405,6 +1404,10 @@ body{
 
 /* 모바일 */
 @media (max-width:480px){
+
+.container{
+    padding-top:calc(26px + env(safe-area-inset-top)) !important;
+  }
 
 .main-menu-card,
 .sub-card{
