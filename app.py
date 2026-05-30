@@ -1584,6 +1584,14 @@ body{
   }
 }
 
+body.app-webview #fabWrap{
+  display:none !important;
+}
+
+body.app-webview .visitor-left #reportBtn{
+  display:flex !important;
+}
+
 </style>
 </head>
 
@@ -1632,7 +1640,7 @@ body{
 
 <div class="bottom-row">
 
-<a href="/guide" target="_blank" class="bottom-card">
+<a href="/guide" class="bottom-card">
 
 <img src="/static/pdf_icon.png">
 
@@ -1948,6 +1956,10 @@ body{
 </style>
 
 <script>
+if ((navigator.userAgent || "").indexOf("CareNaviApp") !== -1) {
+  document.body.classList.add("app-webview");
+}
+
 const reportBtn = document.getElementById("reportBtn");
 const reportModal = document.getElementById("reportModal");
 
