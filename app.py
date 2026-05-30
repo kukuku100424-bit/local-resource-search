@@ -1194,7 +1194,7 @@ HOME_HTML = """
 .bottom-img{
   width:100%;
   margin-top:-120px;
-  margin-bottom:-80px;
+  margin-bottom:-140px;
   pointer-events:none;
   position:relative;
   z-index:0;
@@ -1520,9 +1520,10 @@ body{
   font-size:15px;
   color:#374151;
   font-weight:600;
+  letter-spacing:-0.2px;
 }
 
-.copyright-sub span{
+.copyright-sub .brand{
   color:#2563eb;
   font-weight:800;
 }
@@ -1533,7 +1534,7 @@ body{
   padding:0 12px;
   display:flex;
   justify-content:space-between;
-  align-items:flex-end;
+  align-items:flex-start;
   gap:16px;
 }
 
@@ -1546,7 +1547,7 @@ body{
 .visitor-box div{
   padding:4px 10px;
   border-radius:999px;
-  background:#f1f5f9;
+  background:transparent;
   color:#6b7280;
   font-size:12px;
   line-height:1.2;
@@ -1651,9 +1652,16 @@ body{
 <img src="/static/bottom.png" class="bottom-img">
 <div class="bottom-footer">
 
-  <div class="visitor-box">
-    <div>총 {{total}}</div>
-    <div>오늘 {{today}}</div>
+  <div class="visitor-left">
+    <div id="reportBtn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+        <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+      </svg>
+    </div>
+    <div class="visitor-box">
+      <div>총 {{total}}</div>
+      <div>오늘 {{today}}</div>
+    </div>
   </div>
 
   <div class="copyright">
@@ -1662,28 +1670,48 @@ body{
       ©국민건강보험공단 광주전라제주지역본부
     </div>
     <div class="copyright-sub">
-      통합돌봄 연구반 <span>돌봄곳간</span>
+      통합돌봄부(TF) &amp; 연구반 <span class="brand">돌봄곳간</span>
     </div>
   </div>
 
 </div>
 
 <style>
-@media (max-width:480px){
-  a[style*="position:fixed"]{
-    right:14px !important;
-    bottom:14px !important;
-    width:54px !important;
-    height:54px !important;
-    font-size:22px !important;
-  }
-}
 </style>
-<!-- ===== Floating Button ===== -->
-<div id="reportBtn">
-  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
-    <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
-  </svg>
+
+<!-- ===== 스피드다이얼 FAB ===== -->
+<div id="fabWrap">
+  <!-- 서브 메뉴 아이템들 (위로 펼쳐짐) -->
+  <div id="fabItems">
+  <div id="fabItem_apk" class="fab-item" style="display:none;">
+    <div class="fab-item-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+        <path d="M17.5 2.5L15.5 1l-1.3 2.1C13.5 2.8 12.8 2.6 12 2.6s-1.5.2-2.2.5L8.5 1 6.5 2.5l1.2 2C6.1 5.7 5 7.5 5 9.5h14c0-2-.9-3.8-2.7-5l1.2-2zM9 7.5c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm6 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1z"/>
+        <rect x="2" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
+        <rect x="19.5" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
+        <path d="M5 11v8c0 1.1.9 2 2 2h1v3h2v-3h4v3h2v-3h1c1.1 0 2-.9 2-2v-8H5z"/>
+      </svg>
+    </div>
+    <span class="fab-item-label">앱 설치</span>
+  </div>
+  <div id="fabItem_report" class="fab-item">
+    <div class="fab-item-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+        <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+      </svg>
+    </div>
+    <span class="fab-item-label">의견보내기</span>
+  </div>
+  </div><!-- /fabItems -->
+  <!-- 메인 버튼 -->
+  <div id="fabMain">
+    <svg id="fabIconPlus" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+      <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+    </svg>
+    <svg id="fabIconClose" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24" style="display:none;">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    </svg>
+  </div>
 </div>
 
 <!-- ===== Modal ===== -->
@@ -1705,27 +1733,156 @@ body{
 
 <style>
 
-/* ===== 버튼 ===== */
+/* ===== visitor-left 컨테이너 ===== */
+.visitor-left{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  padding-bottom:40px;
+}
+
+/* PC 오류제보 버튼 */
 #reportBtn{
-  position:fixed;
-  right:30px;
-  bottom:50px;
-  width:60px;
-  height:60px;
+  width:54px;
+  height:54px;
   border-radius:50%;
   background:linear-gradient(135deg,#3b82f6,#2563eb);
   display:flex;
   align-items:center;
   justify-content:center;
-  box-shadow:0 10px 24px rgba(0,0,0,0.25);
+  box-shadow:0 8px 20px rgba(37,99,235,0.4);
   cursor:pointer;
-  z-index:9999;
-  transition:0.2s;
+  transition:transform 0.2s;
 }
 
 #reportBtn:hover{
   transform:scale(1.08);
 }
+
+/* ===== 스피드다이얼 FAB ===== */
+#fabWrap{
+  position:fixed;
+  left:14px;
+  bottom:80px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:12px;
+  z-index:9999;
+}
+
+/* 메인 버튼 */
+#fabMain{
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 8px 20px rgba(37,99,235,0.4);
+  cursor:pointer;
+  transition:transform 0.2s, box-shadow 0.2s;
+  flex-shrink:0;
+}
+
+#fabMain:hover{
+  transform:scale(1.08);
+}
+
+#fabMain.open{
+  background:linear-gradient(135deg,#64748b,#475569);
+  box-shadow:0 8px 20px rgba(0,0,0,0.25);
+}
+
+/* 서브 아이템 */
+/* 서브 아이템 감싸는 박스 */
+#fabItems{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  border-radius:16px;
+  padding:10px 12px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.18);
+  min-width:120px;
+}
+
+#fabItems:empty{
+  display:none;
+}
+
+.fab-item{
+  display:none;
+  align-items:center;
+  gap:10px;
+  flex-direction:row;
+}
+
+.fab-item.show{
+  display:flex;
+  animation:fabItemIn 0.18s ease;
+}
+
+@keyframes fabItemIn{
+  from{ opacity:0; transform:translateY(8px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+.fab-item-btn{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 12px rgba(37,99,235,0.35);
+  cursor:pointer;
+  transition:transform 0.15s;
+  flex-shrink:0;
+}
+
+.fab-item-btn:hover{
+  transform:scale(1.08);
+}
+
+.fab-item-label{
+  color:#1e293b;
+  font-size:13px;
+  font-weight:700;
+  white-space:nowrap;
+  pointer-events:none;
+}
+
+/* PC에서 visitor-left 안 reportBtn은 그대로 표시 */
+/* 모바일에서 visitor-left 안 reportBtn 숨김 */
+@media (max-width:600px){
+  .visitor-left #reportBtn{
+    display:none !important;
+  }
+  .visitor-left{
+    flex-direction:row;
+    align-items:center;
+    padding-bottom:0;
+  }
+  #reportBox{
+    width:100%;
+    height:100%;
+    border-radius:0;
+  }
+}
+
+/* PC에선 fabWrap 숨김 — visitor-left 안 reportBtn 사용 */
+@media (min-width:601px){
+  #fabWrap{
+    display:none;
+  }
+}
+
 
 /* ===== 모달 ===== */
 #reportModal{
@@ -1785,30 +1942,96 @@ body{
   }
 }
 
-/* ===== 모바일 ===== */
-@media (max-width:480px){
-
-  #reportBtn{
-    left:14px;     /* 👈 추가 */
-    right:auto;    /* 👈 추가 */
-    bottom:50px;
-    width:54px;
-    height:54px;
-  }
-
-  #reportBox{
-    width:100%;
-    height:100%;
-    border-radius:0;
-  }
-
-}
-
 </style>
 
 <script>
 const reportBtn = document.getElementById("reportBtn");
 const reportModal = document.getElementById("reportModal");
+
+/* ===== 스피드다이얼 FAB ===== */
+(function(){
+  var ua = navigator.userAgent || "";
+  var isAndroid = /Android/i.test(ua);
+  var isIOS = /iPhone|iPad|iPod/i.test(ua);
+  var isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  var isWebView = /; wv\)/.test(ua);
+  var hasApk = isAndroid && !isIOS && !isStandalone && !isWebView;
+
+  // standalone 앱 모드: fabWrap 숨기고 reportBtn 강제 표시
+  if(isStandalone){
+    var fabWrapEl = document.getElementById("fabWrap");
+    if(fabWrapEl) fabWrapEl.style.display = "none";
+    var reportBtnEl = document.getElementById("reportBtn");
+    if(reportBtnEl) reportBtnEl.style.display = "flex";
+  }
+
+  var fabMain    = document.getElementById("fabMain");
+  var fabItemApk = document.getElementById("fabItem_apk");
+  var fabItemRep = document.getElementById("fabItem_report");
+  var fabIconPlus  = document.getElementById("fabIconPlus");
+  var fabIconClose = document.getElementById("fabIconClose");
+  var isOpen = false;
+
+  var fabItems = document.getElementById("fabItems");
+
+  // 안드로이드면 앱설치 항목 보이게
+  if(hasApk && fabItemApk){
+    fabItemApk.style.display = "";
+  }
+
+  // 박스 초기 숨김
+  if(fabItems) fabItems.style.display = "none";
+
+  function openFab(){
+    isOpen = true;
+    fabMain.classList.add("open");
+    fabIconPlus.style.display  = "none";
+    fabIconClose.style.display = "";
+    if(fabItems) fabItems.style.display = "flex";
+    if(fabItemRep) fabItemRep.classList.add("show");
+    if(hasApk && fabItemApk) fabItemApk.classList.add("show");
+  }
+
+  function closeFab(){
+    isOpen = false;
+    fabMain.classList.remove("open");
+    fabIconPlus.style.display  = "";
+    fabIconClose.style.display = "none";
+    if(fabItems) fabItems.style.display = "none";
+    if(fabItemRep) fabItemRep.classList.remove("show");
+    if(fabItemApk) fabItemApk.classList.remove("show");
+  }
+
+  if(fabMain){
+    fabMain.addEventListener("click", function(e){
+      e.stopPropagation();
+      isOpen ? closeFab() : openFab();
+    });
+  }
+
+  // 오류제보 클릭
+  if(fabItemRep){
+    fabItemRep.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      location.href = "/board";
+    });
+  }
+
+  // 앱 설치 클릭
+  if(fabItemApk){
+    fabItemApk.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      window.location.href = "/static/carenavi.apk";
+    });
+  }
+
+  // 바깥 클릭 시 닫기
+  document.addEventListener("click", function(){
+    if(isOpen) closeFab();
+  });
+})();
 
 /* 홈 진입 시 현재 상태를 홈으로 고정하고, 홈 상태를 하나 더 쌓아둠 */
 history.replaceState({ page: "home-root" }, "", location.href);
@@ -2510,7 +2733,7 @@ h2{
 
   <div class="top-bar">
     <a href="/home" class="home-button">홈으로</a>
-    <a href="/board/write" class="home-button">글쓰기</a>
+    <a href="/board/write" class="home-button">의견보내기</a>
   </div>
 
   <h2>오류제보 / 의견게시판</h2>
@@ -2540,7 +2763,7 @@ BOARD_WRITE_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>글쓰기</title>
+<title>의견보내기</title>
 <style>
 body{
   margin:0;
@@ -2633,7 +2856,7 @@ button{
   </div>
 
   <div class="card">
-    <h2>글쓰기</h2>
+    <h2>의견보내기</h2>
     <p class="desc">작성하신 내용은 관리자만 확인할 수 있습니다.</p>
 
     <form method="post">
