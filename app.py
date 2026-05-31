@@ -1584,12 +1584,32 @@ body{
   }
 }
 
-body.app-webview #fabWrap{
+body.app-webview .visitor-left #reportBtn{
   display:none !important;
 }
 
-body.app-webview .visitor-left #reportBtn{
+body.app-webview #fabWrap{
   display:flex !important;
+  left:14px !important;
+  bottom:80px !important;
+  z-index:9999 !important;
+}
+
+body.app-webview #fabItems{
+  display:none !important;
+}
+
+body.app-webview #fabIconPlus,
+body.app-webview #fabIconClose{
+  display:none !important;
+}
+
+body.app-webview #fabMain::before{
+  content:"▣";
+  color:white;
+  font-size:28px;
+  font-weight:800;
+  line-height:1;
 }
 
 </style>
@@ -1988,6 +2008,19 @@ const reportModal = document.getElementById("reportModal");
   var isOpen = false;
 
   var fabItems = document.getElementById("fabItems");
+
+if ((navigator.userAgent || "").indexOf("CareNaviApp") !== -1) {
+  if(fabItems) fabItems.style.display = "none";
+
+  if(fabMain){
+    fabMain.addEventListener("click", function(e){
+      e.stopPropagation();
+      location.href = "/board";
+    });
+  }
+
+  return;
+}
 
   // 안드로이드면 앱설치 항목 보이게
   if(hasApk && fabItemApk){
