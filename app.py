@@ -1584,32 +1584,43 @@ body{
   }
 }
 
-body.app-webview .visitor-left #reportBtn{
+body.mobile-single-report .visitor-left #reportBtn{
   display:none !important;
 }
 
-body.app-webview #fabWrap{
+body.mobile-single-report #fabWrap{
   display:flex !important;
   left:14px !important;
   bottom:80px !important;
   z-index:9999 !important;
 }
 
-body.app-webview #fabItems{
+body.mobile-single-report #fabItems{
   display:none !important;
 }
 
-body.app-webview #fabIconPlus,
-body.app-webview #fabIconClose{
+body.mobile-single-report #fabIconPlus,
+body.mobile-single-report #fabIconClose{
   display:none !important;
 }
 
-body.app-webview #fabMain::before{
-  content:"▣";
-  color:white;
-  font-size:28px;
-  font-weight:800;
-  line-height:1;
+if (isCareNaviAppMode || isMobileMode) {
+  if(fabItems) fabItems.style.display = "none";
+
+  if(fabMain){
+    fabMain.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="white" viewBox="0 0 24 24">
+        <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+      </svg>
+    `;
+
+    fabMain.addEventListener("click", function(e){
+      e.stopPropagation();
+      location.href = "/board";
+    });
+  }
+
+  return;
 }
 
 </style>
@@ -1976,8 +1987,12 @@ body.app-webview #fabMain::before{
 </style>
 
 <script>
-if ((navigator.userAgent || "").indexOf("CareNaviApp") !== -1) {
-  document.body.classList.add("app-webview");
+const uaForMode = navigator.userAgent || "";
+const isCareNaviAppMode = uaForMode.indexOf("CareNaviApp") !== -1;
+const isMobileMode = /Android|iPhone|iPad|iPod/i.test(uaForMode);
+
+if (isCareNaviAppMode || isMobileMode) {
+  document.body.classList.add("mobile-single-report");
 }
 
 const reportBtn = document.getElementById("reportBtn");
@@ -2009,7 +2024,7 @@ const reportModal = document.getElementById("reportModal");
 
   var fabItems = document.getElementById("fabItems");
 
-if ((navigator.userAgent || "").indexOf("CareNaviApp") !== -1) {
+if (isCareNaviAppMode || isMobileMode) {
   if(fabItems) fabItems.style.display = "none";
 
   if(fabMain){
