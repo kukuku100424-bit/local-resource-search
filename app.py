@@ -897,6 +897,11 @@ input, select{
   color:#374151;
 }
 
+/* 앱(standalone/CareNaviApp) 모드: 상단 여백 축소 */
+body.app-mode .container{
+  padding-top:6px !important;
+}
+
 /* =========================
    모바일 최적화 (핵심)
 ========================= */
@@ -1976,6 +1981,11 @@ body{
   var isApp        = ua.indexOf("CareNaviApp") !== -1;
   var isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
   var isWebView    = /; wv\)/.test(ua);
+
+  // 앱 모드 body 클래스 (상단 여백 축소용)
+  if(isApp || isStandalone){
+    document.body.classList.add("app-mode");
+  }
 
   // 안드로이드 일반 브라우저: + 스피드다이얼 FAB
   var useAndroidFab = isAndroid && !isIOS && !isApp && !isStandalone && !isWebView;
