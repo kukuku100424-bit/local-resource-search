@@ -909,7 +909,11 @@ body.app-mode .container{
 
   /* 전체 여백 줄이기 */
   .container{
-    padding:12px 12px 20px 12px;
+    padding:4px 12px 20px 12px;
+  }
+
+  .title{
+    margin-bottom:14px;
   }
 
   /* 타이틀 */
@@ -3295,7 +3299,9 @@ def board_delete(post_id):
 
 @app.route("/guide")
 def guide():
-    return redirect("/static/guide.pdf")
+    pdf_url = request.host_url + "static/guide.pdf"
+    google_viewer = f"https://docs.google.com/viewer?url={pdf_url}&embedded=true"
+    return redirect(google_viewer)
 
 # =========================
 # 상세 API (팝업에서 사용)
