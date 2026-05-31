@@ -1678,7 +1678,7 @@ body{
       </svg>
     </div>
     <div id="singleReportBtn" style="display:none;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24">
         <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
       </svg>
     </div>
@@ -1768,11 +1768,11 @@ body{
 
 /* PC/아이폰/앱 단일 의견보내기 버튼 */
 #singleReportBtn{
-  width:44px;
-  height:44px;
+  width:54px;
+  height:54px;
   border-radius:50%;
   background:linear-gradient(135deg,#3b82f6,#2563eb);
-  box-shadow:0 4px 16px rgba(37,99,235,0.4);
+  box-shadow:0 8px 20px rgba(37,99,235,0.4);
   cursor:pointer;
   z-index:9999;
   display:none;
@@ -1785,9 +1785,22 @@ body{
   transform:scale(1.08);
 }
 
-/* PC에서만 알약 모양 + 글씨 */
+/* 모바일/앱: fixed 왼쪽 하단 (+ 버튼 위치) */
+@media (max-width:600px){
+  #singleReportBtn{
+    position:fixed;
+    left:14px;
+    bottom:80px;
+    width:54px;
+    height:54px;
+    border-radius:50%;
+  }
+}
+
+/* PC: bottom-footer 안 static, 알약 모양 */
 @media (min-width:601px){
   #singleReportBtn{
+    position:static;
     width:auto;
     height:38px;
     border-radius:999px;
@@ -1798,6 +1811,7 @@ body{
     color:#fff;
     letter-spacing:-0.2px;
     white-space:nowrap;
+    align-self:flex-end;
   }
   #singleReportBtn::after{
     content:'의견보내기';
@@ -1817,7 +1831,7 @@ body{
 #fabWrap{
   position:fixed;
   left:14px;
-  bottom:80px;
+  bottom:200px;
   display:flex;
   flex-direction:column;
   align-items:flex-start;
@@ -1932,7 +1946,14 @@ body{
 /* PC에선 fabWrap 숨김 — visitor-left 안 reportBtn 사용 */
 @media (min-width:601px){
   #fabWrap{
-    display:none;
+    display:none !important;
+  }
+}
+
+/* 모바일 웹에서 fabWrap 위치 */
+@media (max-width:600px){
+  #fabWrap{
+    bottom:200px !important;
   }
 }
 
@@ -2014,7 +2035,7 @@ body{
   }
 
   // 안드로이드 일반 브라우저: + 스피드다이얼 FAB
-  var useAndroidFab = isAndroid && !isIOS && !isApp && !isStandalone && !isWebView;
+  var useAndroidFab = isAndroid && !isIOS;
 
   var fabWrap       = document.getElementById("fabWrap");
   var fabMain       = document.getElementById("fabMain");
@@ -2030,6 +2051,12 @@ body{
     // ── 안드로이드: + FAB 표시
     if(fabWrap)  fabWrap.style.display  = "flex";
     if(singleBtn) singleBtn.style.display = "none";
+
+    // 앱/WebView/standalone 에서는 앱설치 항목 숨김 + 원래 위치 유지
+    if(isApp || isWebView || isStandalone){
+      if(fabItemApk) fabItemApk.style.display = "none";
+      if(fabWrap) fabWrap.style.setProperty('bottom', '80px', 'important');
+    }
 
     function openFab(){
       isOpen = true;
