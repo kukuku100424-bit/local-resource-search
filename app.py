@@ -2052,10 +2052,9 @@ body{
     if(fabWrap)  fabWrap.style.display  = "flex";
     if(singleBtn) singleBtn.style.display = "none";
 
-    // 앱/WebView/standalone 에서는 앱설치 항목 숨김 + 원래 위치 유지
+    // 앱/WebView/standalone 에서는 앱설치 항목 숨김
     if(isApp || isWebView || isStandalone){
       if(fabItemApk) fabItemApk.style.display = "none";
-      if(fabWrap) fabWrap.style.setProperty('bottom', '80px', 'important');
     }
 
     function openFab(){
