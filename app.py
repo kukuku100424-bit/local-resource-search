@@ -1536,6 +1536,10 @@ body{
   font-weight:800;
 }
 
+.copyright-sub .tf-label{
+  font-size:13px;
+}
+
 
 .bottom-footer{
   margin-top:-40px;
@@ -1550,6 +1554,11 @@ body{
   display:flex;
   gap:8px;
   flex-wrap:wrap;
+}
+
+.visitor-box-top{
+  justify-content:center;
+  margin-top:0;
 }
 
 .visitor-box div{
@@ -1668,6 +1677,11 @@ body{
         <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
       </svg>
     </div>
+    <div id="singleReportBtn" style="display:none;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+        <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+      </svg>
+    </div>
     <div class="visitor-box">
       <div>총 {{total}}</div>
       <div>오늘 {{today}}</div>
@@ -1680,7 +1694,7 @@ body{
       ©국민건강보험공단 광주전라제주지역본부
     </div>
     <div class="copyright-sub">
-      통합돌봄부(TF) &amp; 연구반 <span class="brand">돌봄곳간</span>
+      통합돌봄부<span class="tf-label">(TF)</span> &amp; 연구반 <span class="brand">돌봄곳간</span>
     </div>
   </div>
 
@@ -1723,11 +1737,6 @@ body{
 </div>
 
 <!-- ===== 단일 의견보내기 버튼 (PC/아이폰/앱) ===== -->
-<div id="singleReportBtn" style="display:none;">
-  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
-    <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
-  </svg>
-</div>
 
 <!-- ===== Modal ===== -->
 <div id="reportModal">
@@ -1759,11 +1768,8 @@ body{
 
 /* PC/아이폰/앱 단일 의견보내기 버튼 */
 #singleReportBtn{
-  position:fixed;
-  left:18px;
-  bottom:80px;
-  width:58px;
-  height:58px;
+  width:44px;
+  height:44px;
   border-radius:50%;
   background:linear-gradient(135deg,#3b82f6,#2563eb);
   box-shadow:0 4px 16px rgba(37,99,235,0.4);
@@ -1773,9 +1779,29 @@ body{
   align-items:center;
   justify-content:center;
   transition:transform 0.2s;
+  flex-shrink:0;
 }
 #singleReportBtn:hover{
   transform:scale(1.08);
+}
+
+/* PC에서만 알약 모양 + 글씨 */
+@media (min-width:601px){
+  #singleReportBtn{
+    width:auto;
+    height:38px;
+    border-radius:999px;
+    padding:0 16px 0 12px;
+    gap:7px;
+    font-size:13px;
+    font-weight:700;
+    color:#fff;
+    letter-spacing:-0.2px;
+    white-space:nowrap;
+  }
+  #singleReportBtn::after{
+    content:'의견보내기';
+  }
 }
 
 /* PC 오류제보 버튼 (visitor-left 안 구버튼 - 숨김) */
@@ -1794,7 +1820,7 @@ body{
   bottom:80px;
   display:flex;
   flex-direction:column;
-  align-items:center;
+  align-items:flex-start;
   gap:12px;
   z-index:9999;
 }
