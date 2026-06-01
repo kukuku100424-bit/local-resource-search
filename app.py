@@ -2451,6 +2451,42 @@ h2{
     font-size:22px;
   }
 }
+
+.pager{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  margin-top:12px;
+  flex-wrap:wrap;
+}
+
+.pager button{
+  min-width:32px;
+  height:32px;
+  border:1px solid #d1d5db;
+  background:#ffffff;
+  color:#374151;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.pager button.active{
+  background:#2563eb;
+  color:#ffffff;
+  border-color:#2563eb;
+}
+
+.pager button:hover{
+  background:#eff6ff;
+}
+
+.pager button.active:hover{
+  background:#2563eb;
+}
+
 </style>
 </head>
 <body>
@@ -2482,7 +2518,7 @@ h2{
 
 <div class="card">
     <h2>일자별 방문자수</h2>
-    <div class="table-scroll">
+    <div>
     <table>
       <thead>
         <tr>
@@ -2490,7 +2526,7 @@ h2{
           <th>방문자수</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="visitTableBody">
         {% for row in daily_visits %}
         <tr>
           <td>{{ row["date"] }}</td>
@@ -2500,11 +2536,12 @@ h2{
       </tbody>
     </table>
     </div>
+    <div id="visitPager" class="pager"></div>
   </div>
 
 <div class="card">
     <h2>일자별 지역 클릭수</h2>
-    <div class="table-scroll">
+    <div>
     <table>
       <thead>
         <tr>
@@ -2515,7 +2552,7 @@ h2{
           <th>클릭수</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="regionTableBody">
         {% for row in daily_regions %}
         <tr>
           <td>{{ row["date"] }}</td>
@@ -2528,11 +2565,94 @@ h2{
       </tbody>
     </table>
     </div>
+    <div id="regionPager" class="pager"></div>
   </div>
 
+
 </div>
+<script>
+function setupPagination(tbodyId, pagerId, rowsPerPage){
+  const tbody = document.getElementById(tbodyId);
+  const pager = document.getElementById(pagerId);
+
+  if(!tbody || !pager) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const totalPages = Math.ceil(rows.length / rowsPerPage);
+
+  if(totalPages <= 1){
+    pager.style.display = "none";
+    return;
+  }
+
+  let currentPage = 1;
+
+  function renderPage(page){
+    currentPage = page;
+
+    rows.forEach(function(row, index){
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      row.style.display = index >= start && index < end ? "" : "none";
+    });
+
+    renderPager();
+  }
+
+  function renderPager(){
+    pager.innerHTML = "";
+
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+    if(endPage - startPage < maxVisible - 1){
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.textContent = "‹";
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = function(){
+      if(currentPage > 1) renderPage(currentPage - 1);
+    };
+    pager.appendChild(prevBtn);
+
+    for(let i = startPage; i <= endPage; i++){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = i;
+      if(i === currentPage){
+        btn.classList.add("active");
+      }
+      btn.onclick = function(){
+        renderPage(i);
+      };
+      pager.appendChild(btn);
+    }
+
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.textContent = "›";
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = function(){
+      if(currentPage < totalPages) renderPage(currentPage + 1);
+    };
+    pager.appendChild(nextBtn);
+  }
+
+  renderPage(1);
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  setupPagination("visitTableBody", "visitPager", 10);
+  setupPagination("regionTableBody", "regionPager", 10);
+});
+</script>
 </body>
 </html>
+
 """
 @app.route("/stats")
 def stats():
