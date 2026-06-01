@@ -7482,11 +7482,12 @@ transition:0.2s;
     </div>
 
     <a
-      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{group['대분류']|urlencode}}&middle_category={{group['중분류']|urlencode}}&from_desc=1"
-      class="group-search-btn"
-    >
-      기관검색
-    </a>
+  href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{group['대분류']|urlencode}}&middle_category={{group['중분류']|urlencode}}&from_desc=1"
+  class="group-search-btn"
+  onclick="return openComboGuideModal(this.href)"
+>
+  기관검색
+</a>
   </div>
 
   <div class="sub-service-section">
@@ -7770,9 +7771,13 @@ function playBeep(type="start"){
 let comboGuideTargetHref = "";
 
 function openComboGuideModal(href){
-  if(href){
-    window.location.href = href;
+  comboGuideTargetHref = href || "";
+
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "flex";
   }
+
   return false;
 }
 
