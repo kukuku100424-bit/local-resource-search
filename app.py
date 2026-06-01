@@ -2176,14 +2176,15 @@ body{
   var isOpen        = false;
 
   if(useAndroidFab){
-    // ── 안드로이드: + FAB 표시
-    if(fabWrap)  fabWrap.style.display  = "flex";
-    if(singleBtn) singleBtn.style.display = "none";
+// ── 안드로이드: + FAB 표시
+if(fabWrap) fabWrap.style.display = "flex";
+if(singleBtn) singleBtn.style.display = "none";
 
-    // 앱/WebView/standalone 에서는 앱설치 항목 숨김
-    if(isApp || isWebView || isStandalone){
-      if(fabItemApk) fabItemApk.style.display = "none";
-    }
+// 실제 케어네비 앱 / PWA 모드에서만 앱설치 항목 숨김
+// 네이버앱, 삼성브라우저, 크롬, 웨일에서는 앱설치 표시
+if(isApp || isStandalone){
+  if(fabItemApk) fabItemApk.style.display = "none";
+}
 
     function openFab(){
       isOpen = true;
