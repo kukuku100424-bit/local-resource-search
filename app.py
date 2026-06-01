@@ -1738,7 +1738,39 @@ body{
 
 <!-- ===== 단일 의견보내기 버튼 (PC/아이폰/앱) ===== -->
 
+
+
+
 <!-- ===== Modal ===== -->
+
+<!-- ===== 앱 설치 안내 모달 ===== -->
+<div id="apkInstallModal" onclick="closeApkInstallModalByBg(event)">
+  <div class="apk-install-box">
+
+    <div class="apk-install-icon">📱</div>
+
+    <div class="apk-install-title">케어네비 앱 설치 안내</div>
+
+    <div class="apk-install-subtitle">
+      안드로이드용 설치 파일을 다운로드합니다.
+    </div>
+
+    <div class="apk-install-text">
+      다운로드 후 설치 화면이 나오면<br>
+      <b>'설치'</b>를 눌러주세요.<br><br>
+      휴대폰 설정에 따라<br>
+      <b>'출처를 알 수 없는 앱 설치 허용'</b>이<br>
+      필요할 수 있습니다.
+    </div>
+
+    <div class="apk-install-buttons">
+      <button type="button" class="apk-cancel-btn" onclick="closeApkInstallModal()">취소</button>
+      <button type="button" class="apk-confirm-btn" onclick="confirmApkDownload()">다운로드</button>
+    </div>
+
+  </div>
+</div>
+
 <div id="reportModal">
   <div id="reportBox">
 
@@ -1957,6 +1989,102 @@ body{
   }
 }
 
+/* ===== 앱 설치 안내 모달 ===== */
+#apkInstallModal{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:10050;
+  backdrop-filter:blur(3px);
+  -webkit-backdrop-filter:blur(3px);
+}
+
+.apk-install-box{
+  background:#ffffff;
+  border-radius:22px;
+  padding:34px 28px 26px;
+  width:88%;
+  max-width:360px;
+  text-align:center;
+  box-shadow:0 18px 50px rgba(0,0,0,0.24);
+  font-family:inherit;
+  animation:apkModalIn 0.2s ease;
+}
+
+.apk-install-icon{
+  font-size:38px;
+  margin-bottom:12px;
+}
+
+.apk-install-title{
+  font-size:18px;
+  font-weight:900;
+  color:#111827;
+  margin-bottom:8px;
+  letter-spacing:-0.3px;
+}
+
+.apk-install-subtitle{
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.5;
+  margin-bottom:18px;
+}
+
+.apk-install-text{
+  font-size:13.5px;
+  color:#374151;
+  line-height:1.7;
+  word-break:keep-all;
+  margin-bottom:22px;
+}
+
+.apk-install-text b{
+  color:#2563eb;
+  font-weight:800;
+}
+
+.apk-install-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.apk-cancel-btn,
+.apk-confirm-btn{
+  height:42px;
+  border-radius:10px;
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  border:none;
+}
+
+.apk-cancel-btn{
+  background:#f3f4f6;
+  color:#4b5563;
+}
+
+.apk-confirm-btn{
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#ffffff;
+  box-shadow:0 6px 16px rgba(37,99,235,0.28);
+}
+
+@keyframes apkModalIn{
+  from{
+    opacity:0;
+    transform:translateY(14px) scale(0.98);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
 
 /* ===== 모달 ===== */
 #reportModal{
@@ -2092,15 +2220,7 @@ body{
   fabItemApk.addEventListener("click", function(e){
     e.stopPropagation();
     closeFab();
-
-    var ok = confirm(`케어네비 앱 설치 파일을 다운로드합니다.
-
-다운로드 후 설치 화면이 나오면 '설치'를 눌러주세요.
-휴대폰 설정에 따라 '출처를 알 수 없는 앱 설치 허용'이 필요할 수 있습니다.`);
-
-    if(ok){
-      window.location.href = "/static/carenavi.apk";
-    }
+    openApkInstallModal();
   });
 }
 
@@ -2127,6 +2247,31 @@ history.pushState({ page: "home" }, "", location.href);
 reportBtn.onclick = () => {
   location.href = "/board";
 };
+
+function openApkInstallModal(){
+  var modal = document.getElementById("apkInstallModal");
+  if(modal){
+    modal.style.display = "flex";
+  }
+}
+
+function closeApkInstallModal(){
+  var modal = document.getElementById("apkInstallModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+}
+
+function closeApkInstallModalByBg(e){
+  if(e.target && e.target.id === "apkInstallModal"){
+    closeApkInstallModal();
+  }
+}
+
+function confirmApkDownload(){
+  closeApkInstallModal();
+  window.location.href = "/static/carenavi.apk";
+}
 
 function openReport(){
   location.href = "/board/write";
