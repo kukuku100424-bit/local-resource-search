@@ -2089,12 +2089,22 @@ body{
       });
     }
     if(fabItemApk){
-      fabItemApk.addEventListener("click", function(e){
-        e.stopPropagation();
-        closeFab();
-        window.location.href = "/static/carenavi.apk";
-      });
+  fabItemApk.addEventListener("click", function(e){
+    e.stopPropagation();
+    closeFab();
+
+    var ok = confirm(
+      "케어네비 앱 설치 파일을 다운로드합니다.\n\n" +
+      "다운로드 후 설치 화면이 나오면 '설치'를 눌러주세요.\n" +
+      "휴대폰 설정에 따라 '출처를 알 수 없는 앱 설치 허용'이 필요할 수 있습니다."
+    );
+
+    if(ok){
+      window.location.href = "/static/carenavi.apk";
     }
+  });
+}
+
     document.addEventListener("click", function(){ if(isOpen) closeFab(); });
 
   } else {
