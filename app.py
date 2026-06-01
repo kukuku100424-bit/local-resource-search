@@ -6531,12 +6531,24 @@ button:hover{
 }
 
 @media (max-width:480px){
+  .direct-need-box{
+    position:relative;
+  }
+
+  .direct-need-tooltip-wrap{
+    position:static;
+  }
+
   .direct-need-tooltip-box{
-    left:50%;
-    top:26px;
-    transform:translateX(-50%);
-    max-width:calc(100vw - 32px);
+    left:12px;
+    right:12px;
+    top:56px;
+    transform:none;
+    width:auto;
+    max-width:none;
+    box-sizing:border-box;
     text-align:left;
+    z-index:5000;
   }
 }
 .cute-star{
@@ -6767,70 +6779,100 @@ button:hover{
 
 @media (max-width:480px){
   .group-card-top{
-    flex-direction:column;
-    align-items:stretch;
-    gap:10px;
+    flex-direction:row;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:6px;
+    padding:10px 10px 6px !important;
   }
 
   .group-title-area{
-    width:100%;
+    flex:1 1 auto;
+    width:auto;
     min-width:0;
   }
 
-  .group-search-btn{
-    align-self:flex-end;
-    margin-top:0;
+  .group-title-grid{
+    gap:3px;
+    align-items:flex-start;
   }
 
   .group-title-value{
-    font-size:15px;
+    font-size:14px;
     font-weight:750;
+    line-height:1.35;
+  }
+
+  .group-title-value.main-val{
+    font-size:11px;
+    line-height:1.35;
+  }
+
+  .group-title-arrow{
+    font-size:11px;
+    line-height:1.35;
+  }
+
+  .group-search-btn{
+    align-self:flex-start;
+    height:24px;
+    min-height:24px;
+    padding:0 8px;
+    font-size:11px;
+    margin-top:2px;
+    flex-shrink:0;
+  }
+
+  .sub-service-section{
+    padding:6px 10px 10px !important;
+  }
+
+  .sub-service-label{
+    margin-bottom:5px;
+  }
+
+  .sub-service-tabs{
+    gap:5px;
+    margin-bottom:8px;
   }
 
   .sub-service-tab{
     font-size:12.5px !important;
-    padding:7px 11px !important;
+    padding:6px 10px !important;
+    min-height:28px;
   }
 
   .direct-need-box{
-  margin:14px 0 18px 0;
-  padding:14px;
-
-  background:#eef4ff;
-
-  border:2px solid #5b8ff9;
-
-  border-radius:16px;
-}
+    margin:14px 0 18px 0;
+    padding:14px;
+    background:#eef4ff;
+    border:2px solid #5b8ff9;
+    border-radius:16px;
+  }
 
   .direct-need-title{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:2px;
-
-  height:32px;
-  padding:0 14px 0 10px;
-
-  border-radius:999px;
-
-  background:#ffffff;
-  border:1px solid #93c5fd;
-
-  color:#2563eb;
-
-  font-size:12px;
-  font-weight:800;
-  line-height:1;
- margin-bottom:16px;
-}
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    height:32px;
+    padding:0 14px 0 10px;
+    border-radius:999px;
+    background:#ffffff;
+    border:1px solid #93c5fd;
+    color:#2563eb;
+    font-size:12px;
+    font-weight:800;
+    line-height:1;
+    margin-bottom:16px;
+  }
 
   .cute-star{
-  width:auto;
-  height:auto;
-  margin-right:0;
-  font-size:11px;
-}
+    width:auto;
+    height:auto;
+    margin-right:0;
+    font-size:11px;
+  }
 }
 
 
@@ -7287,7 +7329,6 @@ transition:0.2s;
 
     <a
       href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{group['대분류']|urlencode}}&middle_category={{group['중분류']|urlencode}}&from_desc=1"
-      onclick="return openComboGuideModal(this.href);"
       class="group-search-btn"
     >
       기관검색
@@ -7575,11 +7616,8 @@ function playBeep(type="start"){
 let comboGuideTargetHref = "";
 
 function openComboGuideModal(href){
-  comboGuideTargetHref = href || "";
-
-  const modal = document.getElementById("comboGuideModal");
-  if(modal){
-    modal.style.display = "flex";
+  if(href){
+    window.location.href = href;
   }
   return false;
 }
