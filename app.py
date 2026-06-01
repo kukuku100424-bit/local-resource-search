@@ -3563,6 +3563,72 @@ iframe{
     <a href="/home" class="home-btn">홈으로</a>
   </div>
 
+  <iframe src="https://docs.google.com/gview?embedded=1&url=https%3A%2F%2Fcarenavi.kr%2Fstatic%2Fguide.pdf"></iframe>
+</div>
+</body>
+</html>
+""")
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 사업 안내</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+}
+.viewer-wrap{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+.viewer-top{
+  height:48px;
+  background:#ffffff;
+  border-bottom:1px solid #e5e7eb;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 12px;
+  box-sizing:border-box;
+}
+.viewer-title{
+  font-size:14px;
+  font-weight:800;
+  color:#111827;
+}
+.home-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:30px;
+  padding:0 10px;
+  border-radius:8px;
+  background:#f3f4f6;
+  color:#374151;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:700;
+}
+iframe{
+  flex:1;
+  width:100%;
+  border:none;
+  background:#fff;
+}
+</style>
+</head>
+<body>
+<div class="viewer-wrap">
+  <div class="viewer-top">
+    <div class="viewer-title">통합돌봄 사업 안내</div>
+    <a href="/home" class="home-btn">홈으로</a>
+  </div>
+
   <iframe src="https://docs.google.com/gview?embedded=1&url=https://carenavi.kr/static/guide.pdf"></iframe>
 </div>
 </body>
