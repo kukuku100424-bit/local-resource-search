@@ -7843,8 +7843,32 @@ function setVoiceButtonRecording(active){
 function startVoiceInput(event){
   if(event) event.preventDefault();
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(window.AndroidVoice && navigator.userAgent.indexOf("CareNaviApp") !== -1){
+    window.__careNaviVoiceResult = function(text){
+      if(!text) return;
 
+      queryInput.value = text;
+
+      const overlay = document.getElementById("voiceOverlay");
+      if(overlay){
+        overlay.style.display = "none";
+      }
+
+      if(loading){
+        loading.style.display = "flex";
+      }
+
+      startLoadingMessages();
+
+      document.getElementById("descAction").value = "search";
+      searchForm.submit();
+    };
+
+    window.AndroidVoice.startVoiceSearch();
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SpeechRecognition){
     alert("이 브라우저는 음성인식을 지원하지 않습니다.");
     return;
