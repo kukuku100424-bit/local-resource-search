@@ -1640,7 +1640,7 @@ body{
 <div class="icon">📋</div>
 
 <div class="text">
-<b>통합돌봄 지자체(사전/자체/연계) 조사</b>
+<b>통합돌봄 지자체 조사 서식</b>
 <span>사전조사, 자체조사, 연계조사를 진행하고 저장합니다.</span>
 </div>
 
@@ -4077,7 +4077,7 @@ function comboGuideStart() {
   overlay.addEventListener('click', closeGuide);
 }
 
-window.addEventListener('load', function() { setTimeout(comboGuideStart, 300); });
+// 가이드 투어 제거: 자동 실행하지 않음
 </script>
 
 </body>
@@ -6517,13 +6517,27 @@ button:hover{
   line-height:1.55;
   padding:8px 12px;
   border-radius:8px;
-  white-space:nowrap;
+  width:max-content;
+  max-width:min(360px, calc(100vw - 64px));
+  white-space:normal;
+  word-break:keep-all;
+  overflow-wrap:break-word;
   z-index:999;
   box-shadow:0 4px 14px rgba(0,0,0,0.18);
   pointer-events:none;
 }
 .direct-need-tooltip-wrap:hover .direct-need-tooltip-box{
   display:block;
+}
+
+@media (max-width:480px){
+  .direct-need-tooltip-box{
+    left:50%;
+    top:26px;
+    transform:translateX(-50%);
+    max-width:calc(100vw - 32px);
+    text-align:left;
+  }
 }
 .cute-star{
   display:inline-flex;
@@ -6610,9 +6624,9 @@ button:hover{
 
 .group-title-grid{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   gap:4px;
-  flex-wrap:nowrap;
+  flex-wrap:wrap;
 }
 
 .group-title-col{
@@ -6629,9 +6643,11 @@ button:hover{
   color:#111827;
   line-height:1.35;
   letter-spacing:-0.3px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+  white-space:normal;
+  overflow:visible;
+  text-overflow:clip;
+  word-break:keep-all;
+  overflow-wrap:break-word;
 }
 
 .group-title-value.main-val{
@@ -6751,23 +6767,23 @@ button:hover{
 
 @media (max-width:480px){
   .group-card-top{
-    flex-direction:row;
-    align-items:flex-start;
+    flex-direction:column;
+    align-items:stretch;
     gap:10px;
   }
 
   .group-title-area{
-    flex:1;
+    width:100%;
     min-width:0;
   }
 
   .group-search-btn{
-    align-self:flex-start;
-    margin-top:2px;
+    align-self:flex-end;
+    margin-top:0;
   }
 
   .group-title-value{
-    font-size:16px;
+    font-size:15px;
     font-weight:750;
   }
 
@@ -9132,7 +9148,7 @@ function careGuideStart() {
   overlay.addEventListener('click', closeGuide);
 }
 
-window.addEventListener('load', function() { setTimeout(careGuideStart, 300); });
+// 가이드 투어 제거: 자동 실행하지 않음
 </script>
 
 </body>
@@ -10825,7 +10841,7 @@ document.addEventListener('click', function(){
   document.querySelectorAll('.direct-need-tooltip-box').forEach(function(b){ b.style.display='none'; });
 });
 
-window.addEventListener('load', function() { setTimeout(guideStart, 300); });
+// 가이드 투어 제거: 자동 실행하지 않음
 </script>
 </body>
 </html>
