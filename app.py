@@ -3502,7 +3502,72 @@ def board_delete(post_id):
 
 @app.route("/guide")
 def guide():
-    return redirect("/static/guide.pdf")
+    return render_template_string("""
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 사업 안내</title>
+<style>
+body{
+  margin:0;
+  background:#f4f6fb;
+  font-family:'Pretendard',sans-serif;
+}
+.viewer-wrap{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+.viewer-top{
+  height:48px;
+  background:#ffffff;
+  border-bottom:1px solid #e5e7eb;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 12px;
+  box-sizing:border-box;
+}
+.viewer-title{
+  font-size:14px;
+  font-weight:800;
+  color:#111827;
+}
+.home-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:30px;
+  padding:0 10px;
+  border-radius:8px;
+  background:#f3f4f6;
+  color:#374151;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:700;
+}
+iframe{
+  flex:1;
+  width:100%;
+  border:none;
+  background:#fff;
+}
+</style>
+</head>
+<body>
+<div class="viewer-wrap">
+  <div class="viewer-top">
+    <div class="viewer-title">통합돌봄 사업 안내</div>
+    <a href="/home" class="home-btn">홈으로</a>
+  </div>
+
+  <iframe src="https://docs.google.com/gview?embedded=1&url=https://carenavi.kr/static/guide.pdf"></iframe>
+</div>
+</body>
+</html>
+""")
 
 # =========================
 # 상세 API (팝업에서 사용)
@@ -7394,7 +7459,7 @@ transition:0.2s;
 
 </button>
 
-<input type="file" id="imgInput" accept="image/*;capture=camera" capture="environment" style="display:none;">
+<input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none;">
 
 <button type="button" onclick="openImage()" id="imgBtn">
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 24 24">
@@ -7840,35 +7905,74 @@ function setVoiceButtonRecording(active){
   }
 }
 
+function finishVoiceUI(){
+  isRecording = false;
+  setVoiceButtonRecording(false);
+  playBeep("end");
+
+  const overlay = document.getElementById("voiceOverlay");
+  if(overlay){
+    overlay.style.display = "none";
+  }
+}
+
+function submitVoiceText(transcript){
+  if(!transcript) {
+    finishVoiceUI();
+    return;
+  }
+
+  queryInput.value = transcript;
+
+  finishVoiceUI();
+
+  if(loading){
+    loading.style.display = "flex";
+  }
+
+  startLoadingMessages();
+
+  document.getElementById("descAction").value = "search";
+  searchForm.submit();
+}
+
+window.__careNaviVoiceResult = function(text){
+  submitVoiceText(text);
+};
+
+window.__careNaviVoiceEnd = function(){
+  finishVoiceUI();
+};
+
 function startVoiceInput(event){
   if(event) event.preventDefault();
 
-  if(window.AndroidVoice && navigator.userAgent.indexOf("CareNaviApp") !== -1){
-    window.__careNaviVoiceResult = function(text){
-      if(!text) return;
+  const isCareNaviApp = navigator.userAgent.indexOf("CareNaviApp") !== -1;
 
-      queryInput.value = text;
-
-      const overlay = document.getElementById("voiceOverlay");
-      if(overlay){
-        overlay.style.display = "none";
+  if(isCareNaviApp && window.AndroidVoice){
+    if(isRecording){
+      if(window.AndroidVoice.stopVoiceSearch){
+        window.AndroidVoice.stopVoiceSearch();
       }
+      finishVoiceUI();
+      return;
+    }
 
-      if(loading){
-        loading.style.display = "flex";
-      }
+    isRecording = true;
+    setVoiceButtonRecording(true);
+    playBeep("start");
 
-      startLoadingMessages();
-
-      document.getElementById("descAction").value = "search";
-      searchForm.submit();
-    };
+    const overlay = document.getElementById("voiceOverlay");
+    if(overlay){
+      overlay.style.display = "block";
+    }
 
     window.AndroidVoice.startVoiceSearch();
     return;
   }
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
   if(!SpeechRecognition){
     alert("이 브라우저는 음성인식을 지원하지 않습니다.");
     return;
@@ -7882,47 +7986,25 @@ function startVoiceInput(event){
   recognition = new SpeechRecognition();
   recognition.lang = "ko-KR";
 
-recognition.onstart = function(){
-  isRecording = true;
-  setVoiceButtonRecording(true);
-  playBeep("start");
+  recognition.onstart = function(){
+    isRecording = true;
+    setVoiceButtonRecording(true);
+    playBeep("start");
 
-  const overlay = document.getElementById("voiceOverlay");
-  if(overlay){
-    overlay.style.display = "block";
-  }
-};
+    const overlay = document.getElementById("voiceOverlay");
+    if(overlay){
+      overlay.style.display = "block";
+    }
+  };
 
-recognition.onresult = function(e){
-  const transcript = e.results[0][0].transcript;
-  queryInput.value = transcript;
+  recognition.onresult = function(e){
+    const transcript = e.results[0][0].transcript;
+    submitVoiceText(transcript);
+  };
 
-  const overlay = document.getElementById("voiceOverlay");
-  if(overlay){
-    overlay.style.display = "none";
-  }
-
-  if(loading){
-    loading.style.display = "flex";
-  }
-
-  startLoadingMessages();
-
-  document.getElementById("descAction").value = "search";
-  searchForm.submit();
-};
-
-recognition.onend = function(){
-  isRecording = false;
-  setVoiceButtonRecording(false);
-  playBeep("end");
-
-  const overlay = document.getElementById("voiceOverlay");
-  if(overlay){
-    overlay.style.display = "none";
-  }
-};
-
+  recognition.onend = function(){
+    finishVoiceUI();
+  };
 
   recognition.start();
 }
