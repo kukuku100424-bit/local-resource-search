@@ -1764,9 +1764,9 @@ body{
     </div>
 
     <div class="apk-install-buttons">
-      <button type="button" class="apk-cancel-btn" onclick="closeApkInstallModal()">취소</button>
-      <button type="button" class="apk-confirm-btn" onclick="confirmApkDownload()">다운로드</button>
-    </div>
+  <button type="button" class="apk-confirm-btn" onclick="confirmApkDownload()">다운로드</button>
+  <button type="button" class="apk-cancel-btn" onclick="closeApkInstallModal()">취소</button>
+</div>
 
   </div>
 </div>
