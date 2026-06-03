@@ -1240,16 +1240,200 @@ body{
 
 .home-admin-hidden{
   position:absolute;
-  top:-4px;
-  right:0;
-  font-size:10px;
-  color:#cbd5e1;
+  top:-14px;
+  left:-2px;
+  font-size:9px;
+  color:#e5e7eb;
   text-decoration:none;
-  font-weight:600;
+  font-weight:500;
+  opacity:0.5;
 }
 
 .home-admin-hidden:hover{
-  color:#64748b;
+  color:#94a3b8;
+  opacity:1;
+}
+
+/* 사용설명서 버튼 (동그란 ? 버튼) */
+.home-help-btn{
+  position:absolute;
+  top:-2px;
+  right:0;
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#2563eb;
+  border:none;
+  border-radius:50%;
+  color:#fff;
+  font-size:18px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+  text-decoration:none;
+  z-index:5;
+  box-shadow:0 2px 6px rgba(37,99,235,0.3);
+  transition:background 0.15s, transform 0.1s;
+}
+.home-help-btn:hover{
+  background:#1d4ed8;
+}
+.home-help-btn:active{
+  transform:scale(0.94);
+}
+
+/* 가이드(설명서) 모달 */
+.guide-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.75);
+  z-index:10000;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.guide-modal.open{ display:flex; }
+.guide-box{
+  background:#fff;
+  border-radius:16px;
+  max-width:560px;
+  width:100%;
+  max-height:92vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.guide-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 16px;
+  border-bottom:1px solid #e5e7eb;
+}
+.guide-title{
+  font-size:15px;
+  font-weight:800;
+  color:#111827;
+}
+.guide-close{
+  background:none;
+  border:none;
+  font-size:22px;
+  color:#6b7280;
+  cursor:pointer;
+  padding:4px 8px;
+}
+.guide-image-wrap{
+  flex:1;
+  overflow:auto;
+  background:#f9fafb;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding:8px;
+}
+.guide-image-wrap img{
+  max-width:100%;
+  height:auto;
+  display:block;
+}
+.guide-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px;
+  border-top:1px solid #e5e7eb;
+  background:#fff;
+}
+.guide-nav-btn{
+  padding:8px 16px;
+  border-radius:10px;
+  background:#2563eb;
+  color:#fff;
+  border:none;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+}
+.guide-nav-btn:disabled{
+  background:#cbd5e1;
+  cursor:not-allowed;
+}
+.guide-page-indicator{
+  font-size:13px;
+  color:#6b7280;
+  font-weight:600;
+}
+
+/* 첫방문 가이드 투어 */
+.tour-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.65);
+  z-index:9998;
+  pointer-events:auto;
+}
+.tour-overlay.open{ display:block; }
+.tour-spotlight{
+  position:fixed;
+  border-radius:24px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,0.65);
+  pointer-events:none;
+  z-index:9999;
+  transition:all 0.25s ease;
+}
+.tour-popup{
+  display:none;
+  position:fixed;
+  z-index:10001;
+  background:#fff;
+  border-radius:14px;
+  padding:18px 18px 14px;
+  max-width:300px;
+  box-shadow:0 12px 36px rgba(0,0,0,0.3);
+}
+.tour-popup.open{ display:block; }
+.tour-popup-title{
+  font-size:15px;
+  font-weight:800;
+  color:#111827;
+  margin-bottom:6px;
+}
+.tour-popup-text{
+  font-size:13px;
+  color:#475569;
+  line-height:1.5;
+  margin-bottom:14px;
+}
+.tour-popup-buttons{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+.tour-btn{
+  border:none;
+  border-radius:8px;
+  padding:7px 12px;
+  font-size:12.5px;
+  font-weight:700;
+  cursor:pointer;
+}
+.tour-btn-primary{
+  background:#2563eb;
+  color:#fff;
+}
+.tour-btn-secondary{
+  background:#f1f5f9;
+  color:#475569;
+}
+.tour-btn-dismiss{
+  background:transparent;
+  color:#94a3b8;
+  font-weight:600;
 }
 
 .title + .card{
@@ -1597,6 +1781,7 @@ body{
 
 <div class="title">
 <a href="/admin" class="home-admin-hidden">관리자</a>
+<button type="button" class="home-help-btn" onclick="openGuide()" aria-label="사용설명서">?</button>
 <h1>NHIS-G <span>케어네비</span></h1>
 <p>통합돌봄 자원 검색 및 안내 서비스</p>
 </div>
@@ -2303,6 +2488,153 @@ window.addEventListener("popstate", function (e) {
     reportModal.style.display = "none";
   }
   history.pushState({ page: "home" }, "", location.href);
+});
+</script>
+
+<!-- 사용설명서 모달 -->
+<div id="guideModal" class="guide-modal" onclick="onGuideBgClick(event)">
+  <div class="guide-box" onclick="event.stopPropagation()">
+    <div class="guide-header">
+      <div class="guide-title">사용설명서</div>
+      <button type="button" class="guide-close" onclick="closeGuide()">×</button>
+    </div>
+    <div class="guide-image-wrap">
+      <img id="guideImage" src="" alt="사용설명서" />
+    </div>
+    <div class="guide-nav">
+      <button type="button" class="guide-nav-btn" id="guidePrev" onclick="prevGuidePage()">이전</button>
+      <div class="guide-page-indicator" id="guidePageIndicator">1</div>
+      <button type="button" class="guide-nav-btn" id="guideNext" onclick="nextGuidePage()">다음</button>
+    </div>
+  </div>
+</div>
+
+<!-- 첫방문 가이드 투어 -->
+<div id="tourOverlay" class="tour-overlay" onclick="closeTour()"></div>
+<div id="tourSpotlight" class="tour-spotlight" style="display:none;"></div>
+<div id="tourPopup" class="tour-popup">
+  <div class="tour-popup-title">케어네비를 처음 방문해주셨네요 👋</div>
+  <div class="tour-popup-text">사용법이 궁금하시면 우측 상단의 <b>?</b> 버튼을 눌러보세요.</div>
+  <div class="tour-popup-buttons">
+    <button type="button" class="tour-btn tour-btn-primary" onclick="openGuideFromTour()">설명서 보기</button>
+    <button type="button" class="tour-btn tour-btn-dismiss" onclick="dismissTourForever()">다시 보지 않기</button>
+  </div>
+</div>
+
+<script>
+/* ===== 사용설명서 ===== */
+var guideTotalPages = 0;       // 동적으로 탐지됨
+var guideCurrentPage = 1;
+var guideMaxKnown = 0;          // 지금까지 존재 확인된 최대 페이지
+
+function openGuide(){
+  closeTour();
+  guideCurrentPage = 1;
+  loadGuidePage(1);
+  document.getElementById('guideModal').classList.add('open');
+}
+function closeGuide(){
+  document.getElementById('guideModal').classList.remove('open');
+}
+function onGuideBgClick(e){
+  if(e.target && e.target.id === 'guideModal'){ closeGuide(); }
+}
+function loadGuidePage(n){
+  var img = document.getElementById('guideImage');
+  var indicator = document.getElementById('guidePageIndicator');
+  var nextBtn = document.getElementById('guideNext');
+  var prevBtn = document.getElementById('guidePrev');
+
+  img.onload = function(){
+    if(n > guideMaxKnown) guideMaxKnown = n;
+    indicator.textContent = n + (guideTotalPages ? ' / ' + guideTotalPages : '');
+    prevBtn.disabled = (n <= 1);
+    /* 다음 페이지 존재 여부 미리 확인 */
+    var probe = new Image();
+    probe.onload = function(){ nextBtn.disabled = false; };
+    probe.onerror = function(){
+      nextBtn.disabled = true;
+      guideTotalPages = n;
+      indicator.textContent = n + ' / ' + guideTotalPages;
+    };
+    probe.src = '/static/' + (n + 1) + '.jpg?v=' + Date.now();
+  };
+  img.onerror = function(){
+    /* 페이지가 없으면 이전 페이지로 */
+    if(n > 1){
+      guideTotalPages = n - 1;
+      guideCurrentPage = n - 1;
+      loadGuidePage(guideCurrentPage);
+    }
+  };
+  img.src = '/static/' + n + '.jpg?v=' + Date.now();
+}
+function nextGuidePage(){
+  guideCurrentPage += 1;
+  loadGuidePage(guideCurrentPage);
+}
+function prevGuidePage(){
+  if(guideCurrentPage > 1){
+    guideCurrentPage -= 1;
+    loadGuidePage(guideCurrentPage);
+  }
+}
+
+/* ===== 첫방문 가이드 투어 ===== */
+var TOUR_STORAGE_KEY = 'careNaviTourDismissed';
+
+function tourDismissed(){
+  try { return localStorage.getItem(TOUR_STORAGE_KEY) === '1'; }
+  catch(e){ return false; }
+}
+function dismissTourForever(){
+  try { localStorage.setItem(TOUR_STORAGE_KEY, '1'); }
+  catch(e){}
+  closeTour();
+}
+function openTour(){
+  var btn = document.querySelector('.home-help-btn');
+  if(!btn) return;
+  var rect = btn.getBoundingClientRect();
+
+  var spotlight = document.getElementById('tourSpotlight');
+  var pad = 8;
+  spotlight.style.display = 'block';
+  spotlight.style.top    = (rect.top  - pad) + 'px';
+  spotlight.style.left   = (rect.left - pad) + 'px';
+  spotlight.style.width  = (rect.width  + pad*2) + 'px';
+  spotlight.style.height = (rect.height + pad*2) + 'px';
+
+  var popup = document.getElementById('tourPopup');
+  popup.classList.add('open');
+
+  /* 팝업을 화면 중앙에 배치 (버튼 아래쪽) */
+  var viewportW = window.innerWidth;
+  var actualWidth = popup.offsetWidth || 300;
+  var top  = rect.bottom + 14;
+  var left = (viewportW - actualWidth) / 2;
+  if(left < 12) left = 12;
+  popup.style.top  = top + 'px';
+  popup.style.left = left + 'px';
+
+  document.getElementById('tourOverlay').classList.add('open');
+}
+function closeTour(){
+  document.getElementById('tourOverlay').classList.remove('open');
+  document.getElementById('tourPopup').classList.remove('open');
+  document.getElementById('tourSpotlight').style.display = 'none';
+}
+function openGuideFromTour(){
+  closeTour();
+  openGuide();
+}
+
+/* 페이지 로드시 첫방문 체크 */
+window.addEventListener('load', function(){
+  if(!tourDismissed()){
+    /* 약간 딜레이 줘서 레이아웃 안정화 후 띄움 */
+    setTimeout(openTour, 350);
+  }
 });
 </script>
 
