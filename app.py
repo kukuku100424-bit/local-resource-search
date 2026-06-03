@@ -3842,9 +3842,15 @@ label.field-label:first-of-type{ margin-top:8px; }
 
 /* ── 모달 ── */
 .modal-overlay{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:999; }
-.modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; }
+.modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; overscroll-behavior:contain; }
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
+.modal-box p.m-long{ margin:0; word-break:keep-all; }
+.m-long.clamp{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+.m-long-row{ margin:0 0 10px 0; }
+.m-more{ display:none; align-items:center; justify-content:center; gap:3px; width:100%; margin:3px 0 0; padding:0; border:none; background:none; color:#6b7280; font-size:12px; font-weight:600; cursor:pointer; }
+.m-more-ico{ transition:transform .15s; }
+.m-more.expanded .m-more-ico{ transform:rotate(180deg); }
 .modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
 .modal-btn:hover{ background:#4a6cd4; }
 
@@ -4016,7 +4022,7 @@ label.field-label:first-of-type{ margin-top:8px; }
 <div id="modal" class="modal-overlay">
   <div class="modal-box">
     <h3 id="m_title"></h3>
-    <p style="margin:0 0 14px 0; line-height:1.6;">
+    <p style="margin:0 0 10px 0; line-height:1.6;">
       <b>기관명:</b> <span id="m_org" style="white-space:normal; word-break:keep-all;"></span>
     </p>
     <p>
@@ -4024,9 +4030,18 @@ label.field-label:first-of-type{ margin-top:8px; }
       <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">&#128222;</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
-    <p id="m_target_row" style="display:none;"><b>대상:</b> <span id="m_target"></span></p>
-    <p id="m_content_row" style="display:none;"><b>주요내용:</b> <span id="m_content"></span></p>
-    <p id="m_price_row" style="display:none;"><b>서비스단가:</b> <span id="m_price"></span></p>
+    <div id="m_target_row" class="m-long-row" style="display:none;">
+      <p class="m-long clamp" id="m_target_p"><b>대상:</b> <span id="m_target"></span></p>
+      <button type="button" class="m-more" id="m_target_more" onclick="toggleMore('m_target_p','m_target_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div id="m_content_row" class="m-long-row" style="display:none;">
+      <p class="m-long clamp" id="m_content_p"><b>주요내용:</b> <span id="m_content"></span></p>
+      <button type="button" class="m-more" id="m_content_more" onclick="toggleMore('m_content_p','m_content_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div id="m_price_row" class="m-long-row" style="display:none;">
+      <p class="m-long clamp" id="m_price_p"><b>서비스단가:</b> <span id="m_price"></span></p>
+      <button type="button" class="m-more" id="m_price_more" onclick="toggleMore('m_price_p','m_price_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
     <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;display:none;"></iframe>
     <button onclick="closeModal()" class="modal-btn">닫기</button>
   </div>
@@ -4085,11 +4100,48 @@ function openDetail(idx){
       }
 
       document.getElementById("modal").style.display = "block";
+      document.body.style.overflow = "hidden";
+      requestAnimationFrame(function(){
+        setupClamp("m_target_p","m_target_more");
+        setupClamp("m_content_p","m_content_more");
+        setupClamp("m_price_p","m_price_more");
+      });
     });
+}
+
+function setupClamp(pId, btnId){
+  var p = document.getElementById(pId);
+  var b = document.getElementById(btnId);
+  if(!p || !b) return;
+  p.classList.add("clamp");
+  b.classList.remove("expanded");
+  var t = b.querySelector(".m-more-t");
+  if(t) t.innerText = "더보기";
+  b.style.display = "none";
+  if(p.scrollHeight - p.clientHeight > 1){
+    b.style.display = "flex";
+  }
+}
+
+function toggleMore(pId, btnId){
+  var p = document.getElementById(pId);
+  var b = document.getElementById(btnId);
+  if(!p || !b) return;
+  var t = b.querySelector(".m-more-t");
+  if(p.classList.contains("clamp")){
+    p.classList.remove("clamp");
+    b.classList.add("expanded");
+    if(t) t.innerText = "접기";
+  } else {
+    p.classList.add("clamp");
+    b.classList.remove("expanded");
+    if(t) t.innerText = "더보기";
+  }
 }
 
 function closeModal(){
   document.getElementById("modal").style.display = "none";
+  document.body.style.overflow = "";
 }
 
 function handleSidoChange(form){
