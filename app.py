@@ -1003,32 +1003,6 @@ df.columns = [
     for c in df.columns
 ]
 
-# =========================
-# 설명회용 테스트 자원 추가
-# 엑셀에는 추가하지 않고, 실행 중에만 df에 1건 추가
-# =========================
-TEST_RESOURCE = {
-    "시도": "광주광역시",
-    "시군구": "서구",
-    "대분류": "요양",
-    "중분류": "방문요양",
-    "프로그램명(사업명)": "OO방문요양",
-    "서비스제공기관명": "ㅁㅁ재가복지센터",
-    "기관연락처": "062-1234-5678",
-    "기관주소": "광주광역시 상무중앙로 114번길 14",
-    "서비스내용": "요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원",
-    "서비스설명": "노인을 대상으로 요양보호사가 가정을 방문하여 식사, 청소, 이동 도움 등 일상생활을 지원하는 방문요양 서비스",
-    "검색어": "노인, 방문요양, 요양보호사, 식사 지원, 일상생활 지원, 가정 방문, 재가복지",
-    "관리주체": "지자체",
-    "기타": "서비스단가: 월 20,000원<br>주요내용: 요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원<br>대상: 노인"
-}
-
-for col in TEST_RESOURCE.keys():
-    if col not in df.columns:
-        df[col] = ""
-
-df = pd.concat([df, pd.DataFrame([TEST_RESOURCE])], ignore_index=True)
-
 def find_col(*names):
     for name in names:
         clean_name = str(name).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
@@ -3642,14 +3616,9 @@ def detail(idx):
     program_name = str(r.get("프로그램명(사업명)", "")).strip()
     org_name = str(r.get("서비스제공기관명", "")).strip()
 
-    service_price = ""
-    service_content = ""
-    service_target = ""
-
-    if program_name == "OO방문요양" and org_name == "ㅁㅁ재가복지센터":
-        service_price = "월 20,000원"
-        service_content = "요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원"
-        service_target = "노인"
+    service_price = str(r.get("서비스단가", "")).strip()
+    service_content = str(r.get("주요내용", "")).strip()
+    service_target = str(r.get("지원대상", "")).strip()
 
     return jsonify({
         "프로그램명칭": program_name,
@@ -3875,9 +3844,21 @@ label.field-label:first-of-type{ margin-top:8px; }
 .modal-overlay{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:999; }
 .modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; }
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
+.m-title-box{ background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; line-height:1.4; padding:7px 12px; border-radius:8px; margin:0 0 14px; word-break:keep-all; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
-.modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
-.modal-btn:hover{ background:#4a6cd4; }
+.modal-btn{ display:block; width:fit-content; min-width:96px; margin:16px auto 0; padding:7px 24px; border:none; border-radius:8px; background:#f1f3f7; color:#4b5563; font-size:13.5px; font-weight:600; cursor:pointer; }
+.modal-btn:hover{ background:#e6e9f0; }
+.m-field{ margin:0 0 11px 0; }
+.m-label{ font-size:12px; font-weight:700; color:#5b7ee5; margin-bottom:2px; letter-spacing:.01em; }
+.m-value{ font-size:14px; line-height:1.5; color:#1f2430; white-space:normal; word-break:keep-all; }
+.tel-btn{ display:inline-flex; align-items:center; margin-left:7px; vertical-align:middle; text-decoration:none; color:#5b7ee5; }
+.tel-btn:hover{ color:#4a6cd4; }
+.tel-btn svg{ display:block; }
+.m-value.clamp{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.m-more{ display:none; align-items:center; justify-content:center; gap:3px; width:100%; margin-top:5px; padding:0; border:none; background:none; color:#6b7280; font-size:12px; font-weight:600; cursor:pointer; }
+.m-more-ico{ transition:transform .15s; }
+.m-more.expanded .m-more-ico{ transform:rotate(180deg); }
+#m_map{ height:200px; }
 
 /* ── 카피라이트 ── */
 .copyright{ text-align:right; margin-top:22px; margin-bottom:6px; padding:0 12px; }
@@ -3913,6 +3894,13 @@ label.field-label:first-of-type{ margin-top:8px; }
   .copyright-line{ margin-bottom:10px; }
   .copyright-main{ font-size:11.5px; line-height:1.45; }
   .copyright-sub{ margin-top:3px; font-size:13px; }
+  .modal-box{ padding:16px 16px 18px; top:4%; max-height:92vh; }
+  .modal-box h3{ font-size:15px; line-height:1.4; margin-bottom:10px; }
+  .m-title-box{ font-size:13.5px; padding:6px 11px; margin-bottom:12px; }
+  .m-field{ margin-bottom:8px; }
+  .m-value{ font-size:13.5px; line-height:1.45; }
+  #m_map{ height:180px !important; margin-top:10px !important; }
+  .modal-btn{ margin:12px auto 0; padding:6px 22px; }
 }
 </style>
 </head>
@@ -4046,19 +4034,45 @@ label.field-label:first-of-type{ margin-top:8px; }
 <!-- 상세 모달 -->
 <div id="modal" class="modal-overlay">
   <div class="modal-box">
-    <h3 id="m_title"></h3>
-    <p style="margin:0 0 14px 0; line-height:1.6;">
-      <b>기관명:</b> <span id="m_org" style="white-space:normal; word-break:keep-all;"></span>
-    </p>
-    <p>
-      <b>기관 연락처:</b> <span id="m_tel"></span>
-      <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">&#128222;</a>
-    </p>
-    <p><b>기관주소:</b> <span id="m_addr"></span></p>
-    <p id="m_price_row" style="display:none;"><b>서비스단가:</b> <span id="m_price"></span></p>
-    <p id="m_content_row" style="display:none;"><b>주요내용:</b> <span id="m_content"></span></p>
-    <p id="m_target_row" style="display:none;"><b>대상:</b> <span id="m_target"></span></p>
-    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;display:none;"></iframe>
+    <div id="m_title" class="m-title-box"></div>
+
+    <div class="m-field">
+      <div class="m-label">기관명</div>
+      <div class="m-value" id="m_org"></div>
+    </div>
+
+    <div class="m-field">
+      <div class="m-label">기관 연락처</div>
+      <div class="m-value">
+        <span id="m_tel"></span>
+        <a id="tel_link" class="tel-btn" style="display:none;" aria-label="전화 걸기"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19.23 15.26l-2.54-.29a1.99 1.99 0 0 0-1.64.57l-1.84 1.84a15.05 15.05 0 0 1-6.59-6.59l1.85-1.85c.43-.43.64-1.03.57-1.64l-.29-2.52a2.001 2.001 0 0 0-1.99-1.77H5.03c-1.13 0-2.07.94-2 2.07.53 8.54 7.36 15.36 15.89 15.89 1.13.07 2.07-.87 2.07-2v-1.73c.01-1.01-.75-1.86-1.76-1.98z"/></svg></a>
+      </div>
+    </div>
+
+    <div class="m-field">
+      <div class="m-label">기관주소</div>
+      <div class="m-value" id="m_addr"></div>
+    </div>
+
+    <div class="m-field" id="m_target_row" style="display:none;">
+      <div class="m-label">대상</div>
+      <div class="m-value clamp" id="m_target"></div>
+      <button type="button" class="m-more" id="m_target_more" onclick="toggleMore('m_target','m_target_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+
+    <div class="m-field" id="m_content_row" style="display:none;">
+      <div class="m-label">주요내용</div>
+      <div class="m-value clamp" id="m_content"></div>
+      <button type="button" class="m-more" id="m_content_more" onclick="toggleMore('m_content','m_content_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+
+    <div class="m-field" id="m_price_row" style="display:none;">
+      <div class="m-label">서비스단가</div>
+      <div class="m-value clamp" id="m_price"></div>
+      <button type="button" class="m-more" id="m_price_more" onclick="toggleMore('m_price','m_price_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+
+    <iframe id="m_map" width="100%" height="200" style="border:0;margin-top:12px;display:none;border-radius:10px;"></iframe>
     <button onclick="closeModal()" class="modal-btn">닫기</button>
   </div>
 </div>
@@ -4107,7 +4121,7 @@ function openDetail(idx){
         const cleanNumber = tel.replace(/[^0-9]/g, "");
         if(cleanNumber){
           telLink.href = "tel:" + cleanNumber;
-          telLink.style.display = "inline";
+          telLink.style.display = "inline-flex";
         } else {
           telLink.style.display = "none";
         }
@@ -4116,7 +4130,42 @@ function openDetail(idx){
       }
 
       document.getElementById("modal").style.display = "block";
+      requestAnimationFrame(function(){
+        setupClamp("m_target","m_target_more");
+        setupClamp("m_content","m_content_more");
+        setupClamp("m_price","m_price_more");
+      });
     });
+}
+
+function setupClamp(valId, btnId){
+  var v = document.getElementById(valId);
+  var b = document.getElementById(btnId);
+  if(!v || !b) return;
+  v.classList.add("clamp");
+  b.classList.remove("expanded");
+  var t = b.querySelector(".m-more-t");
+  if(t) t.innerText = "더보기";
+  b.style.display = "none";
+  if(v.scrollHeight - v.clientHeight > 1){
+    b.style.display = "flex";
+  }
+}
+
+function toggleMore(valId, btnId){
+  var v = document.getElementById(valId);
+  var b = document.getElementById(btnId);
+  if(!v || !b) return;
+  var t = b.querySelector(".m-more-t");
+  if(v.classList.contains("clamp")){
+    v.classList.remove("clamp");
+    b.classList.add("expanded");
+    if(t) t.innerText = "접기";
+  } else {
+    v.classList.add("clamp");
+    b.classList.remove("expanded");
+    if(t) t.innerText = "더보기";
+  }
 }
 
 function closeModal(){
