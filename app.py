@@ -3845,12 +3845,12 @@ label.field-label:first-of-type{ margin-top:8px; }
 .modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; overscroll-behavior:contain; }
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
-.modal-box p.m-long{ margin:0; word-break:keep-all; }
-.m-long.clamp{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
-.m-long-row{ margin:0 0 10px 0; }
-.m-more{ display:none; align-items:center; justify-content:center; gap:3px; width:100%; margin:3px 0 0; padding:0; border:none; background:none; color:#6b7280; font-size:12px; font-weight:600; cursor:pointer; }
-.m-more-ico{ transition:transform .15s; }
-.m-more.expanded .m-more-ico{ transform:rotate(180deg); }
+.m-acc{ margin:0 0 8px 0; }
+.m-acc-btn{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; padding:9px 12px; border:1px solid #e3e7ef; border-radius:8px; background:#f7f8fb; color:#333; font-size:13px; font-weight:700; text-align:left; cursor:pointer; }
+.m-acc-btn:hover{ background:#eef1f6; }
+.m-acc-ico{ flex:none; transition:transform .15s; color:#9aa1b0; }
+.m-acc.open .m-acc-ico{ transform:rotate(180deg); }
+.m-acc-body{ display:none; padding:8px 12px 0; font-size:13px; line-height:1.6; color:#333; word-break:keep-all; white-space:normal; }
 .modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
 .modal-btn:hover{ background:#4a6cd4; }
 
@@ -4030,19 +4030,19 @@ label.field-label:first-of-type{ margin-top:8px; }
       <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">&#128222;</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
-    <div id="m_target_row" class="m-long-row" style="display:none;">
-      <p class="m-long clamp" id="m_target_p"><b>대상:</b> <span id="m_target"></span></p>
-      <button type="button" class="m-more" id="m_target_more" onclick="toggleMore('m_target_p','m_target_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div id="m_target_row" class="m-acc" style="display:none;">
+      <button type="button" class="m-acc-btn" onclick="toggleAcc('m_target_row','m_target_wrap')"><span>대상</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="m-acc-body" id="m_target_wrap"><span id="m_target"></span></div>
     </div>
-    <div id="m_content_row" class="m-long-row" style="display:none;">
-      <p class="m-long clamp" id="m_content_p"><b>주요내용:</b> <span id="m_content"></span></p>
-      <button type="button" class="m-more" id="m_content_more" onclick="toggleMore('m_content_p','m_content_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div id="m_content_row" class="m-acc" style="display:none;">
+      <button type="button" class="m-acc-btn" onclick="toggleAcc('m_content_row','m_content_wrap')"><span>주요내용</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="m-acc-body" id="m_content_wrap"><span id="m_content"></span></div>
     </div>
-    <div id="m_price_row" class="m-long-row" style="display:none;">
-      <p class="m-long clamp" id="m_price_p"><b>서비스단가:</b> <span id="m_price"></span></p>
-      <button type="button" class="m-more" id="m_price_more" onclick="toggleMore('m_price_p','m_price_more')"><span class="m-more-t">더보기</span><svg class="m-more-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div id="m_price_row" class="m-acc" style="display:none;">
+      <button type="button" class="m-acc-btn" onclick="toggleAcc('m_price_row','m_price_wrap')"><span>서비스단가</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="m-acc-body" id="m_price_wrap"><span id="m_price"></span></div>
     </div>
-    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;display:none;"></iframe>
+    <iframe id="m_map" width="100%" height="170" style="border:0;margin-top:10px;display:none;border-radius:8px;"></iframe>
     <button onclick="closeModal()" class="modal-btn">닫기</button>
   </div>
 </div>
@@ -4101,41 +4101,29 @@ function openDetail(idx){
 
       document.getElementById("modal").style.display = "block";
       document.body.style.overflow = "hidden";
-      requestAnimationFrame(function(){
-        setupClamp("m_target_p","m_target_more");
-        setupClamp("m_content_p","m_content_more");
-        setupClamp("m_price_p","m_price_more");
-      });
+      resetAcc("m_target_row","m_target_wrap");
+      resetAcc("m_content_row","m_content_wrap");
+      resetAcc("m_price_row","m_price_wrap");
     });
 }
 
-function setupClamp(pId, btnId){
-  var p = document.getElementById(pId);
-  var b = document.getElementById(btnId);
-  if(!p || !b) return;
-  p.classList.add("clamp");
-  b.classList.remove("expanded");
-  var t = b.querySelector(".m-more-t");
-  if(t) t.innerText = "더보기";
-  b.style.display = "none";
-  if(p.scrollHeight - p.clientHeight > 1){
-    b.style.display = "flex";
-  }
+function resetAcc(rowId, bodyId){
+  var row = document.getElementById(rowId);
+  var body = document.getElementById(bodyId);
+  if(row) row.classList.remove("open");
+  if(body) body.style.display = "none";
 }
 
-function toggleMore(pId, btnId){
-  var p = document.getElementById(pId);
-  var b = document.getElementById(btnId);
-  if(!p || !b) return;
-  var t = b.querySelector(".m-more-t");
-  if(p.classList.contains("clamp")){
-    p.classList.remove("clamp");
-    b.classList.add("expanded");
-    if(t) t.innerText = "접기";
+function toggleAcc(rowId, bodyId){
+  var row = document.getElementById(rowId);
+  var body = document.getElementById(bodyId);
+  if(!row || !body) return;
+  if(body.style.display === "block"){
+    body.style.display = "none";
+    row.classList.remove("open");
   } else {
-    p.classList.add("clamp");
-    b.classList.remove("expanded");
-    if(t) t.innerText = "더보기";
+    body.style.display = "block";
+    row.classList.add("open");
   }
 }
 
