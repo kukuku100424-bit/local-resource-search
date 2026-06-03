@@ -3845,12 +3845,13 @@ label.field-label:first-of-type{ margin-top:8px; }
 .modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; overscroll-behavior:contain; }
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
-.m-acc{ margin:0 0 8px 0; }
-.m-acc-btn{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; padding:9px 12px; border:1px solid #e3e7ef; border-radius:8px; background:#f7f8fb; color:#333; font-size:13px; font-weight:700; text-align:left; cursor:pointer; }
+.m-acc-row{ display:flex; gap:6px; margin:2px 0 0; }
+.m-acc-btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:4px; min-width:0; padding:9px 6px; border:1px solid #e3e7ef; border-radius:8px; background:#f7f8fb; color:#333; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
 .m-acc-btn:hover{ background:#eef1f6; }
+.m-acc-btn.open{ background:#eef2ff; border-color:#c7d4f5; color:#4a6cd4; }
 .m-acc-ico{ flex:none; transition:transform .15s; color:#9aa1b0; }
-.m-acc.open .m-acc-ico{ transform:rotate(180deg); }
-.m-acc-body{ display:none; padding:8px 12px 0; font-size:13px; line-height:1.6; color:#333; word-break:keep-all; white-space:normal; }
+.m-acc-btn.open .m-acc-ico{ transform:rotate(180deg); color:#5b7ee5; }
+.m-acc-body{ display:none; margin-top:8px; padding:9px 12px; border:1px solid #e3e7ef; border-radius:8px; background:#fafbfc; font-size:13px; line-height:1.6; color:#333; word-break:keep-all; }
 .modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
 .modal-btn:hover{ background:#4a6cd4; }
 
@@ -4030,18 +4031,14 @@ label.field-label:first-of-type{ margin-top:8px; }
       <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">&#128222;</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
-    <div id="m_target_row" class="m-acc" style="display:none;">
-      <button type="button" class="m-acc-btn" onclick="toggleAcc('m_target_row','m_target_wrap')"><span>대상</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-      <div class="m-acc-body" id="m_target_wrap"><span id="m_target"></span></div>
+    <div class="m-acc-row">
+      <button type="button" id="m_target_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_target_row','m_target_wrap')"><span>대상</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button type="button" id="m_content_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_content_row','m_content_wrap')"><span>주요내용</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button type="button" id="m_price_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_price_row','m_price_wrap')"><span>서비스단가</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     </div>
-    <div id="m_content_row" class="m-acc" style="display:none;">
-      <button type="button" class="m-acc-btn" onclick="toggleAcc('m_content_row','m_content_wrap')"><span>주요내용</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-      <div class="m-acc-body" id="m_content_wrap"><span id="m_content"></span></div>
-    </div>
-    <div id="m_price_row" class="m-acc" style="display:none;">
-      <button type="button" class="m-acc-btn" onclick="toggleAcc('m_price_row','m_price_wrap')"><span>서비스단가</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-      <div class="m-acc-body" id="m_price_wrap"><span id="m_price"></span></div>
-    </div>
+    <div class="m-acc-body" id="m_target_wrap"><span id="m_target"></span></div>
+    <div class="m-acc-body" id="m_content_wrap"><span id="m_content"></span></div>
+    <div class="m-acc-body" id="m_price_wrap"><span id="m_price"></span></div>
     <iframe id="m_map" width="100%" height="170" style="border:0;margin-top:10px;display:none;border-radius:8px;"></iframe>
     <button onclick="closeModal()" class="modal-btn">닫기</button>
   </div>
@@ -4068,9 +4065,9 @@ function openDetail(idx){
       document.getElementById("m_content").innerText = content;
       document.getElementById("m_target").innerText = target;
 
-      priceRow.style.display = price ? "block" : "none";
-      contentRow.style.display = content ? "block" : "none";
-      targetRow.style.display = target ? "block" : "none";
+      priceRow.style.display = price ? "flex" : "none";
+      contentRow.style.display = content ? "flex" : "none";
+      targetRow.style.display = target ? "flex" : "none";
 
       const addr = (d["기관주소"] || "").trim();
       const mapFrame = document.getElementById("m_map");
@@ -4101,29 +4098,30 @@ function openDetail(idx){
 
       document.getElementById("modal").style.display = "block";
       document.body.style.overflow = "hidden";
-      resetAcc("m_target_row","m_target_wrap");
-      resetAcc("m_content_row","m_content_wrap");
-      resetAcc("m_price_row","m_price_wrap");
+      resetAccAll();
     });
 }
 
-function resetAcc(rowId, bodyId){
-  var row = document.getElementById(rowId);
-  var body = document.getElementById(bodyId);
-  if(row) row.classList.remove("open");
-  if(body) body.style.display = "none";
+var ACC_PAIRS = [["m_target_row","m_target_wrap"],["m_content_row","m_content_wrap"],["m_price_row","m_price_wrap"]];
+
+function resetAccAll(){
+  ACC_PAIRS.forEach(function(pair){
+    var btn = document.getElementById(pair[0]);
+    var body = document.getElementById(pair[1]);
+    if(btn) btn.classList.remove("open");
+    if(body) body.style.display = "none";
+  });
 }
 
-function toggleAcc(rowId, bodyId){
-  var row = document.getElementById(rowId);
+function toggleAcc(btnId, bodyId){
+  var btn = document.getElementById(btnId);
   var body = document.getElementById(bodyId);
-  if(!row || !body) return;
-  if(body.style.display === "block"){
-    body.style.display = "none";
-    row.classList.remove("open");
-  } else {
+  if(!btn || !body) return;
+  var willOpen = body.style.display !== "block";
+  resetAccAll();
+  if(willOpen){
     body.style.display = "block";
-    row.classList.add("open");
+    btn.classList.add("open");
   }
 }
 
