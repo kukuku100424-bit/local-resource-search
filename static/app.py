@@ -152,6 +152,7 @@ def require_login_all_pages():
         request.path == "/"
         or request.path == "/login"
         or request.path == "/admin"
+        or request.path == "/app-version.json"
         or request.path.startswith("/static")
     ):
         return None
@@ -453,6 +454,20 @@ button:hover{
 </div>
 
 </div>
+
+<div id="cn-app-version" style="position:fixed;bottom:8px;right:10px;font-size:11px;color:#aaa;pointer-events:none;z-index:9999;"></div>
+<script>
+(function(){
+  if(window.AndroidAppInfo){
+    try{
+      var name = window.AndroidAppInfo.getVersionName();
+      var code = window.AndroidAppInfo.getVersionCode();
+      var el = document.getElementById('cn-app-version');
+      if(el) el.textContent = '케어네비 앱 v' + name + ' (' + code + ')';
+    }catch(e){}
+  }
+})();
+</script>
 </body>
 </html>
 """
@@ -1002,32 +1017,6 @@ df.columns = [
     str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
     for c in df.columns
 ]
-
-# =========================
-# 설명회용 테스트 자원 추가
-# 엑셀에는 추가하지 않고, 실행 중에만 df에 1건 추가
-# =========================
-TEST_RESOURCE = {
-    "시도": "광주광역시",
-    "시군구": "서구",
-    "대분류": "요양",
-    "중분류": "방문요양",
-    "프로그램명(사업명)": "OO방문요양",
-    "서비스제공기관명": "ㅁㅁ재가복지센터",
-    "기관연락처": "062-1234-5678",
-    "기관주소": "광주광역시 상무중앙로 114번길 14",
-    "서비스내용": "요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원",
-    "서비스설명": "노인을 대상으로 요양보호사가 가정을 방문하여 식사, 청소, 이동 도움 등 일상생활을 지원하는 방문요양 서비스",
-    "검색어": "노인, 방문요양, 요양보호사, 식사 지원, 일상생활 지원, 가정 방문, 재가복지",
-    "관리주체": "지자체",
-    "기타": "서비스단가: 월 20,000원<br>주요내용: 요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원<br>대상: 노인"
-}
-
-for col in TEST_RESOURCE.keys():
-    if col not in df.columns:
-        df[col] = ""
-
-df = pd.concat([df, pd.DataFrame([TEST_RESOURCE])], ignore_index=True)
 
 def find_col(*names):
     for name in names:
@@ -2451,6 +2440,42 @@ h2{
     font-size:22px;
   }
 }
+
+.pager{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  margin-top:12px;
+  flex-wrap:wrap;
+}
+
+.pager button{
+  min-width:32px;
+  height:32px;
+  border:1px solid #d1d5db;
+  background:#ffffff;
+  color:#374151;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.pager button.active{
+  background:#2563eb;
+  color:#ffffff;
+  border-color:#2563eb;
+}
+
+.pager button:hover{
+  background:#eff6ff;
+}
+
+.pager button.active:hover{
+  background:#2563eb;
+}
+
 </style>
 </head>
 <body>
@@ -2482,7 +2507,7 @@ h2{
 
 <div class="card">
     <h2>일자별 방문자수</h2>
-    <div class="table-scroll">
+    <div>
     <table>
       <thead>
         <tr>
@@ -2490,7 +2515,7 @@ h2{
           <th>방문자수</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="visitTableBody">
         {% for row in daily_visits %}
         <tr>
           <td>{{ row["date"] }}</td>
@@ -2500,11 +2525,12 @@ h2{
       </tbody>
     </table>
     </div>
+    <div id="visitPager" class="pager"></div>
   </div>
 
 <div class="card">
     <h2>일자별 지역 클릭수</h2>
-    <div class="table-scroll">
+    <div>
     <table>
       <thead>
         <tr>
@@ -2515,7 +2541,7 @@ h2{
           <th>클릭수</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="regionTableBody">
         {% for row in daily_regions %}
         <tr>
           <td>{{ row["date"] }}</td>
@@ -2528,11 +2554,94 @@ h2{
       </tbody>
     </table>
     </div>
+    <div id="regionPager" class="pager"></div>
   </div>
 
+
 </div>
+<script>
+function setupPagination(tbodyId, pagerId, rowsPerPage){
+  const tbody = document.getElementById(tbodyId);
+  const pager = document.getElementById(pagerId);
+
+  if(!tbody || !pager) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const totalPages = Math.ceil(rows.length / rowsPerPage);
+
+  if(totalPages <= 1){
+    pager.style.display = "none";
+    return;
+  }
+
+  let currentPage = 1;
+
+  function renderPage(page){
+    currentPage = page;
+
+    rows.forEach(function(row, index){
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      row.style.display = index >= start && index < end ? "" : "none";
+    });
+
+    renderPager();
+  }
+
+  function renderPager(){
+    pager.innerHTML = "";
+
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+    if(endPage - startPage < maxVisible - 1){
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.textContent = "‹";
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = function(){
+      if(currentPage > 1) renderPage(currentPage - 1);
+    };
+    pager.appendChild(prevBtn);
+
+    for(let i = startPage; i <= endPage; i++){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = i;
+      if(i === currentPage){
+        btn.classList.add("active");
+      }
+      btn.onclick = function(){
+        renderPage(i);
+      };
+      pager.appendChild(btn);
+    }
+
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.textContent = "›";
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = function(){
+      if(currentPage < totalPages) renderPage(currentPage + 1);
+    };
+    pager.appendChild(nextBtn);
+  }
+
+  renderPage(1);
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  setupPagination("visitTableBody", "visitPager", 10);
+  setupPagination("regionTableBody", "regionPager", 10);
+});
+</script>
 </body>
 </html>
+
 """
 @app.route("/stats")
 def stats():
@@ -3522,14 +3631,9 @@ def detail(idx):
     program_name = str(r.get("프로그램명(사업명)", "")).strip()
     org_name = str(r.get("서비스제공기관명", "")).strip()
 
-    service_price = ""
-    service_content = ""
-    service_target = ""
-
-    if program_name == "OO방문요양" and org_name == "ㅁㅁ재가복지센터":
-        service_price = "월 20,000원"
-        service_content = "요양보호사가 가정을 방문하여 식사 등 일상생활 등을 지원"
-        service_target = "노인"
+    service_price = str(r.get("서비스단가", "")).strip()
+    service_content = str(r.get("주요내용", "")).strip()
+    service_target = str(r.get("지원대상", "")).strip()
 
     return jsonify({
         "프로그램명칭": program_name,
@@ -3753,9 +3857,16 @@ label.field-label:first-of-type{ margin-top:8px; }
 
 /* ── 모달 ── */
 .modal-overlay{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:999; }
-.modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; }
+.modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; overscroll-behavior:contain; }
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
+.m-acc-row{ display:flex; gap:6px; margin:2px 0 0; }
+.m-acc-btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:4px; min-width:0; padding:9px 6px; border:1px solid #e3e7ef; border-radius:8px; background:#f7f8fb; color:#333; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
+.m-acc-btn:hover{ background:#eef1f6; }
+.m-acc-btn.open{ background:#eef2ff; border-color:#c7d4f5; color:#4a6cd4; }
+.m-acc-ico{ flex:none; transition:transform .15s; color:#9aa1b0; }
+.m-acc-btn.open .m-acc-ico{ transform:rotate(180deg); color:#5b7ee5; }
+.m-acc-body{ display:none; margin-top:8px; padding:9px 12px; border:1px solid #e3e7ef; border-radius:8px; background:#fafbfc; font-size:13px; line-height:1.6; color:#333; word-break:keep-all; }
 .modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
 .modal-btn:hover{ background:#4a6cd4; }
 
@@ -3927,7 +4038,7 @@ label.field-label:first-of-type{ margin-top:8px; }
 <div id="modal" class="modal-overlay">
   <div class="modal-box">
     <h3 id="m_title"></h3>
-    <p style="margin:0 0 14px 0; line-height:1.6;">
+    <p style="margin:0 0 10px 0; line-height:1.6;">
       <b>기관명:</b> <span id="m_org" style="white-space:normal; word-break:keep-all;"></span>
     </p>
     <p>
@@ -3935,10 +4046,15 @@ label.field-label:first-of-type{ margin-top:8px; }
       <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">&#128222;</a>
     </p>
     <p><b>기관주소:</b> <span id="m_addr"></span></p>
-    <p id="m_price_row" style="display:none;"><b>서비스단가:</b> <span id="m_price"></span></p>
-    <p id="m_content_row" style="display:none;"><b>주요내용:</b> <span id="m_content"></span></p>
-    <p id="m_target_row" style="display:none;"><b>대상:</b> <span id="m_target"></span></p>
-    <iframe id="m_map" width="100%" height="250" style="border:0;margin-top:10px;display:none;"></iframe>
+    <div class="m-acc-row">
+      <button type="button" id="m_target_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_target_row','m_target_wrap')"><span>대상</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button type="button" id="m_content_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_content_row','m_content_wrap')"><span>주요내용</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button type="button" id="m_price_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_price_row','m_price_wrap')"><span>서비스단가</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div class="m-acc-body" id="m_target_wrap"><span id="m_target"></span></div>
+    <div class="m-acc-body" id="m_content_wrap"><span id="m_content"></span></div>
+    <div class="m-acc-body" id="m_price_wrap"><span id="m_price"></span></div>
+    <iframe id="m_map" width="100%" height="170" style="border:0;margin-top:10px;display:none;border-radius:8px;"></iframe>
     <button onclick="closeModal()" class="modal-btn">닫기</button>
   </div>
 </div>
@@ -3964,9 +4080,9 @@ function openDetail(idx){
       document.getElementById("m_content").innerText = content;
       document.getElementById("m_target").innerText = target;
 
-      priceRow.style.display = price ? "block" : "none";
-      contentRow.style.display = content ? "block" : "none";
-      targetRow.style.display = target ? "block" : "none";
+      priceRow.style.display = price ? "flex" : "none";
+      contentRow.style.display = content ? "flex" : "none";
+      targetRow.style.display = target ? "flex" : "none";
 
       const addr = (d["기관주소"] || "").trim();
       const mapFrame = document.getElementById("m_map");
@@ -3996,11 +4112,37 @@ function openDetail(idx){
       }
 
       document.getElementById("modal").style.display = "block";
+      document.body.style.overflow = "hidden";
+      resetAccAll();
     });
+}
+
+var ACC_PAIRS = [["m_target_row","m_target_wrap"],["m_content_row","m_content_wrap"],["m_price_row","m_price_wrap"]];
+
+function resetAccAll(){
+  ACC_PAIRS.forEach(function(pair){
+    var btn = document.getElementById(pair[0]);
+    var body = document.getElementById(pair[1]);
+    if(btn) btn.classList.remove("open");
+    if(body) body.style.display = "none";
+  });
+}
+
+function toggleAcc(btnId, bodyId){
+  var btn = document.getElementById(btnId);
+  var body = document.getElementById(bodyId);
+  if(!btn || !body) return;
+  var willOpen = body.style.display !== "block";
+  resetAccAll();
+  if(willOpen){
+    body.style.display = "block";
+    btn.classList.add("open");
+  }
 }
 
 function closeModal(){
   document.getElementById("modal").style.display = "none";
+  document.body.style.overflow = "";
 }
 
 function handleSidoChange(form){
@@ -11147,6 +11289,15 @@ def survey():
 @login_required
 def nhis25():
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
+
+@app.route("/app-version.json")
+def app_version():
+    return {
+        "latestAppVersionCode": 3,
+        "latestAppVersionName": "1.1",
+        "apkUrl": "https://carenavi.kr/static/carenavi.apk",
+        "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
+    }
 
 if __name__ == "__main__":
     app.run()
