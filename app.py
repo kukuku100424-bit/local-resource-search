@@ -11275,5 +11275,14 @@ def survey():
 def nhis25():
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
 
+@app.route("/app-version.json")
+def app_version():
+    return {
+        "latestVersionCode": 2,
+        "latestVersionName": "1.1",
+        "apkUrl": "https://carenavi.kr/static/carenavi.apk",
+        "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
+
+
 if __name__ == "__main__":
     app.run()
