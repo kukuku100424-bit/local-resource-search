@@ -462,7 +462,7 @@ button:hover{
     try{
       var name = window.AndroidAppInfo.getVersionName();
       var el = document.getElementById('cn-app-version');
-      if(el) el.textContent = '케어네비 앱 v' + name;
+      if(el) el.textContent = '케어네비 v' + name;
     }catch(e){}
   }
 })();
