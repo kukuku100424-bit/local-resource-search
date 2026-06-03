@@ -454,6 +454,20 @@ button:hover{
 </div>
 
 </div>
+
+<div id="cn-app-version" style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:#aaa;pointer-events:none;z-index:9999;"></div>
+<script>
+(function(){
+  if(window.AndroidAppInfo){
+    try{
+      var name = window.AndroidAppInfo.getVersionName();
+      var code = window.AndroidAppInfo.getVersionCode();
+      var el = document.getElementById('cn-app-version');
+      if(el) el.textContent = '케어네비 앱 v' + name + ' (' + code + ')';
+    }catch(e){}
+  }
+})();
+</script>
 </body>
 </html>
 """
