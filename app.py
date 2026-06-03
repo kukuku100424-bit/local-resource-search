@@ -11279,7 +11279,7 @@ def nhis25():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 2,
+        "latestAppVersionCode": 3,
         "latestAppVersionName": "1.1",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
