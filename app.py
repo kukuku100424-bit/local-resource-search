@@ -152,6 +152,7 @@ def require_login_all_pages():
         request.path == "/"
         or request.path == "/login"
         or request.path == "/admin"
+        or request.path == "/app-version.json"
         or request.path.startswith("/static")
     ):
         return None
@@ -11278,7 +11279,7 @@ def nhis25():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 3,
+        "latestAppVersionCode": 2,
         "latestAppVersionName": "1.1",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
