@@ -1608,23 +1608,23 @@ body.app-mode .container{
   position:fixed;
   z-index:10001;
   background:#fff;
-  border-radius:14px;
-  padding:18px 18px 14px;
-  max-width:min(420px, calc(100vw - 24px));
+  border-radius:16px;
+  padding:22px 22px 16px;
+  width:min(88vw, 400px);
   box-shadow:0 12px 36px rgba(0,0,0,0.3);
 }
 .tour-popup.open{ display:block; }
 .tour-popup-title{
-  font-size:15px;
+  font-size:16.5px;
   font-weight:800;
   color:#111827;
-  margin-bottom:6px;
+  margin-bottom:8px;
 }
 .tour-popup-text{
-  font-size:13px;
+  font-size:14px;
   color:#475569;
-  line-height:1.5;
-  margin-bottom:14px;
+  line-height:1.55;
+  margin-bottom:16px;
   word-break:keep-all;
 }
 .tour-popup-buttons{
@@ -1668,6 +1668,19 @@ body.app-mode .container{
   font-weight:900;
   vertical-align:middle;
   line-height:1;
+}
+
+/* PC: 가이드 투어 팝업 더 크게 */
+@media (min-width:601px){
+  .tour-popup{
+    width:480px;
+    padding:30px 32px 22px;
+    border-radius:18px;
+  }
+  .tour-popup-title{ font-size:21px; margin-bottom:10px; }
+  .tour-popup-text{ font-size:16px; line-height:1.6; margin-bottom:20px; }
+  .tour-btn{ font-size:14.5px; padding:10px 18px; border-radius:10px; }
+  .tour-q-icon{ width:20px; height:20px; font-size:12px; }
 }
 
 .title + .card{
