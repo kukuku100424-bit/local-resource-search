@@ -1610,7 +1610,7 @@ body.app-mode .container{
   background:#fff;
   border-radius:14px;
   padding:18px 18px 14px;
-  max-width:300px;
+  max-width:min(420px, calc(100vw - 24px));
   box-shadow:0 12px 36px rgba(0,0,0,0.3);
 }
 .tour-popup.open{ display:block; }
@@ -1625,6 +1625,7 @@ body.app-mode .container{
   color:#475569;
   line-height:1.5;
   margin-bottom:14px;
+  word-break:keep-all;
 }
 .tour-popup-buttons{
   display:flex;
@@ -2839,7 +2840,7 @@ window.addEventListener("popstate", function (e) {
 <div id="tourSpotlight" class="tour-spotlight" style="display:none;"></div>
 <div id="tourPopup" class="tour-popup">
   <div class="tour-popup-title">케어네비를 처음 방문해주셨네요 👋</div>
-  <div class="tour-popup-text">사용법이 궁금하시면 우측 상단의 <span class="tour-q-icon">?</span> 버튼을 눌러보세요.</div>
+  <div class="tour-popup-text">사용법은 우측 상단 <span style="white-space:nowrap;"><span class="tour-q-icon">?</span> 버튼을</span> 눌러보세요.</div>
   <div class="tour-popup-buttons">
     <button type="button" class="tour-btn tour-btn-primary" onclick="openGuideFromTour()">설명서 보기</button>
     <button type="button" class="tour-btn tour-btn-dismiss" onclick="dismissTourForever()">다시 보지 않기</button>
