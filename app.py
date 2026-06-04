@@ -222,35 +222,24 @@ body{
 
 .admin-link{
   position:absolute;
-  top:14px;
-  right:14px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  height:32px;
-  padding:0 12px;
-  border:none;
-  border-radius:999px;
-  background:#f3f4f6;
-  color:#6b7280;
-  font-size:13px;
-  font-weight:700;
+  top:16px;
+  right:18px;
+  color:#9ca3af;
+  font-size:12px;
+  font-weight:600;
   text-decoration:none;
-  box-shadow:0 4px 14px rgba(0,0,0,0.12);
-  transition:all .18s ease;
   z-index:2;
+  transition:color .15s ease;
 }
 
 .admin-link:hover{
-  background:#e5e7eb;
-  color:#374151;
-  transform:translateY(-1px);
+  color:#6b7280;
+  text-decoration:underline;
 }
 
 .admin-link:active{
-  transform:translateY(0);
+  color:#374151;
 }
-
 .box{
   position:relative;
   width:100%;
@@ -4227,7 +4216,7 @@ label.field-label:first-of-type{ margin-top:8px; }
 @media (min-width:768px){
   .modal-box{ max-width:760px; padding:24px 28px; }
   /* 기관 상세 지도 iframe 도 PC 에서 세로로 더 크게 */
-  #m_map{ height:400px !important; }
+  #m_map{ height:260px !important; }
 }
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
@@ -11664,8 +11653,8 @@ def nhis25():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 7,
-        "latestAppVersionName": "1.7",
+        "latestAppVersionCode": 8,
+        "latestAppVersionName": "1.8",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
     }
