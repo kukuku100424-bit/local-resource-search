@@ -1341,24 +1341,38 @@ body.app-mode .container{
   border:2px solid #fff;
 }
 
+/* 공지사항 버튼 임시 숨김 */
+.home-notice-btn{
+  display:none !important;
+}
+
 /* 모바일: 종+물음표 버튼 축소 */
 @media (max-width:480px){
   .home-help-btn{
-    width:28px !important;
-    height:28px !important;
-    font-size:15px !important;
+    width:27px !important;
+    height:27px !important;
+    font-size:14px !important;
+    top:-10px !important;
+    right:0 !important;
   }
+
   .home-notice-btn{
-    width:28px !important;
-    height:28px !important;
+    width:27px !important;
+    height:27px !important;
+    top:-10px !important;
     right:34px !important;
   }
+
   .home-notice-btn svg{
-    width:14px !important;
-    height:14px !important;
+    width:13px !important;
+    height:13px !important;
   }
+
   .home-notice-btn .notice-dot{
-    width:7px; height:7px; top:-1px; right:-1px;
+    width:6px;
+    height:6px;
+    top:-1px;
+    right:-1px;
   }
 }
 
@@ -2812,7 +2826,7 @@ function openTour(){
   var rect = btn.getBoundingClientRect();
 
   var spotlight = document.getElementById('tourSpotlight');
-  var pad = 8;
+  var pad = 6;
   spotlight.style.display = 'block';
   spotlight.style.top    = (rect.top  - pad) + 'px';
   spotlight.style.left   = (rect.left - pad) + 'px';
