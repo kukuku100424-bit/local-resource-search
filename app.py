@@ -1163,6 +1163,26 @@ SIGUNGU_OPTIONS = sorted(set(
     normalize_sigungu(v) for v in sorted_unique_values("시군구") if str(v).strip()
 ))
 
+
+def clean_notices_for_template(notices):
+    """공지사항 날짜값이 없거나 None이어도 템플릿이 터지지 않게 정리"""
+    cleaned = []
+    for n in notices or []:
+        if not isinstance(n, dict):
+            continue
+
+        item = dict(n)
+        raw = item.get("created_at") or item.get("inserted_at") or item.get("updated_at") or ""
+        raw = str(raw) if raw is not None else ""
+
+        item["created_date"] = raw[:10] if raw else ""
+        item["created_datetime"] = raw[:19].replace("T", " ") if raw else ""
+        item["title"] = item.get("title") or "제목 없음"
+        item["content"] = item.get("content") or ""
+        item["is_active"] = bool(item.get("is_active", True))
+        cleaned.append(item)
+    return cleaned
+
 MAIN_CATEGORY_OPTIONS = sorted_unique_values("대분류")
 MIDDLE_CATEGORY_OPTIONS = sorted_unique_values("중분류")
 MANAGER_OPTIONS = sorted_unique_values("관리주체")
@@ -2658,7 +2678,7 @@ window.addEventListener("popstate", function (e) {
       {% if notices %}
         {% for n in notices %}
         <div class="notice-item">
-          <div class="notice-item-date">{{ n.created_at[:10] }}</div>
+          <div class="notice-item-date">{{ n.created_date }}</div>
           <div class="notice-item-title">{{ n.title }}</div>
           <div class="notice-item-content">{{ n.content }}</div>
         </div>
@@ -2854,9 +2874,11 @@ def home():
                 notices = res.json()
         else:
             notices = [{"id":1,"title":"테스트 공지","content":"로컬 테스트용 공지사항입니다.","created_at":"2026-06-04T00:00:00"}]
-    except:
-        pass
+    except Exception as e:
+        app.logger.exception(e)
+        notices = []
 
+    notices = clean_notices_for_template(notices)
     return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices)
 
 STATS_HTML = """
@@ -4223,7 +4245,7 @@ h2{ margin:0 0 16px 0; font-size:20px; }
   {% if notices %}
     {% for n in notices %}
     <div class="card">
-      <div class="meta">{{ n.created_at[:19].replace("T"," ") }}</div>
+      <div class="meta">{{ n.created_datetime }}</div>
       <div class="title">{{ n.title }}</div>
       <div class="content">{{ n.content }}</div>
       <span class="status {% if n.is_active %}status-active{% else %}status-inactive{% endif %}">
@@ -4261,6 +4283,7 @@ def notice_admin():
             notices = res.json()
     else:
         notices = [{"id":1,"title":"테스트 공지","content":"로컬 테스트","created_at":"2026-06-04T00:00:00","is_active":True}]
+    notices = clean_notices_for_template(notices)
     return render_template_string(NOTICE_ADMIN_HTML, notices=notices)
 
 @app.route("/notice/admin/write", methods=["POST"])
@@ -4270,11 +4293,17 @@ def notice_admin_write():
     title = (request.form.get("title","") or "").strip()
     content = (request.form.get("content","") or "").strip()
     if title and content and os.getenv("RENDER") is not None:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/notices",
-            headers=SUPABASE_HEADERS,
-            json={"title": title, "content": content, "is_active": True}
-        )
+        try:
+            now = datetime.datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+            res = requests.post(
+                f"{SUPABASE_URL}/rest/v1/notices",
+                headers=SUPABASE_HEADERS,
+                json={"title": title, "content": content, "is_active": True, "created_at": now}
+            )
+            if not res.ok:
+                app.logger.error("notice insert failed: %s %s", res.status_code, res.text)
+        except Exception as e:
+            app.logger.exception(e)
     return redirect(url_for("notice_admin"))
 
 @app.route("/notice/admin/toggle/<int:notice_id>", methods=["POST"])
