@@ -1608,23 +1608,23 @@ body.app-mode .container{
   position:fixed;
   z-index:10001;
   background:#fff;
-  border-radius:16px;
-  padding:22px 22px 16px;
-  width:min(88vw, 400px);
+  border-radius:14px;
+  padding:18px 18px 14px;
+  max-width:300px;
   box-shadow:0 12px 36px rgba(0,0,0,0.3);
 }
 .tour-popup.open{ display:block; }
 .tour-popup-title{
-  font-size:16.5px;
+  font-size:15px;
   font-weight:800;
   color:#111827;
-  margin-bottom:8px;
+  margin-bottom:6px;
 }
 .tour-popup-text{
-  font-size:14px;
+  font-size:13px;
   color:#475569;
-  line-height:1.55;
-  margin-bottom:16px;
+  line-height:1.5;
+  margin-bottom:14px;
   word-break:keep-all;
 }
 .tour-popup-buttons{
@@ -1674,6 +1674,7 @@ body.app-mode .container{
 @media (min-width:601px){
   .tour-popup{
     width:480px;
+    max-width:none;
     padding:30px 32px 22px;
     border-radius:18px;
   }
