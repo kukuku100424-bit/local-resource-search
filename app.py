@@ -165,6 +165,10 @@ def require_login_all_pages():
         if not session.get("is_admin"):
             return redirect(url_for("admin_login"))
         return None
+    if request.path.startswith("/notice/admin"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
@@ -1281,6 +1285,141 @@ body.app-mode .container{
   transform:scale(0.94);
 }
 
+/* 공지사항 버튼 */
+.home-notice-btn{
+  position:absolute;
+  top:-2px;
+  right:42px;
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#2563eb;
+  border:none;
+  border-radius:50%;
+  color:#fff;
+  font-size:16px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+  text-decoration:none;
+  z-index:5;
+  box-shadow:0 2px 6px rgba(37,99,235,0.3);
+  transition:background 0.15s, transform 0.1s;
+}
+.home-notice-btn:hover{ background:#1d4ed8; }
+.home-notice-btn:active{ transform:scale(0.94); }
+.home-notice-btn .notice-dot{
+  position:absolute;
+  top:0px;
+  right:0px;
+  width:9px;
+  height:9px;
+  background:#ef4444;
+  border-radius:50%;
+  border:2px solid #fff;
+}
+
+/* 모바일: 종+물음표 버튼 축소 */
+@media (max-width:480px){
+  .home-help-btn{
+    width:28px !important;
+    height:28px !important;
+    font-size:15px !important;
+  }
+  .home-notice-btn{
+    width:28px !important;
+    height:28px !important;
+    right:34px !important;
+  }
+  .home-notice-btn svg{
+    width:14px !important;
+    height:14px !important;
+  }
+  .home-notice-btn .notice-dot{
+    width:7px; height:7px; top:-1px; right:-1px;
+  }
+}
+
+/* 공지사항 모달 */
+.notice-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  z-index:10000;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.notice-modal.open{ display:flex; }
+.notice-box{
+  background:#fff;
+  border-radius:18px;
+  max-width:480px;
+  width:100%;
+  max-height:80vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  box-shadow:0 20px 50px rgba(15,23,42,0.22);
+}
+.notice-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 20px;
+  border-bottom:1px solid #e5e7eb;
+}
+.notice-header-title{
+  font-size:16px;
+  font-weight:800;
+  color:#111827;
+}
+.notice-close{
+  background:none;
+  border:none;
+  font-size:22px;
+  color:#6b7280;
+  cursor:pointer;
+  padding:4px 8px;
+}
+.notice-body{
+  flex:1;
+  overflow-y:auto;
+  padding:16px 20px;
+}
+.notice-item{
+  padding:14px 0;
+  border-bottom:1px solid #f3f4f6;
+}
+.notice-item:last-child{ border-bottom:none; }
+.notice-item-title{
+  font-size:14px;
+  font-weight:700;
+  color:#111827;
+  margin-bottom:5px;
+}
+.notice-item-date{
+  font-size:11px;
+  color:#9ca3af;
+  margin-bottom:6px;
+}
+.notice-item-content{
+  font-size:13px;
+  color:#4b5563;
+  line-height:1.65;
+  white-space:pre-line;
+  word-break:keep-all;
+}
+.notice-empty{
+  text-align:center;
+  color:#9ca3af;
+  font-size:13px;
+  padding:30px 0;
+}
+
 /* 가이드(설명서) 모달 */
 .guide-modal{
   display:none;
@@ -1794,6 +1933,10 @@ body.app-mode .container{
 
 <div class="title">
 <a href="/admin" class="home-admin-hidden">관리자</a>
+<button type="button" class="home-notice-btn" onclick="openNotice()" aria-label="공지사항">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4V4.29C7.12 5.14 5 7.82 5 11V17L3 19V20H21V19L19 17V11C19 7.82 16.88 5.14 14 4.29V4C14 2.9 13.1 2 12 2Z" fill="white"/><path d="M12 24C13.66 24 15 22.66 15 21H9C9 22.66 10.34 24 12 24Z" fill="white"/></svg>
+  {% if notices %}<span class="notice-dot"></span>{% endif %}
+</button>
 <button type="button" class="home-help-btn" onclick="openGuide()" aria-label="사용설명서">?</button>
 <h1>NHIS-G <span>케어네비</span></h1>
 <p>통합돌봄 자원 검색 및 안내 서비스</p>
@@ -2504,6 +2647,29 @@ window.addEventListener("popstate", function (e) {
 });
 </script>
 
+<!-- 공지사항 모달 -->
+<div id="noticeModal" class="notice-modal" onclick="if(event.target===this)closeNotice()">
+  <div class="notice-box" onclick="event.stopPropagation()">
+    <div class="notice-header">
+      <div class="notice-header-title">공지사항</div>
+      <button type="button" class="notice-close" onclick="closeNotice()">×</button>
+    </div>
+    <div class="notice-body">
+      {% if notices %}
+        {% for n in notices %}
+        <div class="notice-item">
+          <div class="notice-item-date">{{ n.created_at[:10] }}</div>
+          <div class="notice-item-title">{{ n.title }}</div>
+          <div class="notice-item-content">{{ n.content }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="notice-empty">등록된 공지사항이 없습니다.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 <!-- 사용설명서 모달 -->
 <div id="guideModal" class="guide-modal" onclick="onGuideBgClick(event)">
   <div class="guide-box" onclick="event.stopPropagation()">
@@ -2535,6 +2701,14 @@ window.addEventListener("popstate", function (e) {
 </div>
 
 <script>
+/* ===== 공지사항 ===== */
+function openNotice(){
+  document.getElementById('noticeModal').classList.add('open');
+}
+function closeNotice(){
+  document.getElementById('noticeModal').classList.remove('open');
+}
+
 /* ===== 사용설명서 ===== */
 var guideTotalPages = 0;       // 동적으로 탐지됨
 var guideCurrentPage = 1;
@@ -2669,7 +2843,21 @@ window.addEventListener('load', function(){
 def home():
     total, today = update_visitors()
 
-    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today)
+    notices = []
+    try:
+        if os.getenv("RENDER") is not None:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/notices?select=*&is_active=eq.true&order=created_at.desc&limit=10",
+                headers=SUPABASE_HEADERS
+            )
+            if res.ok:
+                notices = res.json()
+        else:
+            notices = [{"id":1,"title":"테스트 공지","content":"로컬 테스트용 공지사항입니다.","created_at":"2026-06-04T00:00:00"}]
+    except:
+        pass
+
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices)
 
 STATS_HTML = """
 <!DOCTYPE html>
@@ -2839,6 +3027,7 @@ h2{
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <a href="/board/admin" class="home-button">게시판</a>
+      <a href="/notice/admin" class="home-button">공지관리</a>
       <a href="/stats/export/visits" class="home-button">엑셀</a>
       <a href="/stats/export/regions" class="home-button">엑셀2</a>
     </div>
@@ -3558,6 +3747,13 @@ button{
     <p class="desc">작성하신 내용은 관리자만 확인할 수 있습니다.</p>
 
     <form method="post">
+      <label>소속기관 <span style="color:#ef4444;">*</span></label>
+      <select name="org_type" required style="width:100%;box-sizing:border-box;margin-top:7px;border:1px solid #d1d5db;border-radius:12px;padding:12px;font-size:15px;font-family:inherit;background:#fff;color:#111827;">
+        <option value="" disabled selected>소속기관을 선택하세요</option>
+        <option value="지자체">지자체</option>
+        <option value="공단">공단</option>
+      </select>
+
       <label>작성자</label>
       <input type="text" name="writer" placeholder="이름 또는 소속을 입력하세요">
 
@@ -3566,6 +3762,10 @@ button{
 
       <label>내용</label>
       <textarea name="content" placeholder="오류 내용이나 의견을 입력하세요" required></textarea>
+
+      <label>회신연락처</label>
+      <div style="font-size:12px;color:#9ca3af;margin-top:2px;margin-bottom:4px;">회신이 필요한 경우만 작성해주세요</div>
+      <input type="text" name="reply_contact" placeholder="이메일 또는 전화번호">
 
       <button type="submit">등록하기</button>
     </form>
@@ -3842,6 +4042,8 @@ body{
       <div class="meta">
         {{ post["created_at"][:19].replace("T", " ") }}
         · 작성자: {{ post["writer"] or "미입력" }}
+        {% if post.get("org_type") %} · 소속: {{ post["org_type"] }}{% endif %}
+        {% if post.get("reply_contact") %}<br>회신연락처: {{ post["reply_contact"] }}{% endif %}
       </div>
       <div class="title">{{ post["title"] }}</div>
       <div class="content">{{ post["content"] }}</div>
@@ -3871,8 +4073,10 @@ def board_write():
         writer = (request.form.get("writer", "") or "").strip()
         title = (request.form.get("title", "") or "").strip()
         content = (request.form.get("content", "") or "").strip()
+        org_type = (request.form.get("org_type", "") or "").strip()
+        reply_contact = (request.form.get("reply_contact", "") or "").strip()
 
-        if title and content:
+        if title and content and org_type:
             if os.getenv("RENDER") is not None:
                 requests.post(
                     f"{SUPABASE_URL}/rest/v1/board_posts",
@@ -3881,6 +4085,8 @@ def board_write():
                         "writer": writer,
                         "title": title,
                         "content": content,
+                        "org_type": org_type,
+                        "reply_contact": reply_contact,
                         "ip": request.remote_addr
                     }
                 )
@@ -3960,6 +4166,145 @@ def board_delete(post_id):
         )
 
     return redirect(url_for("board_admin"))
+
+# =========================
+# 공지사항 관리 (관리자 전용)
+# =========================
+NOTICE_ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공지사항 관리</title>
+<style>
+body{ margin:0; background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; }
+.container{ max-width:640px; margin:0 auto; padding:24px 16px 40px 16px; }
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px; }
+.home-button{ display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 13px;border-radius:999px;background:#fff;border:1px solid #e5e7eb;color:#6b7280;text-decoration:none;font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(15,23,42,0.08); }
+h2{ margin:0 0 16px 0; font-size:20px; }
+.card{ background:#fff; border-radius:16px; padding:18px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06); }
+.card .meta{ font-size:11px; color:#9ca3af; margin-bottom:4px; }
+.card .title{ font-size:15px; font-weight:700; margin-bottom:4px; }
+.card .content{ font-size:13px; color:#4b5563; line-height:1.6; white-space:pre-line; word-break:keep-all; }
+.status{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:6px; font-weight:600; margin-top:6px; }
+.status-active{ background:#dcfce7; color:#166534; }
+.status-inactive{ background:#f3f4f6; color:#6b7280; }
+.btn-row{ display:flex; gap:6px; margin-top:10px; }
+.btn-sm{ height:30px; padding:0 12px; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+.btn-del{ background:#fee2e2; color:#991b1b; }
+.btn-toggle{ background:#e0e7ff; color:#3730a3; }
+.write-card{ background:#fff; border-radius:16px; padding:22px; box-shadow:0 6px 18px rgba(0,0,0,0.06); margin-bottom:20px; }
+.write-card h3{ margin:0 0 14px 0; font-size:16px; font-weight:800; }
+.write-card label{ display:block; margin-top:10px; font-size:13px; font-weight:700; }
+.write-card input,.write-card textarea{ width:100%; box-sizing:border-box; margin-top:5px; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font-size:14px; font-family:inherit; }
+.write-card textarea{ min-height:100px; resize:vertical; line-height:1.6; }
+.write-card button{ margin-top:14px; width:100%; height:42px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+.empty{ background:#fff; border-radius:16px; padding:22px; color:#9ca3af; text-align:center; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <a href="/stats" class="home-button">통계로</a>
+    <a href="/board/admin" class="home-button">게시판</a>
+  </div>
+  <h2>공지사항 관리</h2>
+  <div class="write-card">
+    <h3>새 공지 작성</h3>
+    <form method="post" action="/notice/admin/write">
+      <label>제목</label>
+      <input type="text" name="title" placeholder="공지 제목" required>
+      <label>내용</label>
+      <textarea name="content" placeholder="공지 내용을 입력하세요" required></textarea>
+      <button type="submit">등록하기</button>
+    </form>
+  </div>
+  {% if notices %}
+    {% for n in notices %}
+    <div class="card">
+      <div class="meta">{{ n.created_at[:19].replace("T"," ") }}</div>
+      <div class="title">{{ n.title }}</div>
+      <div class="content">{{ n.content }}</div>
+      <span class="status {% if n.is_active %}status-active{% else %}status-inactive{% endif %}">
+        {% if n.is_active %}게시중{% else %}숨김{% endif %}
+      </span>
+      <div class="btn-row">
+        <form method="post" action="/notice/admin/toggle/{{ n.id }}">
+          <button type="submit" class="btn-sm btn-toggle">{% if n.is_active %}숨기기{% else %}게시하기{% endif %}</button>
+        </form>
+        <form method="post" action="/notice/admin/delete/{{ n.id }}" onsubmit="return confirm('삭제할까요?');">
+          <button type="submit" class="btn-sm btn-del">삭제</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">등록된 공지가 없습니다.</div>
+  {% endif %}
+</div>
+</body>
+</html>
+"""
+
+@app.route("/notice/admin")
+def notice_admin():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    notices = []
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/notices?select=*&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        if res.ok:
+            notices = res.json()
+    else:
+        notices = [{"id":1,"title":"테스트 공지","content":"로컬 테스트","created_at":"2026-06-04T00:00:00","is_active":True}]
+    return render_template_string(NOTICE_ADMIN_HTML, notices=notices)
+
+@app.route("/notice/admin/write", methods=["POST"])
+def notice_admin_write():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    title = (request.form.get("title","") or "").strip()
+    content = (request.form.get("content","") or "").strip()
+    if title and content and os.getenv("RENDER") is not None:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/notices",
+            headers=SUPABASE_HEADERS,
+            json={"title": title, "content": content, "is_active": True}
+        )
+    return redirect(url_for("notice_admin"))
+
+@app.route("/notice/admin/toggle/<int:notice_id>", methods=["POST"])
+def notice_admin_toggle(notice_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}&select=is_active",
+            headers=SUPABASE_HEADERS
+        )
+        if res.ok and res.json():
+            current = res.json()[0].get("is_active", True)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
+                headers=SUPABASE_HEADERS,
+                json={"is_active": not current}
+            )
+    return redirect(url_for("notice_admin"))
+
+@app.route("/notice/admin/delete/<int:notice_id>", methods=["POST"])
+def notice_admin_delete(notice_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    if os.getenv("RENDER") is not None:
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
+            headers=SUPABASE_HEADERS
+        )
+    return redirect(url_for("notice_admin"))
 
 
 @app.route("/guide")
@@ -4279,7 +4624,10 @@ label.field-label:first-of-type{ margin-top:8px; }
 
 
   <div class="form-card">
-    <div class="form-title">통합돌봄 서비스 기관 찾기</div>
+    <div class="form-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>통합돌봄 서비스 기관 찾기</span>
+      <button type="button" onclick="openComboInfo()" style="width:28px;height:28px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:15px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(37,99,235,0.3);flex-shrink:0;margin-right:4px;" aria-label="안내">!</button>
+    </div>
 
     <form method="post">
     <input type="hidden" name="action" id="comboAction" value="">
@@ -4349,7 +4697,7 @@ label.field-label:first-of-type{ margin-top:8px; }
     <input type="text" name="org_kw" class="field-input" value="{{org_kw}}" placeholder="기관명 포함 검색">
     </div>
 
-    <button type="submit" class="submit-btn" onclick="setSearchAction()">검색하기</button>
+    <button type="submit" class="submit-btn" onclick="return setSearchAction()">검색하기</button>
 
     </form>
   </div>
@@ -4392,6 +4740,25 @@ label.field-label:first-of-type{ margin-top:8px; }
   </div>
   {% endif %}
 
+</div>
+
+<!-- 기관찾기 안내 모달 -->
+<div id="comboInfoModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:400px;background:#fff;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;" onclick="event.stopPropagation()">
+    <div style="padding:20px 22px 10px 22px;border-bottom:1px solid #f3f4f6;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:28px;height:28px;border-radius:50%;background:#eff6ff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#2563eb;">!</span>
+        <span style="font-size:16px;font-weight:800;color:#111827;">서비스 자원 안내</span>
+      </div>
+    </div>
+    <div style="padding:18px 22px;font-size:13.5px;line-height:1.75;color:#374151;word-break:keep-all;">
+      본 서비스 자원 데이터는 <b>지자체 현행화 자료</b> 및 <b>통합돌봄 전용누리집의 서비스 메뉴판</b>을 기준으로 제작되었습니다.<br><br>
+      조회 시기에 따라 <b>실제 운영 기관과 차이</b>가 있을 수 있으므로, 정확한 서비스 운영 여부는 해당 기관에 직접 확인하시기 바랍니다.
+    </div>
+    <div style="padding:10px 22px 20px 22px;">
+      <button type="button" onclick="closeComboInfo()" style="width:100%;height:42px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">확인</button>
+    </div>
+  </div>
 </div>
 
 <!-- 상세 모달 -->
@@ -4518,11 +4885,56 @@ function handleMainCategoryChange(form){
 }
 
 function setSearchAction(){
+  var f = document.querySelector('form');
+  var sido = f.sido.value;
+  var sigungu = f.sigungu.value;
+  var main_cat = f.main_category.value;
+  var mid_cat = f.middle_category.value;
+  var mgr = f.manager.value;
+  var prog = f.program_kw.value.trim();
+  var org = f.org_kw.value.trim();
+  if(!sido && !sigungu && !main_cat && !mid_cat && !mgr && !prog && !org){
+    showComboValidationAlert();
+    return false;
+  }
   document.getElementById("comboAction").value = "search";
+  return true;
+}
+
+function showComboValidationAlert(){
+  var existing = document.getElementById('comboValidationModal');
+  if(existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'comboValidationModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  var box = document.createElement('div');
+  box.style.cssText = 'width:100%;max-width:360px;background:#fff;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;text-align:center;';
+  box.innerHTML =
+    '<div style="padding:28px 24px 12px 24px;">' +
+      '<div style="font-size:36px;margin-bottom:10px;">&#9888;&#65039;</div>' +
+      '<div style="font-size:16px;font-weight:800;color:#111827;margin-bottom:8px;">검색 조건을 입력해주세요</div>' +
+      '<div style="font-size:13px;color:#6b7280;line-height:1.6;">최소 하나 이상의 조건을 선택하거나<br>입력한 후 검색해주세요.</div>' +
+    '</div>' +
+    '<div style="padding:16px 24px 22px 24px;">' +
+      '<button type="button" id="comboValidCloseBtn" style="width:100%;height:42px;border:none;border-radius:10px;background:#5b7ee5;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">확인</button>' +
+    '</div>';
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  document.getElementById('comboValidCloseBtn').addEventListener('click', function(){ overlay.remove(); });
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) overlay.remove(); });
 }
 
 function resetDescPage(){
   window.location.href = "/combo";
+}
+
+function openComboInfo(){
+  var m = document.getElementById('comboInfoModal');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeComboInfo(); };
+}
+function closeComboInfo(){
+  document.getElementById('comboInfoModal').style.display = 'none';
 }
 
 window.addEventListener("load", function(){
