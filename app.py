@@ -1236,7 +1236,7 @@ body{
 
 /* 앱(CareNaviApp/PWA) 모드: 상단 여백 축소 */
 body.app-mode .container{
-  padding-top:6px !important;
+  padding-top:14px !important;
 }
 /* 타이틀 */
 /* 타이틀 */
@@ -4222,6 +4222,11 @@ label.field-label:first-of-type{ margin-top:8px; }
 /* ── 모달 ── */
 .modal-overlay{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:999; }
 .modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; overscroll-behavior:contain; }
+
+/* PC 화면에서는 팝업을 더 크게 (지도 등이 시원하게 보이도록) */
+@media (min-width:768px){
+  .modal-box{ max-width:760px; padding:24px 28px; }
+}
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
 .m-acc-row{ display:flex; gap:6px; margin:2px 0 0; }
@@ -11657,8 +11662,8 @@ def nhis25():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 4,
-        "latestAppVersionName": "1.4",
+        "latestAppVersionCode": 5,
+        "latestAppVersionName": "1.5",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
     }
