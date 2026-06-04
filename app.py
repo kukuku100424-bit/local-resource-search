@@ -4669,7 +4669,7 @@ def combo():
     if sido and sido in SIGUNGU_MAP:
         sigungu_options = SIGUNGU_MAP[sido]
 
-    middle_category_options = MIDDLE_CATEGORY_OPTIONS
+    middle_category_options = []
     if main_category and "대분류" in df.columns and "중분류" in df.columns:
         temp = df[
             df["대분류"].fillna("").astype(str).str.strip() == main_category
