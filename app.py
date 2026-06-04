@@ -1236,7 +1236,7 @@ body{
 
 /* 앱(CareNaviApp/PWA) 모드: 상단 여백 축소 */
 body.app-mode .container{
-  padding-top:20px !important;
+  padding-top:28px !important;
 }
 /* 타이틀 */
 /* 타이틀 */
@@ -4226,6 +4226,8 @@ label.field-label:first-of-type{ margin-top:8px; }
 /* PC 화면에서는 팝업을 더 크게 (지도 등이 시원하게 보이도록) */
 @media (min-width:768px){
   .modal-box{ max-width:760px; padding:24px 28px; }
+  /* 기관 상세 지도 iframe 도 PC 에서 세로로 더 크게 */
+  #m_map{ height:400px !important; }
 }
 .modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
 .modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
@@ -11662,8 +11664,8 @@ def nhis25():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 6,
-        "latestAppVersionName": "1.6",
+        "latestAppVersionCode": 7,
+        "latestAppVersionName": "1.7",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
     }
