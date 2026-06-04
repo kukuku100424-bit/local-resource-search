@@ -2045,6 +2045,45 @@ body.app-mode .container{
         <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
       </svg>
     </div>
+    <div id="fabWrap" style="display:none;">
+      <div id="fabItems" style="display:none;">
+        <div id="fabItem_notice" class="fab-item">
+          <div class="fab-item-btn" style="position:relative;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4V4.29C7.12 5.14 5 7.82 5 11V17L3 19V20H21V19L19 17V11C19 7.82 16.88 5.14 14 4.29V4C14 2.9 13.1 2 12 2Z" fill="white"/><path d="M12 24C13.66 24 15 22.66 15 21H9C9 22.66 10.34 24 12 24Z" fill="white"/></svg>
+            {% if notices %}<span class="fab-item-dot"></span>{% endif %}
+          </div>
+          <span class="fab-item-label">공지사항</span>
+        </div>
+        <div id="fabItem_report" class="fab-item">
+          <div class="fab-item-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+              <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+            </svg>
+          </div>
+          <span class="fab-item-label">의견보내기</span>
+        </div>
+        <div id="fabItem_apk" class="fab-item">
+          <div class="fab-item-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+              <path d="M17.5 2.5L15.5 1l-1.3 2.1C13.5 2.8 12.8 2.6 12 2.6s-1.5.2-2.2.5L8.5 1 6.5 2.5l1.2 2C6.1 5.7 5 7.5 5 9.5h14c0-2-.9-3.8-2.7-5l1.2-2zM9 7.5c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm6 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1z"/>
+              <rect x="2" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
+              <rect x="19.5" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
+              <path d="M5 11v8c0 1.1.9 2 2 2h1v3h2v-3h4v3h2v-3h1c1.1 0 2-.9 2-2v-8H5z"/>
+            </svg>
+          </div>
+          <span class="fab-item-label">앱 설치</span>
+        </div>
+      </div>
+      <div id="fabMain">
+        {% if notices %}<span id="fabMainDot" class="fab-main-dot"></span>{% endif %}
+        <svg id="fabIconPlus" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+          <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+        <svg id="fabIconClose" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24" style="display:none;">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </div>
+    </div>
     <div class="visitor-box">
       <div>총 {{total}}</div>
       <div>오늘 {{today}}</div>
@@ -2066,38 +2105,6 @@ body.app-mode .container{
 <style>
 </style>
 
-<!-- ===== 스피드다이얼 FAB (안드로이드 전용) ===== -->
-<div id="fabWrap" style="display:none;">
-  <div id="fabItems" style="display:none;">
-    <div id="fabItem_apk" class="fab-item">
-      <div class="fab-item-btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
-          <path d="M17.5 2.5L15.5 1l-1.3 2.1C13.5 2.8 12.8 2.6 12 2.6s-1.5.2-2.2.5L8.5 1 6.5 2.5l1.2 2C6.1 5.7 5 7.5 5 9.5h14c0-2-.9-3.8-2.7-5l1.2-2zM9 7.5c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm6 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1z"/>
-          <rect x="2" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
-          <rect x="19.5" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
-          <path d="M5 11v8c0 1.1.9 2 2 2h1v3h2v-3h4v3h2v-3h1c1.1 0 2-.9 2-2v-8H5z"/>
-        </svg>
-      </div>
-      <span class="fab-item-label">앱 설치</span>
-    </div>
-    <div id="fabItem_report" class="fab-item">
-      <div class="fab-item-btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
-          <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
-        </svg>
-      </div>
-      <span class="fab-item-label">의견보내기</span>
-    </div>
-  </div>
-  <div id="fabMain">
-    <svg id="fabIconPlus" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
-      <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-    </svg>
-    <svg id="fabIconClose" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24" style="display:none;">
-      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-    </svg>
-  </div>
-</div>
 
 <!-- ===== 단일 의견보내기 버튼 (PC/아이폰/앱) ===== -->
 
@@ -2338,11 +2345,52 @@ body.app-mode .container{
   }
 }
 
-/* PC에선 fabWrap 숨김 — visitor-left 안 reportBtn 사용 */
+/* PC: + 버튼을 원래 의견보내기 자리(푸터 visitor-left)로 — fixed 해제 */
 @media (min-width:601px){
   #fabWrap{
-    display:none !important;
+    display:inline-flex !important;
+    position:relative !important;
+    left:auto !important;
+    bottom:auto !important;
+    z-index:1;
+    align-self:flex-start;
+    gap:0;
   }
+  /* 메뉴는 + 버튼 위로 떠서 펼쳐짐 (푸터 레이아웃 안 밀림) */
+  #fabItems{
+    position:absolute;
+    bottom:calc(100% + 12px);
+    left:0;
+  }
+}
+
+/* 단일 의견보내기 버튼/알약 완전 폐지 */
+#singleReportBtn{ display:none !important; }
+
+/* 공지 빨간점 — 메뉴 안 공지사항 항목 */
+.fab-item-dot{
+  position:absolute;
+  top:-2px;
+  right:-2px;
+  width:11px;
+  height:11px;
+  background:#ef4444;
+  border-radius:50%;
+  border:2px solid #fff;
+}
+
+/* 공지 빨간점 — 메인 + 버튼 */
+#fabMain{ position:relative; }
+.fab-main-dot{
+  position:absolute;
+  top:4px;
+  right:4px;
+  width:12px;
+  height:12px;
+  background:#ef4444;
+  border-radius:50%;
+  border:2px solid #fff;
+  z-index:1;
 }
 
 /* 모바일 웹에서 fabWrap 위치 */
@@ -2510,97 +2558,113 @@ body.app-mode .container{
 </style>
 
 <script>
-/* ===== FAB / 단일버튼 초기화 ===== */
+/* ===== FAB 초기화 (항상 + 버튼, 환경별 항목만 분기) ===== */
 (function(){
-  var reportModal = document.getElementById("reportModal");
   var ua = navigator.userAgent || "";
   var isAndroid    = /Android/i.test(ua);
   var isIOS        = /iPhone|iPad|iPod/i.test(ua);
   var isApp        = ua.indexOf("CareNaviApp") !== -1;
   var isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
-  var isWebView    = /; wv\)/.test(ua);
 
   // 앱 모드 body 클래스 (상단 여백 축소용)
   if(isApp || isStandalone){
     document.body.classList.add("app-mode");
   }
 
-  // 안드로이드 일반 브라우저: + 스피드다이얼 FAB (standalone/앱 모드에서는 단일 버튼 사용)
-  var useAndroidFab = isAndroid && !isIOS && !isStandalone && !isApp;
+  // 앱다운(APK)은 안드로이드 일반 브라우저에서만 (아이폰/앱/PWA 제외)
+  var showApk = isAndroid && !isIOS && !isApp && !isStandalone;
 
   var fabWrap       = document.getElementById("fabWrap");
   var fabMain       = document.getElementById("fabMain");
   var fabItems      = document.getElementById("fabItems");
-  var fabItemApk    = document.getElementById("fabItem_apk");
+  var fabItemNotice = document.getElementById("fabItem_notice");
   var fabItemRep    = document.getElementById("fabItem_report");
+  var fabItemApk    = document.getElementById("fabItem_apk");
   var fabIconPlus   = document.getElementById("fabIconPlus");
   var fabIconClose  = document.getElementById("fabIconClose");
   var singleBtn     = document.getElementById("singleReportBtn");
   var isOpen        = false;
 
-  if(useAndroidFab){
-// ── 안드로이드: + FAB 표시
-if(fabWrap) fabWrap.style.display = "flex";
-if(singleBtn) singleBtn.style.display = "none";
+  // 단일버튼/PC 알약 폐지 → 모든 환경에서 + FAB
+  if(singleBtn) singleBtn.style.display = "none";
+  if(fabWrap)   fabWrap.style.display   = "flex";
 
-// 실제 케어네비 앱 / PWA 모드에서만 앱설치 항목 숨김
-// 네이버앱, 삼성브라우저, 크롬, 웨일에서는 앱설치 표시
-if(isApp || isStandalone){
-  if(fabItemApk) fabItemApk.style.display = "none";
-}
+  // 앱다운 항목은 안드로이드 일반 브라우저에서만 노출
+  if(fabItemApk) fabItemApk.style.display = showApk ? "" : "none";
 
-    function openFab(){
-      isOpen = true;
-      if(fabMain)      fabMain.classList.add("open");
-      if(fabIconPlus)  fabIconPlus.style.display  = "none";
-      if(fabIconClose) fabIconClose.style.display = "";
-      if(fabItems)     fabItems.style.display = "flex";
-      if(fabItemRep)   fabItemRep.classList.add("show");
-      if(fabItemApk)   fabItemApk.classList.add("show");
-    }
-    function closeFab(){
-      isOpen = false;
-      if(fabMain)      fabMain.classList.remove("open");
-      if(fabIconPlus)  fabIconPlus.style.display  = "";
-      if(fabIconClose) fabIconClose.style.display = "none";
-      if(fabItems)     fabItems.style.display = "none";
-      if(fabItemRep)   fabItemRep.classList.remove("show");
-      if(fabItemApk)   fabItemApk.classList.remove("show");
-    }
-    if(fabMain){
-      fabMain.addEventListener("click", function(e){
-        e.stopPropagation();
-        isOpen ? closeFab() : openFab();
-      });
-    }
-    if(fabItemRep){
-      fabItemRep.addEventListener("click", function(e){
-        e.stopPropagation();
-        closeFab();
-        location.href = "/board/write";
-      });
-    }
-    if(fabItemApk){
-  fabItemApk.addEventListener("click", function(e){
-    e.stopPropagation();
-    closeFab();
-    openApkInstallModal();
-  });
-}
+  // 열렸을 때 보여줄 항목 (공지/의견은 항상, 앱다운은 조건부)
+  var activeItems = [fabItemNotice, fabItemRep];
+  if(showApk) activeItems.push(fabItemApk);
 
-    document.addEventListener("click", function(){ if(isOpen) closeFab(); });
-
-  } else {
-    // ── PC / 아이폰 / 앱: 단일 의견보내기 버튼
-    if(fabWrap)   fabWrap.style.display   = "none";
-    if(singleBtn){
-      singleBtn.style.display = "flex";
-      singleBtn.addEventListener("click", function(e){
-        e.stopPropagation();
-        openReport();
-      });
-    }
+  function openFab(){
+    isOpen = true;
+    if(fabMain)      fabMain.classList.add("open");
+    if(fabIconPlus)  fabIconPlus.style.display  = "none";
+    if(fabIconClose) fabIconClose.style.display = "";
+    if(fabItems)     fabItems.style.display = "flex";
+    activeItems.forEach(function(it){ if(it) it.classList.add("show"); });
   }
+  function closeFab(){
+    isOpen = false;
+    if(fabMain)      fabMain.classList.remove("open");
+    if(fabIconPlus)  fabIconPlus.style.display  = "";
+    if(fabIconClose) fabIconClose.style.display = "none";
+    if(fabItems)     fabItems.style.display = "none";
+    activeItems.forEach(function(it){ if(it) it.classList.remove("show"); });
+  }
+
+  if(fabMain){
+    fabMain.addEventListener("click", function(e){
+      e.stopPropagation();
+      isOpen ? closeFab() : openFab();
+    });
+  }
+  if(fabItemNotice){
+    fabItemNotice.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      openNotice();
+    });
+  }
+  if(fabItemRep){
+    fabItemRep.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      location.href = "/board/write";
+    });
+  }
+  if(fabItemApk){
+    fabItemApk.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      openApkInstallModal();
+    });
+  }
+
+  document.addEventListener("click", function(){ if(isOpen) closeFab(); });
+})();
+
+/* ===== 공지 빨간점 읽음 처리 (localStorage) ===== */
+(function(){
+  var KEY = "carenavi_seen_notice";
+  var latest = {{ latest_notice_key|tojson }};
+  function hideDots(){
+    var d1 = document.getElementById("fabMainDot");
+    var d2 = document.querySelector("#fabItem_notice .fab-item-dot");
+    if(d1) d1.style.display = "none";
+    if(d2) d2.style.display = "none";
+  }
+  // 이미 본 최신 공지면 점 숨김
+  try{
+    if(!latest || localStorage.getItem(KEY) === latest){
+      hideDots();
+    }
+  }catch(e){}
+  // 공지 열면 본 것으로 기록 + 점 제거
+  window.__careNaviMarkNoticeSeen = function(){
+    try{ if(latest) localStorage.setItem(KEY, latest); }catch(e){}
+    hideDots();
+  };
 })();
 
 /* 홈 진입 시 현재 상태를 홈으로 고정하고, 홈 상태를 하나 더 쌓아둠 */
@@ -2737,6 +2801,7 @@ window.addEventListener("popstate", function (e) {
 <script>
 /* ===== 공지사항 ===== */
 function openNotice(){
+  if(window.__careNaviMarkNoticeSeen) window.__careNaviMarkNoticeSeen();
   document.getElementById('noticeModal').classList.add('open');
 }
 function closeNotice(){
@@ -2893,7 +2958,16 @@ def home():
         notices = []
 
     notices = clean_notices_for_template(notices)
-    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices)
+    latest_notice_key = ""
+    if notices:
+        n0 = notices[0]
+        latest_notice_key = str(
+            n0.get("id")
+            or n0.get("created_at")
+            or n0.get("created_datetime")
+            or ""
+        )
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key)
 
 STATS_HTML = """
 <!DOCTYPE html>
@@ -3855,10 +3929,10 @@ button{
       <label>작성자</label>
       <input type="text" name="writer" placeholder="이름 또는 소속을 입력하세요">
 
-      <label>제목</label>
+      <label>제목 <span style="color:#ef4444;">*</span></label>
       <input type="text" name="title" placeholder="제목을 입력하세요" required>
 
-      <label>내용</label>
+      <label>내용 <span style="color:#ef4444;">*</span></label>
       <textarea name="content" placeholder="오류 내용이나 의견을 입력하세요" required></textarea>
 
       <label>회신연락처</label>
@@ -4318,7 +4392,6 @@ h2{ margin:0 0 16px 0; font-size:20px; }
 <div class="container">
   <div class="top-bar">
     <a href="/stats" class="home-button">통계로</a>
-    <a href="/board/admin" class="home-button">게시판</a>
   </div>
   <h2>공지사항 관리</h2>
   <div class="write-card">
