@@ -1236,7 +1236,7 @@ body{
 
 /* 앱(CareNaviApp/PWA) 모드: 상단 여백 축소 */
 body.app-mode .container{
-  padding-top:14px !important;
+  padding-top:20px !important;
 }
 /* 타이틀 */
 /* 타이틀 */
@@ -11662,8 +11662,8 @@ def nhis25():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 5,
-        "latestAppVersionName": "1.5",
+        "latestAppVersionCode": 6,
+        "latestAppVersionName": "1.6",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
     }
