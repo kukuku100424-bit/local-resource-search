@@ -2904,7 +2904,20 @@ body{
   display:flex;
   justify-content:space-between;
   align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
   margin-bottom:18px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 2px 8px 2px;
+}
+
+.top-right-menu{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  flex-shrink:0;
 }
 
 .home-button{
@@ -2993,14 +3006,50 @@ h2{
 }
 @media (max-width:480px){
   .container{
-    padding:16px 12px 28px 12px;
+    padding:16px 10px 28px 10px;
   }
+
+  .top-bar{
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    justify-content:flex-start !important;
+    overflow-x:auto !important;
+    white-space:nowrap !important;
+    margin-bottom:14px !important;
+    padding-bottom:8px !important;
+  }
+
+  .top-right-menu{
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    flex-shrink:0 !important;
+  }
+
+  .home-button{
+    height:34px !important;
+    padding:0 12px !important;
+    font-size:13px !important;
+    white-space:nowrap !important;
+    flex:0 0 auto !important;
+  }
+
   th, td{
     font-size:13px;
     padding:8px 6px;
   }
   .summary-value{
     font-size:22px;
+  }
+}
+
+@media (max-width:380px){
+  .home-button{
+    padding:0 10px !important;
+    font-size:12.5px !important;
+  }
+  .top-bar,
+  .top-right-menu{
+    gap:5px !important;
   }
 }
 
@@ -3044,10 +3093,10 @@ h2{
 <body>
 <div class="container">
 
-  <div class="top-bar" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+  <div class="top-bar">
     <a href="/home" class="home-button">홈으로</a>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="top-right-menu">
       <a href="/board/admin" class="home-button">게시판</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
       <a href="/stats/export/visits" class="home-button">엑셀</a>
@@ -3582,7 +3631,20 @@ body{
   display:flex;
   justify-content:space-between;
   align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
   margin-bottom:18px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 2px 8px 2px;
+}
+
+.top-right-menu{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  flex-shrink:0;
 }
 .home-button{
   display:inline-flex !important;
@@ -3891,7 +3953,20 @@ body{
   display:flex;
   justify-content:space-between;
   align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
   margin-bottom:18px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 2px 8px 2px;
+}
+
+.top-right-menu{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  flex-shrink:0;
 }
 .home-button{
   display:inline-flex !important;
