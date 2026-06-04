@@ -4489,6 +4489,13 @@ h2{ margin:0 0 16px 0; font-size:20px; }
 .btn-sm{ height:30px; padding:0 12px; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
 .btn-del{ background:#fee2e2; color:#991b1b; }
 .btn-toggle{ background:#e0e7ff; color:#3730a3; }
+.btn-edit{ background:#dbeafe; color:#1e40af; }
+.btn-save{ background:#2563eb; color:#fff; }
+.btn-cancel{ background:#f3f4f6; color:#6b7280; }
+.edit-area{ margin-top:10px; }
+.edit-area label{ display:block; margin-top:10px; font-size:13px; font-weight:700; }
+.edit-area input,.edit-area textarea{ width:100%; box-sizing:border-box; margin-top:5px; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font-size:14px; font-family:inherit; }
+.edit-area textarea{ min-height:100px; resize:vertical; line-height:1.6; }
 .write-card{ background:#fff; border-radius:16px; padding:22px; box-shadow:0 6px 18px rgba(0,0,0,0.06); margin-bottom:20px; }
 .write-card h3{ margin:0 0 14px 0; font-size:16px; font-weight:800; }
 .write-card label{ display:block; margin-top:10px; font-size:13px; font-weight:700; }
@@ -4518,25 +4525,50 @@ h2{ margin:0 0 16px 0; font-size:20px; }
     {% for n in notices %}
     <div class="card">
       <div class="meta">{{ n.created_datetime }}</div>
-      <div class="title">{{ n.title }}</div>
-      <div class="content">{{ n.content }}</div>
-      <span class="status {% if n.is_active %}status-active{% else %}status-inactive{% endif %}">
-        {% if n.is_active %}게시중{% else %}숨김{% endif %}
-      </span>
-      <div class="btn-row">
-        <form method="post" action="/notice/admin/toggle/{{ n.id }}">
-          <button type="submit" class="btn-sm btn-toggle">{% if n.is_active %}숨기기{% else %}게시하기{% endif %}</button>
-        </form>
-        <form method="post" action="/notice/admin/delete/{{ n.id }}" onsubmit="return confirm('삭제할까요?');">
-          <button type="submit" class="btn-sm btn-del">삭제</button>
-        </form>
+
+      <div class="view-area" id="view-{{ n.id }}">
+        <div class="title">{{ n.title }}</div>
+        <div class="content">{{ n.content }}</div>
+        <span class="status {% if n.is_active %}status-active{% else %}status-inactive{% endif %}">
+          {% if n.is_active %}게시중{% else %}숨김{% endif %}
+        </span>
+        <div class="btn-row">
+          <button type="button" class="btn-sm btn-edit" onclick="toggleEdit({{ n.id }})">수정</button>
+          <form method="post" action="/notice/admin/toggle/{{ n.id }}">
+            <button type="submit" class="btn-sm btn-toggle">{% if n.is_active %}숨기기{% else %}게시하기{% endif %}</button>
+          </form>
+          <form method="post" action="/notice/admin/delete/{{ n.id }}" onsubmit="return confirm('삭제할까요?');">
+            <button type="submit" class="btn-sm btn-del">삭제</button>
+          </form>
+        </div>
       </div>
+
+      <form class="edit-area" id="edit-{{ n.id }}" method="post" action="/notice/admin/edit/{{ n.id }}" style="display:none;">
+        <label>제목</label>
+        <input type="text" name="title" value="{{ n.title }}" required>
+        <label>내용</label>
+        <textarea name="content" required>{{ n.content }}</textarea>
+        <div class="btn-row">
+          <button type="submit" class="btn-sm btn-save">저장</button>
+          <button type="button" class="btn-sm btn-cancel" onclick="toggleEdit({{ n.id }})">취소</button>
+        </div>
+      </form>
     </div>
     {% endfor %}
   {% else %}
     <div class="empty">등록된 공지가 없습니다.</div>
   {% endif %}
 </div>
+<script>
+function toggleEdit(id){
+  var v = document.getElementById('view-' + id);
+  var e = document.getElementById('edit-' + id);
+  if(!v || !e) return;
+  var editing = (e.style.display === 'block');
+  v.style.display = editing ? 'block' : 'none';
+  e.style.display = editing ? 'none' : 'block';
+}
+</script>
 </body>
 </html>
 """
@@ -4605,6 +4637,26 @@ def notice_admin_delete(notice_id):
             f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
             headers=SUPABASE_HEADERS
         )
+    return redirect(url_for("notice_admin"))
+
+
+@app.route("/notice/admin/edit/<int:notice_id>", methods=["POST"])
+def notice_admin_edit(notice_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    title = (request.form.get("title","") or "").strip()
+    content = (request.form.get("content","") or "").strip()
+    if title and content and os.getenv("RENDER") is not None:
+        try:
+            res = requests.patch(
+                f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
+                headers=SUPABASE_HEADERS,
+                json={"title": title, "content": content}
+            )
+            if not res.ok:
+                app.logger.error("notice edit failed: %s %s", res.status_code, res.text)
+        except Exception as e:
+            app.logger.exception(e)
     return redirect(url_for("notice_admin"))
 
 
