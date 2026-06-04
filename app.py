@@ -458,6 +458,9 @@ button:hover{
 <div id="cn-app-version" style="position:fixed;bottom:8px;right:10px;font-size:11px;color:#aaa;pointer-events:none;z-index:9999;"></div>
 <script>
 (function(){
+  /* 로그인 페이지 진입 시 가이드투어 세션 dismiss 해제 → 재로그인하면 다시 보임 */
+  try { sessionStorage.removeItem('careNaviTourSessionDismissed'); } catch(e){}
+
   if(window.AndroidAppInfo){
     try{
       var name = window.AndroidAppInfo.getVersionName();
@@ -1230,6 +1233,11 @@ body{
 
   position:relative;
 }
+
+/* 앱(CareNaviApp/PWA) 모드: 상단 여백 축소 */
+body.app-mode .container{
+  padding-top:6px !important;
+}
 /* 타이틀 */
 /* 타이틀 */
 .title{
@@ -1434,6 +1442,22 @@ body{
   background:transparent;
   color:#94a3b8;
   font-weight:600;
+}
+
+/* 팝업 안내문구의 미니 ? 아이콘 (실제 버튼처럼 보이게) */
+.tour-q-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#2563eb;
+  color:#fff;
+  font-size:11px;
+  font-weight:900;
+  vertical-align:middle;
+  line-height:1;
 }
 
 .title + .card{
@@ -2514,7 +2538,7 @@ window.addEventListener("popstate", function (e) {
 <div id="tourSpotlight" class="tour-spotlight" style="display:none;"></div>
 <div id="tourPopup" class="tour-popup">
   <div class="tour-popup-title">케어네비를 처음 방문해주셨네요 👋</div>
-  <div class="tour-popup-text">사용법이 궁금하시면 우측 상단의 <b>?</b> 버튼을 눌러보세요.</div>
+  <div class="tour-popup-text">사용법이 궁금하시면 우측 상단의 <span class="tour-q-icon">?</span> 버튼을 눌러보세요.</div>
   <div class="tour-popup-buttons">
     <button type="button" class="tour-btn tour-btn-primary" onclick="openGuideFromTour()">설명서 보기</button>
     <button type="button" class="tour-btn tour-btn-dismiss" onclick="dismissTourForever()">다시 보지 않기</button>
@@ -2581,16 +2605,23 @@ function prevGuidePage(){
 }
 
 /* ===== 첫방문 가이드 투어 ===== */
-var TOUR_STORAGE_KEY = 'careNaviTourDismissed';
+var TOUR_STORAGE_KEY = 'careNaviTourDismissed';        /* 영구 - "다시 보지 않기" */
+var TOUR_SESSION_KEY = 'careNaviTourSessionDismissed'; /* 세션 - 그냥 닫음 (재로그인 전까지) */
 
 function tourDismissed(){
-  try { return localStorage.getItem(TOUR_STORAGE_KEY) === '1'; }
-  catch(e){ return false; }
+  try {
+    if(localStorage.getItem(TOUR_STORAGE_KEY) === '1') return true;
+    if(sessionStorage.getItem(TOUR_SESSION_KEY) === '1') return true;
+  } catch(e){}
+  return false;
 }
 function dismissTourForever(){
-  try { localStorage.setItem(TOUR_STORAGE_KEY, '1'); }
-  catch(e){}
+  try { localStorage.setItem(TOUR_STORAGE_KEY, '1'); } catch(e){}
+  try { sessionStorage.removeItem(TOUR_SESSION_KEY); } catch(e){}
   closeTour();
+}
+function dismissTourThisSession(){
+  try { sessionStorage.setItem(TOUR_SESSION_KEY, '1'); } catch(e){}
 }
 function openTour(){
   var btn = document.querySelector('.home-help-btn');
@@ -2623,6 +2654,8 @@ function closeTour(){
   document.getElementById('tourOverlay').classList.remove('open');
   document.getElementById('tourPopup').classList.remove('open');
   document.getElementById('tourSpotlight').style.display = 'none';
+  /* "그냥 닫기"는 이번 세션 동안만 안 보이게 (재로그인 시 다시 보임) */
+  dismissTourThisSession();
 }
 function openGuideFromTour(){
   closeTour();
@@ -11624,8 +11657,8 @@ def nhis25():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 3,
-        "latestAppVersionName": "1.1",
+        "latestAppVersionCode": 4,
+        "latestAppVersionName": "1.4",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
     }
