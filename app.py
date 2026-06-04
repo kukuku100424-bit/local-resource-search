@@ -1285,10 +1285,10 @@ body.app-mode .container{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  background:#2563eb;
+  background:#93c5fd;
   border:none;
   border-radius:50%;
-  color:#fff;
+  color:#1e40af;
   font-size:18px;
   font-weight:900;
   line-height:1;
@@ -1434,6 +1434,21 @@ body.app-mode .container{
   font-weight:700;
   color:#111827;
   margin-bottom:5px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.notice-item-title::after{
+  content:'▾';
+  font-size:12px;
+  color:#9ca3af;
+  flex-shrink:0;
+  transition:transform 0.15s;
+}
+.notice-item.open .notice-item-title::after{
+  transform:rotate(180deg);
 }
 .notice-item-date{
   font-size:11px;
@@ -1441,11 +1456,43 @@ body.app-mode .container{
   margin-bottom:6px;
 }
 .notice-item-content{
+  display:none;
   font-size:13px;
   color:#4b5563;
   line-height:1.65;
   white-space:pre-line;
   word-break:keep-all;
+  margin-top:8px;
+}
+.notice-item.open .notice-item-content{
+  display:block;
+}
+/* 공지 페이지네이션 */
+.notice-pagination{
+  display:none;
+  justify-content:center;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  padding:12px 20px 14px;
+  border-top:1px solid #f3f4f6;
+}
+.notice-page-btn{
+  min-width:30px;
+  height:30px;
+  padding:0 8px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:700;
+  color:#6b7280;
+  cursor:pointer;
+}
+.notice-page-btn.active{
+  background:#2563eb;
+  border-color:#2563eb;
+  color:#fff;
 }
 .notice-empty{
   text-align:center;
@@ -1614,8 +1661,8 @@ body.app-mode .container{
   width:18px;
   height:18px;
   border-radius:50%;
-  background:#2563eb;
-  color:#fff;
+  background:#93c5fd;
+  color:#1e40af;
   font-size:11px;
   font-weight:900;
   vertical-align:middle;
@@ -2765,6 +2812,7 @@ window.addEventListener("popstate", function (e) {
         <div class="notice-empty">등록된 공지사항이 없습니다.</div>
       {% endif %}
     </div>
+    <div class="notice-pagination" id="noticePagination"></div>
   </div>
 </div>
 
@@ -2800,8 +2848,55 @@ window.addEventListener("popstate", function (e) {
 
 <script>
 /* ===== 공지사항 ===== */
+/* ===== 공지 아코디언 + 페이지네이션 ===== */
+var NoticePager = (function(){
+  var PER_PAGE = 5;
+  var inited = false, items = [], pager = null, body = null, pages = 1, current = 1;
+  function collapseAll(){ items.forEach(function(it){ it.classList.remove('open'); }); }
+  function renderButtons(){
+    if(!pager) return;
+    if(pages <= 1){ pager.style.display = 'none'; return; }
+    pager.style.display = 'flex';
+    pager.innerHTML = '';
+    for(var p = 1; p <= pages; p++){
+      (function(p){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'notice-page-btn' + (p === current ? ' active' : '');
+        b.textContent = p;
+        b.onclick = function(){ collapseAll(); showPage(p); };
+        pager.appendChild(b);
+      })(p);
+    }
+  }
+  function showPage(p){
+    current = p;
+    items.forEach(function(it, i){
+      it.style.display = (Math.floor(i / PER_PAGE) + 1 === p) ? '' : 'none';
+    });
+    renderButtons();
+    if(body) body.scrollTop = 0;
+  }
+  function init(){
+    if(inited) return;
+    body = document.querySelector('#noticeModal .notice-body');
+    pager = document.getElementById('noticePagination');
+    items = body ? Array.prototype.slice.call(body.querySelectorAll('.notice-item')) : [];
+    pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+    // 제목 클릭 시 본문 펼치기/접기
+    items.forEach(function(it){
+      var t = it.querySelector('.notice-item-title');
+      if(t){ t.addEventListener('click', function(){ it.classList.toggle('open'); }); }
+    });
+    inited = true;
+  }
+  function open(){ init(); collapseAll(); showPage(1); }
+  return { open: open };
+})();
+
 function openNotice(){
   if(window.__careNaviMarkNoticeSeen) window.__careNaviMarkNoticeSeen();
+  NoticePager.open();
   document.getElementById('noticeModal').classList.add('open');
 }
 function closeNotice(){
@@ -2946,7 +3041,7 @@ def home():
     try:
         if os.getenv("RENDER") is not None:
             res = requests.get(
-                f"{SUPABASE_URL}/rest/v1/notices?select=*&is_active=eq.true&order=created_at.desc&limit=10",
+                f"{SUPABASE_URL}/rest/v1/notices?select=*&is_active=eq.true&order=created_at.desc&limit=100",
                 headers=SUPABASE_HEADERS
             )
             if res.ok:
@@ -4817,7 +4912,7 @@ label.field-label:first-of-type{ margin-top:8px; }
   <div class="form-card">
     <div class="form-title" style="display:flex;align-items:center;justify-content:space-between;">
       <span>통합돌봄 서비스 기관 찾기</span>
-      <button type="button" onclick="openComboInfo()" style="width:28px;height:28px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:15px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(37,99,235,0.3);flex-shrink:0;margin-right:4px;" aria-label="안내">!</button>
+      <button type="button" onclick="openComboInfo()" style="width:28px;height:28px;border-radius:50%;border:none;background:#93c5fd;color:#1e40af;font-size:15px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(37,99,235,0.3);flex-shrink:0;margin-right:4px;" aria-label="안내">!</button>
     </div>
 
     <form method="post">
