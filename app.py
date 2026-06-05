@@ -1493,7 +1493,7 @@ body.app-mode .container{
 .notice-line.bullet .b-mark{
   flex-shrink:0;
   font-weight:800;
-  color:#2563eb;
+  color:#111827;
 }
 .notice-line.bullet .b-text{
   flex:1;
@@ -4564,14 +4564,8 @@ h2{ margin:0 0 16px 0; font-size:20px; }
       <div class="view-area" id="view-{{ n.id }}">
         <div class="title">{{ n.title }}</div>
         <div class="content">{{ n.content }}</div>
-        <span class="status {% if n.is_active %}status-active{% else %}status-inactive{% endif %}">
-          {% if n.is_active %}게시중{% else %}숨김{% endif %}
-        </span>
         <div class="btn-row">
           <button type="button" class="btn-sm btn-edit" onclick="toggleEdit({{ n.id }})">수정</button>
-          <form method="post" action="/notice/admin/toggle/{{ n.id }}">
-            <button type="submit" class="btn-sm btn-toggle">{% if n.is_active %}숨기기{% else %}게시하기{% endif %}</button>
-          </form>
           <form method="post" action="/notice/admin/delete/{{ n.id }}" onsubmit="return confirm('삭제할까요?');">
             <button type="submit" class="btn-sm btn-del">삭제</button>
           </form>
