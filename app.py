@@ -1175,10 +1175,26 @@ def clean_notices_for_template(notices):
         raw = item.get("created_at") or item.get("inserted_at") or item.get("updated_at") or ""
         raw = str(raw) if raw is not None else ""
 
-        item["created_date"] = raw[:10] if raw else ""
-        item["created_datetime"] = raw[:19].replace("T", " ") if raw else ""
+        kst_date = ""
+        kst_dt = ""
+        if raw:
+            try:
+                s = raw.replace("Z", "+00:00")
+                dt = datetime.datetime.fromisoformat(s)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=datetime.timezone.utc)
+                dt = dt.astimezone(ZoneInfo("Asia/Seoul"))
+                kst_date = dt.strftime("%Y-%m-%d")
+                kst_dt = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                kst_date = raw[:10]
+                kst_dt = raw[:19].replace("T", " ")
+
+        item["created_date"] = kst_date
+        item["created_datetime"] = kst_dt
         item["title"] = item.get("title") or "제목 없음"
         item["content"] = item.get("content") or ""
+        item["content_lines"] = item["content"].split("\n")
         item["is_active"] = bool(item.get("is_active", True))
         cleaned.append(item)
     return cleaned
@@ -1460,12 +1476,19 @@ body.app-mode .container{
   font-size:13px;
   color:#4b5563;
   line-height:1.65;
-  white-space:pre-line;
   word-break:keep-all;
   margin-top:8px;
 }
 .notice-item.open .notice-item-content{
   display:block;
+}
+/* 본문 한 줄씩 — 하이픈 줄 내어쓰기(wrap 시 글자 아래로 정렬) */
+.notice-line{
+  padding-left:14px;
+  text-indent:-14px;
+}
+.notice-line:empty{
+  height:0.5em;
 }
 /* 공지 페이지네이션 */
 .notice-pagination{
@@ -2445,14 +2468,15 @@ body.app-mode .container{
 #fabMain{ position:relative; }
 .fab-main-dot{
   position:absolute;
-  top:4px;
-  right:4px;
-  width:12px;
-  height:12px;
+  top:-3px;
+  right:-3px;
+  width:15px;
+  height:15px;
   background:#ef4444;
   border-radius:50%;
-  border:2px solid #fff;
-  z-index:1;
+  border:2.5px solid #fff;
+  box-shadow:0 1px 3px rgba(0,0,0,0.25);
+  z-index:2;
 }
 
 /* 모바일 웹에서 fabWrap 위치 */
@@ -2820,7 +2844,9 @@ window.addEventListener("popstate", function (e) {
         <div class="notice-item">
           <div class="notice-item-date">{{ n.created_date }}</div>
           <div class="notice-item-title">{{ n.title }}</div>
-          <div class="notice-item-content">{{ n.content }}</div>
+          <div class="notice-item-content">
+            {% for line in n.content_lines %}<div class="notice-line">{{ line }}</div>{% endfor %}
+          </div>
         </div>
         {% endfor %}
       {% else %}
