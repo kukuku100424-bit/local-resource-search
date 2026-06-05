@@ -1482,13 +1482,20 @@ body.app-mode .container{
 .notice-item.open .notice-item-content{
   display:block;
 }
-/* 본문 한 줄씩 — 하이픈 줄 내어쓰기(wrap 시 글자 아래로 정렬) */
-.notice-line{
-  padding-left:14px;
-  text-indent:-14px;
-}
+/* 본문 한 줄씩 — 하이픈 줄은 마커+텍스트 분리해 wrap 시 글자 아래로 정확히 정렬 */
 .notice-line:empty{
   height:0.5em;
+}
+.notice-line.bullet{
+  display:flex;
+  gap:5px;
+}
+.notice-line.bullet .b-mark{
+  flex-shrink:0;
+}
+.notice-line.bullet .b-text{
+  flex:1;
+  min-width:0;
 }
 /* 공지 페이지네이션 */
 .notice-pagination{
@@ -2845,7 +2852,7 @@ window.addEventListener("popstate", function (e) {
           <div class="notice-item-date">{{ n.created_date }}</div>
           <div class="notice-item-title">{{ n.title }}</div>
           <div class="notice-item-content">
-            {% for line in n.content_lines %}<div class="notice-line">{{ line }}</div>{% endfor %}
+            {% for line in n.content_lines %}{% set t = line.lstrip() %}{% if t[:1] == '-' %}<div class="notice-line bullet"><span class="b-mark">-</span><span class="b-text">{{ t[1:].lstrip() }}</span></div>{% else %}<div class="notice-line">{{ line }}</div>{% endif %}{% endfor %}
           </div>
         </div>
         {% endfor %}
