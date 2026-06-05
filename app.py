@@ -1492,6 +1492,8 @@ body.app-mode .container{
 }
 .notice-line.bullet .b-mark{
   flex-shrink:0;
+  font-weight:800;
+  color:#1f2937;
 }
 .notice-line.bullet .b-text{
   flex:1;
