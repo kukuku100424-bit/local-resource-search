@@ -2190,7 +2190,7 @@ body.app-mode .container{
         <div id="fabItem_notice" class="fab-item">
           <div class="fab-item-btn" style="position:relative;">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4V4.29C7.12 5.14 5 7.82 5 11V17L3 19V20H21V19L19 17V11C19 7.82 16.88 5.14 14 4.29V4C14 2.9 13.1 2 12 2Z" fill="white"/><path d="M12 24C13.66 24 15 22.66 15 21H9C9 22.66 10.34 24 12 24Z" fill="white"/></svg>
-            {% if notices %}<span class="fab-item-dot"></span>{% endif %}
+            {% if notices %}<span class="fab-item-dot" style="display:none;"></span>{% endif %}
           </div>
           <span class="fab-item-label">공지사항</span>
         </div>
@@ -2215,7 +2215,7 @@ body.app-mode .container{
         </div>
       </div>
       <div id="fabMain">
-        {% if notices %}<span id="fabMainDot" class="fab-main-dot"></span>{% endif %}
+        {% if notices %}<span id="fabMainDot" class="fab-main-dot" style="display:none;"></span>{% endif %}
         <svg id="fabIconPlus" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
           <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
         </svg>
@@ -2507,31 +2507,49 @@ body.app-mode .container{
 /* 단일 의견보내기 버튼/알약 완전 폐지 */
 #singleReportBtn{ display:none !important; }
 
-/* 공지 빨간점 — 메뉴 안 공지사항 항목 */
+/* 공지 안읽음 뱃지 — 메뉴 안 공지사항 항목 */
 .fab-item-dot{
   position:absolute;
-  top:-2px;
-  right:-2px;
-  width:11px;
-  height:11px;
+  top:-6px;
+  right:-6px;
+  min-width:16px;
+  height:16px;
+  padding:0 4px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
   background:#ef4444;
-  border-radius:50%;
+  color:#fff;
+  font-size:10px;
+  font-weight:800;
+  line-height:1;
+  border-radius:9px;
   border:2px solid #fff;
+  box-sizing:border-box;
 }
 
-/* 공지 빨간점 — 메인 + 버튼 */
+/* 공지 안읽음 뱃지 — 메인 + 버튼 */
 #fabMain{ position:relative; }
 .fab-main-dot{
   position:absolute;
-  top:-3px;
-  right:-3px;
-  width:15px;
-  height:15px;
+  top:-6px;
+  right:-6px;
+  min-width:18px;
+  height:18px;
+  padding:0 4px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
   background:#ef4444;
-  border-radius:50%;
-  border:2.5px solid #fff;
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+  border-radius:9px;
+  border:2px solid #fff;
   box-shadow:0 1px 3px rgba(0,0,0,0.25);
   z-index:2;
+  box-sizing:border-box;
 }
 
 /* 모바일 웹에서 fabWrap 위치 */
@@ -2785,26 +2803,39 @@ body.app-mode .container{
   document.addEventListener("click", function(){ if(isOpen) closeFab(); });
 })();
 
-/* ===== 공지 빨간점 읽음 처리 (localStorage) ===== */
+/* ===== 공지 안 읽음 개수 뱃지 (localStorage) ===== */
 (function(){
   var KEY = "carenavi_seen_notice";
-  var latest = {{ latest_notice_key|tojson }};
-  function hideDots(){
-    var d1 = document.getElementById("fabMainDot");
-    var d2 = document.querySelector("#fabItem_notice .fab-item-dot");
-    if(d1) d1.style.display = "none";
-    if(d2) d2.style.display = "none";
+  var keys = {{ notice_keys|tojson }};       /* 최신순 */
+  var latest = keys.length ? keys[0] : "";
+  function unreadCount(){
+    var seen = "";
+    try{ seen = localStorage.getItem(KEY) || ""; }catch(e){}
+    if(!keys.length) return 0;
+    if(!seen) return keys.length;
+    var i = keys.indexOf(seen);
+    return i < 0 ? keys.length : i;   /* seen보다 최신인 공지 수 */
   }
-  // 이미 본 최신 공지면 점 숨김
-  try{
-    if(!latest || localStorage.getItem(KEY) === latest){
-      hideDots();
+  function applyBadge(el){
+    if(!el) return;
+    var n = unreadCount();
+    if(n > 0){
+      el.textContent = n > 9 ? "9+" : String(n);
+      el.style.display = "";
+    }else{
+      el.textContent = "";
+      el.style.display = "none";
     }
-  }catch(e){}
-  // 공지 열면 본 것으로 기록 + 점 제거
+  }
+  function refresh(){
+    applyBadge(document.getElementById("fabMainDot"));
+    applyBadge(document.querySelector("#fabItem_notice .fab-item-dot"));
+  }
+  refresh();
+  /* 공지 열면 최신까지 읽은 것으로 기록 + 뱃지 0 */
   window.__careNaviMarkNoticeSeen = function(){
     try{ if(latest) localStorage.setItem(KEY, latest); }catch(e){}
-    hideDots();
+    refresh();
   };
 })();
 
@@ -3150,16 +3181,11 @@ def home():
         notices = []
 
     notices = clean_notices_for_template(notices)
-    latest_notice_key = ""
-    if notices:
-        n0 = notices[0]
-        latest_notice_key = str(
-            n0.get("id")
-            or n0.get("created_at")
-            or n0.get("created_datetime")
-            or ""
-        )
-    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key)
+    def _notice_key(n):
+        return str(n.get("id") or n.get("created_at") or n.get("created_datetime") or "")
+    notice_keys = [k for k in (_notice_key(n) for n in notices) if k]
+    latest_notice_key = notice_keys[0] if notice_keys else ""
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key, notice_keys=notice_keys)
 
 STATS_HTML = """
 <!DOCTYPE html>
@@ -3198,25 +3224,24 @@ body{
   gap:6px;
   flex-wrap:nowrap;
   flex-shrink:0;
-  margin-left:auto;
 }
 
 .home-button{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
-  gap:5px !important;
   height:34px !important;
-  padding:0 15px !important;
-  border-radius:8px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
+
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
+
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:600 !important;
-  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
-  transition:all .15s !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
 }
 
 .home-button:hover{
@@ -3434,7 +3459,7 @@ h2{
     <a href="/home" class="home-button">홈으로</a>
 
     <div class="top-right-menu">
-      <a href="/board/admin" class="home-button">의견확인</a>
+      <a href="/board/admin" class="home-button">게시판</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
       <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀 다운로드</a>
     </div>
@@ -3452,6 +3477,44 @@ h2{
         <div class="summary-value">{{ today_count }}</div>
       </div>
     </div>
+  </div>
+
+  <style>
+    .rank-table{ width:100%; border-collapse:collapse; }
+    .rank-table td{ padding:8px 6px; border-bottom:1px solid #f1f5f9; font-size:14px; }
+    .rank-table tr:last-child td{ border-bottom:none; }
+    .rank-name{ color:#374151; }
+    .rank-count{ text-align:right; color:#2563eb; font-weight:700; white-space:nowrap; }
+  </style>
+
+  <div class="card">
+    <h2>많이 검색된 조건 <span class="small">(기관검색 Top 10)</span></h2>
+    {% if top_search_conditions %}
+    <table class="rank-table">
+      <tbody>
+      {% for row in top_search_conditions %}
+        <tr><td class="rank-name">{{ row[0] }}</td><td class="rank-count">{{ row[1] }}회</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="small">아직 집계된 검색이 없습니다.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>자주 추천된 서비스 <span class="small">(AI검색 Top 10)</span></h2>
+    {% if top_recommended_services %}
+    <table class="rank-table">
+      <tbody>
+      {% for row in top_recommended_services %}
+        <tr><td class="rank-name">{{ row[0] }}</td><td class="rank-count">{{ row[1] }}회</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="small">아직 집계된 추천이 없습니다.</div>
+    {% endif %}
   </div>
 
   <div class="card">
@@ -3787,6 +3850,43 @@ def stats():
     chart_pv, chart_pv_max = _chart_data(daily_pv)
     top_pages_max = max([r["count"] for r in top_pages], default=0)
 
+    # 검색 조건/추천 서비스 집계 (region_logs.services) — 격리: 실패해도 통계 페이지엔 영향 없음
+    top_search_conditions = []
+    top_recommended_services = []
+    try:
+        if os.getenv("RENDER") is not None:
+            _r = requests.get(
+                f"{SUPABASE_URL}/rest/v1/region_logs?select=search_type,services&order=created_at.desc&limit=5000",
+                headers=SUPABASE_HEADERS
+            )
+            _rows = _r.json() if _r.ok else []
+        else:
+            _rows = [
+                {"search_type": "combo", "services": "요양>방문요양"},
+                {"search_type": "combo", "services": "요양>방문요양"},
+                {"search_type": "combo", "services": "일상생활돌봄>가사지원"},
+                {"search_type": "desc", "services": "일상생활돌봄>식사지원||요양>방문요양"},
+                {"search_type": "desc", "services": "요양>방문요양"},
+            ]
+        _cond = {}
+        _svc = {}
+        for _row in _rows:
+            _st = str(_row.get("search_type", "") or "").strip()
+            _sv = str(_row.get("services", "") or "").strip()
+            if not _sv:
+                continue
+            if _st == "combo":
+                _cond[_sv] = _cond.get(_sv, 0) + 1
+            elif _st == "desc":
+                for _tok in _sv.split("||"):
+                    _tok = _tok.strip()
+                    if _tok:
+                        _svc[_tok] = _svc.get(_tok, 0) + 1
+        top_search_conditions = sorted(_cond.items(), key=lambda x: (-x[1], x[0]))[:10]
+        top_recommended_services = sorted(_svc.items(), key=lambda x: (-x[1], x[0]))[:10]
+    except Exception as e:
+        app.logger.exception(e)
+
     return render_template_string(
         STATS_HTML,
         total_count=total_count,
@@ -3801,7 +3901,9 @@ def stats():
         chart_visits=chart_visits,
         chart_visits_max=chart_visits_max,
         chart_pv=chart_pv,
-        chart_pv_max=chart_pv_max
+        chart_pv_max=chart_pv_max,
+        top_search_conditions=top_search_conditions,
+        top_recommended_services=top_recommended_services
     )
 
 @app.route("/stats/export/visits")
@@ -4303,18 +4405,16 @@ body{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
-  gap:5px !important;
   height:34px !important;
-  padding:0 15px !important;
-  border-radius:8px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:600 !important;
-  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
-  transition:all .15s !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
 }
 h2{
   margin:0 0 8px 0;
@@ -4514,18 +4614,16 @@ body{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
-  gap:5px !important;
   height:34px !important;
-  padding:0 15px !important;
-  border-radius:8px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:600 !important;
-  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
-  transition:all .15s !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
 }
 .card{
   background:#fff;
@@ -4603,18 +4701,16 @@ body{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
-  gap:5px !important;
   height:34px !important;
-  padding:0 15px !important;
-  border-radius:8px !important;
+  padding:0 13px !important;
+  border-radius:999px !important;
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:600 !important;
-  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
-  transition:all .15s !important;
+  font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
 }
 .card{
   background:#fff;
@@ -4824,23 +4920,7 @@ NOTICE_ADMIN_HTML = """
 body{ margin:0; background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; }
 .container{ max-width:640px; margin:0 auto; padding:24px 16px 40px 16px; }
 .top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px; }
-.home-button{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:5px;
-  height:34px;
-  padding:0 15px;
-  border-radius:8px;
-  background:#ffffff;
-  border:1px solid #e5e7eb;
-  color:#6b7280;
-  text-decoration:none;
-  font-size:13px;
-  font-weight:600;
-  box-shadow:0 2px 6px rgba(15,23,42,0.08);
-  transition:all .15s;
-}
+.home-button{ display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 13px;border-radius:999px;background:#fff;border:1px solid #e5e7eb;color:#6b7280;text-decoration:none;font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(15,23,42,0.08); }
 h2{ margin:0 0 16px 0; font-size:20px; }
 .card{ background:#fff; border-radius:16px; padding:18px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06); }
 .card .meta{ font-size:11px; color:#9ca3af; margin-bottom:4px; }
@@ -5183,17 +5263,24 @@ def combo():
         )
 
         if os.getenv("RENDER") is not None:
-            requests.post(
-                f"{SUPABASE_URL}/rest/v1/region_logs",
-                headers=SUPABASE_HEADERS,
-                json={
-                    "sido": sido,
-                    "sigungu": sigungu,
-                    "result_count": count,
-                    "ip": request.remote_addr,
-                    "search_type": "combo"
-               }
-            )
+            combo_services = ""
+            if main_category or middle_category:
+                combo_services = (main_category or "-") + ">" + (middle_category or "전체")
+            try:
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/region_logs",
+                    headers=SUPABASE_HEADERS,
+                    json={
+                        "sido": sido,
+                        "sigungu": sigungu,
+                        "result_count": count,
+                        "ip": request.remote_addr,
+                        "search_type": "combo",
+                        "services": combo_services
+                    }
+                )
+            except Exception as e:
+                app.logger.exception(e)
 
     return render_template_string(
         COMBO_HTML,
@@ -6374,17 +6461,29 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
             )
 
             if os.getenv("RENDER") is not None:
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/region_logs",
-                    headers=SUPABASE_HEADERS,
-                    json={
-                        "sido": selected_sido,
-                        "sigungu": selected_sigungu,
-                        "result_count": len(final_results),
-                        "ip": request.remote_addr,
-                        "search_type": "desc"
-                    }
-                )
+                _seen = []
+                for _it in final_results:
+                    _mc = str(_it.get("대분류", "")).strip()
+                    _sc = str(_it.get("중분류", "")).strip()
+                    _tok = (_mc or "-") + ">" + (_sc or "-")
+                    if _tok not in _seen:
+                        _seen.append(_tok)
+                desc_services = "||".join(_seen)
+                try:
+                    requests.post(
+                        f"{SUPABASE_URL}/rest/v1/region_logs",
+                        headers=SUPABASE_HEADERS,
+                        json={
+                            "sido": selected_sido,
+                            "sigungu": selected_sigungu,
+                            "result_count": len(final_results),
+                            "ip": request.remote_addr,
+                            "search_type": "desc",
+                            "services": desc_services
+                        }
+                    )
+                except Exception as e:
+                    app.logger.exception(e)
 
             # ======================
             # [규칙 1] 기초사정 자동 포함
