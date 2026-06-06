@@ -3388,6 +3388,18 @@ h2{
 .chart-bar.pv{
   background:linear-gradient(180deg,#34d399,#059669);
 }
+.chart-bar.page{
+  background:linear-gradient(180deg,#818cf8,#4f46e5);
+}
+.chart.pages .chart-col{
+  flex:1 0 56px;
+  min-width:56px;
+}
+.chart.pages .chart-xlabel{
+  white-space:normal;
+  text-align:center;
+  line-height:1.2;
+}
 .chart-count{
   position:absolute;
   top:-16px;
@@ -3459,42 +3471,19 @@ h2{
   </div>
 
   <div class="card">
-    <h2>페이지뷰 추세 <span class="small">(최근 {{ chart_pv|length }}일)</span></h2>
-    <div class="chart">
-      {% if chart_pv %}
-        {% for r in chart_pv %}
+    <h2>페이지별 조회수</h2>
+    <div class="chart pages">
+      {% if top_pages %}
+        {% for r in top_pages %}
         <div class="chart-col">
-          <div class="chart-bar pv" style="height:{% if chart_pv_max %}{{ [ (r.count * 130 // chart_pv_max), 4 ]|max }}{% else %}4{% endif %}px;"><span class="chart-count">{{ r.count }}</span></div>
-          <div class="chart-xlabel">{{ r.date[5:] }}</div>
+          <div class="chart-bar page" style="height:{% if top_pages_max %}{{ [ (r.count * 130 // top_pages_max), 4 ]|max }}{% else %}4{% endif %}px;"><span class="chart-count">{{ r.count }}</span></div>
+          <div class="chart-xlabel">{{ r.page }}</div>
         </div>
         {% endfor %}
       {% else %}
         <div class="small">아직 페이지뷰 데이터가 없습니다. (Supabase에 page_view_logs 테이블 생성 후 집계됩니다)</div>
       {% endif %}
     </div>
-  </div>
-
-  <div class="card">
-    <h2>페이지별 조회수</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>페이지</th>
-          <th>조회수</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in top_pages %}
-        <tr>
-          <td>{{ r.page }}</td>
-          <td>{{ r.count }}</td>
-        </tr>
-        {% endfor %}
-        {% if not top_pages %}
-        <tr><td colspan="2" class="small">데이터가 없습니다.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
   </div>
 
 <div class="card">
@@ -3806,6 +3795,7 @@ def stats():
 
     chart_visits, chart_visits_max = _chart_data(daily_visits)
     chart_pv, chart_pv_max = _chart_data(daily_pv)
+    top_pages_max = max([r["count"] for r in top_pages], default=0)
 
     return render_template_string(
         STATS_HTML,
@@ -3817,6 +3807,7 @@ def stats():
         pv_today=pv_today,
         daily_pv=daily_pv,
         top_pages=top_pages,
+        top_pages_max=top_pages_max,
         chart_visits=chart_visits,
         chart_visits_max=chart_visits_max,
         chart_pv=chart_pv,
