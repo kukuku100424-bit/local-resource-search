@@ -3428,7 +3428,7 @@ h2{
     <div class="top-right-menu">
       <a href="/board/admin" class="home-button">게시판</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
-      <a href="/stats/export/케어네비_통계.xlsx" class="home-button">엑셀 다운로드</a>
+      <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀 다운로드</a>
     </div>
   </div>
 
@@ -3918,8 +3918,8 @@ def export_stats_regions():
     )
 
 @app.route("/stats/export/all")
-@app.route("/stats/export/케어네비_통계.xlsx")
-def export_stats_all():
+@app.route("/stats/export/xlsx/<path:fname>")
+def export_stats_all(fname=None):
     """방문/페이지뷰/지역 통계를 시트별로 묶어 하나의 엑셀로 일괄 다운로드."""
     if os.getenv("RENDER") is None:
         total_count, today_count = 100, 5
