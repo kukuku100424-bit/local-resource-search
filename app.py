@@ -175,7 +175,16 @@ def favicon():
     return "", 204
 
 import logging
-logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
+# =========================
+# 운영 로그 최소화
+# - Render/Gunicorn/Flask 기본 요청 로그를 최대한 차단
+# - 검색어, 토큰, 추천 결과 같은 민감 정보는 print로 남기지 않음
+# =========================
+logging.getLogger('werkzeug').disabled = True
+logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
+logging.getLogger('gunicorn.access').disabled = True
+logging.getLogger('gunicorn.access').setLevel(logging.CRITICAL)
 logging.getLogger('flask.app').setLevel(logging.ERROR)
 
 @app.before_request
@@ -5996,9 +6005,7 @@ def ocr():
         output_tokens = getattr(usage, "output_tokens", 0) if usage else 0
         total_tokens = getattr(usage, "total_tokens", 0) if usage else 0
 
-        print("OCR 입력 토큰:", input_tokens)
-        print("OCR 출력 토큰:", output_tokens)
-        print("OCR 총 토큰:", total_tokens)
+        # 토큰 사용량은 관리자 통계용 DB에만 누적하고 Render 로그에는 남기지 않음
 
         add_token_usage(input_tokens, output_tokens)
 
@@ -6009,8 +6016,7 @@ def ocr():
             "total_tokens": total_tokens
         }
 
-    except Exception as e:
-        print("OCR 오류:", e)
+    except Exception:
         return {"text": ""}
 
 def build_grouped_service_results(service_results):
@@ -6410,12 +6416,10 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
 
             if hasattr(res, "usage"):
                 try:
-                    print("입력 토큰:", res.usage.input_tokens)
-                    print("출력 토큰:", res.usage.output_tokens)
-                    print("총 토큰:", res.usage.total_tokens)
+                    # 토큰 수는 관리자 통계용 DB에만 저장하고 Render 로그에는 출력하지 않음
                     add_token_usage(res.usage.input_tokens, res.usage.output_tokens)
-                except:
-                    print("토큰 정보:", res.usage)
+                except Exception:
+                    pass
 
             text = res.output_text
             try:
@@ -6758,31 +6762,10 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                         str(item.get("중분류", "")).strip()
                     ) in region_keys
                 ]
-            print("검색어 =", repr(query))
-            print("선택 지역(시도) =", repr(selected_sido))
-            print("선택 지역(시군구) =", repr(selected_sigungu))
-            print("지역필터 전 전체 추천 개수 =", len(final_results))
-            print("=== 목욕 디버그 ===")
-            q_debug = query.replace(" ", "").lower()
-            _bath_need_kw = ["목욕도움","목욕지원","목욕희망","목욕원함","방문목욕","씻겨","씻기도움","씻기지원","목욕케어","목욕서비스","샤워도움","샤워지원","목욕어려움","목욕힘듦","목욕불가","목욕못함","목욕스스로어렵","혼자씻기어렵","혼자목욕어렵","목욕필요","목욕욕구","목욕바람"]
-            _bath_indep_kw = ["혼자목욕가능","혼자씻기가능","혼자씻을수있","스스로목욕가능","목욕혼자가능","씻기혼자가능","혼자목욕함","혼자씻음","목욕스스로가능","목욕독립적","목욕도혼자가능"]
-            print("has_bath_need =", any(k in q_debug for k in _bath_need_kw))
-            print("has_bath_independent =", any(k in q_debug for k in _bath_indep_kw))
-            print("has_bath_keyword(최종) =", has_bath_keyword)
-            print("is_bath_direct =", any(p in q_debug for p in bath_direct_patterns) if has_bath_keyword else "N/A")
-            bath_items = [r for r in final_results if str(r.get("중분류","")).strip() == "방문목욕"]
-            print("방문목욕 항목 수 =", len(bath_items))
-            for b in bath_items:
-                print("  방문목욕 →", b.get("서비스내용",""), "| direct_need =", b.get("direct_need",""))
-            print("==================")
-
             service_results = filtered_results
             # _ai_picked는 정렬용 내부 플래그이므로 결과에서 제거
             for item in service_results:
                 item.pop("_ai_picked", None)
-            print("최종 service_results 개수 =", len(service_results))
-            for r in service_results:
-                print("→", r.get("대분류",""), "|", r.get("중분류",""), "|", r.get("서비스내용",""), "|", r.get("direct_need",""))
 
 
         except Exception as e:
