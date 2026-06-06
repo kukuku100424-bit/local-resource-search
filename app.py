@@ -94,6 +94,52 @@ def add_token_usage(input_tokens, output_tokens):
     except Exception as e:
         app.logger.exception(e)
 
+
+def classify_client_env():
+    """User-Agent 원문은 저장하지 않고 접속 환경만 4개 범주로 분류."""
+    ua = (request.headers.get("User-Agent", "") or "").lower()
+
+    if "iphone" in ua or "ipad" in ua or "ipod" in ua:
+        return "iOS"
+    if "android" in ua:
+        return "Android"
+    if "mobile" in ua:
+        return "Other"
+    return "PC"
+
+
+def add_env_usage():
+    """총 방문자수 기준 접속 환경 집계. User-Agent 원문/IP/검색어는 저장하지 않음."""
+    if os.getenv("RENDER") is None:
+        return
+
+    try:
+        env = classify_client_env()
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/env_stats?env=eq.{env}&select=count",
+            headers=SUPABASE_HEADERS,
+            timeout=5
+        )
+        rows = res.json() if res.ok else []
+
+        if rows:
+            cur = int(rows[0].get("count", 0) or 0)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/env_stats?env=eq.{env}",
+                headers=SUPABASE_HEADERS,
+                json={"count": cur + 1},
+                timeout=5
+            )
+        else:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/env_stats",
+                headers=SUPABASE_HEADERS,
+                json={"env": env, "count": 1},
+                timeout=5
+            )
+    except Exception:
+        pass
+
 def update_visitors():
     now = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
 
@@ -159,6 +205,9 @@ def update_visitors():
                 "today_count": today_count
             }
         )
+
+    # 접속 환경 집계 — User-Agent 원문은 저장하지 않고 PC/Android/iOS/기타 카운트만 누적
+    add_env_usage()
 
     # 방문 로그 저장 — 개인정보(IP) 수집 중단으로 제거됨
     # (총/오늘 방문자 수는 visit_stats 카운터로 계속 집계됨)
@@ -3466,6 +3515,87 @@ h2{
   white-space:nowrap;
 }
 
+/* 접속 환경 도넛 그래프 */
+.env-wrap{
+  display:flex;
+  align-items:center;
+  gap:24px;
+  flex-wrap:wrap;
+  padding:10px 4px 4px;
+}
+.env-donut{
+  width:170px;
+  height:170px;
+  border-radius:50%;
+  position:relative;
+  flex:0 0 auto;
+  box-shadow:inset 0 0 0 1px rgba(15,23,42,0.05);
+}
+.env-donut::after{
+  content:"";
+  position:absolute;
+  inset:34px;
+  background:#ffffff;
+  border-radius:50%;
+  box-shadow:0 0 0 1px #e5e7eb;
+}
+.env-center{
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  z-index:1;
+  pointer-events:none;
+}
+.env-total-label{
+  font-size:11px;
+  color:#9ca3af;
+  margin-bottom:3px;
+}
+.env-total-value{
+  font-size:22px;
+  font-weight:900;
+  color:#111827;
+}
+.env-legend{
+  flex:1;
+  min-width:220px;
+}
+.env-row{
+  display:grid;
+  grid-template-columns:14px 1fr auto auto;
+  gap:8px;
+  align-items:center;
+  padding:7px 0;
+  border-bottom:1px solid #f1f5f9;
+  font-size:13px;
+}
+.env-row:last-child{ border-bottom:none; }
+.env-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+}
+.env-name{ color:#374151; font-weight:700; }
+.env-count{ color:#6b7280; text-align:right; }
+.env-percent{ color:#111827; font-weight:800; text-align:right; }
+
+@media (max-width:480px){
+  .env-wrap{
+    justify-content:center;
+    gap:16px;
+  }
+  .env-donut{
+    width:150px;
+    height:150px;
+  }
+  .env-donut::after{
+    inset:30px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -3524,6 +3654,32 @@ h2{
       {% else %}
         <div class="small">아직 페이지뷰 데이터가 없습니다. (Supabase에 page_view_logs 테이블 생성 후 집계됩니다)</div>
       {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>접속 환경 <span class="small">(총 방문자수 기준)</span></h2>
+    <div class="env-wrap">
+      <div class="env-donut" style="background:{{ env_chart_style }};">
+        <div class="env-center">
+          <div class="env-total-label">총 방문</div>
+          <div class="env-total-value">{{ env_total }}</div>
+        </div>
+      </div>
+      <div class="env-legend">
+        {% if env_total > 0 %}
+          {% for r in env_stats %}
+          <div class="env-row">
+            <span class="env-dot" style="background:{{ r.color }};"></span>
+            <span class="env-name">{{ r.label }}</span>
+            <span class="env-count">{{ r.count }}</span>
+            <span class="env-percent">{{ r.percent }}%</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="small">아직 접속 환경 데이터가 없습니다. (Supabase에 env_stats 테이블 생성 후 집계됩니다)</div>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -3754,6 +3910,59 @@ def _chart_data(daily_list, n=14):
     return asc, mx
 
 
+
+def _compute_env_stats():
+    """접속 환경 통계. User-Agent 원문 없이 env_stats의 집계값만 사용."""
+    env_meta = [
+        {"env": "PC", "label": "PC", "color": "#2563eb"},
+        {"env": "Android", "label": "모바일(안드로이드)", "color": "#059669"},
+        {"env": "iOS", "label": "모바일(iOS)", "color": "#7c3aed"},
+        {"env": "Other", "label": "기타", "color": "#f59e0b"},
+    ]
+    counts = {m["env"]: 0 for m in env_meta}
+
+    try:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/env_stats?select=env,count",
+            headers=SUPABASE_HEADERS,
+            timeout=8
+        )
+        rows = res.json() if res.ok else []
+        if not isinstance(rows, list):
+            rows = []
+        for row in rows:
+            env = str(row.get("env", "") or "")
+            cnt = int(row.get("count", 0) or 0)
+            if env in counts:
+                counts[env] += cnt
+            else:
+                counts["Other"] += cnt
+    except Exception:
+        pass
+
+    total = sum(counts.values())
+    stats = []
+    start = 0.0
+    segments = []
+
+    for meta in env_meta:
+        count = counts.get(meta["env"], 0)
+        percent = round((count / total * 100), 1) if total else 0
+        end = start + (count / total * 360) if total else start
+        if total and count > 0:
+            segments.append(f'{meta["color"]} {start:.2f}deg {end:.2f}deg')
+        stats.append({
+            "env": meta["env"],
+            "label": meta["label"],
+            "color": meta["color"],
+            "count": count,
+            "percent": percent,
+        })
+        start = end
+
+    chart_style = "conic-gradient(" + ", ".join(segments) + ")" if segments else "#e5e7eb"
+    return stats, total, chart_style
+
 @app.route("/stats")
 def stats():
 
@@ -3785,6 +3994,14 @@ def stats():
             {"page": "메인", "count": 41},
             {"page": "공지사항", "count": 16},
         ]
+        env_stats = [
+            {"env": "PC", "label": "PC", "color": "#2563eb", "count": 46, "percent": 46.0},
+            {"env": "Android", "label": "모바일(안드로이드)", "color": "#059669", "count": 38, "percent": 38.0},
+            {"env": "iOS", "label": "모바일(iOS)", "color": "#7c3aed", "count": 14, "percent": 14.0},
+            {"env": "Other", "label": "기타", "color": "#f59e0b", "count": 2, "percent": 2.0},
+        ]
+        env_total = 100
+        env_chart_style = "conic-gradient(#2563eb 0deg 165.60deg, #059669 165.60deg 302.40deg, #7c3aed 302.40deg 352.80deg, #f59e0b 352.80deg 360.00deg)"
     else:
         stats_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
@@ -3852,6 +4069,7 @@ def stats():
             })
 
         pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
+        env_stats, env_total, env_chart_style = _compute_env_stats()
 
     chart_visits, chart_visits_max = _chart_data(daily_visits)
     chart_pv, chart_pv_max = _chart_data(daily_pv)
@@ -3912,7 +4130,10 @@ def stats():
         tok_today_krw=tok_today_krw,
         price_in=GPT_PRICE_INPUT_USD,
         price_out=GPT_PRICE_OUTPUT_USD,
-        usd_krw=USD_TO_KRW
+        usd_krw=USD_TO_KRW,
+        env_stats=env_stats,
+        env_total=env_total,
+        env_chart_style=env_chart_style
     )
 
 @app.route("/stats/export/visits")
