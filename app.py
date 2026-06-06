@@ -172,6 +172,46 @@ def require_login_all_pages():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
+# =========================
+# 페이지뷰(PV) 집계 — 메인 방문자수와 별개. 관리자 통계용.
+# 응답 지연 방지를 위해 비동기 스레드로 적재. (테이블 없으면 조용히 무시)
+# =========================
+import threading as _pv_threading
+
+_PV_EXCLUDE_EXACT = {"/", "/login", "/admin", "/favicon.ico", "/app-version.json"}
+_PV_EXCLUDE_PREFIXES = ("/static", "/stats", "/board/admin", "/notice/admin")
+
+def _pv_insert(path):
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/page_view_logs",
+            headers=SUPABASE_HEADERS,
+            json={"path": path},
+            timeout=5
+        )
+    except Exception:
+        pass
+
+@app.before_request
+def track_page_view():
+    if os.getenv("RENDER") is None:
+        return None
+    if request.method != "GET":
+        return None
+    if not (session.get("logged_in") or session.get("is_admin")):
+        return None
+    path = request.path or ""
+    if path in _PV_EXCLUDE_EXACT:
+        return None
+    for p in _PV_EXCLUDE_PREFIXES:
+        if path.startswith(p):
+            return None
+    try:
+        _pv_threading.Thread(target=_pv_insert, args=(path,), daemon=True).start()
+    except Exception:
+        pass
+    return None
+
 FILE_PATH = "service_resources.xlsx"
 # =========================
 # 서비스 그룹 엑셀 로드 (AI 추천용)
@@ -3321,6 +3361,50 @@ h2{
   background:#2563eb;
 }
 
+/* 막대 그래프 (외부 라이브러리 없이 CSS) */
+.chart{
+  display:flex;
+  align-items:flex-end;
+  gap:6px;
+  padding:22px 4px 0;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.chart-col{
+  flex:1 0 26px;
+  min-width:26px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.chart-bar{
+  width:62%;
+  max-width:32px;
+  min-height:4px;
+  background:linear-gradient(180deg,#60a5fa,#2563eb);
+  border-radius:6px 6px 0 0;
+  position:relative;
+}
+.chart-bar.pv{
+  background:linear-gradient(180deg,#34d399,#059669);
+}
+.chart-count{
+  position:absolute;
+  top:-16px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:10px;
+  font-weight:700;
+  color:#374151;
+  white-space:nowrap;
+}
+.chart-xlabel{
+  margin-top:6px;
+  font-size:10px;
+  color:#9ca3af;
+  white-space:nowrap;
+}
+
 </style>
 </head>
 <body>
@@ -3332,8 +3416,7 @@ h2{
     <div class="top-right-menu">
       <a href="/board/admin" class="home-button">게시판</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
-      <a href="/stats/export/visits" class="home-button">엑셀</a>
-      <a href="/stats/export/regions" class="home-button">엑셀2</a>
+      <a href="/stats/export/all" class="home-button">엑셀 다운로드</a>
     </div>
   </div>
 
@@ -3348,7 +3431,70 @@ h2{
         <div class="summary-label">오늘 방문자수</div>
         <div class="summary-value">{{ today_count }}</div>
       </div>
+      <div class="summary-box">
+        <div class="summary-label">총 페이지뷰</div>
+        <div class="summary-value">{{ pv_total }}</div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-label">오늘 페이지뷰</div>
+        <div class="summary-value">{{ pv_today }}</div>
+      </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>방문 추세 <span class="small">(최근 {{ chart_visits|length }}일)</span></h2>
+    <div class="chart">
+      {% if chart_visits %}
+        {% for r in chart_visits %}
+        <div class="chart-col">
+          <div class="chart-bar" style="height:{% if chart_visits_max %}{{ [ (r.count * 130 // chart_visits_max), 4 ]|max }}{% else %}4{% endif %}px;"><span class="chart-count">{{ r.count }}</span></div>
+          <div class="chart-xlabel">{{ r.date[5:] }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="small">데이터가 없습니다.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>페이지뷰 추세 <span class="small">(최근 {{ chart_pv|length }}일)</span></h2>
+    <div class="chart">
+      {% if chart_pv %}
+        {% for r in chart_pv %}
+        <div class="chart-col">
+          <div class="chart-bar pv" style="height:{% if chart_pv_max %}{{ [ (r.count * 130 // chart_pv_max), 4 ]|max }}{% else %}4{% endif %}px;"><span class="chart-count">{{ r.count }}</span></div>
+          <div class="chart-xlabel">{{ r.date[5:] }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="small">아직 페이지뷰 데이터가 없습니다. (Supabase에 page_view_logs 테이블 생성 후 집계됩니다)</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>페이지별 조회수</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>페이지</th>
+          <th>조회수</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in top_pages %}
+        <tr>
+          <td>{{ r.page }}</td>
+          <td>{{ r.count }}</td>
+        </tr>
+        {% endfor %}
+        {% if not top_pages %}
+        <tr><td colspan="2" class="small">데이터가 없습니다.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
   </div>
 
 <div class="card">
@@ -3489,6 +3635,76 @@ document.addEventListener("DOMContentLoaded", function(){
 </html>
 
 """
+# =========================
+# 페이지뷰/차트 집계 헬퍼 (관리자 통계용)
+# =========================
+def _kst_date_str(s):
+    try:
+        x = str(s).replace("Z", "+00:00")
+        dt = datetime.datetime.fromisoformat(x)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+    except Exception:
+        return str(s)[:10]
+
+_PV_PAGE_NAMES = {
+    "/home": "메인",
+    "/desc": "사례검색",
+    "/combo": "기관검색",
+    "/board/write": "의견 작성",
+    "/board": "의견게시판",
+    "/notice": "공지사항",
+}
+
+def _friendly_page(path):
+    if path in _PV_PAGE_NAMES:
+        return _PV_PAGE_NAMES[path]
+    for k, v in _PV_PAGE_NAMES.items():
+        if path.startswith(k):
+            return v
+    return path or "-"
+
+def _compute_pv_stats():
+    """페이지뷰 통계. 테이블이 없거나 오류면 0/빈값 반환(통계페이지 안 깨지게)."""
+    try:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/page_view_logs?select=created_at,path&order=created_at.desc",
+            headers=SUPABASE_HEADERS,
+            timeout=8
+        )
+        rows = res.json() if res.ok else []
+        if not isinstance(rows, list):
+            rows = []
+    except Exception:
+        rows = []
+
+    today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+    daily_map = defaultdict(int)
+    page_map = defaultdict(int)
+    pv_today = 0
+    for r in rows:
+        d = _kst_date_str(r.get("created_at", ""))
+        daily_map[d] += 1
+        if d == today_kst:
+            pv_today += 1
+        page_map[_friendly_page(str(r.get("path", "") or ""))] += 1
+
+    pv_total = len(rows)
+    daily_pv = [{"date": d, "count": daily_map[d]} for d in sorted(daily_map.keys(), reverse=True)]
+    top_pages = sorted(
+        [{"page": p, "count": c} for p, c in page_map.items()],
+        key=lambda x: x["count"], reverse=True
+    )[:10]
+    return pv_total, pv_today, daily_pv, top_pages
+
+def _chart_data(daily_list, n=14):
+    """일자별 {date,count} desc 리스트 → 최근 n일 asc + 최댓값."""
+    asc = sorted(daily_list, key=lambda r: r["date"])[-n:]
+    mx = max([r["count"] for r in asc], default=0)
+    return asc, mx
+
+
 @app.route("/stats")
 def stats():
 
@@ -3497,96 +3713,114 @@ def stats():
         today_count = 5
 
         daily_visits = [
-            {"date": "2026-04-17", "count": 12},
-            {"date": "2026-04-18", "count": 18},
-            {"date": "2026-04-19", "count": 5}
+            {"date": "2026-06-03", "count": 12},
+            {"date": "2026-06-04", "count": 18},
+            {"date": "2026-06-05", "count": 5}
         ]
 
         daily_regions = [
-            {"date": "2026-04-18", "sido": "광주광역시", "sigungu": "북구", "search_type": "조건기반", "count": 3},
-            {"date": "2026-04-18", "sido": "전라남도", "sigungu": "나주시", "search_type": "사례기반", "count": 2},
-            {"date": "2026-04-19", "sido": "광주광역시", "sigungu": "서구", "search_type": "조건기반", "count": 1}
+            {"date": "2026-06-04", "sido": "광주광역시", "sigungu": "북구", "search_type": "조건기반", "count": 3},
+            {"date": "2026-06-04", "sido": "전라남도", "sigungu": "나주시", "search_type": "사례기반", "count": 2},
+            {"date": "2026-06-05", "sido": "광주광역시", "sigungu": "서구", "search_type": "조건기반", "count": 1}
         ]
 
-        return render_template_string(
-            STATS_HTML,
-            total_count=total_count,
-            today_count=today_count,
-            daily_visits=daily_visits,
-            daily_regions=daily_regions
+        pv_total, pv_today = 173, 41
+        daily_pv = [
+            {"date": "2026-06-03", "count": 58},
+            {"date": "2026-06-04", "count": 74},
+            {"date": "2026-06-05", "count": 41}
+        ]
+        top_pages = [
+            {"page": "기관검색", "count": 64},
+            {"page": "사례검색", "count": 52},
+            {"page": "메인", "count": 41},
+            {"page": "공지사항", "count": 16},
+        ]
+    else:
+        stats_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
+            headers=SUPABASE_HEADERS
         )
+        stats_rows = stats_res.json() if stats_res.ok else []
+        stats_row = stats_rows[0] if stats_rows else {}
 
-    stats_res = requests.get(
-        f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
-        headers=SUPABASE_HEADERS
-    )
-    stats_rows = stats_res.json() if stats_res.ok else []
-    stats_row = stats_rows[0] if stats_rows else {}
+        total_count = int(stats_row.get("total_count", 0))
+        today_count = int(stats_row.get("today_count", 0))
 
-    total_count = int(stats_row.get("total_count", 0))
-    today_count = int(stats_row.get("today_count", 0))
+        visit_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        visit_rows = visit_res.json() if visit_res.ok else []
 
-    visit_res = requests.get(
-        f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
-        headers=SUPABASE_HEADERS
-    )
-    visit_rows = visit_res.json() if visit_res.ok else []
+        daily_visit_map = defaultdict(int)
+        for row in visit_rows:
+            created_at = str(row.get("created_at", ""))
+            if created_at:
+                date_str = created_at[:10]
+                daily_visit_map[date_str] += 1
 
-    daily_visit_map = defaultdict(int)
-    for row in visit_rows:
-        created_at = str(row.get("created_at", ""))
-        if created_at:
-            date_str = created_at[:10]
-            daily_visit_map[date_str] += 1
+        daily_visits = []
+        for date_str in sorted(daily_visit_map.keys(), reverse=True):
+            daily_visits.append({
+                "date": date_str,
+                "count": daily_visit_map[date_str]
+            })
 
-    daily_visits = []
-    for date_str in sorted(daily_visit_map.keys(), reverse=True):
-        daily_visits.append({
-            "date": date_str,
-            "count": daily_visit_map[date_str]
-        })
+        region_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        region_rows = region_res.json() if region_res.ok else []
 
-    region_res = requests.get(
-        f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
-        headers=SUPABASE_HEADERS
-    )
-    region_rows = region_res.json() if region_res.ok else []
+        daily_region_map = defaultdict(int)
+        for row in region_rows:
+            created_at = str(row.get("created_at", ""))
+            date_str = created_at[:10] if created_at else ""
+            sido = str(row.get("sido", "") or "")
+            sigungu = str(row.get("sigungu", "") or "")
+            raw_search_type = str(row.get("search_type", "") or "").strip()
 
-    daily_region_map = defaultdict(int)
-    for row in region_rows:
-        created_at = str(row.get("created_at", ""))
-        date_str = created_at[:10] if created_at else ""
-        sido = str(row.get("sido", "") or "")
-        sigungu = str(row.get("sigungu", "") or "")
-        raw_search_type = str(row.get("search_type", "") or "").strip()
+            if raw_search_type == "combo":
+                search_type = "조건기반"
+            elif raw_search_type == "desc":
+                search_type = "사례기반"
+            else:
+                search_type = raw_search_type or "-"
 
-        if raw_search_type == "combo":
-            search_type = "조건기반"
-        elif raw_search_type == "desc":
-            search_type = "사례기반"
-        else:
-            search_type = raw_search_type or "-"
+            key = (date_str, sido, sigungu, search_type)
+            daily_region_map[key] += 1
 
-        key = (date_str, sido, sigungu, search_type)
-        daily_region_map[key] += 1
+        daily_regions = []
+        for key in sorted(daily_region_map.keys(), reverse=True):
+            date_str, sido, sigungu, search_type = key
+            daily_regions.append({
+                "date": date_str,
+                "sido": sido,
+                "sigungu": sigungu,
+                "search_type": search_type,
+                "count": daily_region_map[key]
+            })
 
-    daily_regions = []
-    for key in sorted(daily_region_map.keys(), reverse=True):
-        date_str, sido, sigungu, search_type = key
-        daily_regions.append({
-            "date": date_str,
-            "sido": sido,
-            "sigungu": sigungu,
-            "search_type": search_type,
-            "count": daily_region_map[key]
-        })
+        pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
+
+    chart_visits, chart_visits_max = _chart_data(daily_visits)
+    chart_pv, chart_pv_max = _chart_data(daily_pv)
 
     return render_template_string(
         STATS_HTML,
         total_count=total_count,
         today_count=today_count,
         daily_visits=daily_visits,
-        daily_regions=daily_regions
+        daily_regions=daily_regions,
+        pv_total=pv_total,
+        pv_today=pv_today,
+        daily_pv=daily_pv,
+        top_pages=top_pages,
+        chart_visits=chart_visits,
+        chart_visits_max=chart_visits_max,
+        chart_pv=chart_pv,
+        chart_pv_max=chart_pv_max
     )
 
 @app.route("/stats/export/visits")
@@ -3691,6 +3925,95 @@ def export_stats_regions():
         output,
         as_attachment=True,
         download_name="일자별_지역클릭수.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.route("/stats/export/all")
+def export_stats_all():
+    """방문/페이지뷰/지역 통계를 시트별로 묶어 하나의 엑셀로 일괄 다운로드."""
+    if os.getenv("RENDER") is None:
+        total_count, today_count = 100, 5
+        daily_visits = [
+            {"날짜": "2026-06-04", "방문자수": 18},
+            {"날짜": "2026-06-05", "방문자수": 5},
+        ]
+        daily_regions = [
+            {"날짜": "2026-06-04", "시도": "광주광역시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
+        ]
+        pv_total, pv_today = 173, 41
+        daily_pv = [{"date": "2026-06-05", "count": 41}]
+        top_pages = [{"page": "기관검색", "count": 64}, {"page": "사례검색", "count": 52}]
+    else:
+        stats_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
+            headers=SUPABASE_HEADERS
+        )
+        stats_rows = stats_res.json() if stats_res.ok else []
+        stats_row = stats_rows[0] if stats_rows else {}
+        total_count = int(stats_row.get("total_count", 0))
+        today_count = int(stats_row.get("today_count", 0))
+
+        visit_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        visit_rows = visit_res.json() if visit_res.ok else []
+        dvm = defaultdict(int)
+        for row in visit_rows:
+            ca = str(row.get("created_at", ""))
+            if ca:
+                dvm[ca[:10]] += 1
+        daily_visits = [{"날짜": d, "방문자수": dvm[d]} for d in sorted(dvm.keys(), reverse=True)]
+
+        region_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        region_rows = region_res.json() if region_res.ok else []
+        drm = defaultdict(int)
+        for row in region_rows:
+            ca = str(row.get("created_at", ""))
+            ds = ca[:10] if ca else ""
+            sido = str(row.get("sido", "") or "")
+            sigungu = str(row.get("sigungu", "") or "")
+            rst = str(row.get("search_type", "") or "").strip()
+            st = "조건기반" if rst == "combo" else "사례기반" if rst == "desc" else (rst or "-")
+            drm[(ds, sido, sigungu, st)] += 1
+        daily_regions = [
+            {"날짜": k[0], "시도": k[1], "시군구": k[2], "검색구분": k[3], "클릭수": drm[k]}
+            for k in sorted(drm.keys(), reverse=True)
+        ]
+
+        pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
+
+    summary_df = pd.DataFrame([
+        {"항목": "총 방문자수", "값": total_count},
+        {"항목": "오늘 방문자수", "값": today_count},
+        {"항목": "총 페이지뷰", "값": pv_total},
+        {"항목": "오늘 페이지뷰", "값": pv_today},
+    ])
+    visits_df = pd.DataFrame(daily_visits) if daily_visits else pd.DataFrame(columns=["날짜", "방문자수"])
+    pv_df = pd.DataFrame(
+        [{"날짜": r["date"], "페이지뷰": r["count"]} for r in daily_pv]
+    ) if daily_pv else pd.DataFrame(columns=["날짜", "페이지뷰"])
+    pages_df = pd.DataFrame(
+        [{"페이지": r["page"], "조회수": r["count"]} for r in top_pages]
+    ) if top_pages else pd.DataFrame(columns=["페이지", "조회수"])
+    regions_df = pd.DataFrame(daily_regions) if daily_regions else pd.DataFrame(columns=["날짜", "시도", "시군구", "검색구분", "클릭수"])
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        summary_df.to_excel(writer, index=False, sheet_name="요약")
+        visits_df.to_excel(writer, index=False, sheet_name="일자별방문자수")
+        pv_df.to_excel(writer, index=False, sheet_name="일자별페이지뷰")
+        pages_df.to_excel(writer, index=False, sheet_name="페이지별조회수")
+        regions_df.to_excel(writer, index=False, sheet_name="일자별지역클릭수")
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="케어네비_통계.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
