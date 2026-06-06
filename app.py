@@ -3198,24 +3198,25 @@ body{
   gap:6px;
   flex-wrap:nowrap;
   flex-shrink:0;
+  margin-left:auto;
 }
 
 .home-button{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
+  gap:5px !important;
   height:34px !important;
-  padding:0 13px !important;
-  border-radius:999px !important;
-
+  padding:0 15px !important;
+  border-radius:8px !important;
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
-
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:700 !important;
-  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
 }
 
 .home-button:hover{
@@ -3433,7 +3434,7 @@ h2{
     <a href="/home" class="home-button">홈으로</a>
 
     <div class="top-right-menu">
-      <a href="/board/admin" class="home-button">게시판</a>
+      <a href="/board/admin" class="home-button">의견확인</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
       <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀 다운로드</a>
     </div>
@@ -4302,16 +4303,18 @@ body{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
+  gap:5px !important;
   height:34px !important;
-  padding:0 13px !important;
-  border-radius:999px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:700 !important;
-  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
 }
 h2{
   margin:0 0 8px 0;
@@ -4511,16 +4514,18 @@ body{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
+  gap:5px !important;
   height:34px !important;
-  padding:0 13px !important;
-  border-radius:999px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:700 !important;
-  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
 }
 .card{
   background:#fff;
@@ -4598,16 +4603,18 @@ body{
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
+  gap:5px !important;
   height:34px !important;
-  padding:0 13px !important;
-  border-radius:999px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
   background:#ffffff !important;
   border:1px solid #e5e7eb !important;
   color:#6b7280 !important;
   text-decoration:none !important;
   font-size:13px !important;
-  font-weight:700 !important;
-  box-shadow:0 3px 10px rgba(15,23,42,0.08) !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
 }
 .card{
   background:#fff;
@@ -4817,7 +4824,23 @@ NOTICE_ADMIN_HTML = """
 body{ margin:0; background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; }
 .container{ max-width:640px; margin:0 auto; padding:24px 16px 40px 16px; }
 .top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px; }
-.home-button{ display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 13px;border-radius:999px;background:#fff;border:1px solid #e5e7eb;color:#6b7280;text-decoration:none;font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(15,23,42,0.08); }
+.home-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  height:34px;
+  padding:0 15px;
+  border-radius:8px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  color:#6b7280;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:600;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08);
+  transition:all .15s;
+}
 h2{ margin:0 0 16px 0; font-size:20px; }
 .card{ background:#fff; border-radius:16px; padding:18px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06); }
 .card .meta{ font-size:11px; color:#9ca3af; margin-bottom:4px; }
