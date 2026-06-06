@@ -3443,14 +3443,6 @@ h2{
         <div class="summary-label">오늘 방문자수</div>
         <div class="summary-value">{{ today_count }}</div>
       </div>
-      <div class="summary-box">
-        <div class="summary-label">총 페이지뷰</div>
-        <div class="summary-value">{{ pv_total }}</div>
-      </div>
-      <div class="summary-box">
-        <div class="summary-label">오늘 페이지뷰</div>
-        <div class="summary-value">{{ pv_today }}</div>
-      </div>
     </div>
   </div>
 
@@ -3641,7 +3633,13 @@ _PV_PAGE_NAMES = {
     "/home": "메인",
     "/desc": "사례검색",
     "/combo": "기관검색",
-    "/board/write": "의견 작성",
+    "/survey": "조사서식",
+    "/care": "사전조사",
+    "/guide": "사용설명서",
+    "/nhis25": "건강보험25시",
+    "/detail": "기관상세",
+    "/board/write": "의견작성",
+    "/board/view": "게시글",
     "/board": "의견게시판",
     "/notice": "공지사항",
 }
