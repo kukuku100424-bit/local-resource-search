@@ -55,6 +55,45 @@ SUPABASE_HEADERS = {
     "Content-Type": "application/json"
 }
 
+# === GPT 토큰 단가/환율 (변동 시 여기만 수정) ===
+GPT_PRICE_INPUT_USD = 0.40    # 입력 100만 토큰당 USD (gpt-4.1-mini)
+GPT_PRICE_OUTPUT_USD = 1.60   # 출력 100만 토큰당 USD (gpt-4.1-mini)
+USD_TO_KRW = 1500             # 환율(원/$), 현재 약 1,540원
+
+def add_token_usage(input_tokens, output_tokens):
+    """GPT 호출 토큰을 날짜별로 Supabase token_usage 테이블에 누적 (best-effort)."""
+    if os.getenv("RENDER") is None:
+        return
+    try:
+        input_tokens = int(input_tokens or 0)
+        output_tokens = int(output_tokens or 0)
+        if input_tokens <= 0 and output_tokens <= 0:
+            return
+        today = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/token_usage?usage_date=eq.{today}&select=input_tokens,output_tokens",
+            headers=SUPABASE_HEADERS, timeout=8
+        )
+        rows = r.json() if r.ok else []
+        if rows:
+            cur_in = int(rows[0].get("input_tokens", 0) or 0)
+            cur_out = int(rows[0].get("output_tokens", 0) or 0)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/token_usage?usage_date=eq.{today}",
+                headers=SUPABASE_HEADERS,
+                json={"input_tokens": cur_in + input_tokens, "output_tokens": cur_out + output_tokens},
+                timeout=8
+            )
+        else:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/token_usage",
+                headers=SUPABASE_HEADERS,
+                json={"usage_date": today, "input_tokens": input_tokens, "output_tokens": output_tokens},
+                timeout=8
+            )
+    except Exception as e:
+        app.logger.exception(e)
+
 def update_visitors():
     now = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
 
@@ -121,15 +160,8 @@ def update_visitors():
             }
         )
 
-    # 방문 로그 저장
-    log_url = f"{SUPABASE_URL}/rest/v1/visit_logs"
-    requests.post(
-        log_url,
-        headers=SUPABASE_HEADERS,
-        json={
-            "ip": request.remote_addr
-        }
-    )
+    # 방문 로그 저장 — 개인정보(IP) 수집 중단으로 제거됨
+    # (총/오늘 방문자 수는 visit_stats 카운터로 계속 집계됨)
 
     # 마지막 방문 시각 저장
     session["last_visit_time"] = now.isoformat()
@@ -3538,6 +3570,35 @@ h2{
     <div id="regionPager" class="pager"></div>
   </div>
 
+  <div class="card">
+    <h2>AI 토큰 사용량 <span class="small">(GPT-4.1-mini)</span></h2>
+    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+      <thead>
+        <tr style="color:#6b7280;">
+          <th style="text-align:left; padding:8px 6px; border-bottom:1px solid #e5e7eb;"></th>
+          <th style="text-align:right; padding:8px 6px; border-bottom:1px solid #e5e7eb;">입력 토큰</th>
+          <th style="text-align:right; padding:8px 6px; border-bottom:1px solid #e5e7eb;">출력 토큰</th>
+          <th style="text-align:right; padding:8px 6px; border-bottom:1px solid #e5e7eb;">사용 요금</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:10px 6px;">총 누적</td>
+          <td style="text-align:right; padding:10px 6px;">{{ "{:,}".format(tok_total_in) }}</td>
+          <td style="text-align:right; padding:10px 6px;">{{ "{:,}".format(tok_total_out) }}</td>
+          <td style="text-align:right; padding:10px 6px; color:#2563eb; font-weight:700;">₩{{ "{:,}".format(tok_total_krw) }}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 6px; border-top:1px solid #f1f5f9;">오늘</td>
+          <td style="text-align:right; padding:10px 6px; border-top:1px solid #f1f5f9;">{{ "{:,}".format(tok_today_in) }}</td>
+          <td style="text-align:right; padding:10px 6px; border-top:1px solid #f1f5f9;">{{ "{:,}".format(tok_today_out) }}</td>
+          <td style="text-align:right; padding:10px 6px; border-top:1px solid #f1f5f9; color:#2563eb; font-weight:700;">₩{{ "{:,}".format(tok_today_krw) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="small" style="margin-top:8px; color:#9ca3af;">단가 입력 ${{ price_in }} / 출력 ${{ price_out }} (1M토큰당) · 환율 ₩{{ "{:,}".format(usd_krw) }}/$ 기준 · 근사치</div>
+  </div>
+
 
 </div>
 <script>
@@ -3787,6 +3848,38 @@ def stats():
     chart_pv, chart_pv_max = _chart_data(daily_pv)
     top_pages_max = max([r["count"] for r in top_pages], default=0)
 
+    # AI 토큰 사용량 집계 (token_usage) — 격리: 실패해도 통계 페이지엔 영향 없음
+    tok_total_in = tok_total_out = tok_today_in = tok_today_out = 0
+    try:
+        today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+        if os.getenv("RENDER") is not None:
+            _tr = requests.get(
+                f"{SUPABASE_URL}/rest/v1/token_usage?select=usage_date,input_tokens,output_tokens",
+                headers=SUPABASE_HEADERS, timeout=8
+            )
+            _trows = _tr.json() if _tr.ok else []
+        else:
+            _trows = [
+                {"usage_date": today_kst, "input_tokens": 12000, "output_tokens": 3000},
+                {"usage_date": "2026-06-05", "input_tokens": 50000, "output_tokens": 9000},
+            ]
+        for _row in _trows:
+            _i = int(_row.get("input_tokens", 0) or 0)
+            _o = int(_row.get("output_tokens", 0) or 0)
+            tok_total_in += _i
+            tok_total_out += _o
+            if str(_row.get("usage_date", "")) == today_kst:
+                tok_today_in += _i
+                tok_today_out += _o
+    except Exception as e:
+        app.logger.exception(e)
+
+    def _tok_krw(inp, outp):
+        usd = inp / 1_000_000 * GPT_PRICE_INPUT_USD + outp / 1_000_000 * GPT_PRICE_OUTPUT_USD
+        return int(round(usd * USD_TO_KRW))
+    tok_total_krw = _tok_krw(tok_total_in, tok_total_out)
+    tok_today_krw = _tok_krw(tok_today_in, tok_today_out)
+
     return render_template_string(
         STATS_HTML,
         total_count=total_count,
@@ -3801,7 +3894,16 @@ def stats():
         chart_visits=chart_visits,
         chart_visits_max=chart_visits_max,
         chart_pv=chart_pv,
-        chart_pv_max=chart_pv_max
+        chart_pv_max=chart_pv_max,
+        tok_total_in=tok_total_in,
+        tok_total_out=tok_total_out,
+        tok_total_krw=tok_total_krw,
+        tok_today_in=tok_today_in,
+        tok_today_out=tok_today_out,
+        tok_today_krw=tok_today_krw,
+        price_in=GPT_PRICE_INPUT_USD,
+        price_out=GPT_PRICE_OUTPUT_USD,
+        usd_krw=USD_TO_KRW
     )
 
 @app.route("/stats/export/visits")
@@ -4729,8 +4831,7 @@ def board_write():
                         "title": title,
                         "content": content,
                         "org_type": org_type,
-                        "reply_contact": reply_contact,
-                        "ip": request.remote_addr
+                        "reply_contact": reply_contact
                     }
                 )
 
@@ -5182,18 +5283,7 @@ def combo():
             for items in manager_groups.values()
         )
 
-        if os.getenv("RENDER") is not None:
-            requests.post(
-                f"{SUPABASE_URL}/rest/v1/region_logs",
-                headers=SUPABASE_HEADERS,
-                json={
-                    "sido": sido,
-                    "sigungu": sigungu,
-                    "result_count": count,
-                    "ip": request.remote_addr,
-                    "search_type": "combo"
-               }
-            )
+        # 검색 로그(지역+IP) 적재 — 개인정보 수집 중단으로 제거됨
 
     return render_template_string(
         COMBO_HTML,
@@ -5910,6 +6000,8 @@ def ocr():
         print("OCR 출력 토큰:", output_tokens)
         print("OCR 총 토큰:", total_tokens)
 
+        add_token_usage(input_tokens, output_tokens)
+
         return {
             "text": text,
             "input_tokens": input_tokens,
@@ -6260,6 +6352,7 @@ def desc():
    - "약 챙기기 어렵다", "복약 관리 어렵다", "약을 많이 먹는다", "약이 많다", "다약제" → 복약관리, 방문보건 계열만 검토한다 (이동지원·재활 포함 금지)
    - "병원 가기 어렵다", "병원 동행이 필요하다", "통원이 어렵다" → 병원동행, 이동지원, 방문보건 계열을 우선 검토한다
    - "반찬을 못함", "식사 준비 어려움", "자주 배고파함", "잘 못 먹음", "차려 먹기 어렵다", "챙겨 먹기 어렵다" → 식사지원, 반찬지원, 영양지원 계열을 추천 대상으로 검토한다
+   - "잘 못 씹음", "씹기 어려움", "씹지 못함", "저작곤란", "삼키기 어려움", "연하곤란", "틀니가 안 맞음", "치아가 없어 못 먹음" 등 씹기·삼킴 문제 → "잘 못 먹음"과 동일하게 식사지원, 반찬지원(죽·갈아먹는 형태 포함), 영양지원 계열을 반드시 추천 대상으로 검토한다
    - 스마트폰·앱·디지털기기 언급 → IoT, 스마트돌봄, 응급안전안심서비스, AI 돌봄기기 검토
    - 입력에 "치매", "인지저하", "기억력 저하", "배회", "인지기능", "알츠하이머" 등이 직접 언급되지 않으면 치매 관련 서비스는 추천하지 않는다
 6. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다
@@ -6320,6 +6413,7 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     print("입력 토큰:", res.usage.input_tokens)
                     print("출력 토큰:", res.usage.output_tokens)
                     print("총 토큰:", res.usage.total_tokens)
+                    add_token_usage(res.usage.input_tokens, res.usage.output_tokens)
                 except:
                     print("토큰 정보:", res.usage)
 
@@ -6373,18 +6467,7 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                 )
             )
 
-            if os.getenv("RENDER") is not None:
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/region_logs",
-                    headers=SUPABASE_HEADERS,
-                    json={
-                        "sido": selected_sido,
-                        "sigungu": selected_sigungu,
-                        "result_count": len(final_results),
-                        "ip": request.remote_addr,
-                        "search_type": "desc"
-                    }
-                )
+            # 검색 로그(지역+IP) 적재 — 개인정보 수집 중단으로 제거됨
 
             # ======================
             # [규칙 1] 기초사정 자동 포함
@@ -9859,6 +9942,7 @@ SYNONYM_GROUPS = {
         "keywords": [
             "배고프", "배가고프", "허기", "허기짐", "굶", "굶고",
             "못먹", "못먹음", "입맛없", "식욕없", "식욕부진",
+            "못씹", "씹기힘들", "씹지못", "저작곤란", "연하곤란", "삼키기힘들", "틀니", "이가없",
             "영양부족", "영양불량", "체중감소", "기운없음"
         ],
         "aliases": [
@@ -10038,7 +10122,7 @@ def expand_query_aliases(query: str):
     if "약" in q_norm or "병원" in q_norm or "복약" in q_norm:
         aliases.extend(["복약관리", "병원동행", "방문보건", "건강관리"])
 
-    if "배고프" in q_norm or "배고파" in q_norm or "허기" in q_norm or "허기지" in q_norm or "굶" in q_norm or "못먹" in q_norm or "식욕없" in q_norm:
+    if "배고프" in q_norm or "배고파" in q_norm or "허기" in q_norm or "허기지" in q_norm or "굶" in q_norm or "못먹" in q_norm or "식욕없" in q_norm or "못씹" in q_norm or "씹기" in q_norm or "씹지" in q_norm or "씹는" in q_norm or "저작" in q_norm or "연하" in q_norm or "삼키" in q_norm or "삼킬" in q_norm or "틀니" in q_norm or "이가없" in q_norm or "치아" in q_norm:
         aliases.extend([
             "영양지원", "식사지원", "반찬지원",
             "도시락", "식사배달", "방문형지원", "건강관리"
@@ -10126,6 +10210,7 @@ def is_irrelevant_query(query: str) -> bool:
 
         "밥못", "식사못", "반찬못", "끼니", "먹기힘들", "챙겨먹기힘들",
         "배고프", "배고파", "배가고프", "배가고파", "허기", "허기짐", "허기지", "굶", "굶고", "못먹", "못먹음",
+        "못씹", "씹기힘들", "씹지못", "씹는것", "저작", "연하곤란", "삼키기힘들", "삼키기어렵", "틀니", "이가없", "치아",
         "입맛없", "식욕없", "식욕부진", "영양부족", "영양불량",
         "도시락", "도시락필요", "식사배달", "밥배달", "배달식", "배달도시락",
         "반찬지원", "식사지원", "영양지원",
