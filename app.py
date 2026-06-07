@@ -2202,11 +2202,10 @@ body.app-mode .container{
 
 
 /* 메인 메뉴 카드: 솟은 버튼 + 누르면 들어감 (디자인 전용) */
-.main-menu-card, .sub-card, .bottom-card { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12); transition:opacity .12s ease; }
-.main-menu-card:active, .sub-card:active, .bottom-card:active { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12) !important; transform:none !important; opacity:0.6 !important; }
+.main-menu-card, .sub-card, .bottom-card { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12); transition:transform .12s ease; }
 
-/* 길게눌러(상세메뉴)·뒤로가기 후 눌림/호버가 끼어 간격·띠지색이 틀어지는 것 방지
-   — 브라우저 hover 감지(@media hover)에 의존하지 않고, 모든 기기에서 hover/active를 평상시와 동일하게 고정 */
+/* 길게눌러(상세메뉴)·뒤로가기 후 호버가 끼어 간격·띠지색이 틀어지는 것 방지
+   — 브라우저 hover 감지(@media hover)에 의존하지 않고, 모든 기기에서 hover를 평상시와 동일하게 고정 */
 .main-menu-card, .sub-card, .bottom-card{
   -webkit-touch-callout:none;
   -webkit-user-select:none;
@@ -2219,6 +2218,9 @@ body.app-mode .container{
 .main-menu-card:hover, .sub-card:hover, .bottom-card:hover{ background:#fff !important; }
 .main-menu-card:hover{ border-left-color:#3b82f6 !important; }
 .sub-card:hover{ border-left-color:#fb7185 !important; }
+/* 누름 효과: 다른 버튼과 통일(살짝 작아짐). 호버 규칙보다 뒤에 둬서 탭 시 우선 적용 */
+.main-menu-card:active, .sub-card:active, .bottom-card:active{ transform:scale(0.96) !important; }
+html.tap-reset .main-menu-card, html.tap-reset .sub-card, html.tap-reset .bottom-card{ transform:none !important; }
 
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
@@ -3254,6 +3256,16 @@ window.addEventListener('load', function(){
   if(!tourDismissed()){
     /* 약간 딜레이 줘서 레이아웃 안정화 후 띄움 */
     setTimeout(openTour, 350);
+  }
+});
+
+/* 뒤로가기(bfcache) 복귀 시 끼어있는 누름 상태 초기화 */
+window.addEventListener('pageshow', function(e){
+  if(e.persisted){
+    document.documentElement.classList.add('tap-reset');
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ document.documentElement.classList.remove('tap-reset'); });
+    });
   }
 });
 
