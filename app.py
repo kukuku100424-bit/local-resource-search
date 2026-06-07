@@ -3379,11 +3379,11 @@ body{
 .summary-row{
   display:flex;
   gap:12px;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
 }
 .summary-box{
   flex:1;
-  min-width:180px;
+  min-width:0;
   background:#f8fafc;
   border:1px solid #e5e7eb;
   border-radius:12px;
@@ -4131,7 +4131,7 @@ def stats():
         pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
         env_stats, env_total, env_chart_style = _compute_env_stats()
 
-    chart_visits, chart_visits_max = _chart_data(daily_visits)
+    chart_visits, chart_visits_max = _chart_data(daily_visits, 10)
     chart_pv, chart_pv_max = _chart_data(daily_pv)
     top_pages_max = max([r["count"] for r in top_pages], default=0)
 
