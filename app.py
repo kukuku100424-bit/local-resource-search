@@ -548,8 +548,9 @@ button:hover{
 }
 
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 
@@ -764,8 +765,9 @@ button:hover{
   }
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 
@@ -891,8 +893,9 @@ body{
   transition:all .15s;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -2199,11 +2202,12 @@ body.app-mode .container{
 
 
 /* 메인 메뉴 카드: 솟은 버튼 + 누르면 들어감 (디자인 전용) */
-.main-menu-card, .sub-card { box-shadow:0 7px 0 #ccd4e2, 0 12px 18px rgba(15,23,42,0.12); }
-.main-menu-card:active, .sub-card:active { transform:translateY(6px) !important; box-shadow:0 1px 0 #ccd4e2, 0 2px 6px rgba(15,23,42,0.12) !important; }
+.main-menu-card, .sub-card, .bottom-card { box-shadow:0 10px 0 #c2cbdc, 0 16px 22px rgba(15,23,42,0.16); transition:transform .12s ease, box-shadow .12s ease; }
+.main-menu-card:active, .sub-card:active, .bottom-card:active { transform:translateY(10px) !important; box-shadow:0 1px 0 #c2cbdc, 0 2px 6px rgba(15,23,42,0.16) !important; }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 
@@ -2350,8 +2354,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, a.card:
 
 <style>
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 
 
@@ -2806,8 +2811,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, a.card:
 }
 
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 
 <script>
@@ -3619,8 +3625,9 @@ h2{
 }
 
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -4464,8 +4471,9 @@ button{
   line-height:1.6;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -4598,8 +4606,9 @@ h2{
   color:#6b7280;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -4723,8 +4732,9 @@ button{
   cursor:pointer;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -4821,8 +4831,9 @@ body{
   transition:all .15s !important;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -4921,8 +4932,9 @@ body{
 }
 
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -5041,8 +5053,9 @@ body{
   text-align:center;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -5242,8 +5255,9 @@ h2{ margin:0 0 16px 0; font-size:20px; }
 .write-card button{ margin-top:14px; width:100%; height:42px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
 .empty{ background:#fff; border-radius:16px; padding:22px; color:#9ca3af; text-align:center; font-size:13px; }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -5698,8 +5712,9 @@ label.field-label:first-of-type{ margin-top:8px; }
   .copyright-sub{ margin-top:3px; font-size:13px; }
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
@@ -9208,8 +9223,9 @@ button:hover{
   border-left:2.5px solid #94a3b8 !important;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 
@@ -10850,8 +10866,9 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
   .modal-box{ top:2% !important; }
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 
@@ -11411,8 +11428,9 @@ NHIS25_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>건강보험 25시</title>
 <style>{{style}}
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 
 <style>
@@ -11469,8 +11487,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, a.card:
   display:none;
 }
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 
@@ -11774,8 +11793,9 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
 }
 
 
-/* === 버튼 누름 효과 (디자인 전용, :active만) === */
-button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.95) !important; }
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, a.card:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.88) !important; }
 </style>
 </head>
 <body>
