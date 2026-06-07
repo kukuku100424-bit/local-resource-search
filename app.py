@@ -2202,8 +2202,8 @@ body.app-mode .container{
 
 
 /* 메인 메뉴 카드: 솟은 버튼 + 누르면 들어감 (디자인 전용) */
-.main-menu-card, .sub-card, .bottom-card { box-shadow:0 10px 0 #c2cbdc, 0 16px 22px rgba(15,23,42,0.16); transition:transform .12s ease, box-shadow .12s ease; }
-.main-menu-card:active, .sub-card:active, .bottom-card:active { transform:translateY(10px) !important; box-shadow:0 1px 0 #c2cbdc, 0 2px 6px rgba(15,23,42,0.16) !important; }
+.main-menu-card, .sub-card, .bottom-card { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12); transition:transform .12s ease, box-shadow .12s ease; }
+.main-menu-card:active, .sub-card:active, .bottom-card:active { transform:translateY(6px) !important; box-shadow:0 1px 0 #ccd4e2, 0 2px 5px rgba(15,23,42,0.12) !important; }
 
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
