@@ -2202,8 +2202,8 @@ body.app-mode .container{
 
 
 /* 메인 메뉴 카드: 솟은 버튼 + 누르면 들어감 (디자인 전용) */
-.main-menu-card, .sub-card, .bottom-card { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12); transition:transform .12s ease, box-shadow .12s ease; }
-.main-menu-card:active, .sub-card:active, .bottom-card:active { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12) !important; transform:none !important; }
+.main-menu-card, .sub-card, .bottom-card { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12); transition:opacity .12s ease; }
+.main-menu-card:active, .sub-card:active, .bottom-card:active { box-shadow:0 6px 0 #ccd4e2, 0 10px 16px rgba(15,23,42,0.12) !important; transform:none !important; opacity:0.6 !important; }
 
 /* 길게눌러(상세메뉴)·뒤로가기 후 눌림/호버가 끼어 간격·띠지색이 틀어지는 것 방지
    — 브라우저 hover 감지(@media hover)에 의존하지 않고, 모든 기기에서 hover/active를 평상시와 동일하게 고정 */
