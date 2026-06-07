@@ -1416,14 +1416,14 @@ body.app-mode .container{
   top:-14px;
   left:-2px;
   font-size:9px;
-  color:#e5e7eb;
+  color:#94a3b8;
   text-decoration:none;
   font-weight:500;
-  opacity:0.5;
+  opacity:0.8;
 }
 
 .home-admin-hidden:hover{
-  color:#94a3b8;
+  color:#64748b;
   opacity:1;
 }
 
