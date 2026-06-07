@@ -352,7 +352,7 @@ body{
   margin:0;
   min-height:100vh;
   font-family:'Pretendard',sans-serif;
-  background:#f5f6f7;
+  background:#e8ecf4;
   color:#1f2937;
   display:flex;
   justify-content:center;
@@ -617,7 +617,7 @@ body{
   margin:0;
   min-height:100vh;
   font-family:'Pretendard',sans-serif;
-  background:#f5f6f7;
+  background:#e8ecf4;
   color:#1f2937;
   display:flex;
   justify-content:center;
@@ -834,7 +834,7 @@ ERROR_500_HTML = """
 body{
   margin:0;
   min-height:100vh;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   display:flex;
   align-items:center;
@@ -924,7 +924,7 @@ BASE_STYLE = """
 
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -1385,7 +1385,7 @@ HOME_HTML = """
 body{
   margin:0;
   padding:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -3261,7 +3261,7 @@ STATS_HTML = """
 <style>
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -4343,7 +4343,7 @@ BOARD_HTML = """
 <style>
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -4490,7 +4490,7 @@ BOARD_LIST_HTML = """
 <style>
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -4610,7 +4610,7 @@ BOARD_WRITE_HTML = """
 <style>
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -4743,7 +4743,7 @@ BOARD_SUCCESS_HTML = """
 <style>
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -4814,7 +4814,7 @@ BOARD_VIEW_HTML = """
 <style>
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -4916,7 +4916,7 @@ BOARD_ADMIN_HTML = """
 <style>
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -5152,7 +5152,7 @@ NOTICE_ADMIN_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>공지사항 관리</title>
 <style>
-body{ margin:0; background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; }
+body{ margin:0; background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; }
 .container{ max-width:640px; margin:0 auto; padding:24px 16px 40px 16px; }
 .top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px; }
 .home-button{
@@ -5547,7 +5547,7 @@ COMBO_HTML = """
 <title>통합돌봄 서비스 기관 찾기</title>
 <style>
 *{ box-sizing:border-box; margin:0; padding:0; }
-body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
 .page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
 
 /* ── 상단 바 ── */
@@ -7368,7 +7368,7 @@ DESC_HTML = """
 
 body{
   margin:0;
-  background:#f4f6fb;
+  background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
 }
@@ -10683,7 +10683,7 @@ CARE_HTML = """
 <title>통합돌봄 사전조사</title>
 <style>
 *{ box-sizing:border-box; margin:0; padding:0; }
-body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
 .page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
 
 /* ── 상단 바 ── */
@@ -11503,7 +11503,7 @@ SURVEY_HTML = """
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 *{ box-sizing:border-box; margin:0; padding:0; }
-body{ background:#f4f6fb; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
 .page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
 .top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
 .home-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; text-decoration:none; font-size:13px; font-weight:600; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
