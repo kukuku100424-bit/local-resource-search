@@ -11788,17 +11788,17 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
     justify-content:flex-end !important;
   }
   .relay-service-reason{
-    flex-basis:100% !important;
-    display:block !important;
-    margin-top:2px !important;
-  }
-  .relay-service-input{
-    flex-basis:100% !important;
-    width:100% !important;
-    max-width:100% !important;
-    display:block !important;
-    margin-top:2px !important;
-  }
+  flex-basis:auto !important;
+  display:inline !important;
+  margin-top:0 !important;
+}
+.relay-service-input{
+  flex-basis:100% !important;
+  width:100% !important;
+  max-width:100% !important;
+  display:block !important;
+  margin-top:2px !important;
+}
   .adl-table td span{
     font-size:9px !important;
   }
