@@ -7243,9 +7243,10 @@ DESC_HTML = """
 .desc-title-row .service-table-icon-btn{
   grid-column:3;
   justify-self:end;
-  transform:translate(-10px, 24px);
   position:relative;
-  z-index:5;
+  top:24px;
+  right:10px;
+  z-index:10000;
 }
 
 .service-table-icon-btn{
@@ -8673,6 +8674,13 @@ button:hover{
   cursor:pointer;
   flex-shrink:0;
   user-select:none;
+  border:none;
+  padding:0;
+  margin:0;
+  line-height:1;
+  font-family:inherit;
+  -webkit-appearance:none;
+  appearance:none;
 }
 .direct-need-tooltip-box{
   display:none;
@@ -9203,6 +9211,8 @@ button:hover{
     justify-self:end;
     margin-right:5px;
     margin-bottom:-8px;
+    top:auto;
+    right:auto;
     transform:translateX(-2px);
     white-space:nowrap;
     width:auto !important;
@@ -9262,7 +9272,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 
 <!-- ===== 개인정보 입력 주의 팝업 ===== -->
-<div id="privacyModal">
+<div id="privacyModal" onclick="closePrivacyModalByBg(event)">
   <div id="privacyBox">
 
     <div class="privacy-icon siren-icon">
@@ -9478,7 +9488,7 @@ transition:0.2s;
       <span>직접욕구</span>
     </div>
     <div class="direct-need-tooltip-wrap">
-      <span class="direct-need-tooltip-icon">?</span>
+      <button type="button" class="direct-need-tooltip-icon" aria-label="안내" onclick="var e=event;e.stopPropagation();var b=this.parentElement.querySelector('.direct-need-tooltip-box');if(!b)return;var vis=(b.style.display==='block');document.querySelectorAll('.direct-need-tooltip-box').forEach(function(x){x.style.display='none';});b.style.display=vis?'none':'block';">?</button>
       <div class="direct-need-tooltip-box">대상자·보호자의 희망욕구와 담당자 판단 필요 서비스가 모두 포함되었습니다.</div>
     </div>
   </div>
@@ -10084,6 +10094,13 @@ function closePrivacyModal(){
 
   if(modal){
     modal.style.display = "none";
+  }
+}
+
+function closePrivacyModalByBg(e){
+  // 박스 바깥(어두운 배경) 클릭 시에만 닫기
+  if(e.target && e.target.id === "privacyModal"){
+    closePrivacyModal();
   }
 }
 
@@ -13102,17 +13119,7 @@ function guideStart() {
 }
 
 
-// 직접욕구 툴팁 — 모바일 탭 지원
-document.querySelectorAll('.direct-need-tooltip-icon').forEach(function(icon){
-  icon.addEventListener('click', function(e){
-    e.stopPropagation();
-    var box = icon.parentElement.querySelector('.direct-need-tooltip-box');
-    if(!box) return;
-    var visible = box.style.display === 'block';
-    document.querySelectorAll('.direct-need-tooltip-box').forEach(function(b){ b.style.display='none'; });
-    box.style.display = visible ? 'none' : 'block';
-  });
-});
+// 직접욕구 툴팁 — 인라인 onclick으로 처리(iOS 사파리 탭 지원). 바깥 클릭 시 닫기만 유지
 document.addEventListener('click', function(){
   document.querySelectorAll('.direct-need-tooltip-box').forEach(function(b){ b.style.display='none'; });
 });
