@@ -11718,6 +11718,8 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
   .form-table td{ font-size:11px; padding:5px 4px; word-break:keep-all; }
   .radio-group,.check-group{ gap:5px 8px; }
   .radio-group label,.check-group label{ font-size:11px; white-space:normal; }
+  .radio-group input[type=radio],.radio-group input[type=checkbox],.check-group input[type=radio],.check-group input[type=checkbox]{ width:14px !important; height:14px !important; }
+  .wrap-below .sub-paren{ display:block; margin-top:2px; }
   .paren-sm,.paren-sm label,.paren-sm span{ font-size:9px !important; }
   .sub-paren{ font-size:9px; }
   .sub-paren label{ font-size:9px !important; }
@@ -11969,7 +11971,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
         </div></td></tr>
         <tr><th>가구<br>형태</th><td colspan="7"><div class="radio-group">
           <label><input type="radio" name="s_hh" value="독거"> 독거</label>
-          <span class="opt-group"><label><input type="radio" name="s_hh" value="비독거"> 비독거</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_hh_sub" value="부부"> 부부</label></span> <label><input type="checkbox" name="s_hh_sub" value="노부모"> 노부모</label> <label><input type="checkbox" name="s_hh_sub" value="자녀"> 자녀</label> <label><input type="checkbox" name="s_hh_sub" value="조손"> 조손</label> <label><input type="checkbox" name="s_hh_sub" value="형제자매"> 형제자매</label> <label><input type="checkbox" name="s_hh_sub" value="장애인가구"> 장애인가구</label> <label><input type="checkbox" name="s_hh_sub" value="다문화가구"> 다문화가구</label> <label><input type="checkbox" name="s_hh_sub" value="친척지인"> 친척·지인</label> <span style="white-space:nowrap;"><span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="s_hh_sub" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:55px">)</span>)</span></span></span>
+          <span class="opt-group"><label><input type="radio" name="s_hh" value="비독거"> 비독거</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_hh_sub" value="부부"> 부부</label></span> <label><input type="checkbox" name="s_hh_sub" value="노부모"> 노부모</label> <label><input type="checkbox" name="s_hh_sub" value="자녀"> 자녀</label> <label><input type="checkbox" name="s_hh_sub" value="조손"> 조손</label> <label><input type="checkbox" name="s_hh_sub" value="형제자매"> 형제자매</label> <label><input type="checkbox" name="s_hh_sub" value="장애인가구"> 장애인가구</label> <label><input type="checkbox" name="s_hh_sub" value="다문화가구"> 다문화가구</label> <label><input type="checkbox" name="s_hh_sub" value="친척지인"> 친척·지인</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_hh_sub" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:55px">))</span></span></span>
         </div></td></tr>
         <tr><th>사회보장<br>수급권</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
@@ -11982,35 +11984,38 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
         </div></td></tr>
         <tr><th>대상자<br>유형</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span class="opt-group"><label><input type="radio" name="s_tt" value="장기요양재가"> 장기요양 재가급여자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tg" value="1등급"> 1등급</label></span> <label><input type="checkbox" name="s_tg" value="2등급"> 2등급</label> <label><input type="checkbox" name="s_tg" value="3등급"> 3등급</label> <label><input type="checkbox" name="s_tg" value="4등급"> 4등급</label> <label><input type="checkbox" name="s_tg" value="5등급"> 5등급</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tg" value="인지등급"> 인지등급</label>)</span></span></span>
+            <span class="opt-group wrap-below"><label><input type="checkbox" name="s_tt" value="장기요양재가"> 장기요양 재가급여자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tg" value="1등급"> 1등급</label></span> <label><input type="checkbox" name="s_tg" value="2등급"> 2등급</label> <label><input type="checkbox" name="s_tg" value="3등급"> 3등급</label> <label><input type="checkbox" name="s_tg" value="4등급"> 4등급</label> <label><input type="checkbox" name="s_tg" value="5등급"> 5등급</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tg" value="인지등급"> 인지등급</label>)</span></span></span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <label><input type="radio" name="s_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
-            <label><input type="radio" name="s_tt" value="기각각하"> 기각·각하</label>
-            <label><input type="radio" name="s_tt" value="등급판정신청중"> 장기요양 등급판정 신청 중</label>
+            <label><input type="checkbox" name="s_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
+            <label><input type="checkbox" name="s_tt" value="기각각하"> 기각·각하</label>
+            <label><input type="checkbox" name="s_tt" value="등급판정신청중"> 장기요양 등급판정 신청 중</label>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span class="opt-group"><label><input type="radio" name="s_tt" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tc" value="일반돌봄군"> 일반돌봄군</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tc" value="중점돌봄군"> 중점돌봄군</label>)</span></span></span>
-            <span class="opt-group"><label><input type="radio" name="s_tt" value="퇴원예정자"> 퇴원(예정)자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_td" value="의료기관연계"> 의료기관 연계</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_td" value="지역사회발굴"> 지역사회 발굴</label>)</span></span></span>
+            <span class="opt-group"><label><input type="checkbox" name="s_tt" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tc" value="일반돌봄군"> 일반돌봄군</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tc" value="중점돌봄군"> 중점돌봄군</label>)</span></span></span>
+            <span class="opt-group"><label><input type="checkbox" name="s_tt" value="퇴원예정자"> 퇴원(예정)자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_td" value="의료기관연계"> 의료기관 연계</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_td" value="지역사회발굴"> 지역사회 발굴</label>)</span></span></span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span class="opt-group"><label><input type="radio" name="s_tt" value="장애등록"> 장애등록·정도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tdi" value="심한장애"> 심한 장애</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tdi" value="심하지않은장애"> 심하지 않은 장애</label>)</span></span></span>
+            <span class="opt-group"><label><input type="checkbox" name="s_tt" value="장애등록"> 장애등록·정도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tdi" value="심한장애"> 심한 장애</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tdi" value="심하지않은장애"> 심하지 않은 장애</label>)</span></span></span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span style="display:inline-flex;align-items:center;"><label><input type="radio" name="s_tt" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:90px">)</span>
-            <label><input type="radio" name="s_tt" value="해당없음"> 해당 없음</label>
+            <span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="s_tt" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:90px">)</span>
+            <label><input type="checkbox" name="s_tt" value="해당없음"> 해당 없음</label>
           </div>
         </div></td></tr>
         <tr><th>현재 이용중인<br>서비스</th><td colspan="7"><div class="check-group" style="flex-wrap:wrap;gap:4px 8px;">
           <label><input type="radio" name="s_cs" value="없음"> 없음</label>
-          <span class="opt-group"><label><input type="radio" name="s_cs" value="있음"> 있음</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_csd" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label></span> <label><input type="checkbox" name="s_csd" value="치매안심센터"> 치매안심센터</label> <label><input type="checkbox" name="s_csd" value="급식도시락반찬"> 급식 및 도시락 반찬</label> <label><input type="checkbox" name="s_csd" value="활동보조"> 활동보조</label> <label><input type="checkbox" name="s_csd" value="말벗"> 말벗</label> <label><input type="checkbox" name="s_csd" value="보건소사업"> 보건소사업</label> <label><input type="checkbox" name="s_csd" value="주거개선사업"> 주거개선사업</label> <label><input type="checkbox" name="s_csd" value="건강운동교실"> 건강운동교실</label> <label><input type="checkbox" name="s_csd" value="목욕이미용"> 목욕·이미용</label> <label><input type="checkbox" name="s_csd" value="이동지원"> 이동지원</label> <label><input type="checkbox" name="s_csd" value="노인일자리사업"> 노인일자리 사업</label> <label><input type="checkbox" name="s_csd" value="무료진료연계"> 무료진료연계</label> <label><input type="checkbox" name="s_csd" value="가사간병방문도움"> 가사간병방문도움</label> <label><input type="checkbox" name="s_csd" value="여가문화교육"> 여가, 문화, 교육</label> <span style="white-space:nowrap;"><span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="s_csd" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:60px">)</span>)</span></span></span>
+          <span class="opt-group"><label><input type="radio" name="s_cs" value="있음"> 있음</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_csd" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label></span> <label><input type="checkbox" name="s_csd" value="치매안심센터"> 치매안심센터</label> <label><input type="checkbox" name="s_csd" value="급식도시락반찬"> 급식 및 도시락 반찬</label> <label><input type="checkbox" name="s_csd" value="활동보조"> 활동보조</label> <label><input type="checkbox" name="s_csd" value="말벗"> 말벗</label> <label><input type="checkbox" name="s_csd" value="보건소사업"> 보건소사업</label> <label><input type="checkbox" name="s_csd" value="주거개선사업"> 주거개선사업</label> <label><input type="checkbox" name="s_csd" value="건강운동교실"> 건강운동교실</label> <label><input type="checkbox" name="s_csd" value="목욕이미용"> 목욕·이미용</label> <label><input type="checkbox" name="s_csd" value="이동지원"> 이동지원</label> <label><input type="checkbox" name="s_csd" value="노인일자리사업"> 노인일자리 사업</label> <label><input type="checkbox" name="s_csd" value="무료진료연계"> 무료진료연계</label> <label><input type="checkbox" name="s_csd" value="가사간병방문도움"> 가사간병방문도움</label> <label><input type="checkbox" name="s_csd" value="여가문화교육"> 여가, 문화, 교육</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_csd" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:60px">))</span></span></span>
         </div></td></tr>
       </table>
 
       <div class="section-header">&#9632; 주거환경상태<br><span style="font-weight:400;font-size:11px;">(현장조사 시 조사자가 확인 / 병원조사인 경우 생략 가능)</span></div>
       <table class="form-table">
         <tr><th>생활방식</th><td colspan="5"><div class="radio-group">
-          <span class="opt-group"><label><input type="radio" name="s_ls" value="단독보행"> 단독보행</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_ls_sub" value="클러치사용"> 클러치사용</label></span> <label><input type="checkbox" name="s_ls_sub" value="좌식생활"> 좌식생활</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_ls_sub" value="휠체어사용"> 휠체어사용</label>)</span></span></span>
+          <label><input type="radio" name="s_ls" value="단독보행"> 단독보행</label>
+          <label><input type="checkbox" name="s_ls_sub" value="클러치사용"> 클러치사용</label>
+          <label><input type="checkbox" name="s_ls_sub" value="좌식생활"> 좌식생활</label>
+          <label><input type="checkbox" name="s_ls_sub" value="휠체어사용"> 휠체어사용</label>
           <label><input type="radio" name="s_ls" value="와상생활"> 와상생활</label>
         </div></td></tr>
         <tr>
@@ -12262,34 +12267,27 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
         </div></td></tr>
         <tr><th>가구<br>형태</th><td colspan="7"><div class="radio-group">
           <label><input type="radio" name="r_hh" value="독거"> 독거</label>
-          <span class="opt-group"><label><input type="radio" name="r_hh" value="비독거"> 비독거</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_hh_sub" value="부부"> 부부</label></span> <label><input type="checkbox" name="r_hh_sub" value="노부모"> 노부모</label> <label><input type="checkbox" name="r_hh_sub" value="자녀"> 자녀</label> <label><input type="checkbox" name="r_hh_sub" value="조손"> 조손</label> <label><input type="checkbox" name="r_hh_sub" value="형제자매"> 형제자매</label> <label><input type="checkbox" name="r_hh_sub" value="장애인가구"> 장애인가구</label> <label><input type="checkbox" name="r_hh_sub" value="다문화가구"> 다문화가구</label> <label><input type="checkbox" name="r_hh_sub" value="친척지인"> 친척·지인</label> <span style="white-space:nowrap;"><span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="r_hh_sub" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:55px">)</span>)</span></span></span>
+          <span class="opt-group"><label><input type="radio" name="r_hh" value="비독거"> 비독거</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_hh_sub" value="부부"> 부부</label></span> <label><input type="checkbox" name="r_hh_sub" value="노부모"> 노부모</label> <label><input type="checkbox" name="r_hh_sub" value="자녀"> 자녀</label> <label><input type="checkbox" name="r_hh_sub" value="조손"> 조손</label> <label><input type="checkbox" name="r_hh_sub" value="형제자매"> 형제자매</label> <label><input type="checkbox" name="r_hh_sub" value="장애인가구"> 장애인가구</label> <label><input type="checkbox" name="r_hh_sub" value="다문화가구"> 다문화가구</label> <label><input type="checkbox" name="r_hh_sub" value="친척지인"> 친척·지인</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_hh_sub" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:55px">))</span></span></span>
         </div></td></tr>
-        <tr><th>사회보장<br>수급권</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
-          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span class="opt-group"><label><input type="radio" name="r_wf2" value="국민기초"> 국민기초생활보장제도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_wf_sub" value="생계급여"> 생계급여</label></span> <label><input type="checkbox" name="r_wf_sub" value="의료급여"> 의료급여</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_wf_sub" value="주거급여"> 주거급여</label>)</span></span></span>
-            <label><input type="checkbox" name="r_wf" value="차상위"> 차상위</label>
-            <label><input type="checkbox" name="r_wf" value="일반보훈"> 일반(보훈)</label>
-            <label><input type="radio" name="r_wf2" value="기초연금"> 기초연금</label>
-            <label><input type="radio" name="r_wf2" value="일반가구"> 일반가구</label>
+        <tr><th>사회보장<br>수급권</th><td colspan="7">
+          <div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:6px;">
+            <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+              <span class="opt-group"><label><input type="radio" name="r_wf2" value="국민기초"> 국민기초생활보장제도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_wf_sub" value="생계급여"> 생계급여</label></span> <label><input type="checkbox" name="r_wf_sub" value="의료급여"> 의료급여</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_wf_sub" value="주거급여"> 주거급여</label>)</span></span></span>
+              <label><input type="checkbox" name="r_wf" value="차상위"> 차상위</label>
+              <label><input type="checkbox" name="r_wf" value="일반보훈"> 일반(보훈)</label>
+              <label><input type="radio" name="r_wf2" value="기초연금"> 기초연금</label>
+              <label><input type="radio" name="r_wf2" value="일반가구"> 일반가구</label>
+            </div>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span>주수입원:</span>
-            <label><input type="checkbox" name="r_inc" value="공적연금"> 공적연금</label>
-            <label><input type="checkbox" name="r_inc" value="사적지원"> 사적지원(가족지원)</label>
-            <label><input type="checkbox" name="r_inc" value="근로수입"> 근로수입</label>
-            <span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="r_inc" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:50px">)</span>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span>본인부담 가능여부:</span>
-            <label><input type="radio" name="r_copay" value="부담가능"> 부담가능</label>
-            <label><input type="radio" name="r_copay" value="일부부담가능"> 일부 부담가능</label>
-            <label><input type="radio" name="r_copay" value="부담어려움"> 부담어려움</label>
-          </div>
-        </div></td></tr>
+          <table style="border-collapse:collapse;width:100%;table-layout:fixed;">
+            <tr><th style="border:1px solid #d1d5db;padding:5px 8px;background:#f8fafc;font-weight:600;text-align:center;white-space:nowrap;width:6.5em;">주수입원</th><td style="border:1px solid #d1d5db;padding:5px 8px;"><div class="check-group"><label><input type="checkbox" name="r_inc" value="공적연금"> 공적연금</label><label><input type="checkbox" name="r_inc" value="사적지원"> 사적지원(가족지원)</label><label><input type="checkbox" name="r_inc" value="근로수입"> 근로수입</label><span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="r_inc" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:50px">)</span></div></td></tr>
+            <tr><th style="border:1px solid #d1d5db;padding:5px 8px;background:#f8fafc;font-weight:600;text-align:center;white-space:nowrap;width:6.5em;">본인부담<br>가능여부</th><td style="border:1px solid #d1d5db;padding:5px 8px;"><div class="check-group"><label><input type="radio" name="r_copay" value="부담가능"> 부담가능</label><label><input type="radio" name="r_copay" value="일부부담가능"> 일부 부담가능</label><label><input type="radio" name="r_copay" value="부담어려움"> 부담어려움</label></div></td></tr>
+          </table>
+        </td></tr>
         <tr><th>대상자<br>유형</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <label><input type="radio" name="r_tt" value="해당없음"> 해당없음</label>
-            <span class="opt-group"><label><input type="radio" name="r_tt" value="장기요양재가"> 장기요양 재가급여자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_tg" value="1등급"> 1등급</label></span> <label><input type="checkbox" name="r_tg" value="2등급"> 2등급</label> <label><input type="checkbox" name="r_tg" value="3등급"> 3등급</label> <label><input type="checkbox" name="r_tg" value="4등급"> 4등급</label> <label><input type="checkbox" name="r_tg" value="5등급"> 5등급</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_tg" value="인지등급"> 인지등급</label>)</span></span></span>
+            <span class="opt-group wrap-below"><label><input type="radio" name="r_tt" value="장기요양재가"> 장기요양 재가급여자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_tg" value="1등급"> 1등급</label></span> <label><input type="checkbox" name="r_tg" value="2등급"> 2등급</label> <label><input type="checkbox" name="r_tg" value="3등급"> 3등급</label> <label><input type="checkbox" name="r_tg" value="4등급"> 4등급</label> <label><input type="checkbox" name="r_tg" value="5등급"> 5등급</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_tg" value="인지등급"> 인지등급</label>)</span></span></span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <label><input type="radio" name="r_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
@@ -12306,9 +12304,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
             <span class="opt-group"><label><input type="radio" name="r_tt" value="장애등록"> 장애등록·정도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_tdi" value="심한장애"> 심한 장애</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_tdi" value="심하지않은장애"> 심하지 않은 장애</label>)</span></span></span>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
-            <span class="opt-group"><label><input type="radio" name="r_tt" value="장애유형"> 장애유형</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_dtype" value="지체"> 지체</label></span> <label><input type="checkbox" name="r_dtype" value="뇌병변"> 뇌병변</label> <label><input type="checkbox" name="r_dtype" value="시각"> 시각</label> <label><input type="checkbox" name="r_dtype" value="청각"> 청각</label> <label><input type="checkbox" name="r_dtype" value="언어"> 언어</label> <label><input type="checkbox" name="r_dtype" value="지적"> 지적</label> <label><input type="checkbox" name="r_dtype" value="자폐성"> 자폐성</label> <label><input type="checkbox" name="r_dtype" value="정신"> 정신</label> <label><input type="checkbox" name="r_dtype" value="신장"> 신장</label> <label><input type="checkbox" name="r_dtype" value="심장"> 심장</label> <label><input type="checkbox" name="r_dtype" value="호흡기"> 호흡기</label> <label><input type="checkbox" name="r_dtype" value="간"> 간</label> <label><input type="checkbox" name="r_dtype" value="안면"> 안면</label> <label><input type="checkbox" name="r_dtype" value="장루요루"> 장루·요루</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_dtype" value="뇌전증"> 뇌전증</label>)</span></span></span>
+            <span class="opt-group wrap-below"><label><input type="radio" name="r_tt" value="장애유형"> 장애유형</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_dtype" value="지체"> 지체</label></span> <label><input type="checkbox" name="r_dtype" value="뇌병변"> 뇌병변</label> <label><input type="checkbox" name="r_dtype" value="시각"> 시각</label> <label><input type="checkbox" name="r_dtype" value="청각"> 청각</label> <label><input type="checkbox" name="r_dtype" value="언어"> 언어</label> <label><input type="checkbox" name="r_dtype" value="지적"> 지적</label> <label><input type="checkbox" name="r_dtype" value="자폐성"> 자폐성</label> <label><input type="checkbox" name="r_dtype" value="정신"> 정신</label> <label><input type="checkbox" name="r_dtype" value="신장"> 신장</label> <label><input type="checkbox" name="r_dtype" value="심장"> 심장</label> <label><input type="checkbox" name="r_dtype" value="호흡기"> 호흡기</label> <label><input type="checkbox" name="r_dtype" value="간"> 간</label> <label><input type="checkbox" name="r_dtype" value="안면"> 안면</label> <label><input type="checkbox" name="r_dtype" value="장루요루"> 장루·요루</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_dtype" value="뇌전증"> 뇌전증</label>)</span></span></span>
             <span class="paren-sm" style="color:#6b7280;">* 중복시 모두 체크</span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
@@ -12322,7 +12318,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
             <input type="text" name="r_sv_confirm" class="etc-input" style="width:150px">
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;">
-            <span class="opt-group"><label><input type="radio" name="r_sv" value="있음"> 있음</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_svd" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label></span> <label><input type="checkbox" name="r_svd" value="치매안심센터"> 치매안심센터</label> <label><input type="checkbox" name="r_svd" value="급식도시락반찬"> 급식 및 도시락 반찬</label> <label><input type="checkbox" name="r_svd" value="활동보조"> 활동보조</label> <label><input type="checkbox" name="r_svd" value="말벗"> 말벗</label> <label><input type="checkbox" name="r_svd" value="보건소사업"> 보건소사업</label> <label><input type="checkbox" name="r_svd" value="주거개선사업"> 주거개선사업</label> <label><input type="checkbox" name="r_svd" value="건강운동교실"> 건강운동교실</label> <label><input type="checkbox" name="r_svd" value="목욕이미용"> 목욕·이미용</label> <label><input type="checkbox" name="r_svd" value="이동지원"> 이동지원</label> <label><input type="checkbox" name="r_svd" value="노인일자리사업"> 노인일자리 사업</label> <label><input type="checkbox" name="r_svd" value="무료진료연계"> 무료진료연계</label> <label><input type="checkbox" name="r_svd" value="가사간병방문도움"> 가사간병방문도움</label> <label><input type="checkbox" name="r_svd" value="여가문화교육"> 여가, 문화, 교육</label> <span style="white-space:nowrap;"><span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="r_svd" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:60px">)</span>)</span></span></span>
+            <span class="opt-group"><label><input type="radio" name="r_sv" value="있음"> 있음</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_svd" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label></span> <label><input type="checkbox" name="r_svd" value="치매안심센터"> 치매안심센터</label> <label><input type="checkbox" name="r_svd" value="급식도시락반찬"> 급식 및 도시락 반찬</label> <label><input type="checkbox" name="r_svd" value="활동보조"> 활동보조</label> <label><input type="checkbox" name="r_svd" value="말벗"> 말벗</label> <label><input type="checkbox" name="r_svd" value="보건소사업"> 보건소사업</label> <label><input type="checkbox" name="r_svd" value="주거개선사업"> 주거개선사업</label> <label><input type="checkbox" name="r_svd" value="건강운동교실"> 건강운동교실</label> <label><input type="checkbox" name="r_svd" value="목욕이미용"> 목욕·이미용</label> <label><input type="checkbox" name="r_svd" value="이동지원"> 이동지원</label> <label><input type="checkbox" name="r_svd" value="노인일자리사업"> 노인일자리 사업</label> <label><input type="checkbox" name="r_svd" value="무료진료연계"> 무료진료연계</label> <label><input type="checkbox" name="r_svd" value="가사간병방문도움"> 가사간병방문도움</label> <label><input type="checkbox" name="r_svd" value="여가문화교육"> 여가, 문화, 교육</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_svd" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:60px">))</span></span></span>
           </div>
         </div></td></tr>
         <tr><th>희망<br>서비스</th><td colspan="7"><input type="text" name="r_wish" placeholder="희망하는 서비스를 기입하세요"></td></tr>
