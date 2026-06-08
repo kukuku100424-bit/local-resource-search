@@ -7244,6 +7244,8 @@ DESC_HTML = """
   grid-column:3;
   justify-self:end;
   transform:translate(-10px, 24px);
+  position:relative;
+  z-index:5;
 }
 
 .service-table-icon-btn{
@@ -8668,7 +8670,7 @@ button:hover{
   color:#1e40af;
   font-size:11px;
   font-weight:800;
-  cursor:default;
+  cursor:pointer;
   flex-shrink:0;
   user-select:none;
 }
