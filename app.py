@@ -209,8 +209,8 @@ def update_visitors():
     # 접속 환경 집계 — User-Agent 원문은 저장하지 않고 PC/Android/iOS/기타 카운트만 누적
     add_env_usage()
 
-    # 방문 로그 저장 — 개인정보(IP) 수집 중단으로 제거됨
-    # (총/오늘 방문자 수는 visit_stats 카운터로 계속 집계됨)
+    # 방문 로그 저장 (개인정보 없이 날짜만 — 일자별 방문 추세용)
+    log_visit()
 
     # 마지막 방문 시각 저장
     session["last_visit_time"] = now.isoformat()
@@ -307,6 +307,57 @@ def track_page_view():
     except Exception:
         pass
     return None
+
+# =========================
+# 방문/지역 로그 적재 (개인정보 없음: IP/UA/검색어 저장 안 함)
+# - visit_logs: 날짜만 (일자별 방문 추세용)
+# - region_logs: 시도/시군구/검색구분 (일자별 지역 클릭수용)
+# 응답 지연 방지를 위해 비동기 스레드로 적재. (테이블 없으면 조용히 무시)
+# =========================
+def _visit_log_insert():
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/visit_logs",
+            headers=SUPABASE_HEADERS,
+            json={"created_at": datetime.datetime.now(ZoneInfo("Asia/Seoul")).isoformat(), "ip": ""},
+            timeout=5
+        )
+    except Exception:
+        pass
+
+def log_visit():
+    if os.getenv("RENDER") is None:
+        return
+    try:
+        _pv_threading.Thread(target=_visit_log_insert, daemon=True).start()
+    except Exception:
+        pass
+
+def _region_log_insert(sido, sigungu, search_type):
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/region_logs",
+            headers=SUPABASE_HEADERS,
+            json={
+                "created_at": datetime.datetime.now(ZoneInfo("Asia/Seoul")).isoformat(),
+                "sido": sido,
+                "sigungu": sigungu,
+                "search_type": search_type
+            },
+            timeout=5
+        )
+    except Exception:
+        pass
+
+def log_region(sido, sigungu, search_type):
+    if os.getenv("RENDER") is None:
+        return
+    if not (sido or sigungu):
+        return
+    try:
+        _pv_threading.Thread(target=_region_log_insert, args=(sido, sigungu, search_type), daemon=True).start()
+    except Exception:
+        pass
 
 FILE_PATH = "service_resources.xlsx"
 # =========================
@@ -4083,7 +4134,7 @@ def stats():
         for row in visit_rows:
             created_at = str(row.get("created_at", ""))
             if created_at:
-                date_str = created_at[:10]
+                date_str = _kst_date_str(created_at)
                 daily_visit_map[date_str] += 1
 
         daily_visits = []
@@ -4102,7 +4153,7 @@ def stats():
         daily_region_map = defaultdict(int)
         for row in region_rows:
             created_at = str(row.get("created_at", ""))
-            date_str = created_at[:10] if created_at else ""
+            date_str = _kst_date_str(created_at) if created_at else ""
             sido = str(row.get("sido", "") or "")
             sigungu = str(row.get("sigungu", "") or "")
             raw_search_type = str(row.get("search_type", "") or "").strip()
@@ -4216,7 +4267,7 @@ def export_stats_visits():
         for row in visit_rows:
             created_at = str(row.get("created_at", ""))
             if created_at:
-                date_str = created_at[:10]
+                date_str = _kst_date_str(created_at)
                 daily_visit_map[date_str] += 1
 
         daily_visits = []
@@ -4260,7 +4311,7 @@ def export_stats_regions():
         daily_region_map = defaultdict(int)
         for row in region_rows:
             created_at = str(row.get("created_at", ""))
-            date_str = created_at[:10] if created_at else ""
+            date_str = _kst_date_str(created_at) if created_at else ""
             sido = str(row.get("sido", "") or "")
             sigungu = str(row.get("sigungu", "") or "")
             raw_search_type = str(row.get("search_type", "") or "").strip()
@@ -4336,7 +4387,7 @@ def export_stats_all(fname=None):
         for row in visit_rows:
             ca = str(row.get("created_at", ""))
             if ca:
-                dvm[ca[:10]] += 1
+                dvm[_kst_date_str(ca)] += 1
         daily_visits = [{"날짜": d, "방문자수": dvm[d]} for d in sorted(dvm.keys(), reverse=True)]
 
         region_res = requests.get(
@@ -4347,7 +4398,7 @@ def export_stats_all(fname=None):
         drm = defaultdict(int)
         for row in region_rows:
             ca = str(row.get("created_at", ""))
-            ds = ca[:10] if ca else ""
+            ds = _kst_date_str(ca) if ca else ""
             sido = str(row.get("sido", "") or "")
             sigungu = str(row.get("sigungu", "") or "")
             rst = str(row.get("search_type", "") or "").strip()
@@ -5522,6 +5573,7 @@ def combo():
         middle_category_options = [v for v in middle_category_options if v]
 
     if show_results:
+        log_region(sido, sigungu, "combo")
         filtered = df.copy()
 
         if sido and "시도" in filtered.columns:
@@ -6424,6 +6476,7 @@ def desc():
             )
 
         session["desc_last_search_time"] = now_time
+        log_region(selected_sido, selected_sigungu, "desc")
 
         if cache_key in DESC_CACHE:
             cached = DESC_CACHE[cache_key]
