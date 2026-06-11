@@ -209,8 +209,9 @@ def update_visitors():
     # 접속 환경 집계 — User-Agent 원문은 저장하지 않고 PC/Android/iOS/기타 카운트만 누적
     add_env_usage()
 
-    # 방문 로그 저장 — 개인정보(IP) 수집 중단으로 제거됨
+    # 방문 로그 저장 — 일자별 방문자수 집계용 (IP 미수집, 방문 시각만)
     # (총/오늘 방문자 수는 visit_stats 카운터로 계속 집계됨)
+    _pv_threading.Thread(target=_visit_log_insert, daemon=True).start()
 
     # 마지막 방문 시각 저장
     session["last_visit_time"] = now.isoformat()
@@ -285,6 +286,30 @@ def _pv_insert(path):
             f"{SUPABASE_URL}/rest/v1/page_view_logs",
             headers=SUPABASE_HEADERS,
             json={"path": path},
+            timeout=5
+        )
+    except Exception:
+        pass
+
+def _visit_log_insert():
+    """일자별 방문자수 집계용. IP 등 개인정보는 저장하지 않고 방문 시각(created_at 기본값)만 적재."""
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/visit_logs",
+            headers=SUPABASE_HEADERS,
+            json={},
+            timeout=5
+        )
+    except Exception:
+        pass
+
+def _region_log_insert(sido, sigungu, search_type):
+    """일자별 지역 클릭수 집계용. 지역(시도/시군구)·검색구분만 적재 (IP 미수집)."""
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/region_logs",
+            headers=SUPABASE_HEADERS,
+            json={"sido": sido, "sigungu": sigungu, "search_type": search_type},
             timeout=5
         )
     except Exception:
@@ -5601,7 +5626,13 @@ def combo():
             for items in manager_groups.values()
         )
 
-        # 검색 로그(지역+IP) 적재 — 개인정보 수집 중단으로 제거됨
+        # 검색 로그 적재 — 일자별 지역 클릭수 집계용 (IP 미수집, 지역/검색구분만)
+        if os.getenv("RENDER"):
+            _pv_threading.Thread(
+                target=_region_log_insert,
+                args=(sido, sigungu, "combo"),
+                daemon=True
+            ).start()
 
     return render_template_string(
         COMBO_HTML,
@@ -6834,7 +6865,13 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                 )
             )
 
-            # 검색 로그(지역+IP) 적재 — 개인정보 수집 중단으로 제거됨
+            # 검색 로그 적재 — 일자별 지역 클릭수 집계용 (IP 미수집, 지역/검색구분만)
+            if os.getenv("RENDER"):
+                _pv_threading.Thread(
+                    target=_region_log_insert,
+                    args=(selected_sido, selected_sigungu, "desc"),
+                    daemon=True
+                ).start()
 
             # ======================
             # [후처리] 난청/청각 문제 → 의사소통지원 강제 포함
