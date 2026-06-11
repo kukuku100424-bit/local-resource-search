@@ -9677,7 +9677,7 @@ transition:0.2s;
     </div>
     <div class="direct-need-tooltip-wrap">
       <button type="button" class="direct-need-tooltip-icon" aria-label="안내" onclick="var e=event;e.stopPropagation();var b=this.parentElement.querySelector('.direct-need-tooltip-box');if(!b)return;var vis=(b.style.display==='block');document.querySelectorAll('.direct-need-tooltip-box').forEach(function(x){x.style.display='none';});b.style.display=vis?'none':'block';">?</button>
-      <div class="direct-need-tooltip-box">대상자·보호자의 희망욕구와 담당자 판단 필요 서비스가 모두 포함되었습니다.</div>
+      <div class="direct-need-tooltip-box">대상자·보호자의 희망욕구와 조사자 판단 필요 서비스가 모두 포함되었습니다.</div>
     </div>
   </div>
 {% set ns.direct_box_open = true %}
