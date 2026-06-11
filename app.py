@@ -292,12 +292,12 @@ def _pv_insert(path):
         pass
 
 def _visit_log_insert():
-    """일자별 방문자수 집계용. IP 등 개인정보는 저장하지 않고 방문 시각(created_at 기본값)만 적재."""
+    """일자별 방문자수 집계용. 실제 IP 등 개인정보는 저장하지 않고(ip는 빈값) 방문 시각(created_at 기본값)만 적재."""
     try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/visit_logs",
             headers=SUPABASE_HEADERS,
-            json={},
+            json={"ip": ""},
             timeout=5
         )
     except Exception:
