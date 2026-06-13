@@ -3792,26 +3792,24 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   </div>
 
 <div class="card">
-    <h2>일자별 지역 클릭수</h2>
+    <h2>지역 클릭 내역</h2>
     <div>
     <table>
       <thead>
         <tr>
-          <th>날짜</th>
+          <th>일시</th>
           <th>시도</th>
           <th>시군구</th>
           <th>검색구분</th>
-          <th>클릭수</th>
         </tr>
       </thead>
       <tbody id="regionTableBody">
         {% for row in daily_regions %}
         <tr>
-          <td>{{ row["date"] }}</td>
+          <td>{{ row["datetime"] }}</td>
           <td>{{ row["sido"] }}</td>
           <td>{{ row["sigungu"] }}</td>
           <td>{{ row["search_type"] }}</td>
-          <td>{{ row["count"] }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -3948,6 +3946,17 @@ def _kst_date_str(s):
     except Exception:
         return str(s)[:10]
 
+def _kst_datetime_str(s):
+    """UTC created_at → KST 'YYYY-MM-DD HH:MM:SS' 문자열."""
+    try:
+        x = str(s).replace("Z", "+00:00")
+        dt = datetime.datetime.fromisoformat(x)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(s)[:19].replace("T", " ")
+
 def _friendly_page(path):
     return _PV_TRACK.get(path)
 
@@ -4062,9 +4071,9 @@ def stats():
         ]
 
         daily_regions = [
-            {"date": "2026-06-04", "sido": "광주광역시", "sigungu": "북구", "search_type": "조건기반", "count": 3},
-            {"date": "2026-06-04", "sido": "전라남도", "sigungu": "나주시", "search_type": "사례기반", "count": 2},
-            {"date": "2026-06-05", "sido": "광주광역시", "sigungu": "서구", "search_type": "조건기반", "count": 1}
+            {"datetime": "2026-06-04 14:32:10", "sido": "광주광역시", "sigungu": "북구", "search_type": "조건기반"},
+            {"datetime": "2026-06-04 11:05:47", "sido": "전라남도", "sigungu": "나주시", "search_type": "사례기반"},
+            {"datetime": "2026-06-05 09:18:22", "sido": "광주광역시", "sigungu": "서구", "search_type": "조건기반"}
         ]
 
         pv_total, pv_today = 173, 41
@@ -4108,7 +4117,7 @@ def stats():
         for row in visit_rows:
             created_at = str(row.get("created_at", ""))
             if created_at:
-                date_str = created_at[:10]
+                date_str = _kst_date_str(created_at)
                 daily_visit_map[date_str] += 1
 
         daily_visits = []
@@ -4124,10 +4133,11 @@ def stats():
         )
         region_rows = region_res.json() if region_res.ok else []
 
-        daily_region_map = defaultdict(int)
+        # 클릭별 상세 내역 — KST 일시 표시. region_rows는 created_at desc 정렬이라 최신순.
+        daily_regions = []
         for row in region_rows:
             created_at = str(row.get("created_at", ""))
-            date_str = created_at[:10] if created_at else ""
+            dt_str = _kst_datetime_str(created_at) if created_at else ""
             sido = str(row.get("sido", "") or "")
             sigungu = str(row.get("sigungu", "") or "")
             raw_search_type = str(row.get("search_type", "") or "").strip()
@@ -4139,18 +4149,11 @@ def stats():
             else:
                 search_type = raw_search_type or "-"
 
-            key = (date_str, sido, sigungu, search_type)
-            daily_region_map[key] += 1
-
-        daily_regions = []
-        for key in sorted(daily_region_map.keys(), reverse=True):
-            date_str, sido, sigungu, search_type = key
             daily_regions.append({
-                "date": date_str,
+                "datetime": dt_str,
                 "sido": sido,
                 "sigungu": sigungu,
-                "search_type": search_type,
-                "count": daily_region_map[key]
+                "search_type": search_type
             })
 
         pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
@@ -4241,7 +4244,7 @@ def export_stats_visits():
         for row in visit_rows:
             created_at = str(row.get("created_at", ""))
             if created_at:
-                date_str = created_at[:10]
+                date_str = _kst_date_str(created_at)
                 daily_visit_map[date_str] += 1
 
         daily_visits = []
@@ -4285,7 +4288,7 @@ def export_stats_regions():
         daily_region_map = defaultdict(int)
         for row in region_rows:
             created_at = str(row.get("created_at", ""))
-            date_str = created_at[:10] if created_at else ""
+            date_str = _kst_date_str(created_at) if created_at else ""
             sido = str(row.get("sido", "") or "")
             sigungu = str(row.get("sigungu", "") or "")
             raw_search_type = str(row.get("search_type", "") or "").strip()
@@ -4361,7 +4364,7 @@ def export_stats_all(fname=None):
         for row in visit_rows:
             ca = str(row.get("created_at", ""))
             if ca:
-                dvm[ca[:10]] += 1
+                dvm[_kst_date_str(ca)] += 1
         daily_visits = [{"날짜": d, "방문자수": dvm[d]} for d in sorted(dvm.keys(), reverse=True)]
 
         region_res = requests.get(
@@ -4372,7 +4375,7 @@ def export_stats_all(fname=None):
         drm = defaultdict(int)
         for row in region_rows:
             ca = str(row.get("created_at", ""))
-            ds = ca[:10] if ca else ""
+            ds = _kst_date_str(ca) if ca else ""
             sido = str(row.get("sido", "") or "")
             sigungu = str(row.get("sigungu", "") or "")
             rst = str(row.get("search_type", "") or "").strip()
