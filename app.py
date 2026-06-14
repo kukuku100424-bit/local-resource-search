@@ -329,6 +329,25 @@ def _region_log_insert(sido, sigungu, search_type):
     except Exception:
         pass
 
+def cleanup_old_board_posts():
+    """의견보내기 게시글 1년 경과 시 자동 삭제"""
+    if os.getenv("RENDER") is None:
+        return
+
+    try:
+        cutoff = (
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(days=365)
+        ).isoformat()
+
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/board_posts?created_at=lt.{cutoff}",
+            headers=SUPABASE_HEADERS,
+            timeout=5
+        )
+    except Exception:
+        pass
+
 @app.before_request
 def track_page_view():
     if os.getenv("RENDER") is None:
@@ -5245,10 +5264,34 @@ PRIVACY_HTML = """
   <h2>3. 처리위탁 및 국외 처리</h2>
   <p>서비스 운영을 위해 아래 외부 서비스를 이용하며, 일부 정보는 국외에서 처리될 수 있습니다.</p>
   <table>
-    <tr><th>수탁자</th><th>국가</th><th>항목 · 목적</th><th>보유기간</th></tr>
-    <tr><td>Supabase</td><td>일본 등 서비스 제공 리전</td><td>의견 데이터, 운영 통계 저장</td><td>본 방침의 보유기간에 따름</td></tr>
-    <tr><td>OpenAI</td><td>미국 등</td><td>AI 추천 및 OCR 처리를 위한 입력 내용·이미지 처리</td><td>OpenAI API 정책 및 계약 조건에 따름</td></tr>
-    <tr><td>Google/Gmail SMTP</td><td>미국 등</td><td>조사서식 PDF 이메일 발송을 위한 수신 이메일 주소 및 첨부 PDF 처리</td><td>Google 서비스 정책 및 메일 처리 조건에 따름</td></tr>
+    <tr>
+      <th>수탁자</th>
+      <th>처리 국가</th>
+      <th>처리 항목</th>
+      <th>처리 목적</th>
+      <th>보유기간</th>
+    </tr>
+    <tr>
+      <td>Supabase</td>
+      <td>일본 등 서비스 제공 리전</td>
+      <td>의견보내기 작성자, 제목, 내용, 회신연락처, 운영 통계</td>
+      <td>의견 접수 관리 및 운영 통계 저장</td>
+      <td>의견보내기 자료는 접수일로부터 1년, 운영 통계는 개인을 식별할 수 없는 형태로 보관</td>
+    </tr>
+    <tr>
+      <td>OpenAI</td>
+      <td>미국 등</td>
+      <td>사용자가 입력한 사례 내용, OCR 이미지</td>
+      <td>AI 추천 결과 생성 및 이미지 텍스트 추출</td>
+      <td>OpenAI API 정책 및 계약 조건에 따름</td>
+    </tr>
+    <tr>
+      <td>Google/Gmail SMTP</td>
+      <td>미국 등</td>
+      <td>수신 이메일 주소, 생성된 PDF 첨부파일</td>
+      <td>조사서식 PDF 이메일 발송</td>
+      <td>메일 발송 처리 과정에서 이용되며, 발송 메일함 또는 수신자 메일함에 보관될 수 있음</td>
+    </tr>
   </table>
 
   <h2>4. 보유 및 이용기간</h2>
@@ -5325,6 +5368,8 @@ def board_view(post_id):
 
 @app.route("/board/admin")
 def board_admin():
+    cleanup_old_board_posts()
+
     posts = []
 
     if os.getenv("RENDER") is not None:
