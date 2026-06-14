@@ -5267,7 +5267,7 @@ PRIVACY_HTML = """
   <p>AI 추천 결과는 업무 참고용이며, 최종 판단과 안내는 담당자가 관련 지침과 현장 상황을 확인하여 결정해야 합니다.</p>
 
   <h2>9. 개인정보 보호 담당부서</h2>
-  <p>국민건강보험공단 광주전라제주지역본부 통합돌봄지원부</p>
+  <p>국민건강보험공단 광주전라제주지역본부 통합돌봄부<span style="font-size:12px;">(TF)</span></p>
 
   <a class="back" href="javascript:history.back()">돌아가기</a>
 </div>
