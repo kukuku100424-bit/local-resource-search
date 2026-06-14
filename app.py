@@ -2391,11 +2391,12 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <div class="copyright-sub">
       통합돌봄부<span class="tf-label">(TF)</span> &amp; 연구반 <span class="brand">돌봄곳간</span>
     </div>
-    <div style="margin-top:8px;">
-      <a href="/privacy" style="font-size:11px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
-    </div>
   </div>
 
+</div>
+
+<div style="text-align:center;padding:12px 0 2px;">
+  <a href="/privacy" style="font-size:11px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
 </div>
 
 <style>
@@ -5230,9 +5231,9 @@ PRIVACY_HTML = """
   <p>이용자는 본인의 개인정보에 대한 열람 · 정정 · 삭제 · 처리정지를 요청할 수 있으며, 아래 연락처로 요청하실 수 있습니다.</p>
 
   <h2>6. 개인정보 보호책임자</h2>
-  <p>이메일: nhis8584@nhis.or.kr</p>
+  <p>국민건강보험공단 광주전라제주지역본부 정상수 과장<br>이메일: nhis8584@nhis.or.kr</p>
 
-  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+  <a class="back" href="javascript:history.back()">돌아가기</a>
 </div>
 </body>
 </html>
@@ -8736,17 +8737,25 @@ button:hover{
 
 .privacy-warning{
   margin:12px 0 0 0;
-  padding:12px 18px;
+  padding:14px 16px;
   border-radius:12px;
   background:#fff1f2;
   border:1px solid #fb7185;
   color:#9f1239;
   font-size:14px;
   font-weight:700;
-  line-height:1.55;
+  line-height:1.6;
   display:flex;
+  flex-direction:column;
   align-items:center;
-  gap:12px;
+  text-align:center;
+  gap:8px;
+}
+
+.privacy-warning .siren-icon{
+  width:30px;
+  height:31px;
+  flex:0 0 auto;
 }
 
 .privacy-warning-icon{
@@ -9397,7 +9406,7 @@ button:hover{
   position:fixed;
   inset:0;
   background:rgba(15,23,42,0.48);
-  z-index:9999;
+  z-index:10010;
   align-items:center;
   justify-content:center;
   padding:18px;
