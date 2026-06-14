@@ -2401,12 +2401,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <div>총 {{total}}</div>
       <div>오늘 {{today}}</div>
     </div>
+    <div style="text-align:right;padding:8px 0 0;">
+      <a href="/privacy" style="font-size:11px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
+    </div>
   </div>
 
-</div>
-
-<div style="text-align:right;padding:10px 14px 4px;">
-  <a href="/privacy" style="font-size:11px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
 </div>
 
 <style>
@@ -9591,6 +9590,36 @@ body.privacy-modal-open{
   box-shadow:0 8px 18px rgba(37,99,235,0.22);
 }
 
+.privacy-agree-note{
+  margin:14px 0 0 0;
+  font-size:12.5px;
+  color:#4b5563;
+  line-height:1.6;
+  text-align:center;
+  word-break:keep-all;
+}
+
+.privacy-btns{
+  display:flex;
+  gap:10px;
+}
+
+.privacy-btns button{
+  flex:1;
+  width:auto;
+}
+
+.privacy-disagree{
+  height:48px;
+  border:1px solid #d1d5db;
+  border-radius:14px;
+  background:#ffffff;
+  color:#6b7280;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+}
+
 @media (max-width:480px){
   #privacyBox{
     max-width:360px;
@@ -9690,7 +9719,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 
 <!-- ===== 개인정보 입력 주의 팝업 ===== -->
-<div id="privacyModal" onclick="closePrivacyModalByBg(event)" onwheel="event.preventDefault()" ontouchmove="event.preventDefault()">
+<div id="privacyModal" onwheel="event.preventDefault()" ontouchmove="event.preventDefault()">
   <div id="privacyBox">
 
     <div class="privacy-icon siren-icon">
@@ -9727,14 +9756,23 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   건강, 환경 등 돌봄필요 상황만 입력해 주세요.
 </div>
 
+    <div class="privacy-agree-note">
+      위 주의사항을 확인했으며, 개인정보·민감정보를 입력하지 않고 이용하는 데 동의합니다.
+    </div>
+
     <label class="privacy-check">
       <input type="checkbox" id="hidePrivacyToday">
       오늘 하루 보지 않기
     </label>
 
-    <button type="button" class="privacy-confirm" onclick="closePrivacyModal()">
-      확인
-    </button>
+    <div class="privacy-btns">
+      <button type="button" class="privacy-confirm" onclick="closePrivacyModal()">
+        동의하고 시작
+      </button>
+      <button type="button" class="privacy-disagree" onclick="declinePrivacyModal()">
+        동의 안 함
+      </button>
+    </div>
 
   </div>
 </div>
@@ -10554,6 +10592,13 @@ function closePrivacyModalByBg(e){
   if(e.target && e.target.id === "privacyModal"){
     closePrivacyModal();
   }
+}
+
+function declinePrivacyModal(){
+  // 미동의: 사례별 AI 추천을 이용하지 않고 메인페이지로 이동
+  try{ sessionStorage.removeItem("desc_privacy_shown"); }catch(e){}
+  unlockPrivacyScroll();
+  window.location.href = "/home";
 }
 
 window.addEventListener("load", function(){
