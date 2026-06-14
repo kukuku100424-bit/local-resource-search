@@ -8736,8 +8736,9 @@ button:hover{
 }
 
 .privacy-warning{
-  margin:12px 0 0 0;
-  padding:14px 16px;
+  position:relative;
+  margin:30px 0 0 0;
+  padding:26px 16px 14px;
   border-radius:12px;
   background:#fff1f2;
   border:1px solid #fb7185;
@@ -8745,17 +8746,38 @@ button:hover{
   font-size:14px;
   font-weight:700;
   line-height:1.6;
-  display:flex;
-  align-items:flex-start;
   text-align:left;
-  gap:10px;
 }
 
 .privacy-warning .siren-icon{
-  width:26px;
-  height:27px;
-  flex:0 0 26px;
-  margin-top:1px;
+  position:absolute;
+  top:-18px;
+  left:50%;
+  transform:translateX(-50%);
+  width:40px;
+  height:40px;
+  flex:none;
+  margin:0;
+  background:#fff;
+  border:1px solid #fb7185;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 1px 4px rgba(159,18,57,0.12);
+}
+
+.privacy-warning .siren-svg{
+  width:22px;
+  height:23px;
+}
+
+.privacy-warning-text{
+  display:block;
+  width:100%;
+  text-align:left;
+  word-break:keep-all;
+  overflow-wrap:break-word;
 }
 
 .privacy-warning-icon{
@@ -8772,8 +8794,8 @@ button:hover{
 
 @media (max-width:480px){
   .privacy-warning{
-    margin:12px 0 0 0;
-    padding:13px 14px;
+    margin:28px 0 0 0;
+    padding:24px 14px 13px;
     font-size:13px;
     line-height:1.6;
   }
