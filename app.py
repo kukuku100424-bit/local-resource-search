@@ -5190,14 +5190,13 @@ PRIVACY_HTML = """
   h1{font-size:22px;margin:0 0 6px;}
   .updated{color:#94a3b8;font-size:13px;margin-bottom:18px;}
   h2{font-size:16px;margin:20px 0 6px;color:#111827;}
-  p,li,.notice,td,th{word-break:keep-all;overflow-wrap:break-word;line-break:strict;text-align:left;}
   p{font-size:14px;color:#374151;margin:6px 0;}
   li{font-size:14px;color:#374151;margin:3px 0;}
   ul{padding-left:18px;margin:6px 0;}
   .notice{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;color:#9a3412;margin:10px 0;}
   a.back{display:inline-block;margin-top:24px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;}
   table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;}
-  th,td{border:1px solid #e5e7eb;padding:7px 8px;text-align:left;vertical-align:top;}
+  th,td{border:1px solid #e5e7eb;padding:7px 8px;text-align:left;vertical-align:top;word-break:keep-all;}
   th{background:#f8fafc;}
 </style>
 </head>
@@ -5248,7 +5247,7 @@ PRIVACY_HTML = """
   <p>보유기간이 지난 개인정보는 복구할 수 없도록 삭제합니다. 전자파일은 재생할 수 없는 방법으로 삭제합니다.</p>
 
   <h2>6. 정보주체의 권리</h2>
-  <p>이용자는 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 아래 개인정보 보호 담당부서에 연락해 주세요.</p>
+  <p>이용자는 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 아래 개인정보 보호책임자에게 연락해 주세요.</p>
 
   <h2>7. 안전성 확보조치</h2>
   <ul>
@@ -5261,8 +5260,8 @@ PRIVACY_HTML = """
   <h2>8. 자동화된 추천에 관한 안내</h2>
   <p>AI 추천 결과는 업무 참고용이며, 최종 판단과 안내는 담당자가 관련 지침과 현장 상황을 확인하여 결정해야 합니다.</p>
 
-  <h2>9. 개인정보 보호 담당부서</h2>
-  <p>국민건강보험공단 광주전라제주지역본부<br>이메일: nhis8584@nhis.or.kr</p>
+  <h2>9. 개인정보 보호책임자</h2>
+  <p>국민건강보험공단 광주전라제주지역본부 정상수 과장<br>이메일: nhis8584@nhis.or.kr</p>
 
   <a class="back" href="javascript:history.back()">돌아가기</a>
 </div>
@@ -8821,6 +8820,20 @@ button:hover{
   overflow-wrap:break-word;
 }
 
+.privacy-warning-text .mobile-only{ display:none; }
+.privacy-warning-text .pc-only{ display:inline; }
+
+@media (min-width:481px){
+  .privacy-warning{
+    padding:28px 28px 18px;
+    text-align:left;
+  }
+  .privacy-warning-text{
+    text-align:left;
+    line-height:1.75;
+  }
+}
+
 .privacy-warning-icon{
   flex:0 0 auto;
   line-height:1.65;
@@ -8847,7 +8860,10 @@ button:hover{
 
   .privacy-warning-text{
     line-height:1.6;
+    text-align:left;
   }
+  .privacy-warning-text .pc-only{ display:none; }
+  .privacy-warning-text .mobile-only{ display:inline; }
 }
 .siren-icon{
   width:54px;
@@ -9473,6 +9489,14 @@ button:hover{
   align-items:center;
   justify-content:center;
   padding:18px;
+  overscroll-behavior:contain;
+  touch-action:none;
+}
+
+body.privacy-modal-open{
+  overflow:hidden !important;
+  position:fixed !important;
+  width:100% !important;
 }
 
 #privacyBox{
@@ -9681,7 +9705,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 
 <!-- ===== 개인정보 입력 주의 팝업 ===== -->
-<div id="privacyModal" onclick="closePrivacyModalByBg(event)">
+<div id="privacyModal" onclick="closePrivacyModalByBg(event)" onwheel="event.preventDefault()" ontouchmove="event.preventDefault()">
   <div id="privacyBox">
 
     <div class="privacy-icon siren-icon">
@@ -10502,6 +10526,27 @@ function getPrivacyTodayKey(){
   return "privacy_hide_" + d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate();
 }
 
+let privacyScrollY = 0;
+
+function lockPrivacyScroll(){
+  privacyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.style.top = "-" + privacyScrollY + "px";
+  document.body.classList.add("privacy-modal-open");
+}
+
+function unlockPrivacyScroll(){
+  document.body.classList.remove("privacy-modal-open");
+  document.body.style.top = "";
+  window.scrollTo(0, privacyScrollY || 0);
+}
+
+function showPrivacyModal(){
+  const modal = document.getElementById("privacyModal");
+  if(!modal) return;
+  modal.style.display = "flex";
+  lockPrivacyScroll();
+}
+
 function closePrivacyModal(){
   const modal = document.getElementById("privacyModal");
   const check = document.getElementById("hidePrivacyToday");
@@ -10516,6 +10561,7 @@ function closePrivacyModal(){
   if(modal){
     modal.style.display = "none";
   }
+  unlockPrivacyScroll();
 }
 
 function closePrivacyModalByBg(e){
@@ -10550,7 +10596,7 @@ window.addEventListener("load", function(){
     }
   }catch(e){}
 
-  modal.style.display = "flex";
+  showPrivacyModal();
 });
 
 </script>
@@ -10582,7 +10628,10 @@ window.addEventListener("load", function(){
         </svg>
       </span>
 
-      <span class="privacy-warning-text">성명, 주민등록번호, 연락처, 상세주소 등<br>개인정보는 입력하지 마시고,<br>사진 촬영 시 개인정보가 포함된 부분은<br>가리거나 제외하여 촬영해 주세요.<br>개인정보 입력 및 업로드로 인한 책임은<br>사용자에게 있습니다.</span>
+      <span class="privacy-warning-text">
+        <span class="pc-only">성명, 주민등록번호, 연락처, 상세주소 등 개인정보는 입력하지 마시고,<br>사진 촬영 시 개인정보가 포함된 부분은 가리거나 제외하여 촬영해 주세요.<br>개인정보 입력 및 업로드로 인한 책임은 사용자에게 있습니다.</span>
+        <span class="mobile-only">성명, 주민등록번호, 연락처, 상세주소 등<br>개인정보는 입력하지 마시고,<br><br>사진 촬영 시 개인정보가 포함된 부분은<br>가리거나 제외하여 촬영해 주세요.<br><br>개인정보 입력 및 업로드로 인한 책임은<br>사용자에게 있습니다.</span>
+      </span>
     </div>
 
 <!-- ===== 개인정보 입력 차단 팝업 ===== -->
