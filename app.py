@@ -5181,16 +5181,17 @@ PRIVACY_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>개인정보 처리방침</title>
 <style>
-  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:#f1f5f9;color:#1f2937;margin:0;padding:20px;line-height:1.7;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:#f1f5f9;color:#1f2937;margin:0;padding:20px;line-height:1.5;}
   .wrap{max-width:720px;margin:0 auto;background:#fff;border-radius:16px;padding:24px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.05);}
   h1{font-size:22px;margin:0 0 6px;}
-  .updated{color:#94a3b8;font-size:13px;margin-bottom:20px;}
-  h2{font-size:16px;margin:22px 0 8px;color:#111827;}
-  p,li{font-size:14px;color:#374151;}
-  ul{padding-left:18px;margin:6px 0;}
+  .updated{color:#94a3b8;font-size:13px;margin-bottom:18px;}
+  h2{font-size:16px;margin:18px 0 5px;color:#111827;}
+  p{font-size:14px;color:#374151;margin:5px 0;}
+  li{font-size:14px;color:#374151;margin:2px 0;}
+  ul{padding-left:18px;margin:5px 0;}
   a.back{display:inline-block;margin-top:24px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;}
-  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}
-  th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top;}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;}
+  th,td{border:1px solid #e5e7eb;padding:6px 7px;text-align:left;vertical-align:top;word-break:keep-all;}
   th{background:#f8fafc;}
 </style>
 </head>
@@ -5219,7 +5220,7 @@ PRIVACY_HTML = """
   <h2>3. 처리위탁 및 국외이전</h2>
   <p>서비스 운영을 위해 아래와 같이 개인정보 처리를 위탁하며, 일부는 국외에서 처리됩니다.</p>
   <table>
-    <tr><th>수탁자</th><th>이전 국가</th><th>항목 · 목적</th><th>보유기간</th></tr>
+    <tr><th>수탁자</th><th>국가</th><th>항목 · 목적</th><th>보유기간</th></tr>
     <tr><td>Supabase</td><td>일본</td><td>의견 데이터 저장 · 보관</td><td>아래 4항과 동일</td></tr>
     <tr><td>OpenAI</td><td>미국</td><td>AI 서비스 추천 및 이미지(OCR) 처리 — 입력 데이터는 저장되지 않음</td><td>미보관</td></tr>
   </table>
@@ -10539,7 +10540,7 @@ window.addEventListener("load", function(){
         </svg>
       </span>
 
-      <span class="privacy-warning-text"> 성명, 주민등록번호 등 개인정보를 입력하지 마세요. <br>사진 촬영 시 서류의 개인정보 부분은 가린 후 촬영해 주세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
+      <span class="privacy-warning-text">성명·주민등록번호 등 개인정보는 입력하지 마시고, 사진 촬영 시 서류의 개인정보 부분은 가린 후 촬영해 주세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
     </div>
 
 <!-- ===== 개인정보 입력 차단 팝업 ===== -->
