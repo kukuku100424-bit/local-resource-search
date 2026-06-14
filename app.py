@@ -218,7 +218,11 @@ def update_visitors():
 
     return total, today_count
 
-app.secret_key = "super_secret_key"
+# 운영환경에서는 반드시 환경변수로 설정하세요.
+# Render 환경에서 값이 비어 있으면 로그인이 되지 않도록 기본값을 두지 않습니다.
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "local_dev_secret_key_change_me")
+USER_PASSWORD = os.getenv("USER_PASSWORD", "1234" if os.getenv("RENDER") is None else "")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "qwer" if os.getenv("RENDER") is None else "")
 
 @app.route("/favicon.ico")
 def favicon():
@@ -829,7 +833,7 @@ def login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if pw == "1234":  # 원하는 비밀번호
+        if USER_PASSWORD and pw == USER_PASSWORD:
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
@@ -843,7 +847,7 @@ def admin_login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if pw == "qwer":
+        if ADMIN_PASSWORD and pw == ADMIN_PASSWORD:
             session["is_admin"] = True
             return redirect(url_for("stats"))
         else:
@@ -5181,17 +5185,18 @@ PRIVACY_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>개인정보 처리방침</title>
 <style>
-  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:#f1f5f9;color:#1f2937;margin:0;padding:20px;line-height:1.5;}
-  .wrap{max-width:720px;margin:0 auto;background:#fff;border-radius:16px;padding:24px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.05);}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:#f1f5f9;color:#1f2937;margin:0;padding:20px;line-height:1.55;}
+  .wrap{max-width:760px;margin:0 auto;background:#fff;border-radius:16px;padding:24px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.05);}
   h1{font-size:22px;margin:0 0 6px;}
   .updated{color:#94a3b8;font-size:13px;margin-bottom:18px;}
-  h2{font-size:16px;margin:18px 0 5px;color:#111827;}
-  p{font-size:14px;color:#374151;margin:5px 0;}
-  li{font-size:14px;color:#374151;margin:2px 0;}
-  ul{padding-left:18px;margin:5px 0;}
+  h2{font-size:16px;margin:20px 0 6px;color:#111827;}
+  p{font-size:14px;color:#374151;margin:6px 0;}
+  li{font-size:14px;color:#374151;margin:3px 0;}
+  ul{padding-left:18px;margin:6px 0;}
+  .notice{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;color:#9a3412;margin:10px 0;}
   a.back{display:inline-block;margin-top:24px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;}
   table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;}
-  th,td{border:1px solid #e5e7eb;padding:6px 7px;text-align:left;vertical-align:top;word-break:keep-all;}
+  th,td{border:1px solid #e5e7eb;padding:7px 8px;text-align:left;vertical-align:top;word-break:keep-all;}
   th{background:#f8fafc;}
 </style>
 </head>
@@ -5202,36 +5207,60 @@ PRIVACY_HTML = """
 
   <p>케어네비(이하 "서비스")는 「개인정보 보호법」을 준수하며, 이용자의 개인정보를 다음과 같이 처리합니다.</p>
 
-  <h2>1. 수집하는 개인정보 항목 및 목적</h2>
-  <p>서비스는 '의견보내기(오류제보)' 기능에서만 개인정보를 수집합니다.</p>
+  <div class="notice">
+    본 서비스는 업무 참고용 서비스입니다. 이름, 주민등록번호, 연락처, 상세주소, 진단서·처방전 원본 등 직접 식별 가능한 개인정보나 민감정보는 입력 또는 업로드하지 않도록 주의해 주세요.
+  </div>
+
+  <h2>1. 처리하는 개인정보 항목 및 목적</h2>
+  <table>
+    <tr><th>기능</th><th>처리 항목</th><th>이용 목적</th><th>보유기간</th></tr>
+    <tr><td>의견보내기</td><td>작성자, 회신연락처, 제목·문의내용</td><td>오류제보·의견 접수 및 회신</td><td>접수일로부터 1년</td></tr>
+    <tr><td>사례별 AI 추천</td><td>이용자가 입력한 사례 내용</td><td>통합돌봄 서비스 추천 결과 생성</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
+    <tr><td>이미지 OCR</td><td>이용자가 업로드한 이미지 및 이미지에서 추출된 텍스트</td><td>사진 속 사례 내용 추출</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
+    <tr><td>조사서식 작성·PDF 발송</td><td>이용자가 입력한 조사 내용, 수신 이메일 주소, 생성된 PDF</td><td>조사서식 PDF 생성 및 이메일 발송</td><td>서버 DB에 저장하지 않음. 메일 발송 과정에서 일시 이용</td></tr>
+  </table>
+
+  <h2>2. 통계 정보</h2>
+  <p>서비스는 운영 통계를 위해 아래 정보를 처리합니다. IP, 검색어, User-Agent 원문은 저장하지 않으며 특정 개인을 식별하지 않는 형태로 집계합니다.</p>
   <ul>
-    <li>수집 항목: 작성자(이름 또는 소속), 회신연락처(이메일 또는 전화번호)</li>
-    <li>제목·문의내용은 자유입력 항목으로, 이용자가 입력할 경우 개인정보가 포함될 수 있습니다.</li>
-    <li>소속기관 구분(지자체/공단)은 통계 목적의 선택 항목으로 개인을 식별하지 않습니다.</li>
-    <li>이용 목적: 오류제보·의견 접수 및 회신</li>
+    <li>방문자수, 페이지별 조회수, 지역별 클릭수, AI 토큰 사용량</li>
+    <li>접속환경 분류값: PC, Android, iOS, 기타</li>
   </ul>
 
-  <h2>2. 통계 정보 (개인정보에 해당하지 않음)</h2>
-  <p>서비스는 운영 통계를 위해 아래 정보를 수집하나, IP·검색어 등 개인 식별정보는 수집하지 않아 특정 개인을 알아볼 수 없습니다.</p>
-  <ul>
-    <li>방문자수, 지역별 클릭수, 페이지별 조회수, AI 토큰 사용량, 접속환경(PC/모바일)</li>
-  </ul>
-
-  <h2>3. 처리위탁 및 국외이전</h2>
-  <p>서비스 운영을 위해 아래와 같이 개인정보 처리를 위탁하며, 일부는 국외에서 처리됩니다.</p>
+  <h2>3. 처리위탁 및 국외 처리</h2>
+  <p>서비스 운영을 위해 아래 외부 서비스를 이용하며, 일부 정보는 국외에서 처리될 수 있습니다.</p>
   <table>
     <tr><th>수탁자</th><th>국가</th><th>항목 · 목적</th><th>보유기간</th></tr>
-    <tr><td>Supabase</td><td>일본</td><td>의견 데이터 저장 · 보관</td><td>아래 4항과 동일</td></tr>
-    <tr><td>OpenAI</td><td>미국</td><td>AI 서비스 추천 및 이미지(OCR) 처리 — 입력 데이터는 저장되지 않음</td><td>미보관</td></tr>
+    <tr><td>Supabase</td><td>일본 등 서비스 제공 리전</td><td>의견 데이터, 운영 통계 저장</td><td>본 방침의 보유기간에 따름</td></tr>
+    <tr><td>OpenAI</td><td>미국 등</td><td>AI 추천 및 OCR 처리를 위한 입력 내용·이미지 처리</td><td>OpenAI API 정책 및 계약 조건에 따름</td></tr>
+    <tr><td>Google/Gmail SMTP</td><td>미국 등</td><td>조사서식 PDF 이메일 발송을 위한 수신 이메일 주소 및 첨부 PDF 처리</td><td>Google 서비스 정책 및 메일 처리 조건에 따름</td></tr>
   </table>
 
   <h2>4. 보유 및 이용기간</h2>
-  <p>수집된 의견 및 회신연락처는 접수일로부터 <b>1년</b> 보관 후 파기합니다.</p>
+  <ul>
+    <li>의견보내기 접수 내용 및 회신연락처: 접수일로부터 1년</li>
+    <li>AI 추천 입력 내용, OCR 이미지, 조사서식 PDF: 서버 DB에 저장하지 않고 요청 처리 과정에서만 일시 이용</li>
+    <li>운영 통계: 개인을 식별할 수 없는 집계 정보로 보관</li>
+  </ul>
 
-  <h2>5. 정보주체의 권리</h2>
-  <p>이용자는 본인의 개인정보에 대한 열람 · 정정 · 삭제 · 처리정지를 요청할 수 있으며, 아래 연락처로 요청하실 수 있습니다.</p>
+  <h2>5. 파기 방법</h2>
+  <p>보유기간이 지난 개인정보는 복구할 수 없도록 삭제합니다. 전자파일은 재생할 수 없는 방법으로 삭제합니다.</p>
 
-  <h2>6. 개인정보 보호책임자</h2>
+  <h2>6. 정보주체의 권리</h2>
+  <p>이용자는 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 아래 개인정보 보호책임자에게 연락해 주세요.</p>
+
+  <h2>7. 안전성 확보조치</h2>
+  <ul>
+    <li>관리자 페이지 접근 제한</li>
+    <li>운영 로그 최소화 및 검색어·토큰·추천 결과 로그 미저장</li>
+    <li>IP 및 User-Agent 원문 미저장</li>
+    <li>외부 API 키 및 비밀번호의 환경변수 관리</li>
+  </ul>
+
+  <h2>8. 자동화된 추천에 관한 안내</h2>
+  <p>AI 추천 결과는 업무 참고용이며, 최종 판단과 안내는 담당자가 관련 지침과 현장 상황을 확인하여 결정해야 합니다.</p>
+
+  <h2>9. 개인정보 보호책임자</h2>
   <p>국민건강보험공단 광주전라제주지역본부 정상수 과장<br>이메일: nhis8584@nhis.or.kr</p>
 
   <a class="back" href="javascript:history.back()">돌아가기</a>
@@ -6415,15 +6444,25 @@ function comboGuideStart() {
 
 @app.route("/ocr", methods=["POST"])
 def ocr():
+    # 개인정보가 포함된 이미지가 외부 OCR 처리로 넘어가지 않도록 사용자 확인을 서버에서도 검사
+    if request.form.get("ocr_privacy_confirmed") != "yes":
+        return jsonify({"error": "개인정보 업로드 주의사항 확인이 필요합니다."}), 400
+
     file = request.files.get("image")
     if not file:
         return {"text": ""}
+
+    if not (file.mimetype or "").startswith("image/"):
+        return jsonify({"error": "이미지 파일만 업로드할 수 있습니다."}), 400
 
     import base64
     from openai import OpenAI
     client = OpenAI()
 
     img_bytes = file.read()
+    if len(img_bytes) > 8 * 1024 * 1024:
+        return jsonify({"error": "이미지 용량은 8MB 이하만 업로드할 수 있습니다."}), 400
+
     img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 
     try:
@@ -10359,8 +10398,10 @@ document.getElementById("imgInput").addEventListener("change", async function(){
   const file = this.files[0];
   if(!file) return;
 
+
   const formData = new FormData();
   formData.append("image", file);
+  formData.append("ocr_privacy_confirmed", "yes");
 
   if(loading){
     loading.style.display = "flex";
@@ -10540,7 +10581,7 @@ window.addEventListener("load", function(){
         </svg>
       </span>
 
-      <span class="privacy-warning-text">성명·주민등록번호 등 개인정보는 입력하지 마시고, 사진 촬영 시 서류의 개인정보 부분은 가린 후 촬영해 주세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
+      <span class="privacy-warning-text">성명, 주민등록번호, 연락처, 상세주소 등<br>개인정보는 입력하지 마시고,<br><br>사진 촬영 시 개인정보가 포함된 부분은<br>가리거나 제외하여 촬영해 주세요.<br><br>개인정보 입력 및 업로드로 인한 책임은<br>사용자에게 있습니다.</span>
     </div>
 
 <!-- ===== 개인정보 입력 차단 팝업 ===== -->
