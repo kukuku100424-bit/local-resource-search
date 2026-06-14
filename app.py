@@ -10666,7 +10666,7 @@ window.addEventListener("load", function(){
       </span>
 
       <div class="privacy-warning-text">
-        <p class="pw-main">성명·주민번호·연락처·주소 등 개인정보는 입력하지 마세요. 사진은 개인정보를 가리고 촬영해 주세요. <span class="pw-sub">입력·업로드 책임은 사용자에게 있습니다.</span></p>
+        <p class="pw-main">성명·주민번호·연락처·주소 등 개인정보는 입력하지 마시고 사진 촬영 시 개인정보를 가려주세요. <span class="pw-sub">입력·업로드의 책임은 사용자에게 있습니다.</span></p>
       </div>
     </div>
 
