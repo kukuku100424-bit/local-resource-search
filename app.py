@@ -5229,9 +5229,16 @@ PRIVACY_HTML = """
   ul{padding-left:18px;margin:6px 0;}
   .notice{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;color:#9a3412;margin:10px 0;}
   a.back{display:inline-block;margin-top:24px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;}
-  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;}
+  .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0;}
+  table{width:100%;min-width:720px;border-collapse:collapse;margin:0;font-size:12px;}
   th,td{border:1px solid #e5e7eb;padding:7px 8px;text-align:left;vertical-align:top;word-break:keep-all;}
   th{background:#f8fafc;}
+  @media (max-width:480px){
+    body{padding:12px;}
+    .wrap{padding:20px 14px;}
+    .table-scroll{margin:8px 0 10px 0;padding-bottom:4px;}
+    table{font-size:11.5px;min-width:760px;}
+  }
 </style>
 </head>
 <body>
@@ -5246,6 +5253,7 @@ PRIVACY_HTML = """
   </div>
 
   <h2>1. 처리하는 개인정보 항목 및 목적</h2>
+  <div class="table-scroll">
   <table>
     <tr><th>기능</th><th>처리 항목</th><th>이용 목적</th><th>보유기간</th></tr>
     <tr><td>의견보내기</td><td>작성자, 회신연락처, 제목·문의내용</td><td>오류제보·의견 접수 및 회신</td><td>접수일로부터 1년</td></tr>
@@ -5253,6 +5261,7 @@ PRIVACY_HTML = """
     <tr><td>이미지 OCR</td><td>이용자가 업로드한 이미지 및 이미지에서 추출된 텍스트</td><td>사진 속 사례 내용 추출</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
     <tr><td>조사서식 작성·PDF 발송</td><td>이용자가 입력한 조사 내용, 수신 이메일 주소, 생성된 PDF</td><td>조사서식 PDF 생성 및 이메일 발송</td><td>서버 DB에 저장하지 않음. 메일 발송 과정에서 일시 이용</td></tr>
   </table>
+  </div>
 
   <h2>2. 통계 정보</h2>
   <p>서비스는 운영 통계를 위해 아래 정보를 처리합니다. IP, 검색어, User-Agent 원문은 저장하지 않으며 특정 개인을 식별하지 않는 형태로 집계합니다.</p>
@@ -5263,6 +5272,7 @@ PRIVACY_HTML = """
 
   <h2>3. 처리위탁 및 국외 처리</h2>
   <p>서비스 운영을 위해 아래 외부 서비스를 이용하며, 일부 정보는 국외에서 처리될 수 있습니다.</p>
+  <div class="table-scroll">
   <table>
     <tr>
       <th>수탁자</th>
@@ -5293,6 +5303,7 @@ PRIVACY_HTML = """
       <td>메일 발송 처리 과정에서 이용되며, 발송 메일함 또는 수신자 메일함에 보관될 수 있음</td>
     </tr>
   </table>
+  </div>
 
   <h2>4. 보유 및 이용기간</h2>
   <ul>
