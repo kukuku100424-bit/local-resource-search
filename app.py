@@ -243,6 +243,7 @@ def require_login_all_pages():
         request.path == "/"
         or request.path == "/login"
         or request.path == "/admin"
+        or request.path == "/privacy"
         or request.path == "/app-version.json"
         or request.path.startswith("/static")
     ):
@@ -2390,6 +2391,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <div class="copyright-sub">
       통합돌봄부<span class="tf-label">(TF)</span> &amp; 연구반 <span class="brand">돌봄곳간</span>
     </div>
+    <div style="margin-top:8px;">
+      <a href="/privacy" style="font-size:11px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
+    </div>
   </div>
 
 </div>
@@ -3957,6 +3961,21 @@ def _kst_datetime_str(s):
     except Exception:
         return str(s)[:19].replace("T", " ")
 
+import re as _re_pii
+_PII_PATTERNS = [
+    r'[\w.+-]+@[\w-]+\.[\w.-]+',              # 이메일
+    r'\d{6}\s*-\s*\d{7}',                     # 주민등록번호
+    r'01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}',  # 휴대폰
+    r'\d{2,3}[-\s.]\d{3,4}[-\s.]\d{4}',       # 일반전화
+]
+def _contains_pii(text):
+    """자유입력에 식별정보(주민번호·전화·이메일) 패턴이 있으면 True 반환.
+    탐지 시 GPT로 전송하지 않고 차단. (이름은 패턴이 없어 탐지 못 함 → 경고문이 보완)"""
+    if not text:
+        return False
+    t = str(text)
+    return any(_re_pii.search(p, t) for p in _PII_PATTERNS)
+
 def _friendly_page(path):
     return _PV_TRACK.get(path)
 
@@ -4826,6 +4845,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <input type="text" name="reply_contact" placeholder="이메일 또는 전화번호">
 
       <button type="submit">등록하기</button>
+      <div style="text-align:center;margin-top:14px;">
+        <a href="/privacy" style="font-size:12px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
+      </div>
     </form>
   </div>
 
@@ -5149,6 +5171,76 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 </html>
 """
 
+
+PRIVACY_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>개인정보 처리방침</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:#f1f5f9;color:#1f2937;margin:0;padding:20px;line-height:1.7;}
+  .wrap{max-width:720px;margin:0 auto;background:#fff;border-radius:16px;padding:24px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.05);}
+  h1{font-size:22px;margin:0 0 6px;}
+  .updated{color:#94a3b8;font-size:13px;margin-bottom:20px;}
+  h2{font-size:16px;margin:22px 0 8px;color:#111827;}
+  p,li{font-size:14px;color:#374151;}
+  ul{padding-left:18px;margin:6px 0;}
+  a.back{display:inline-block;margin-top:24px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;}
+  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}
+  th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top;}
+  th{background:#f8fafc;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>개인정보 처리방침</h1>
+  <div class="updated">시행일: 2026년 6월 14일</div>
+
+  <p>케어네비(이하 "서비스")는 「개인정보 보호법」을 준수하며, 이용자의 개인정보를 다음과 같이 처리합니다.</p>
+
+  <h2>1. 수집하는 개인정보 항목 및 목적</h2>
+  <p>서비스는 '의견보내기(오류제보)' 기능에서만 개인정보를 수집합니다.</p>
+  <ul>
+    <li>수집 항목: 작성자(이름 또는 소속), 회신연락처(이메일 또는 전화번호)</li>
+    <li>제목·문의내용은 자유입력 항목으로, 이용자가 입력할 경우 개인정보가 포함될 수 있습니다.</li>
+    <li>소속기관 구분(지자체/공단)은 통계 목적의 선택 항목으로 개인을 식별하지 않습니다.</li>
+    <li>이용 목적: 오류제보·의견 접수 및 회신</li>
+  </ul>
+
+  <h2>2. 통계 정보 (개인정보에 해당하지 않음)</h2>
+  <p>서비스는 운영 통계를 위해 아래 정보를 수집하나, IP·검색어 등 개인 식별정보는 수집하지 않아 특정 개인을 알아볼 수 없습니다.</p>
+  <ul>
+    <li>방문자수, 지역별 클릭수, 페이지별 조회수, AI 토큰 사용량, 접속환경(PC/모바일)</li>
+  </ul>
+
+  <h2>3. 처리위탁 및 국외이전</h2>
+  <p>서비스 운영을 위해 아래와 같이 개인정보 처리를 위탁하며, 일부는 국외에서 처리됩니다.</p>
+  <table>
+    <tr><th>수탁자</th><th>이전 국가</th><th>항목 · 목적</th><th>보유기간</th></tr>
+    <tr><td>Supabase</td><td>일본</td><td>의견 데이터 저장 · 보관</td><td>아래 4항과 동일</td></tr>
+    <tr><td>OpenAI</td><td>미국</td><td>AI 서비스 추천 및 이미지(OCR) 처리 — 입력 데이터는 저장되지 않음</td><td>미보관</td></tr>
+  </table>
+
+  <h2>4. 보유 및 이용기간</h2>
+  <p>수집된 의견 및 회신연락처는 접수일로부터 <b>1년</b> 보관 후 파기합니다.</p>
+
+  <h2>5. 정보주체의 권리</h2>
+  <p>이용자는 본인의 개인정보에 대한 열람 · 정정 · 삭제 · 처리정지를 요청할 수 있으며, 아래 연락처로 요청하실 수 있습니다.</p>
+
+  <h2>6. 개인정보 보호책임자</h2>
+  <p>이메일: nhis8584@nhis.or.kr</p>
+
+  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/privacy")
+def privacy():
+    return render_template_string(PRIVACY_HTML)
 
 @app.route("/board")
 def board():
@@ -6436,6 +6528,24 @@ def desc():
     do_search = (action == "search")
         
     if request.method == "POST" and do_search:
+        # 개인정보(전화·주민번호·이메일) 탐지 시 GPT로 전송하지 않고 차단 + 팝업
+        if _contains_pii(query):
+            return render_template_string(
+                DESC_HTML,
+                style=BASE_STYLE,
+                query=query,
+                results=results,
+                cond_display=cond_display,
+                count=0,
+                service_results=[],
+                warning_msg="",
+                selected_sido=selected_sido,
+                selected_sigungu=selected_sigungu,
+                sido_options=SIDO_OPTIONS,
+                sigungu_options=SIGUNGU_MAP.get(selected_sido, []),
+                pii_block=True
+            )
+
         now_time = time.time()
         last_search_time = session.get("desc_last_search_time", 0)
 
@@ -6657,7 +6767,6 @@ def desc():
             )
 
         client = OpenAI(api_key=api_key)
-
 
         prompt = f"""
 너는 통합돌봄 서비스 추천 전문가다.
@@ -9789,6 +9898,10 @@ transition:0.2s;
 {% if ns.direct_box_open %}
 </div>
 {% endif %}
+
+<div style="margin-top:18px;padding:12px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;font-size:12.5px;line-height:1.6;color:#64748b;text-align:center;">
+  본 추천 결과는 AI 기반 참고 자료이며, 최종 판단과 책임은 담당자의 전문적 판단에 따릅니다.
+</div>
 </div>
 
 {% endif %}
@@ -10268,7 +10381,13 @@ document.getElementById("imgInput").addEventListener("change", async function(){
 });
 
 if(searchForm){
-  searchForm.addEventListener("submit", function(){
+  searchForm.addEventListener("submit", function(e){
+    var qv = (document.getElementById("queryInput") || {}).value || "";
+    if(window.__hasPII && window.__hasPII(qv)){
+      if(e && e.preventDefault){ e.preventDefault(); }
+      if(typeof openPiiModal === "function"){ openPiiModal(); }
+      return false;
+    }
     if(descSubmitBtn){
       descSubmitBtn.disabled = true;
       descSubmitBtn.innerText = "검색 중...";
@@ -10389,8 +10508,45 @@ window.addEventListener("load", function(){
         </svg>
       </span>
 
-      <span class="privacy-warning-text"> 성명, 주민등록번호 등 개인정보를 입력하지 마세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
+      <span class="privacy-warning-text"> 성명, 주민등록번호 등 개인정보를 입력하지 마세요. <br>사진 촬영 시 서류의 개인정보 부분은 가린 후 촬영해 주세요. <br>개인정보 입력으로 인한 책임은 사용자에게 있습니다.</span>
     </div>
+
+<!-- ===== 개인정보 입력 차단 팝업 ===== -->
+<div id="piiModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closePiiModal()">
+  <div style="width:100%;max-width:360px;background:#fff;border-radius:18px;padding:26px 22px;text-align:center;box-shadow:0 20px 50px rgba(15,23,42,0.25);">
+    <div style="font-size:38px;line-height:1;margin-bottom:12px;">🔒</div>
+    <div style="font-size:18px;font-weight:800;color:#111827;margin-bottom:10px;">개인정보가 감지되었습니다</div>
+    <div style="font-size:14px;color:#4b5563;line-height:1.65;">전화번호 · 주민등록번호 · 이메일 등<br>개인정보가 포함되어 <b>검색이 차단</b>되었습니다.<br>해당 정보를 지우고 다시 검색해 주세요.</div>
+    <button type="button" onclick="closePiiModal()" style="margin-top:20px;width:100%;padding:13px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">확인</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var PII = [
+    /[\\w.+-]+@[\\w-]+\\.[\\w.-]+/,
+    /\\d{6}\\s*-\\s*\\d{7}/,
+    /01[016789][-\\s.]?\\d{3,4}[-\\s.]?\\d{4}/,
+    /\\d{2,3}[-\\s.]\\d{3,4}[-\\s.]\\d{4}/
+  ];
+  window.__hasPII = function(t){
+    if(!t) return false;
+    for(var i=0;i<PII.length;i++){ if(PII[i].test(t)) return true; }
+    return false;
+  };
+  window.openPiiModal = function(){
+    var m = document.getElementById("piiModal");
+    if(m){ m.style.display = "flex"; }
+  };
+  window.closePiiModal = function(){
+    var m = document.getElementById("piiModal");
+    if(m){ m.style.display = "none"; }
+  };
+})();
+{% if pii_block|default(false) %}
+window.addEventListener("DOMContentLoaded", function(){ if(window.openPiiModal) window.openPiiModal(); });
+{% endif %}
+</script>
 
 </body>
 </html>
