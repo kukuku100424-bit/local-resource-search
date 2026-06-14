@@ -2669,6 +2669,19 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   }
 }
 
+
+/* PC에서도 방문자수는 모바일처럼 우측 정렬 */
+@media (min-width:601px){
+  .visitor-left{
+    flex:1;
+    width:100%;
+  }
+  .visitor-left .visitor-box{
+    width:100%;
+    justify-content:flex-end;
+  }
+}
+
 /* 단일 의견보내기 버튼/알약 완전 폐지 */
 #singleReportBtn{ display:none !important; }
 
