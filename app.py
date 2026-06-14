@@ -5247,7 +5247,7 @@ PRIVACY_HTML = """
   <p>보유기간이 지난 개인정보는 복구할 수 없도록 삭제합니다. 전자파일은 재생할 수 없는 방법으로 삭제합니다.</p>
 
   <h2>6. 정보주체의 권리</h2>
-  <p>이용자는 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 아래 개인정보 보호책임자에게 연락해 주세요.</p>
+  <p>이용자는 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 아래 담당부서로 요청할 수 있습니다.</p>
 
   <h2>7. 안전성 확보조치</h2>
   <ul>
@@ -5260,8 +5260,8 @@ PRIVACY_HTML = """
   <h2>8. 자동화된 추천에 관한 안내</h2>
   <p>AI 추천 결과는 업무 참고용이며, 최종 판단과 안내는 담당자가 관련 지침과 현장 상황을 확인하여 결정해야 합니다.</p>
 
-  <h2>9. 개인정보 보호책임자</h2>
-  <p>국민건강보험공단 광주전라제주지역본부 정상수 과장<br>이메일: nhis8584@nhis.or.kr</p>
+  <h2>9. 개인정보 보호 담당부서</h2>
+  <p>국민건강보험공단 광주전라제주지역본부 통합돌봄지원부</p>
 
   <a class="back" href="javascript:history.back()">돌아가기</a>
 </div>
@@ -8820,9 +8820,6 @@ button:hover{
   overflow-wrap:break-word;
 }
 
-.privacy-warning-text .mobile-only{ display:none; }
-.privacy-warning-text .pc-only{ display:inline; }
-
 @media (min-width:481px){
   .privacy-warning{
     padding:28px 28px 18px;
@@ -8862,8 +8859,6 @@ button:hover{
     line-height:1.6;
     text-align:left;
   }
-  .privacy-warning-text .pc-only{ display:none; }
-  .privacy-warning-text .mobile-only{ display:inline; }
 }
 .siren-icon{
   width:54px;
@@ -10628,10 +10623,7 @@ window.addEventListener("load", function(){
         </svg>
       </span>
 
-      <span class="privacy-warning-text">
-        <span class="pc-only">성명, 주민등록번호, 연락처, 상세주소 등 개인정보는 입력하지 마시고,<br>사진 촬영 시 개인정보가 포함된 부분은 가리거나 제외하여 촬영해 주세요.<br>개인정보 입력 및 업로드로 인한 책임은 사용자에게 있습니다.</span>
-        <span class="mobile-only">성명, 주민등록번호, 연락처, 상세주소 등<br>개인정보는 입력하지 마시고,<br><br>사진 촬영 시 개인정보가 포함된 부분은<br>가리거나 제외하여 촬영해 주세요.<br><br>개인정보 입력 및 업로드로 인한 책임은<br>사용자에게 있습니다.</span>
-      </span>
+      <span class="privacy-warning-text">성명, 주민등록번호, 연락처, 상세주소 등 개인정보는 입력하지 마시고, 사진 촬영 시 개인정보가 포함된 부분은 가리거나 제외하여 촬영해 주세요. 개인정보 입력 및 업로드로 인한 책임은 사용자에게 있습니다.</span>
     </div>
 
 <!-- ===== 개인정보 입력 차단 팝업 ===== -->
