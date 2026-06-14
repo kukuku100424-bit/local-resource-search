@@ -8821,7 +8821,7 @@ button:hover{
 .privacy-warning-text{
   display:block;
   width:100%;
-  text-align:justify;
+  text-align:left;
   word-break:keep-all;
   overflow-wrap:break-word;
 }
@@ -10659,8 +10659,8 @@ window.addEventListener("load", function(){
       </span>
 
       <div class="privacy-warning-text">
-        <p class="pw-main">성명·주민번호·연락처·주소 등 개인정보는 입력하지 마세요. 사진은 개인정보가 보이지 않도록 가리거나 제외하고 촬영해 주세요.</p>
-        <p class="pw-sub">입력·업로드에 대한 책임은 사용자에게 있습니다.</p>
+        <p class="pw-main">성명·주민번호·연락처·주소 등 개인정보는 입력하지 마세요. 사진은 개인정보를 가리고 촬영해 주세요.</p>
+        <p class="pw-sub">입력·업로드 책임은 사용자에게 있습니다.</p>
       </div>
     </div>
 
