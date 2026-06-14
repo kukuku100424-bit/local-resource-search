@@ -2395,7 +2395,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 </div>
 
-<div style="text-align:center;padding:12px 0 2px;">
+<div style="text-align:right;padding:10px 14px 4px;">
   <a href="/privacy" style="font-size:11px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
 </div>
 
@@ -8746,16 +8746,16 @@ button:hover{
   font-weight:700;
   line-height:1.6;
   display:flex;
-  flex-direction:column;
-  align-items:center;
-  text-align:center;
-  gap:8px;
+  align-items:flex-start;
+  text-align:left;
+  gap:10px;
 }
 
 .privacy-warning .siren-icon{
-  width:30px;
-  height:31px;
-  flex:0 0 auto;
+  width:26px;
+  height:27px;
+  flex:0 0 26px;
+  margin-top:1px;
 }
 
 .privacy-warning-icon{
