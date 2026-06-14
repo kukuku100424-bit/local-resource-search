@@ -8830,6 +8830,7 @@ button:hover{
   margin:0;
   padding-left:0;
   text-indent:0;
+  text-wrap:balance;
 }
 
 .privacy-warning-text .pw-sub{
