@@ -8827,16 +8827,14 @@ button:hover{
   overflow-wrap:break-word;
 }
 
-.privacy-warning-text .pw-main{
+.privacy-warning-text p{
   margin:0;
+  padding-left:0;
+  text-indent:0;
 }
 
 .privacy-warning-text .pw-sub{
-  margin:8px 0 0 0;
-  font-size:0.9em;
-  font-weight:600;
-  color:#be123c;
-  opacity:0.9;
+  margin:6px 0 0 0;
 }
 
 @media (min-width:481px){
