@@ -1,4 +1,4 @@
-﻿from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session, send_file, Response
+from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session, send_file, Response
 import pandas as pd
 import os
 import re
@@ -17,6 +17,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
+from werkzeug.security import generate_password_hash, check_password_hash
 
 def make_cache_key(text):
     text = str(text or "")
@@ -219,10 +220,18 @@ def update_visitors():
     return total, today_count
 
 # 운영환경에서는 반드시 환경변수로 설정하세요.
-# Render 환경에서 값이 비어 있으면 로그인이 되지 않도록 기본값을 두지 않습니다.
+# Render 운영환경에서는 USER_PASSWORD_HASH, ADMIN_PASSWORD_HASH가 비어 있으면 로그인이 되지 않습니다.
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "local_dev_secret_key_change_me")
-USER_PASSWORD = os.getenv("USER_PASSWORD", "1234" if os.getenv("RENDER") is None else "")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "qwer" if os.getenv("RENDER") is None else "")
+USER_PASSWORD_HASH = os.getenv("USER_PASSWORD_HASH", "")
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
+
+# 로컬 테스트가 필요할 때만 .env에 LOCAL_DEV=1을 넣으세요.
+# - 사용자: 1234
+# - 관리자: qwer
+# 주의: Render에는 LOCAL_DEV를 절대 넣지 마세요.
+if os.getenv("LOCAL_DEV") == "1":
+    USER_PASSWORD_HASH = generate_password_hash("1234")
+    ADMIN_PASSWORD_HASH = generate_password_hash("qwer")
 
 @app.route("/favicon.ico")
 def favicon():
@@ -833,7 +842,7 @@ def login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if USER_PASSWORD and pw == USER_PASSWORD:
+        if USER_PASSWORD_HASH and check_password_hash(USER_PASSWORD_HASH, pw):
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
@@ -847,7 +856,7 @@ def admin_login():
     if request.method == "POST":
         pw = request.form.get("password", "")
 
-        if ADMIN_PASSWORD and pw == ADMIN_PASSWORD:
+        if ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH, pw):
             session["is_admin"] = True
             return redirect(url_for("stats"))
         else:
