@@ -8785,14 +8785,14 @@ button:hover{
 .privacy-warning{
   position:relative;
   margin:30px 0 0 0;
-  padding:26px 16px 14px;
+  padding:26px 18px 16px;
   border-radius:12px;
   background:#fff1f2;
   border:1px solid #fb7185;
   color:#9f1239;
   font-size:14px;
   font-weight:700;
-  line-height:1.6;
+  line-height:1.65;
   text-align:left;
 }
 
@@ -8827,44 +8827,29 @@ button:hover{
   overflow-wrap:break-word;
 }
 
+.privacy-warning-text .pw-main{
+  margin:0;
+}
+
+.privacy-warning-text .pw-sub{
+  margin:8px 0 0 0;
+  font-size:0.9em;
+  font-weight:600;
+  color:#be123c;
+  opacity:0.9;
+}
+
 @media (min-width:481px){
   .privacy-warning{
     padding:28px 28px 18px;
-    text-align:left;
   }
-  .privacy-warning-text{
-    text-align:left;
-    line-height:1.75;
-  }
-}
-
-.privacy-warning-icon{
-  flex:0 0 auto;
-  line-height:1.65;
-}
-
-.privacy-warning-text{
-  flex:1;
-  min-width:0;
-  word-break:keep-all;
-  overflow-wrap:break-word;
 }
 
 @media (max-width:480px){
   .privacy-warning{
     margin:28px 0 0 0;
-    padding:24px 14px 13px;
+    padding:24px 14px 14px;
     font-size:13px;
-    line-height:1.6;
-  }
-
-  .privacy-warning-icon{
-    line-height:1.6;
-  }
-
-  .privacy-warning-text{
-    line-height:1.6;
-    text-align:left;
   }
 }
 .siren-icon{
@@ -10630,7 +10615,10 @@ window.addEventListener("load", function(){
         </svg>
       </span>
 
-      <span class="privacy-warning-text">성명, 주민등록번호, 연락처, 상세주소 등 개인정보는 입력하지 마시고, 사진 촬영 시 개인정보가 포함된 부분은 가리거나 제외하여 촬영해 주세요.<br>개인정보 입력 및 업로드로 인한 책임은 사용자에게 있습니다.</span>
+      <div class="privacy-warning-text">
+        <p class="pw-main">성명·주민등록번호·연락처·상세주소 등 개인정보는 입력하지 마시고, 사진은 개인정보가 보이지 않도록 가리거나 제외하고 촬영해 주세요.</p>
+        <p class="pw-sub">입력·업로드에 대한 책임은 사용자에게 있습니다.</p>
+      </div>
     </div>
 
 <!-- ===== 개인정보 입력 차단 팝업 ===== -->
