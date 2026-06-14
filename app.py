@@ -2201,6 +2201,12 @@ body.app-mode .container{
   white-space:nowrap;
 }
 
+.copyright .visitor-box{
+  width:100%;
+  justify-content:flex-end;
+  margin-top:10px;
+}
+
 @media (max-width:480px){
   .bottom-footer{
     flex-direction:column-reverse;
@@ -2381,10 +2387,6 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
         </svg>
       </div>
     </div>
-    <div class="visitor-box">
-      <div>총 {{total}}</div>
-      <div>오늘 {{today}}</div>
-    </div>
   </div>
 
   <div class="copyright">
@@ -2394,6 +2396,10 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     </div>
     <div class="copyright-sub">
       통합돌봄부<span class="tf-label">(TF)</span> &amp; 연구반 <span class="brand">돌봄곳간</span>
+    </div>
+    <div class="visitor-box">
+      <div>총 {{total}}</div>
+      <div>오늘 {{today}}</div>
     </div>
   </div>
 
@@ -2669,18 +2675,6 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   }
 }
 
-
-/* PC에서도 방문자수는 모바일처럼 우측 정렬 */
-@media (min-width:601px){
-  .visitor-left{
-    flex:1;
-    width:100%;
-  }
-  .visitor-left .visitor-box{
-    width:100%;
-    justify-content:flex-end;
-  }
-}
 
 /* 단일 의견보내기 버튼/알약 완전 폐지 */
 #singleReportBtn{ display:none !important; }
