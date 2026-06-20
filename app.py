@@ -1072,115 +1072,9 @@ html,body{
 
 .btn-action:active{transform:scale(.98);}
 
-.btn-action.fab-on{background:#3b82f6;border-color:#3b82f6;color:#fff;box-shadow:0 4px 14px rgba(59,130,246,.28);}
+.btn-action.fab-on{background:#3b82f6;border-color:#3b82f6;color:#fff;}
 
-.facility-menu{
-
-  display:none;
-
-  margin-bottom:6px;
-
-  background:#eff6ff;
-
-  border:2px solid #3b82f6;
-
-  border-radius:14px;
-
-  padding:12px;
-
-  box-shadow:0 6px 18px rgba(37,99,235,.16);
-
-  animation:facilityDrop .22s ease-out;
-
-}
-
-.facility-menu-title{
-
-  font-size:14px;
-
-  font-weight:900;
-
-  color:#1e3a8a;
-
-  margin:0 0 4px 2px;
-
-}
-
-.facility-menu-sub{
-
-  font-size:11px;
-
-  font-weight:600;
-
-  color:#64748b;
-
-  margin:0 0 10px 2px;
-
-  line-height:1.35;
-
-}
-
-.facility-menu-grid{
-
-  display:grid;
-
-  grid-template-columns:1fr 1fr 1fr;
-
-  gap:7px;
-
-}
-
-.facility-choice-btn{
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  gap:6px;
-
-  height:42px;
-
-  border-radius:11px;
-
-  font-size:13px;
-
-  font-weight:800;
-
-  color:#334155;
-
-  background:#fff;
-
-  border:1.5px solid #bfdbfe;
-
-  cursor:pointer;
-
-  box-shadow:0 2px 8px rgba(15,23,42,.08);
-
-}
-
-.facility-choice-btn:active{transform:scale(.98);}
-
-.facility-choice-dot{
-
-  width:10px;
-
-  height:10px;
-
-  border-radius:50%;
-
-  flex-shrink:0;
-
-}
-
-@keyframes facilityDrop{
-
-  from{opacity:0;transform:translateY(-6px);}
-
-  to{opacity:1;transform:translateY(0);}
-
-}
+#facilityFabMenu.fab-dim{position:relative;z-index:30;box-shadow:0 0 0 100vmax rgba(15,23,42,0.5);}
 
 
 
@@ -1684,13 +1578,12 @@ html,body{
 
         </div>
 
-        <div id="facilityFabMenu" class="facility-menu">
-          <div class="facility-menu-title">📍 찾을 항목을 선택하세요</div>
-          <div class="facility-menu-sub">현재 위치 기준으로 가장 가까운 장소를 찾아줍니다.</div>
-          <div class="facility-menu-grid">
-            <button class="facility-choice-btn" onclick="findNearestFacility('공중화장실')"><span class="facility-choice-dot" style="background:#f59e0b;"></span>화장실</button>
-            <button class="facility-choice-btn" onclick="findNearestFacility('주차장')"><span class="facility-choice-dot" style="background:#8b5cf6;"></span>주차장</button>
-            <button class="facility-choice-btn" onclick="findNearestFacility('위험지역')"><span class="facility-choice-dot" style="background:#ef4444;"></span>위험지역</button>
+        <div id="facilityFabMenu" style="display:none;margin-bottom:6px;background:#f1f5f9;border:1px dashed #cbd5e1;border-radius:12px;padding:10px;">
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin:0 0 8px 2px;">📍 내 주변에서 찾기</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;">
+            <button onclick="findNearestFacility('공중화장실')" style="display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;font-size:13px;font-weight:700;color:#334155;background:#fff;border:1px solid #e2e8f0;cursor:pointer;"><span style="width:9px;height:9px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>화장실</button>
+            <button onclick="findNearestFacility('주차장')" style="display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;font-size:13px;font-weight:700;color:#334155;background:#fff;border:1px solid #e2e8f0;cursor:pointer;"><span style="width:9px;height:9px;border-radius:50%;background:#8b5cf6;flex-shrink:0;"></span>주차장</button>
+            <button onclick="findNearestFacility('위험지역')" style="display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:10px;font-size:13px;font-weight:700;color:#334155;background:#fff;border:1px solid #e2e8f0;cursor:pointer;"><span style="width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0;"></span>위험지역</button>
           </div>
         </div>
 
@@ -4392,18 +4285,14 @@ function toggleFacilityFab(){
   if(!m) return;
   const open = (m.style.display !== "block");
   m.style.display = open ? "block" : "none";
+  m.classList.toggle("fab-dim", open);
   const b = document.getElementById("facilityFabBtn");
   if(b) b.classList.toggle("fab-on", open);
-  if(open){
-    setTimeout(function(){
-      m.scrollIntoView({ behavior:"smooth", block:"center" });
-    }, 80);
-  }
 }
 
 function closeFacilityFab(){
   const m = document.getElementById("facilityFabMenu");
-  if(m) m.style.display = "none";
+  if(m){ m.style.display = "none"; m.classList.remove("fab-dim"); }
   const b = document.getElementById("facilityFabBtn");
   if(b) b.classList.remove("fab-on");
 }
