@@ -7633,7 +7633,7 @@ DESC_HTML = """
 
 .loading-ci{
   width:132px;
-  margin-top:22;
+  margin-top:28px;
   opacity:0.82;
   display:block;
 }
@@ -10154,15 +10154,6 @@ transition:0.2s;
   <div class="loading-step"></div>
 </div>
 
-<div class="ai-model-wrap" style="margin-top:28px;">
-  <div class="ai-model-badge">
-    <div class="ai-model-top">
-      <img src="/static/gpt.png" class="ai-logo">
-      <span class="ai-engine-text">검색엔진: GPT-4.1</span>
-    </div>
-  </div>
-</div>
-
 <img src="/static/ci.png" class="loading-ci">
   </div>
 
@@ -10712,8 +10703,9 @@ window.addEventListener("load", function(){
 </script>
 
   <div class="tip-notice">
-    <p>※ 입력한 사례와 유사한 <b class="highlight">통합돌봄 서비스를 최대 30가지</b> 추천합니다.</p>
-    <p>※ 통합판정조사, 지자체 조사의 <b class="highlight">참고사항 전문</b>을 모두 입력해도 <b class="highlight">AI가 추천서비스를 안내</b>합니다.</p>
+    <p>※ 입력한 사례와 유사한 <b class="highlight">통합돌봄 서비스를 최대 30가지</b> 추천합니다. (최대 2,000자)</p>
+    <p>※ <b class="highlight">AI 기반 추천 서비스</b>로, 같은 사례라도 추천 결과가 달라질 수 있습니다.</p>
+    <p>※ <b class="highlight">지역 설정 시</b> 해당 지역 자원의 서비스 분류를, 미설정 시 전체 분류를 추천합니다.</p>
 
     <div class="privacy-warning">
       <span class="privacy-warning-icon siren-icon" aria-hidden="true">
