@@ -12546,8 +12546,8 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
   flex:0 0 auto !important;
 }
   .etc-input{ width:56px !important; font-size:11px; }
-  .adl-table thead tr th:nth-child(n+5),.adl-table tbody tr td:nth-child(n+5){ display:none; }
-  .adl-table thead tr th:first-child{ width:50%; }
+  .adl-table thead tr th:nth-child(2),.adl-table thead tr th:nth-child(3),.adl-table thead tr th:nth-child(4),.adl-table thead tr th:nth-child(6),.adl-table thead tr th:nth-child(7),.adl-table thead tr th:nth-child(8){ width:32px; word-break:break-all; }
+  .adl-table tbody tr td:nth-child(5){ text-align:left; }
   .th-internet-pc{ display:none !important; }
   .th-internet-mo{ display:block !important; font-size:10px; }
   span.th-internet-mo{ display:inline !important; }
