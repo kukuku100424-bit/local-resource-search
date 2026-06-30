@@ -7078,6 +7078,14 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     reason = reason.replace(term + ", ", "").replace(", " + term, "").replace(term, "")
                 item["선택이유"] = reason
 
+            # 방문구강관리 하드 가드: 입력에 구강·치아 단서가 없으면 강제 제거 (GPT 오추천 차단)
+            ORAL_CLUES = ["구강", "입안", "입속", "칫솔질", "양치", "잇몸", "치아", "치주",
+                          "입냄새", "구취", "백태", "구내염", "입마름", "구강건조", "틀니"]
+            _q_oral = query.replace(" ", "")
+            if not any(c in _q_oral for c in ORAL_CLUES):
+                final_results = [it for it in final_results
+                                 if "구강" not in str(it.get("중분류", ""))]
+
             final_results.sort(
                 key=lambda x: (
                     0 if x.get("direct_need") else 1,
