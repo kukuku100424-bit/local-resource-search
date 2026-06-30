@@ -10703,7 +10703,7 @@ window.addEventListener("load", function(){
 </script>
 
   <div class="tip-notice">
-    <p>※ 입력한 사례와 유사한 <b class="highlight">통합돌봄 서비스를 최대 30가지</b> 추천합니다. (최대 2,000자)</p>
+    <p>※ 입력한 사례와 유사한 <b class="highlight">통합돌봄 서비스를 최대 30가지</b> 추천합니다.(최대 2,000자)</p>
     <p>※ <b class="highlight">AI 기반 추천 서비스</b>로, 같은 사례라도 추천 결과가 달라질 수 있습니다.</p>
     <p>※ <b class="highlight">지역 설정 시</b> 해당 지역 자원의 서비스 분류를, 미설정 시 전체 분류를 추천합니다.</p>
 
