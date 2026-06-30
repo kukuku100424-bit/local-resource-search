@@ -7834,9 +7834,9 @@ DESC_HTML = """
 
   .desc-top-bar .home-button,
   .desc-top-bar .reset-button{
-    height:34px !important;
-    padding:0 13px !important;
-    font-size:13px !important;
+    height:30px !important;
+    padding:0 10px !important;
+    font-size:11.5px !important;
   }
 }
 
