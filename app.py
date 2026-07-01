@@ -56,6 +56,58 @@ SUPABASE_HEADERS = {
     "Content-Type": "application/json"
 }
 
+# =========================
+# 점검 모드 (서버 점검 시 전체 이용자 접근 차단)
+# - Supabase에 상태 저장 → 재배포/재시작 후에도 유지됨
+# - 관리자(is_admin)는 점검 중에도 전체 페이지 접근 가능 (테스트용)
+# - 매 요청마다 DB 조회하지 않도록 짧은 캐시(_MAINT_TTL초) 사용
+# =========================
+import time as _maint_time
+
+_MAINT_CACHE = {"data": {"on": False, "message": "", "resume_at": ""}, "ts": 0}
+_MAINT_TTL = 5  # 초
+
+def _load_maintenance_state():
+    now = _maint_time.time()
+    if now - _MAINT_CACHE["ts"] < _MAINT_TTL:
+        return _MAINT_CACHE["data"]
+
+    if os.getenv("RENDER") is not None:
+        try:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?select=*&id=eq.1",
+                headers=SUPABASE_HEADERS,
+                timeout=3
+            )
+            rows = res.json() if res.ok else []
+            if rows:
+                row = rows[0]
+                _MAINT_CACHE["data"] = {
+                    "on": bool(row.get("is_on")),
+                    "message": row.get("message") or "",
+                    "resume_at": row.get("resume_at") or "",
+                }
+        except Exception:
+            pass
+
+    _MAINT_CACHE["ts"] = now
+    return _MAINT_CACHE["data"]
+
+def _save_maintenance_state(on, message, resume_at):
+    _MAINT_CACHE["data"] = {"on": on, "message": message, "resume_at": resume_at}
+    _MAINT_CACHE["ts"] = _maint_time.time()
+
+    if os.getenv("RENDER") is not None:
+        try:
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?id=eq.1",
+                headers=SUPABASE_HEADERS,
+                json={"is_on": on, "message": message, "resume_at": resume_at},
+                timeout=3
+            )
+        except Exception:
+            pass
+
 # === GPT 토큰 단가/환율 (변동 시 여기만 수정) ===
 GPT_PRICE_INPUT_USD = 0.40    # 입력 100만 토큰당 USD (gpt-4.1-mini)
 GPT_PRICE_OUTPUT_USD = 1.60   # 출력 100만 토큰당 USD (gpt-4.1-mini)
@@ -252,6 +304,22 @@ logging.getLogger('flask.app').setLevel(logging.ERROR)
 
 @app.before_request
 def require_login_all_pages():
+    # ---- 점검 모드: 관리자 관련 경로/정적 파일 제외 전체 차단 ----
+    maint = _load_maintenance_state()
+    if maint["on"]:
+        if not (
+            request.path.startswith("/admin")
+            or request.path.startswith("/static")
+            or request.path == "/favicon.ico"
+            or request.path == "/app-version.json"
+            or session.get("is_admin")
+        ):
+            return render_template_string(
+                MAINTENANCE_HTML,
+                message=maint["message"],
+                resume_at=maint["resume_at"],
+            ), 503
+
     if (
         request.path == "/"
         or request.path == "/login"
@@ -262,6 +330,10 @@ def require_login_all_pages():
     ):
         return None
 
+    if request.path.startswith("/admin/maintenance"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
     if request.path.startswith("/stats"):
         if not session.get("is_admin"):
             return redirect(url_for("admin_login"))
@@ -969,6 +1041,204 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 </body>
 </html>
 """
+
+# =========================
+# 점검 모드 안내 페이지
+# =========================
+MAINTENANCE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서버 점검 중입니다</title>
+<style>
+body{
+  margin:0;
+  min-height:100vh;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  color:#111827;
+}
+.box{
+  width:100%;
+  max-width:460px;
+  background:white;
+  border-radius:18px;
+  padding:32px 24px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.08);
+  text-align:center;
+}
+.icon{ font-size:40px; margin-bottom:12px; }
+.title{ font-size:20px; font-weight:800; margin-bottom:12px; }
+.msg{
+  font-size:14px;
+  line-height:1.7;
+  color:#4b5563;
+  word-break:keep-all;
+  white-space:pre-line;
+  margin-bottom:14px;
+}
+.resume{
+  font-size:13px;
+  color:#2563eb;
+  font-weight:700;
+  background:#eff6ff;
+  border-radius:10px;
+  padding:10px 12px;
+  margin-bottom:16px;
+}
+.admin-link{
+  display:inline-block;
+  margin-top:6px;
+  font-size:12px;
+  color:#9ca3af;
+  text-decoration:none;
+}
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">🛠️</div>
+    <div class="title">서버 점검 중입니다</div>
+    <div class="msg">{{ message if message else "더 나은 서비스 제공을 위해 시스템 점검을 진행하고 있습니다.\\n잠시 후 다시 이용해 주세요." }}</div>
+    {% if resume_at %}
+      <div class="resume">예상 재개 시간: {{ resume_at }}</div>
+    {% endif %}
+    <a href="/admin" class="admin-link">관리자 로그인</a>
+  </div>
+</body>
+</html>
+"""
+
+# =========================
+# 점검 모드 관리자 패널
+# =========================
+MAINTENANCE_ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>점검 모드 관리</title>
+<style>
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:'Pretendard',sans-serif;
+  background:#e8ecf4;
+  color:#1f2937;
+  display:flex;
+  justify-content:center;
+  padding:40px 16px;
+}
+.box{
+  width:100%;
+  max-width:460px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:22px;
+  padding:28px 24px;
+  box-shadow:0 16px 38px rgba(15,23,42,0.12);
+}
+h1{ font-size:19px; font-weight:800; margin:0 0 6px 0; }
+.status{
+  display:inline-block;
+  font-size:13px;
+  font-weight:700;
+  padding:4px 10px;
+  border-radius:999px;
+  margin-bottom:20px;
+}
+.on{ background:#fee2e2; color:#dc2626; }
+.off{ background:#dcfce7; color:#16a34a; }
+label{ font-size:13px; font-weight:600; color:#374151; display:block; margin:14px 0 6px; }
+textarea, input[type=text]{
+  width:100%;
+  border:1px solid #d1d5db;
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:14px;
+  font-family:inherit;
+  resize:vertical;
+}
+textarea{ min-height:80px; }
+.btn-row{ display:flex; gap:8px; margin-top:20px; }
+button{
+  flex:1;
+  height:48px;
+  border:none;
+  border-radius:12px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+}
+.btn-on{ background:linear-gradient(135deg,#ef4444,#b91c1c); color:#fff; }
+.btn-off{ background:linear-gradient(135deg,#334155,#0f172a); color:#fff; }
+.back-link{
+  display:inline-block;
+  margin-top:16px;
+  font-size:13px;
+  color:#6b7280;
+  text-decoration:none;
+}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>점검 모드 관리</h1>
+  <span class="status {{ 'on' if mode.on else 'off' }}">{{ '점검 중 (사용자 접근 차단됨)' if mode.on else '정상 운영 중' }}</span>
+
+  <form method="post" action="/admin/maintenance/on">
+    <label>점검 안내 문구 (선택)</label>
+    <textarea name="message" placeholder="예: 서버 데이터 정비 작업 중입니다.">{{ mode.message }}</textarea>
+    <label>예상 재개 시간 (선택)</label>
+    <input type="text" name="resume_at" placeholder="예: 오늘 밤 11시" value="{{ mode.resume_at }}">
+    <div class="btn-row">
+      <button type="submit" class="btn-on">점검 모드 켜기</button>
+    </div>
+  </form>
+
+  <form method="post" action="/admin/maintenance/off">
+    <div class="btn-row">
+      <button type="submit" class="btn-off">점검 모드 끄기</button>
+    </div>
+  </form>
+
+  <a href="/stats" class="back-link">통계 페이지로 돌아가기</a>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/admin/maintenance", methods=["GET"])
+def maintenance_panel():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    maint = _load_maintenance_state()
+    return render_template_string(MAINTENANCE_ADMIN_HTML, mode=maint)
+
+@app.route("/admin/maintenance/on", methods=["POST"])
+def maintenance_on():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    message = request.form.get("message", "").strip()
+    resume_at = request.form.get("resume_at", "").strip()
+    _save_maintenance_state(True, message, resume_at)
+    return redirect(url_for("maintenance_panel"))
+
+@app.route("/admin/maintenance/off", methods=["POST"])
+def maintenance_off():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    maint = _load_maintenance_state()
+    _save_maintenance_state(False, maint["message"], maint["resume_at"])
+    return redirect(url_for("maintenance_panel"))
 
 @app.errorhandler(404)
 def handle_404(e):
@@ -3735,6 +4005,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <div class="top-right-menu">
       <a href="/board/admin" class="home-button">의견확인</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
+      <a href="/admin/maintenance" class="home-button">점검모드</a>
       <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀 다운로드</a>
     </div>
   </div>
