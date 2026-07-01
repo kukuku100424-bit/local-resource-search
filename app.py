@@ -1056,6 +1056,7 @@ MAINTENANCE_HTML = """
 body{
   margin:0;
   min-height:100vh;
+  min-height:100dvh;
   background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   display:flex;
