@@ -3707,6 +3707,15 @@ body{
   background:#f3f4f6 !important;
   color:#374151 !important;
 }
+.maint-btn{
+  background:#fee2e2 !important;
+  border:1px solid #fecaca !important;
+  color:#dc2626 !important;
+}
+.maint-btn:hover{
+  background:#fecaca !important;
+  color:#b91c1c !important;
+}
 .card{
   background:#ffffff;
   border-radius:16px;
@@ -4005,8 +4014,8 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <div class="top-right-menu">
       <a href="/board/admin" class="home-button">의견확인</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
-      <a href="/admin/maintenance" class="home-button">점검모드</a>
-      <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀 다운로드</a>
+      <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀받기</a>
+      <a href="/admin/maintenance" class="home-button maint-btn">점검모드</a>
     </div>
   </div>
 
