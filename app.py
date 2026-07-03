@@ -1545,13 +1545,13 @@ def normalize_sido(text):
     )
 
     mapping = {
-        "광주": "광주광역시",
-        "광주시": "광주광역시",
-        "광주 광역시": "광주광역시",
-        "광주광역시": "광주광역시",
-
-        "전남": "전라남도",
-        "전라남도": "전라남도",
+        "광주": "전남광주통합특별시",
+        "광주시": "전남광주통합특별시",
+        "광주 광역시": "전남광주통합특별시",
+        "광주광역시": "전남광주통합특별시",
+        "전남": "전남광주통합특별시",
+        "전라남도": "전남광주통합특별시",
+        "전남광주통합특별시": "전남광주통합특별시",
 
         "전북": "전북특별자치도",
         "전라북도": "전북특별자치도",
@@ -1612,30 +1612,58 @@ def normalize_sigungu(text):
     return mapping.get(t, t)
 
 
-SIGUNGU_MAP = {
-    "광주광역시": ["동구", "서구", "남구", "북구", "광산구"],
+SIDO_PRIORITY_ORDER = ["전남광주통합특별시", "전북특별자치도", "제주특별자치도"]
 
-    "전라남도": [
-        "강진군", "고흥군", "곡성군", "광양시", "구례군",
-        "나주시", "담양군", "목포시", "무안군",
-        "보성군", "순천시", "신안군",
-        "여수시", "영광군", "영암군", "완도군",
-        "장성군", "장흥군", "진도군",
-        "함평군", "해남군", "화순군"
-    ],
-
-    "전북특별자치도": [
-        "고창군", "군산시", "김제시", "남원시",
-        "무주군", "부안군",
-        "순창군",
-        "완주군", "익산시", "임실군",
-        "장수군", "전주시", "정읍시", "진안군"
-    ],
-
-    "제주특별자치도": ["제주시", "서귀포시"]
+SIGUNGU_PRIORITY = {
+    "전남광주통합특별시": ["광주동구", "광주서구", "광주남구", "광주북구", "광주광산구"],
+    "전북특별자치도": ["전주시 덕진구", "전주시 완산구"],
+    "제주특별자치도": ["제주시", "서귀포시"],
 }
 
-SIDO_OPTIONS = ["광주광역시", "전라남도", "전북특별자치도", "제주특별자치도"]
+
+def _order_sigungu(sido_val, values):
+    priority = SIGUNGU_PRIORITY.get(sido_val, [])
+    ordered = [v for v in priority if v in values]
+    ordered += sorted(v for v in values if v not in priority)
+    return ordered
+
+
+def _build_region_options():
+    """실제 엑셀의 시도/시군구 컬럼 값에서만 옵션을 생성 (하드코딩·기본값 없음).
+    엑셀에 값이 없으면 드롭박스도 비게 되고, 이는 엑셀 데이터 오류를 바로 알아챌 수 있게 하기 위한 의도."""
+    sido_col = find_col("시도", "시도명", "광역시도")
+    sigungu_col = find_col("시군구")
+
+    if not sido_col:
+        return [], {}
+
+    sido_series = df[sido_col].fillna("").astype(str).apply(normalize_sido).str.strip()
+
+    if sigungu_col:
+        sigungu_series = df[sigungu_col].fillna("").astype(str).apply(normalize_sigungu).str.strip()
+    else:
+        sigungu_series = pd.Series([""] * len(df))
+
+    grouped = {}
+    for sido_val, sigungu_val in zip(sido_series, sigungu_series):
+        if not sido_val:
+            continue
+        grouped.setdefault(sido_val, set())
+        if sigungu_val:
+            grouped[sido_val].add(sigungu_val)
+
+    ordered_sido = [s for s in SIDO_PRIORITY_ORDER if s in grouped]
+    ordered_sido += sorted(s for s in grouped if s not in SIDO_PRIORITY_ORDER)
+
+    sigungu_map = {
+        sido_val: _order_sigungu(sido_val, vals)
+        for sido_val, vals in grouped.items()
+    }
+
+    return ordered_sido, sigungu_map
+
+
+SIDO_OPTIONS, SIGUNGU_MAP = _build_region_options()
 SIGUNGU_OPTIONS = sorted(set(
     normalize_sigungu(v) for v in sorted_unique_values("시군구") if str(v).strip()
 ))
@@ -4410,9 +4438,9 @@ def stats():
         ]
 
         daily_regions = [
-            {"datetime": "2026-06-04 14:32:10", "sido": "광주광역시", "sigungu": "북구", "search_type": "조건기반"},
-            {"datetime": "2026-06-04 11:05:47", "sido": "전라남도", "sigungu": "나주시", "search_type": "사례기반"},
-            {"datetime": "2026-06-05 09:18:22", "sido": "광주광역시", "sigungu": "서구", "search_type": "조건기반"}
+            {"datetime": "2026-06-04 14:32:10", "sido": "전남광주통합특별시", "sigungu": "북구", "search_type": "조건기반"},
+            {"datetime": "2026-06-04 11:05:47", "sido": "전남광주통합특별시", "sigungu": "나주시", "search_type": "사례기반"},
+            {"datetime": "2026-06-05 09:18:22", "sido": "전남광주통합특별시", "sigungu": "서구", "search_type": "조건기반"}
         ]
 
         pv_total, pv_today = 173, 41
@@ -4613,9 +4641,9 @@ def export_stats_regions():
 
     if os.getenv("RENDER") is None:
         daily_regions = [
-            {"날짜": "2026-04-18", "시도": "광주광역시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
-            {"날짜": "2026-04-18", "시도": "전라남도", "시군구": "나주시", "검색구분": "사례기반", "클릭수": 2},
-            {"날짜": "2026-04-19", "시도": "광주광역시", "시군구": "서구", "검색구분": "조건기반", "클릭수": 1}
+            {"날짜": "2026-04-18", "시도": "전남광주통합특별시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
+            {"날짜": "2026-04-18", "시도": "전남광주통합특별시", "시군구": "나주시", "검색구분": "사례기반", "클릭수": 2},
+            {"날짜": "2026-04-19", "시도": "전남광주통합특별시", "시군구": "서구", "검색구분": "조건기반", "클릭수": 1}
         ]
     else:
         region_res = requests.get(
@@ -4679,7 +4707,7 @@ def export_stats_all(fname=None):
             {"날짜": "2026-06-05", "방문자수": 5},
         ]
         daily_regions = [
-            {"날짜": "2026-06-04", "시도": "광주광역시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
+            {"날짜": "2026-06-04", "시도": "전남광주통합특별시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
         ]
         pv_total, pv_today = 173, 41
         daily_pv = [{"date": "2026-06-05", "count": 41}]
@@ -5953,6 +5981,26 @@ def pv_guide():
         except Exception:
             pass
     return ("", 204)
+_GWANGJU_GU_RE = re.compile(r"^(광주)?(동구|서구|남구|북구|광산구)")
+
+
+def to_map_search_address(addr: str) -> str:
+    """지도(구글맵) 검색용 주소 변환.
+    2026-07-01 전남광주통합특별시 출범 직후라 구글/카카오맵이 아직 새 행정구역명을
+    인식하지 못해, 지도 검색을 보낼 때만 옛 행정구역명(광주광역시/전라남도)으로
+    바꿔서 보낸다. 화면에 표시되는 기관주소 텍스트 자체는 건드리지 않는다."""
+    addr = str(addr or "").strip()
+    prefix = "전남광주통합특별시"
+
+    if not addr.startswith(prefix):
+        return addr
+
+    rest = addr[len(prefix):].strip()
+    old_sido = "광주광역시" if _GWANGJU_GU_RE.match(rest) else "전라남도"
+
+    return f"{old_sido} {rest}".strip()
+
+
 # =========================
 # 상세 API (팝업에서 사용)
 # =========================
@@ -5981,6 +6029,7 @@ def detail(idx):
         "서비스제공기관명": org_name,
         "기관연락처": str(r.get("기관연락처", "")),
         "기관주소": str(r.get("기관주소", "")),
+        "기관주소_지도용": to_map_search_address(r.get("기관주소", "")),
         "기타": "",
         "서비스단가": service_price,
         "주요내용": service_content,
@@ -6453,7 +6502,7 @@ function openDetail(idx){
       contentRow.style.display = content ? "flex" : "none";
       targetRow.style.display = target ? "flex" : "none";
 
-      const addr = (d["기관주소"] || "").trim();
+      const addr = (d["기관주소_지도용"] || d["기관주소"] || "").trim();
       const mapFrame = document.getElementById("m_map");
 
       if(addr){
@@ -6982,6 +7031,7 @@ def desc():
                     warning_msg=warning_msg,
                     selected_sido=selected_sido,
                     selected_sigungu=selected_sigungu,
+                    sido_options=SIDO_OPTIONS,
                     sigungu_options=SIGUNGU_OPTIONS
                 )
             else:
@@ -7163,6 +7213,7 @@ def desc():
                 warning_msg=warning_msg,
                 selected_sido=selected_sido,
                 selected_sigungu=selected_sigungu,
+                sido_options=SIDO_OPTIONS,
                 sigungu_options=SIGUNGU_OPTIONS
             )
 
@@ -7870,6 +7921,7 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
         warning_msg=warning_msg,
         selected_sido=selected_sido,
         selected_sigungu=selected_sigungu,
+        sido_options=SIDO_OPTIONS,
         sigungu_options=sigungu_options
     )
 
@@ -10195,10 +10247,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <label>시도</label>
       <select name="sido" onchange="handleDescSidoChange(this.form)">
         <option value="">전체</option>
-        <option value="광주광역시" {% if selected_sido=="광주광역시" %}selected{% endif %}>광주광역시</option>
-        <option value="전라남도" {% if selected_sido=="전라남도" %}selected{% endif %}>전라남도</option>
-        <option value="전북특별자치도" {% if selected_sido=="전북특별자치도" %}selected{% endif %}>전북특별자치도</option>
-        <option value="제주특별자치도" {% if selected_sido=="제주특별자치도" %}selected{% endif %}>제주특별자치도</option>
+        {% for s in sido_options %}
+        <option value="{{s}}" {% if s==selected_sido %}selected{% endif %}>{{s}}</option>
+        {% endfor %}
       </select>
     </div>
 
@@ -11722,7 +11773,8 @@ def make_no_result_response(query, results, cond_display, count, service_results
              grouped_service_results=build_grouped_service_results(service_results),
         warning_msg=warning_msg,
         found_sido=found_sido,
-        found_sigungu=found_sigungu
+        found_sigungu=found_sigungu,
+        sido_options=SIDO_OPTIONS
     )
 
 
@@ -11734,62 +11786,63 @@ def extract_region_from_query(query: str):
     found_sigungu = ""
 
     sido_alias_map = {
-        "전라남도": "전라남도",
-        "전남": "전라남도",
+        "전남광주통합특별시": "전남광주통합특별시",
+        "전라남도": "전남광주통합특별시",
+        "전남": "전남광주통합특별시",
+        "광주광역시": "전남광주통합특별시",
+        "광주": "전남광주통합특별시",
         "전라북도": "전라북도",
         "전북": "전라북도",
-        "광주광역시": "광주광역시",
-        "광주": "광주광역시",
         "제주특별자치도": "제주특별자치도",
         "제주도": "제주특별자치도",
         "제주": "제주특별자치도"
     }
 
     sigungu_alias_map = {
-        "목포시": ("전라남도", "목포시"),
-        "목포": ("전라남도", "목포시"),
-        "여수시": ("전라남도", "여수시"),
-        "여수": ("전라남도", "여수시"),
-        "순천시": ("전라남도", "순천시"),
-        "순천": ("전라남도", "순천시"),
-        "나주시": ("전라남도", "나주시"),
-        "나주": ("전라남도", "나주시"),
-        "광양시": ("전라남도", "광양시"),
-        "광양": ("전라남도", "광양시"),
-        "담양군": ("전라남도", "담양군"),
-        "담양": ("전라남도", "담양군"),
-        "곡성군": ("전라남도", "곡성군"),
-        "곡성": ("전라남도", "곡성군"),
-        "구례군": ("전라남도", "구례군"),
-        "구례": ("전라남도", "구례군"),
-        "고흥군": ("전라남도", "고흥군"),
-        "고흥": ("전라남도", "고흥군"),
-        "보성군": ("전라남도", "보성군"),
-        "보성": ("전라남도", "보성군"),
-        "화순군": ("전라남도", "화순군"),
-        "화순": ("전라남도", "화순군"),
-        "장흥군": ("전라남도", "장흥군"),
-        "장흥": ("전라남도", "장흥군"),
-        "강진군": ("전라남도", "강진군"),
-        "강진": ("전라남도", "강진군"),
-        "해남군": ("전라남도", "해남군"),
-        "해남": ("전라남도", "해남군"),
-        "영암군": ("전라남도", "영암군"),
-        "영암": ("전라남도", "영암군"),
-        "무안군": ("전라남도", "무안군"),
-        "무안": ("전라남도", "무안군"),
-        "함평군": ("전라남도", "함평군"),
-        "함평": ("전라남도", "함평군"),
-        "영광군": ("전라남도", "영광군"),
-        "영광": ("전라남도", "영광군"),
-        "장성군": ("전라남도", "장성군"),
-        "장성": ("전라남도", "장성군"),
-        "완도군": ("전라남도", "완도군"),
-        "완도": ("전라남도", "완도군"),
-        "진도군": ("전라남도", "진도군"),
-        "진도": ("전라남도", "진도군"),
-        "신안군": ("전라남도", "신안군"),
-        "신안": ("전라남도", "신안군"),
+        "목포시": ("전남광주통합특별시", "목포시"),
+        "목포": ("전남광주통합특별시", "목포시"),
+        "여수시": ("전남광주통합특별시", "여수시"),
+        "여수": ("전남광주통합특별시", "여수시"),
+        "순천시": ("전남광주통합특별시", "순천시"),
+        "순천": ("전남광주통합특별시", "순천시"),
+        "나주시": ("전남광주통합특별시", "나주시"),
+        "나주": ("전남광주통합특별시", "나주시"),
+        "광양시": ("전남광주통합특별시", "광양시"),
+        "광양": ("전남광주통합특별시", "광양시"),
+        "담양군": ("전남광주통합특별시", "담양군"),
+        "담양": ("전남광주통합특별시", "담양군"),
+        "곡성군": ("전남광주통합특별시", "곡성군"),
+        "곡성": ("전남광주통합특별시", "곡성군"),
+        "구례군": ("전남광주통합특별시", "구례군"),
+        "구례": ("전남광주통합특별시", "구례군"),
+        "고흥군": ("전남광주통합특별시", "고흥군"),
+        "고흥": ("전남광주통합특별시", "고흥군"),
+        "보성군": ("전남광주통합특별시", "보성군"),
+        "보성": ("전남광주통합특별시", "보성군"),
+        "화순군": ("전남광주통합특별시", "화순군"),
+        "화순": ("전남광주통합특별시", "화순군"),
+        "장흥군": ("전남광주통합특별시", "장흥군"),
+        "장흥": ("전남광주통합특별시", "장흥군"),
+        "강진군": ("전남광주통합특별시", "강진군"),
+        "강진": ("전남광주통합특별시", "강진군"),
+        "해남군": ("전남광주통합특별시", "해남군"),
+        "해남": ("전남광주통합특별시", "해남군"),
+        "영암군": ("전남광주통합특별시", "영암군"),
+        "영암": ("전남광주통합특별시", "영암군"),
+        "무안군": ("전남광주통합특별시", "무안군"),
+        "무안": ("전남광주통합특별시", "무안군"),
+        "함평군": ("전남광주통합특별시", "함평군"),
+        "함평": ("전남광주통합특별시", "함평군"),
+        "영광군": ("전남광주통합특별시", "영광군"),
+        "영광": ("전남광주통합특별시", "영광군"),
+        "장성군": ("전남광주통합특별시", "장성군"),
+        "장성": ("전남광주통합특별시", "장성군"),
+        "완도군": ("전남광주통합특별시", "완도군"),
+        "완도": ("전남광주통합특별시", "완도군"),
+        "진도군": ("전남광주통합특별시", "진도군"),
+        "진도": ("전남광주통합특별시", "진도군"),
+        "신안군": ("전남광주통합특별시", "신안군"),
+        "신안": ("전남광주통합특별시", "신안군"),
 
         "전주시": ("전라북도", "전주시"),
         "전주": ("전라북도", "전주시"),
@@ -11822,20 +11875,20 @@ def extract_region_from_query(query: str):
         "부안군": ("전라북도", "부안군"),
         "부안": ("전라북도", "부안군"),
 
-        "동구": ("광주광역시", "동구"),
-        "서구": ("광주광역시", "서구"),
-        "남구": ("광주광역시", "남구"),
-        "북구": ("광주광역시", "북구"),
-        "광산구": ("광주광역시", "광산구"),
-        "광산": ("광주광역시", "광산구"),
-        "광주동구": ("광주광역시", "동구"),
-        "광주서구": ("광주광역시", "서구"),
-        "광주남구": ("광주광역시", "남구"),
-        "광주북구": ("광주광역시", "북구"),
-        "광주광역시동구": ("광주광역시", "동구"),
-        "광주광역시서구": ("광주광역시", "서구"),
-        "광주광역시남구": ("광주광역시", "남구"),
-        "광주광역시북구": ("광주광역시", "북구"),
+        "동구": ("전남광주통합특별시", "동구"),
+        "서구": ("전남광주통합특별시", "서구"),
+        "남구": ("전남광주통합특별시", "남구"),
+        "북구": ("전남광주통합특별시", "북구"),
+        "광산구": ("전남광주통합특별시", "광산구"),
+        "광산": ("전남광주통합특별시", "광산구"),
+        "광주동구": ("전남광주통합특별시", "동구"),
+        "광주서구": ("전남광주통합특별시", "서구"),
+        "광주남구": ("전남광주통합특별시", "남구"),
+        "광주북구": ("전남광주통합특별시", "북구"),
+        "광주광역시동구": ("전남광주통합특별시", "동구"),
+        "광주광역시서구": ("전남광주통합특별시", "서구"),
+        "광주광역시남구": ("전남광주통합특별시", "남구"),
+        "광주광역시북구": ("전남광주통합특별시", "북구"),
 
         "제주시": ("제주특별자치도", "제주시"),
         "제주시청": ("제주특별자치도", "제주시"),
