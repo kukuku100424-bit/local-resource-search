@@ -5979,7 +5979,7 @@ def notice_admin_edit(notice_id):
 def guide():
     return redirect("/static/guide.pdf")
 
-@app.route("/pv/guide")
+@app.route("/pv/guide", methods=["GET", "POST"])
 def pv_guide():
     # 사용설명서 모달(openGuide)에서 호출 → 페이지뷰로 적재
     if os.getenv("RENDER") is not None and (session.get("logged_in") or session.get("is_admin")):
