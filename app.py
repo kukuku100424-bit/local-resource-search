@@ -289,6 +289,11 @@ if os.getenv("LOCAL_DEV") == "1":
 def favicon():
     return "", 204
 
+@app.errorhandler(405)
+def method_not_allowed(e):
+    app.logger.error(f"405 - {request.method} {request.path} - UA: {request.headers.get('User-Agent')}")
+    return e, 405
+
 import logging
 
 # =========================
@@ -4309,6 +4314,8 @@ def _kst_datetime_str(s):
     except Exception:
         return str(s)[:19].replace("T", " ")
 
+app.jinja_env.filters['kst'] = _kst_datetime_str
+
 import re as _re_pii
 _PII_PATTERNS = [
     r'[\w.+-]+@[\w-]+\.[\w.-]+',              # 이메일
@@ -5049,7 +5056,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <a href="/board/view/{{ post['id'] }}" class="board-card">
         <div class="board-title">{{ post["title"] }}</div>
         <div class="board-meta">
-          {{ post["created_at"][:19].replace("T", " ") }}
+          {{ post["created_at"] | kst }}
           · 작성자: {{ post["writer"] or "미입력" }}
         </div>
       </a>
@@ -5373,7 +5380,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   <div class="card">
     <div class="title">{{ post["title"] }}</div>
     <div class="meta">
-      {{ post["created_at"][:19].replace("T", " ") }}
+      {{ post["created_at"] | kst }}
       · 작성자: {{ post["writer"] or "미입력" }}
     </div>
     <div class="content">{{ post["content"] }}</div>
@@ -5497,7 +5504,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     {% for post in posts %}
     <div class="card" onclick="location.href='/board/admin/view/{{ post['id'] }}'">
       <div class="meta">
-        {{ post["created_at"][:19].replace("T", " ") }}
+        {{ post["created_at"] | kst }}
         · 작성자: {{ post["writer"] or "미입력" }}
         {% if post.get("org_type") %} · 소속: {{ post["org_type"] }}{% endif %}
         {% if post.get("reply_contact") %}<br>회신연락처: {{ post["reply_contact"] }}{% endif %}
