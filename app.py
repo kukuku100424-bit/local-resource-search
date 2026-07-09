@@ -47,116 +47,206 @@ from io import BytesIO
 
 
 def update_visitors():
-    """방문자수 집계. IP는 절대 수집하지 않고, 개별 방문 시각(타임스탬프)도 저장하지 않는다.
-    같은 브라우저(세션) 안에서는 1시간에 1번만 카운트하고, 그 외엔 '날짜별 합계' 숫자만 +1 한다."""
+
+
 
     if not SUPABASE_URL or not SUPABASE_KEY:
+
+        print("Supabase 환경변수 없음")
+
         return {
+
             "total": 0,
+
             "today_count": 0
+
         }
 
+
+
     try:
+
         headers = {
+
             "apikey": SUPABASE_KEY,
+
             "Authorization": f"Bearer {SUPABASE_KEY}",
+
             "Content-Type": "application/json",
+
             "Prefer": "return=representation"
+
         }
+
+
 
         url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1"
 
+
+
         r = requests.get(url, headers=headers)
 
+        print("Supabase visit_stats 조회 상태:", r.status_code, r.text)
+
+
+
         if r.status_code >= 400:
+
             return {
+
                 "total": 0,
+
                 "today_count": 0
+
             }
+
+
 
         rows = r.json()
 
+
+
         if not rows or not isinstance(rows, list):
+
             return {
+
                 "total": 0,
+
                 "today_count": 0
+
             }
+
+
 
         row = rows[0]
 
+
+
         total = int(row.get("total_count", 0))
+
         today = str(row.get("today_date", datetime.now(KST).date()))
+
         today_count = int(row.get("today_count", 0))
 
+
+
         now_time = time.time()
+
         last_counted_at = session.get("last_visit_counted_at", 0)
 
-        # 같은 브라우저(세션) 안에서 1시간 이내 재방문이면 카운트 증가 안 함
+
+
+        # 같은 브라우저에서 1시간 안에 다시 접속하면 카운트 증가 안 함
+
         if last_counted_at and now_time - float(last_counted_at) < 3600:
+
+            print("1시간 이내 재방문: 방문자 수 증가 안 함")
+
             return {
+
                 "total": total,
+
                 "today_count": today_count
+
             }
+
+
 
         now_day = str(datetime.now(KST).date())
 
+
+
         total += 1
 
+
+
         if today == now_day:
+
             today_count += 1
+
         else:
+
             today = now_day
+
             today_count = 1
 
+
+
         update_data = {
+
             "total_count": total,
+
             "today_date": today,
+
             "today_count": today_count,
+
             "updated_at": datetime.now(KST).isoformat()
+
         }
 
-        requests.patch(
+
+
+        r2 = requests.patch(
+
             url,
+
             headers=headers,
+
             json=update_data
+
         )
 
-        # 일자별 방문자수 집계용 — 개별 시각/IP는 저장하지 않고, 오늘 날짜의 합계 숫자만 +1
-        try:
-            dc_select_url = f"{SUPABASE_URL}/rest/v1/visit_daily_counts?visit_date=eq.{now_day}&select=count"
-            dc_res = requests.get(dc_select_url, headers=headers, timeout=5)
-            dc_rows = dc_res.json() if dc_res.ok else []
 
-            if dc_rows:
-                cur = int(dc_rows[0].get("count", 0) or 0)
-                requests.patch(
-                    f"{SUPABASE_URL}/rest/v1/visit_daily_counts?visit_date=eq.{now_day}",
-                    headers=headers,
-                    json={"count": cur + 1},
-                    timeout=5
-                )
-            else:
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/visit_daily_counts",
-                    headers=headers,
-                    json={"visit_date": now_day, "count": 1},
-                    timeout=5
-                )
-        except Exception:
-            pass
+
+        print("Supabase visit_stats 업데이트 상태:", r2.status_code, r2.text)
+
+
+
+        r3 = requests.post(
+
+            f"{SUPABASE_URL}/rest/v1/visit_logs",
+
+            headers=headers,
+
+            json={
+
+                "created_at": datetime.now(KST).isoformat(),
+                "ip": request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+            }
+
+        )
+
+
+
+        print("Supabase visit_logs 저장 상태:", r3.status_code, r3.text)
+
+
 
         session["last_visit_counted_at"] = now_time
 
+
+
         return {
+
             "total": total,
+
             "today_count": today_count
+
         }
 
+
+
     except Exception as e:
+
         print("방문자 Supabase 처리 오류:", e)
+
         return {
+
             "total": 0,
+
             "today_count": 0
+
         }
 
 
@@ -214,6 +304,10 @@ def save_search_log(data):
             json=payload
 
         )
+
+
+
+        print("Supabase search_logs 저장 완료")
 
 
 
@@ -8366,6 +8460,8 @@ def post_rating():
 
         return jsonify({"ok": False})
 
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+
     try:
 
         headers = {
@@ -8724,6 +8820,8 @@ def stats():
             headers=headers
         )
 
+        print("Supabase 관리자페이지 조회 상태:", res.status_code, res.text)
+
         if res.status_code >= 400:
             return f"""
             <h2>조회 통계 오류</h2>
@@ -8864,10 +8962,10 @@ def stats():
             total_visit_count = 0
             today_visit_count = 0
 
-        # 일자별 방문자수 (visit_daily_counts — 개별 시각/IP 없이 날짜별 합계만 저장됨)
+        # 일자별 방문자수 (visit_logs)
         try:
             vl_res = requests.get(
-                f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc&limit=10000",
+                f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at&order=created_at.desc&limit=10000",
                 headers=headers
             )
             if vl_res.status_code >= 400:
@@ -8878,9 +8976,16 @@ def stats():
                     visit_daily_df = pd.DataFrame(columns=["날짜", "방문수"])
                 else:
                     vldf = pd.DataFrame(vl_logs)
-                    visit_daily_df = vldf.rename(columns={"visit_date": "날짜", "count": "방문수"})[["날짜", "방문수"]]
+                    if "created_at" not in vldf.columns:
+                        visit_daily_df = pd.DataFrame(columns=["날짜", "방문수"])
+                    else:
+                        dt_utc = pd.to_datetime(vldf["created_at"], errors="coerce", utc=True)
+                        vldf["day"] = dt_utc.dt.tz_convert(KST).dt.strftime("%Y-%m-%d")
+                        vldf["day"] = vldf["day"].fillna("날짜없음")
+                        visit_daily_df = vldf.groupby("day", dropna=False).size().reset_index(name="방문수")
+                        visit_daily_df.columns = ["날짜", "방문수"]
         except Exception as e:
-            print("visit_daily_counts 조회 실패:", e)
+            print("visit_logs 조회 실패:", e)
             visit_daily_df = pd.DataFrame(columns=["날짜", "방문수"])
 
         def _daily_chart_json(df, value_cols, limit_days=10):
@@ -9474,7 +9579,7 @@ def stats_excel():
 
 
 
-        for col in ["created_at", "province", "city", "town", "categories", "result_count"]:
+        for col in ["created_at", "province", "city", "town", "categories", "result_count", "ip"]:
 
             if col not in df.columns:
 
