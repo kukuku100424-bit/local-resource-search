@@ -383,14 +383,32 @@ def _pv_insert(path):
         pass
 
 def _visit_log_insert():
-    """일자별 방문자수 집계용. 실제 IP 등 개인정보는 저장하지 않고(ip는 빈값) 방문 시각(created_at 기본값)만 적재."""
+    """일자별 방문자수 집계용. 개별 방문 시각(타임스탬프)은 전혀 저장하지 않고,
+    '오늘 날짜'의 합계 카운트만 +1 한다 (visit_stats/env_stats와 동일한 방식)."""
     try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/visit_logs",
+        today = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?visit_date=eq.{today}&select=count",
             headers=SUPABASE_HEADERS,
-            json={"ip": ""},
             timeout=5
         )
+        rows = res.json() if res.ok else []
+
+        if rows:
+            cur = int(rows[0].get("count", 0) or 0)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/visit_daily_counts?visit_date=eq.{today}",
+                headers=SUPABASE_HEADERS,
+                json={"count": cur + 1},
+                timeout=5
+            )
+        else:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/visit_daily_counts",
+                headers=SUPABASE_HEADERS,
+                json={"visit_date": today, "count": 1},
+                timeout=5
+            )
     except Exception:
         pass
 
@@ -4482,24 +4500,19 @@ def stats():
         today_count = int(stats_row.get("today_count", 0))
 
         visit_res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
             headers=SUPABASE_HEADERS
         )
         visit_rows = visit_res.json() if visit_res.ok else []
 
-        daily_visit_map = defaultdict(int)
-        for row in visit_rows:
-            created_at = str(row.get("created_at", ""))
-            if created_at:
-                date_str = _kst_date_str(created_at)
-                daily_visit_map[date_str] += 1
-
         daily_visits = []
-        for date_str in sorted(daily_visit_map.keys(), reverse=True):
-            daily_visits.append({
-                "date": date_str,
-                "count": daily_visit_map[date_str]
-            })
+        for row in visit_rows:
+            date_str = str(row.get("visit_date", ""))
+            if date_str:
+                daily_visits.append({
+                    "date": date_str,
+                    "count": int(row.get("count", 0) or 0)
+                })
 
         region_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
@@ -4609,24 +4622,19 @@ def export_stats_visits():
         ]
     else:
         visit_res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
             headers=SUPABASE_HEADERS
         )
         visit_rows = visit_res.json() if visit_res.ok else []
 
-        daily_visit_map = defaultdict(int)
-        for row in visit_rows:
-            created_at = str(row.get("created_at", ""))
-            if created_at:
-                date_str = _kst_date_str(created_at)
-                daily_visit_map[date_str] += 1
-
         daily_visits = []
-        for date_str in sorted(daily_visit_map.keys(), reverse=True):
-            daily_visits.append({
-                "날짜": date_str,
-                "방문자수": daily_visit_map[date_str]
-            })
+        for row in visit_rows:
+            date_str = str(row.get("visit_date", ""))
+            if date_str:
+                daily_visits.append({
+                    "날짜": date_str,
+                    "방문자수": int(row.get("count", 0) or 0)
+                })
 
     df_export = pd.DataFrame(daily_visits)
 
@@ -4730,16 +4738,14 @@ def export_stats_all(fname=None):
         today_count = int(stats_row.get("today_count", 0))
 
         visit_res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at,ip&order=created_at.desc",
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
             headers=SUPABASE_HEADERS
         )
         visit_rows = visit_res.json() if visit_res.ok else []
-        dvm = defaultdict(int)
-        for row in visit_rows:
-            ca = str(row.get("created_at", ""))
-            if ca:
-                dvm[_kst_date_str(ca)] += 1
-        daily_visits = [{"날짜": d, "방문자수": dvm[d]} for d in sorted(dvm.keys(), reverse=True)]
+        daily_visits = [
+            {"날짜": str(row.get("visit_date", "")), "방문자수": int(row.get("count", 0) or 0)}
+            for row in visit_rows if row.get("visit_date")
+        ]
 
         region_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
