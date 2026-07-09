@@ -231,17 +231,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "safe-map-secret-key")
 
 Compress(app)
 
-# =========================
-# 운영 로그 최소화
-# - Render/Gunicorn/Flask 기본 요청 로그(접속 IP 포함)를 최대한 차단
-# =========================
-import logging
-logging.getLogger('werkzeug').disabled = True
-logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
-logging.getLogger('gunicorn.access').disabled = True
-logging.getLogger('gunicorn.access').setLevel(logging.CRITICAL)
-logging.getLogger('flask.app').setLevel(logging.ERROR)
-
 
 
 
