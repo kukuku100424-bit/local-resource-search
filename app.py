@@ -1,11662 +1,14474 @@
-from flask import Flask, request, jsonify, render_template_string, Response, send_file, session
-
+from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session, send_file, Response
 import pandas as pd
-
-from flask_compress import Compress
-
 import os
-
 import re
-
-import time
-
-import threading
-
-import requests
-
-try:
-
-    from dotenv import load_dotenv
-
-    load_dotenv()
-
-except ImportError:
-
-    pass
-
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-
-import webbrowser
-
-from urllib.parse import quote
-
 import json
-
-from datetime import date, datetime
-
-from zoneinfo import ZoneInfo
-
-KST = ZoneInfo("Asia/Seoul")
-
+import time
 from io import BytesIO
-
-
-
-
-
-def update_visitors():
-
-
-
-    if not SUPABASE_URL or not SUPABASE_KEY:
-
-        print("Supabase 환경변수 없음")
-
-        return {
-
-            "total": 0,
-
-            "today_count": 0
-
-        }
-
-
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json",
-
-            "Prefer": "return=representation"
-
-        }
-
-
-
-        url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1"
-
-
-
-        r = requests.get(url, headers=headers)
-
-        print("Supabase visit_stats 조회 상태:", r.status_code, r.text)
-
-
-
-        if r.status_code >= 400:
-
-            return {
-
-                "total": 0,
-
-                "today_count": 0
-
-            }
-
-
-
-        rows = r.json()
-
-
-
-        if not rows or not isinstance(rows, list):
-
-            return {
-
-                "total": 0,
-
-                "today_count": 0
-
-            }
-
-
-
-        row = rows[0]
-
-
-
-        total = int(row.get("total_count", 0))
-
-        today = str(row.get("today_date", datetime.now(KST).date()))
-
-        today_count = int(row.get("today_count", 0))
-
-
-
-        now_time = time.time()
-
-        last_counted_at = session.get("last_visit_counted_at", 0)
-
-
-
-        # 같은 브라우저에서 1시간 안에 다시 접속하면 카운트 증가 안 함
-
-        if last_counted_at and now_time - float(last_counted_at) < 3600:
-
-            print("1시간 이내 재방문: 방문자 수 증가 안 함")
-
-            return {
-
-                "total": total,
-
-                "today_count": today_count
-
-            }
-
-
-
-        now_day = str(datetime.now(KST).date())
-
-
-
-        total += 1
-
-
-
-        if today == now_day:
-
-            today_count += 1
-
-        else:
-
-            today = now_day
-
-            today_count = 1
-
-
-
-        update_data = {
-
-            "total_count": total,
-
-            "today_date": today,
-
-            "today_count": today_count,
-
-            "updated_at": datetime.now(KST).isoformat()
-
-        }
-
-
-
-        r2 = requests.patch(
-
-            url,
-
-            headers=headers,
-
-            json=update_data
-
-        )
-
-
-
-        print("Supabase visit_stats 업데이트 상태:", r2.status_code, r2.text)
-
-
-
-        r3 = requests.post(
-
-            f"{SUPABASE_URL}/rest/v1/visit_logs",
-
-            headers=headers,
-
-            json={
-
-                "created_at": datetime.now(KST).isoformat(),
-                "ip": request.headers.get("X-Forwarded-For", request.remote_addr or "")
-
-            }
-
-        )
-
-
-
-        print("Supabase visit_logs 저장 상태:", r3.status_code, r3.text)
-
-
-
-        session["last_visit_counted_at"] = now_time
-
-
-
-        return {
-
-            "total": total,
-
-            "today_count": today_count
-
-        }
-
-
-
-    except Exception as e:
-
-        print("방문자 Supabase 처리 오류:", e)
-
-        return {
-
-            "total": 0,
-
-            "today_count": 0
-
-        }
-
-
-
-
-
-def save_search_log(data):
-
-
-
-    if not SUPABASE_URL or not SUPABASE_KEY:
-
-        print("Supabase 환경변수 없음")
-
-        return
-
-
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json",
-
-            "Prefer": "return=representation"
-
-        }
-
-
-
-        payload = {
-
-            "province": data.get("province", ""),
-
-            "city": data.get("city", ""),
-
-            "categories": data.get("categories", []),
-
-            "result_count": data.get("result_count", 0)
-
-        }
-
-
-
-        r = requests.post(
-
-            f"{SUPABASE_URL}/rest/v1/search_logs",
-
-            headers=headers,
-
-            json=payload
-
-        )
-
-
-
-        print("Supabase search_logs 저장 완료")
-
-
-
-    except Exception as e:
-
-        print("검색로그 Supabase 처리 오류:", e)
-
-
-
+from collections import defaultdict
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from openai import OpenAI
+import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders
+from werkzeug.security import generate_password_hash, check_password_hash
+
+def make_cache_key(text):
+    text = str(text or "")
+    text = text.strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
+def compress_text(s, max_len=60):
+    s = str(s).strip()
+    if len(s) <= max_len:
+        return s
+
+    half = max_len // 2
+    return s[:half] + " … " + s[-half:]
 
 
 app = Flask(__name__)
+DESC_CACHE = {}
 
-app.secret_key = os.environ.get("SECRET_KEY", "safe-map-secret-key")
+def trim_desc_cache(max_size=100):
+    """DESC_CACHE가 max_size 초과 시 오래된 항목부터 제거"""
+    if len(DESC_CACHE) > max_size:
+        sorted_keys = sorted(DESC_CACHE, key=lambda k: DESC_CACHE[k].get("time", 0))
+        for k in sorted_keys[:len(DESC_CACHE) - max_size]:
+            del DESC_CACHE[k]
 
-Compress(app)
+import datetime
+from zoneinfo import ZoneInfo
 
+                           
+SUPABASE_URL = "https://iiktpwqncvwvrzytfssb.supabase.co"
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-
-
-
-app.json.ensure_ascii = False
-
-
-
-KAKAO_KEY = os.environ.get("KAKAO_KEY")
-
-KAKAO_JS_KEY = os.environ.get("KAKAO_JS_KEY", os.environ.get("KAKAO_KEY", ""))
-
-
-
-@app.route("/search_place")
-
-def search_place():
-
-
-
-    query = request.args.get("q","")
-
-
-
-    url = "https://dapi.kakao.com/v2/local/search/keyword.json"
-
-
-
-    headers = {
-
-        "Authorization": f"KakaoAK {KAKAO_KEY}"
-
-    }
-
-
-
-    params = {
-
-        "query": query
-
-    }
-
-
-
-    r = requests.get(url, headers=headers, params=params)
-
-
-
-    return jsonify(r.json())
-
-
-
-app.config["JSON_AS_ASCII"] = False
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-FILE_PATH = "mapdata_geocoded.xlsx"
-
-# 항목별 엑셀(공중화장실.xlsx 등)을 각각 읽어 합친다. mapdata 폴더 우선, 없으면 앱 루트.
-
-DATA_DIR = os.path.join(BASE_DIR, "mapdata") if os.path.isdir(os.path.join(BASE_DIR, "mapdata")) else BASE_DIR
-
-SPLIT_FILES = ["공중화장실.xlsx", "상습결빙지역.xlsx", "교통사고위험지역.xlsx", "주차장.xlsx", "자동심장충격기.xlsx"]
-
-DATA_CACHE = None
-
-
-
-
-
-TYPE_COLORS = {
-
-    "상습결빙지역": "#06b6d4",
-
-    "공중화장실": "#f59e0b",
-
-    "교통사고위험지역": "#ef4444",   # 추가
-
-    "공영주차장": "#8b5cf6",
-
-    "민영주차장": "#8b5cf6",
-
-    "자동심장충격기": "#16a34a"
-
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json"
 }
 
-
-
-DEFAULT_CENTER = [34.85, 126.90]
-
-DEFAULT_ZOOM = 9
-
-
-
-
-
-def safe_str(v):
-
-    if pd.isna(v):
-
-        return ""
-
-    return str(v).strip()
-
-
-
-
-
-def extract_town_from_address(address):
-
-    addr = safe_str(address)
-
-    if not addr:
-
-        return "읍면동없음"
-
-
-
-    # 읍/면/동/가/리 추출
-
-    found = re.findall(r'([가-힣0-9]+(?:읍|면|동))', addr)
-
-    if found:
-
-        for token in reversed(found):
-
-            if token.endswith(("읍", "면", "동")):
-
-                return token
-
-
-
-    return "읍면동없음"
-
-
-
-
-
-def sample_desc(category, city, town, address):
-
-
-
-    if category == "상습결빙지역":
-
-        return f"{city} {town} 일대는 겨울철 노면 결빙 위험이 높은 구간입니다."
-
-
-
-    if category == "공중화장실":
-
-        return f"{city} {town} 인근 공중화장실 위치입니다."
-
-
-
-    if category == "교통사고위험지역":
-
-        return f"{city} {town} 일대는 교통사고 발생률이 높은 구간입니다."
-
-    if category in ("공영주차장", "민영주차장"):
-
-        return f"{city} {town} 인근 {category} 위치입니다."
-
-
-
-    return f"{city} {town} 위치 정보입니다."
-
-
-
-def sample_date(category):
-
-
-
-    m = {
-
-        "상습결빙지역": "2025-12-28",
-
-        "공중화장실": "2025-01-01",
-
-        "교통사고위험지역": "2025-01-01",   # 추가
-
-        "공영주차장": "2025-01-01",
-
-        "민영주차장": "2025-01-01"
-
-    }
-
-
-
-    return m.get(category, "2025-01-01")
-
- 
-
-
-
-def build_photo_url(row):
-
-
-
-    category = safe_str(row["구분"])
-
-
-
-    if category == "공중화장실":
-
-        return "/photo/111"
-
-
-
-    if category == "상습결빙지역":
-
-        return "/photo/222"
-
-
-
-    if category == "교통사고위험지역":
-
-        return "/photo/333"
-
-
-
-    return "/photo/111"
-
-
-
-def load_df():
-
-
-
-    global DATA_CACHE
-
-
-
-    if DATA_CACHE is not None:
-
-        return DATA_CACHE
-
-
-
-    frames = []
-
-    for _fn in SPLIT_FILES:
-
-        _fp = os.path.join(DATA_DIR, _fn)
-
-        if os.path.exists(_fp):
-
-            frames.append(pd.read_excel(_fp))
-
-    if frames:
-
-        df = pd.concat(frames, ignore_index=True)
-
-    elif os.path.exists(FILE_PATH):
-
-        df = pd.read_excel(FILE_PATH)
-
+# =========================
+# 점검 모드 (서버 점검 시 전체 이용자 접근 차단)
+# - Supabase에 상태 저장 → 재배포/재시작 후에도 유지됨
+# - 관리자(is_admin)는 점검 중에도 전체 페이지 접근 가능 (테스트용)
+# - 매 요청마다 DB 조회하지 않도록 짧은 캐시(_MAINT_TTL초) 사용
+# =========================
+import time as _maint_time
+
+_MAINT_CACHE = {"data": {"on": False, "message": "", "resume_at": ""}, "ts": 0}
+_MAINT_TTL = 5  # 초
+
+def _load_maintenance_state():
+    now = _maint_time.time()
+    if now - _MAINT_CACHE["ts"] < _MAINT_TTL:
+        return _MAINT_CACHE["data"]
+
+    if os.getenv("RENDER") is not None:
+        try:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?select=*&id=eq.1",
+                headers=SUPABASE_HEADERS,
+                timeout=3
+            )
+            rows = res.json() if res.ok else []
+            if rows:
+                row = rows[0]
+                _MAINT_CACHE["data"] = {
+                    "on": bool(row.get("is_on")),
+                    "message": row.get("message") or "",
+                    "resume_at": row.get("resume_at") or "",
+                }
+        except Exception:
+            pass
+
+    _MAINT_CACHE["ts"] = now
+    return _MAINT_CACHE["data"]
+
+def _save_maintenance_state(on, message, resume_at):
+    _MAINT_CACHE["data"] = {"on": on, "message": message, "resume_at": resume_at}
+    _MAINT_CACHE["ts"] = _maint_time.time()
+
+    if os.getenv("RENDER") is not None:
+        try:
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?id=eq.1",
+                headers=SUPABASE_HEADERS,
+                json={"is_on": on, "message": message, "resume_at": resume_at},
+                timeout=3
+            )
+        except Exception:
+            pass
+
+# === GPT 토큰 단가/환율 (변동 시 여기만 수정) ===
+GPT_PRICE_INPUT_USD = 0.40    # 입력 100만 토큰당 USD (gpt-4.1-mini)
+GPT_PRICE_OUTPUT_USD = 1.60   # 출력 100만 토큰당 USD (gpt-4.1-mini)
+USD_TO_KRW = 1500             # 환율(원/$), 현재 약 1,540원
+
+def add_token_usage(input_tokens, output_tokens):
+    """GPT 호출 토큰을 날짜별로 Supabase token_usage 테이블에 누적 (best-effort)."""
+    if os.getenv("RENDER") is None:
+        return
+    try:
+        input_tokens = int(input_tokens or 0)
+        output_tokens = int(output_tokens or 0)
+        if input_tokens <= 0 and output_tokens <= 0:
+            return
+        today = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/token_usage?usage_date=eq.{today}&select=input_tokens,output_tokens",
+            headers=SUPABASE_HEADERS, timeout=8
+        )
+        rows = r.json() if r.ok else []
+        if rows:
+            cur_in = int(rows[0].get("input_tokens", 0) or 0)
+            cur_out = int(rows[0].get("output_tokens", 0) or 0)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/token_usage?usage_date=eq.{today}",
+                headers=SUPABASE_HEADERS,
+                json={"input_tokens": cur_in + input_tokens, "output_tokens": cur_out + output_tokens},
+                timeout=8
+            )
+        else:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/token_usage",
+                headers=SUPABASE_HEADERS,
+                json={"usage_date": today, "input_tokens": input_tokens, "output_tokens": output_tokens},
+                timeout=8
+            )
+    except Exception as e:
+        app.logger.exception(e)
+
+
+def classify_client_env():
+    """User-Agent 원문은 저장하지 않고 접속 환경만 4개 범주로 분류."""
+    ua = (request.headers.get("User-Agent", "") or "").lower()
+
+    if "iphone" in ua or "ipad" in ua or "ipod" in ua:
+        return "iOS"
+    if "android" in ua:
+        return "Android"
+    if "mobile" in ua:
+        return "Other"
+    return "PC"
+
+
+def add_env_usage():
+    """총 방문자수 기준 접속 환경 집계. User-Agent 원문/IP/검색어는 저장하지 않음."""
+    if os.getenv("RENDER") is None:
+        return
+
+    try:
+        env = classify_client_env()
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/env_stats?env=eq.{env}&select=count",
+            headers=SUPABASE_HEADERS,
+            timeout=5
+        )
+        rows = res.json() if res.ok else []
+
+        if rows:
+            cur = int(rows[0].get("count", 0) or 0)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/env_stats?env=eq.{env}",
+                headers=SUPABASE_HEADERS,
+                json={"count": cur + 1},
+                timeout=5
+            )
+        else:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/env_stats",
+                headers=SUPABASE_HEADERS,
+                json={"env": env, "count": 1},
+                timeout=5
+            )
+    except Exception:
+        pass
+
+def update_visitors():
+    now = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
+
+    # 🔥 로컬 테스트용
+    if os.getenv("RENDER") is None:
+        return 100, 5
+
+    # 같은 브라우저에서 1시간 이내 재방문이면 카운트 안 함
+    last_visit_str = session.get("last_visit_time", "")
+    if last_visit_str:
+        try:
+            last_visit = datetime.datetime.fromisoformat(last_visit_str)
+            if (now - last_visit).total_seconds() < 3600:
+                select_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*"
+                res = requests.get(select_url, headers=SUPABASE_HEADERS)
+                rows = res.json()
+
+                if rows:
+                    data = rows[0]
+                    return int(data.get("total_count", 0)), int(data.get("today_count", 0))
+                else:
+                    return 0, 0
+        except:
+            pass
+
+    today = now.strftime("%Y-%m-%d")
+
+    select_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*"
+    res = requests.get(select_url, headers=SUPABASE_HEADERS)
+    rows = res.json()
+
+    if not rows:
+        total = 1
+        today_count = 1
+
+        insert_url = f"{SUPABASE_URL}/rest/v1/visit_stats"
+        requests.post(
+            insert_url,
+            headers={**SUPABASE_HEADERS, "Prefer": "return=representation"},
+            json={
+                "id": 1,
+                "total_count": total,
+                "today_date": today,
+                "today_count": today_count
+            }
+        )
     else:
-
-        raise FileNotFoundError("지도 데이터 엑셀이 없습니다. (항목별 .xlsx 또는 mapdata_geocoded.xlsx)")
-
-    
-
-    required = ["순번", "구분", "시도", "시군구", "주소", "위도", "경도"]
-
-    for col in required:
-
-        if col not in df.columns:
-
-            raise ValueError(f"엑셀에 '{col}' 열이 없습니다.")
-
-
-
-    if "시도" not in df.columns:
-
-        df["시도"] = ""
-
-
-
-    if "읍면동" not in df.columns:
-
-        df["읍면동"] = df["주소"].apply(extract_town_from_address)
-
-
-
-    if "사고설명" not in df.columns:
-
-        df["사고설명"] = ""
-
-
-
-    if "날짜" not in df.columns:
-
-        df["날짜"] = ""
-
-
-
-    if "사진URL" not in df.columns:
-
-        df["사진URL"] = ""
-
-
-
-    for col in ["구분", "시도", "시군구", "주소", "읍면동", "사고설명", "날짜", "사진URL"]:
-
-        df[col] = df[col].apply(safe_str)
-
-    df["구분"] = df["구분"].str.strip()
-
-
-
-    df["위도"] = pd.to_numeric(df["위도"], errors="coerce")
-
-    df["경도"] = pd.to_numeric(df["경도"], errors="coerce")
-
-
-
-    # 좌표 없는 건 자동 제외
-
-    df = df[df["위도"].notna() & df["경도"].notna()].copy()
-
-    # 항목별 파일을 합치면 순번이 겹치므로 전체 다시 매김 (고유 id 보장)
-
-    df = df.reset_index(drop=True)
-
-    df["순번"] = range(1, len(df) + 1)
-
-    DATA_CACHE = df
-
-    return DATA_CACHE
-
-
-
-
-
-def row_to_dict(row):
-
-    category = safe_str(row["구분"])
-
-    province = safe_str(row["시도"])
-
-    city = safe_str(row["시군구"])
-
-    town = safe_str(row["읍면동"])
-
-    address = safe_str(row["주소"])
-
-
-
-    desc = safe_str(row.get("사고설명", ""))
-
-    if not desc:
-
-        desc = sample_desc(category, city, town, address)
-
-
-
-    date_value = safe_str(row.get("날짜", ""))
-
-    if not date_value:
-
-        date_value = sample_date(category)
-
-
-
-    return {
-
-        "시도": province,
-
-        "순번": safe_str(row["순번"]),
-
-        "구분": category,
-
-        "시군구": city,
-
-        "읍면동": town,
-
-        "주소": address,
-
-        "위도": float(row["위도"]),
-
-        "경도": float(row["경도"]),
-
-        "사고설명": desc,
-
-        "날짜": date_value,
-
-        "사진URL": build_photo_url(row),
-
-        "마커색상": TYPE_COLORS.get(category, "#334155"),
-
+        data = rows[0]
+        total = int(data.get("total_count", 0)) + 1
+
+        if data.get("today_date") == today:
+            today_count = int(data.get("today_count", 0)) + 1
+        else:
+            today_count = 1
+
+        patch_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1"
+        requests.patch(
+            patch_url,
+            headers=SUPABASE_HEADERS,
+            json={
+                "total_count": total,
+                "today_date": today,
+                "today_count": today_count
+            }
+        )
+
+    # 접속 환경 집계 — User-Agent 원문은 저장하지 않고 PC/Android/iOS/기타 카운트만 누적
+    add_env_usage()
+
+    # 방문 로그 저장 — 일자별 방문자수 집계용 (IP 미수집, 방문 시각만)
+    # (총/오늘 방문자 수는 visit_stats 카운터로 계속 집계됨)
+    _pv_threading.Thread(target=_visit_log_insert, daemon=True).start()
+
+    # 마지막 방문 시각 저장
+    session["last_visit_time"] = now.isoformat()
+
+    return total, today_count
+
+# 운영환경에서는 반드시 환경변수로 설정하세요.
+# Render 운영환경에서는 USER_PASSWORD_HASH, ADMIN_PASSWORD_HASH가 비어 있으면 로그인이 되지 않습니다.
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "local_dev_secret_key_change_me")
+USER_PASSWORD_HASH = os.getenv("USER_PASSWORD_HASH", "")
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
+
+# 로컬 테스트가 필요할 때만 .env에 LOCAL_DEV=1을 넣으세요.
+# - 사용자: 1234
+# - 관리자: qwer
+# 주의: Render에는 LOCAL_DEV를 절대 넣지 마세요.
+if os.getenv("LOCAL_DEV") == "1":
+    USER_PASSWORD_HASH = generate_password_hash("1234")
+    ADMIN_PASSWORD_HASH = generate_password_hash("qwer")
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    app.logger.error(f"405 - {request.method} {request.path} - UA: {request.headers.get('User-Agent')}")
+    return e, 405
+
+import logging
+
+# =========================
+# 운영 로그 최소화
+# - Render/Gunicorn/Flask 기본 요청 로그를 최대한 차단
+# - 검색어, 토큰, 추천 결과 같은 민감 정보는 print로 남기지 않음
+# =========================
+logging.getLogger('werkzeug').disabled = True
+logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
+logging.getLogger('gunicorn.access').disabled = True
+logging.getLogger('gunicorn.access').setLevel(logging.CRITICAL)
+logging.getLogger('flask.app').setLevel(logging.ERROR)
+
+@app.before_request
+def require_login_all_pages():
+    # ---- 점검 모드: 관리자 관련 경로/정적 파일 제외 전체 차단 ----
+    maint = _load_maintenance_state()
+    if maint["on"]:
+        if not (
+            request.path.startswith("/admin")
+            or request.path.startswith("/static")
+            or request.path == "/favicon.ico"
+            or request.path == "/app-version.json"
+            or session.get("is_admin")
+        ):
+            return render_template_string(
+                MAINTENANCE_HTML,
+                message=maint["message"],
+                resume_at=maint["resume_at"],
+            ), 503
+
+    if (
+        request.path == "/"
+        or request.path == "/login"
+        or request.path == "/admin"
+        or request.path == "/privacy"
+        or request.path == "/app-version.json"
+        or request.path.startswith("/static")
+    ):
+        return None
+
+    if request.path.startswith("/admin/maintenance"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
+    if request.path.startswith("/stats"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
+    if request.path.startswith("/board/admin"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
+    if request.path.startswith("/notice/admin"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+
+# =========================
+# 페이지뷰(PV) 집계 — 메인 방문자수와 별개. 관리자 통계용.
+# 응답 지연 방지를 위해 비동기 스레드로 적재. (테이블 없으면 조용히 무시)
+# =========================
+import threading as _pv_threading
+
+# 페이지뷰로 집계할 화이트리스트 (이 6개만 수집). path → 표시이름
+# /manual 은 사용설명서 모달(openGuide)에서 핑(/pv/guide)으로 적재됨 (실제 라우트 아님)
+_PV_TRACK = {
+    "/desc": "사례검색",
+    "/combo": "기관검색",
+    "/survey": "조사서식",
+    "/guide": "사업안내",
+    "/nhis25": "건강보험25시",
+    "/manual": "사용설명서",
+}
+
+def _pv_insert(path):
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/page_view_logs",
+            headers=SUPABASE_HEADERS,
+            json={"path": path},
+            timeout=5
+        )
+    except Exception:
+        pass
+
+def _visit_log_insert():
+    """일자별 방문자수 집계용. 개별 방문 시각(타임스탬프)은 전혀 저장하지 않고,
+    '오늘 날짜'의 합계 카운트만 +1 한다 (visit_stats/env_stats와 동일한 방식)."""
+    try:
+        today = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?visit_date=eq.{today}&select=count",
+            headers=SUPABASE_HEADERS,
+            timeout=5
+        )
+        rows = res.json() if res.ok else []
+
+        if rows:
+            cur = int(rows[0].get("count", 0) or 0)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/visit_daily_counts?visit_date=eq.{today}",
+                headers=SUPABASE_HEADERS,
+                json={"count": cur + 1},
+                timeout=5
+            )
+        else:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/visit_daily_counts",
+                headers=SUPABASE_HEADERS,
+                json={"visit_date": today, "count": 1},
+                timeout=5
+            )
+    except Exception:
+        pass
+
+def _region_log_insert(sido, sigungu, search_type):
+    """일자별 지역 클릭수 집계용. 지역(시도/시군구)·검색구분만 적재 (IP 미수집)."""
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/region_logs",
+            headers=SUPABASE_HEADERS,
+            json={"sido": sido, "sigungu": sigungu, "search_type": search_type},
+            timeout=5
+        )
+    except Exception:
+        pass
+
+def cleanup_old_board_posts():
+    """의견보내기 게시글 1년 경과 시 자동 삭제"""
+    if os.getenv("RENDER") is None:
+        return
+
+    try:
+        cutoff = (
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(days=365)
+        ).isoformat()
+
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/board_posts?created_at=lt.{cutoff}",
+            headers=SUPABASE_HEADERS,
+            timeout=5
+        )
+    except Exception:
+        pass
+
+@app.before_request
+def track_page_view():
+    if os.getenv("RENDER") is None:
+        return None
+    if request.method != "GET":
+        return None
+    if not (session.get("logged_in") or session.get("is_admin")):
+        return None
+    path = request.path or ""
+    # 허용목록에 있는 실제 페이지만 집계 (/manual은 핑 라우트에서 직접 적재)
+    if path not in _PV_TRACK or path == "/manual":
+        return None
+    try:
+        _pv_threading.Thread(target=_pv_insert, args=(path,), daemon=True).start()
+    except Exception:
+        pass
+    return None
+
+FILE_PATH = "service_resources.xlsx"
+# =========================
+# 서비스 그룹 엑셀 로드 (AI 추천용)
+# =========================
+SERVICE_GROUP_FILE = "service_group.xlsx"
+
+service_df = pd.read_excel(SERVICE_GROUP_FILE).fillna("")
+service_df.columns = service_df.columns.astype(str).str.replace(" ", "").str.strip()
+
+
+# =========================
+# 로그인 체크
+# =========================
+from functools import wraps
+from flask import session, redirect, url_for
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
+# =========================
+# 로그인 페이지
+# =========================
+# =========================
+# 로그인 페이지
+# =========================
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>케어네비 로그인</title>
+
+<style>
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:'Pretendard',sans-serif;
+  background:#e8ecf4;
+  color:#1f2937;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:24px 16px;
+}
+
+.admin-link{
+  position:absolute;
+  top:16px;
+  right:18px;
+  color:#9ca3af;
+  font-size:12px;
+  font-weight:600;
+  text-decoration:none;
+  z-index:2;
+  transition:color .15s ease;
+}
+
+.admin-link:hover{
+  color:#6b7280;
+  text-decoration:underline;
+}
+
+.admin-link:active{
+  color:#374151;
+}
+.box{
+  position:relative;
+  width:100%;
+  max-width:420px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:22px;
+  padding:40px 24px 28px 24px;
+  text-align:center;
+  box-shadow:0 16px 38px rgba(15,23,42,0.15);
+}
+
+.simple-logo{
+  font-size:30px;
+  font-weight:800;
+  letter-spacing:-0.8px;
+  color:#111827;
+  margin-bottom:8px;
+}
+
+.logo-line{
+  width:40px;
+  height:3px;
+  margin:6px auto 8px auto;
+  border-radius:999px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+}
+
+.sub-title{
+  font-size:14px;
+  color:#6b7280;
+  margin-bottom:48px;
+  line-height:1.5;
+}
+
+
+.error-msg{
+  background:#fff4f4;
+  color:#d93025;
+  border:1px solid #ffd9d6;
+  padding:12px 14px;
+  border-radius:12px;
+  font-size:14px;
+  margin:0 0 14px 0;
+  text-align:left;
+}
+
+.form-area{
+  text-align:left;
+}
+.input-label{
+  display:block;
+  font-size:14px;
+  font-weight:700;
+  color:#374151;
+  margin-bottom:8px;
+}
+
+input{
+  width:100%;
+  height:54px;
+  padding:0 16px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  font-size:16px;
+  color:#111827;
+  background:#fff;
+  outline:none;
+  transition:border-color 0.15s, box-shadow 0.15s;
+  margin-bottom:14px;
+}
+
+input::placeholder{
+  color:#9ca3af;
+}
+
+input:focus{
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.08);
+}
+
+button{
+  width:100%;
+  height:54px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#ffffff;
+  font-size:17px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.15s;
+  box-shadow:0 4px 14px rgba(37,99,235,0.25);
+}
+
+button:hover{
+  opacity:0.9;
+}
+
+.notice{
+  margin-top:22px;
+  padding-top:18px;
+  border-top:1px solid #f1f5f9;
+  font-size:12px;
+  color:#6b7280;
+  line-height:1.65;
+  word-break:keep-all;
+}
+
+.bottom-logo{
+  margin-top:16px;
+}
+
+.bottom-logo img{
+  width:100%;
+  max-width:210px;
+  display:block;
+  margin:0 auto;
+  opacity:0.82;
+}
+
+@media (max-width:480px){
+  body{
+    min-height:100dvh;
+    padding:16px;
+    align-items:center;
+  }
+
+.box{
+  box-shadow:0 16px 38px rgba(15,23,42,0.15);
+  padding:48px 24px 36px 24px;
+}
+
+  .simple-logo{
+    font-size:28px;
+  }
+
+  .sub-title{
+    font-size:13px;
+    margin-bottom:40px;
+  }
+
+  .input-label{
+    font-size:13px;
+  }
+
+  input{
+    height:50px;
+    font-size:15px;
+    border-radius:10px;
+  }
+
+  button{
+    height:50px;
+    font-size:16px;
+    border-radius:10px;
+  }
+
+  .notice{
+    font-size:11.5px;
+  }
+
+  .bottom-logo img{
+    max-width:190px;
+  }
+}
+
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+
+<body>
+<div class="box">
+  <a href="/admin" class="admin-link">관리자</a>
+
+  <div class="simple-logo">케어네비</div>
+  <div class="logo-line"></div>
+  <div class="sub-title">통합돌봄 지원 프로그램 사용자 로그인</div>
+
+  {% if error %}
+    <div class="error-msg">❌ {{error}}</div>
+  {% endif %}
+
+  <form method="post" class="form-area">
+    <input type="password" name="password" placeholder="비밀번호를 입력하세요">
+    <button type="submit">로그인</button>
+  </form>
+
+  <div class="notice">
+    ※ 본 서비스는 광주전라제주지역본부<br>
+    관할 지자체, 지사 직원을 대상으로 운영됩니다.
+  </div>
+
+
+<div class="bottom-bar">
+
+  <div class="bottom-logo">
+    <img src="/static/ci.png" alt="CI">
+  </div>
+
+  
+</div>
+
+</div>
+
+<div id="cn-app-version" style="position:fixed;bottom:8px;right:10px;font-size:11px;color:#aaa;pointer-events:none;z-index:9999;"></div>
+<script>
+(function(){
+  /* 로그인 페이지 진입 시 가이드투어 세션 dismiss 해제 → 재로그인하면 다시 보임 */
+  try { sessionStorage.removeItem('careNaviTourSessionDismissed'); } catch(e){}
+
+  if(window.AndroidAppInfo){
+    try{
+      var name = window.AndroidAppInfo.getVersionName();
+      var el = document.getElementById('cn-app-version');
+      if(el) el.textContent = '케어네비 v' + name;
+    }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>
+"""
+ADMIN_LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 인증</title>
+
+<style>
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:'Pretendard',sans-serif;
+  background:#e8ecf4;
+  color:#1f2937;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:24px 16px;
+}
+
+.box{
+  position:relative;
+  width:100%;
+  max-width:420px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:22px;
+  padding:40px 24px 28px 24px;
+  text-align:center;
+  box-shadow:0 16px 38px rgba(15,23,42,0.15);
+}
+
+.simple-logo{
+  font-size:28px;
+  font-weight:800;
+  letter-spacing:-0.8px;
+  color:#111827;
+  margin-bottom:8px;
+}
+
+.logo-line{
+  width:40px;
+  height:3px;
+  margin:6px auto 8px auto;
+  border-radius:999px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+}
+
+.sub-title{
+  font-size:14px;
+  color:#6b7280;
+  margin-bottom:40px;
+  line-height:1.5;
+}
+
+.error-msg{
+  background:#fff4f4;
+  color:#d93025;
+  border:1px solid #ffd9d6;
+  padding:12px 14px;
+  border-radius:12px;
+  font-size:14px;
+  margin:0 0 14px 0;
+  text-align:left;
+}
+
+.form-area{
+  text-align:left;
+}
+
+input{
+  width:100%;
+  height:54px;
+  padding:0 16px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  font-size:16px;
+  color:#111827;
+  background:#fff;
+  outline:none;
+  transition:border-color 0.15s, box-shadow 0.15s;
+  margin-bottom:14px;
+}
+
+input::placeholder{
+  color:#9ca3af;
+}
+
+input:focus{
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.08);
+}
+
+button{
+  width:100%;
+  height:54px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#334155,#0f172a);
+  color:#ffffff;
+  font-size:17px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.15s;
+  box-shadow:0 4px 14px rgba(15,23,42,0.3);
+}
+
+button:hover{
+  opacity:0.9;
+}
+
+.back-link{
+  display:inline-block;
+  margin-top:14px;
+  font-size:13px;
+  color:#6b7280;
+  text-decoration:none;
+}
+
+.back-link:hover{
+  color:#2563eb;
+}
+
+@media (max-width:480px){
+  body{
+    min-height:100dvh;
+    padding:16px;
+  }
+
+  .box{
+    box-shadow:0 16px 38px rgba(15,23,42,0.15);
+    padding:48px 24px 36px 24px;
+  }
+
+  .simple-logo{
+    font-size:26px;
+  }
+
+  .sub-title{
+    font-size:13px;
+    margin-bottom:34px;
+  }
+
+  input{
+    height:50px;
+    font-size:15px;
+    border-radius:10px;
+  }
+
+  button{
+    height:50px;
+    font-size:16px;
+    border-radius:10px;
+  }
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+
+<body>
+<div class="box">
+  <div class="simple-logo">관리자 인증</div>
+  <div class="logo-line"></div>
+  <div class="sub-title">통계 페이지 접근을 위해 관리자 암호를 입력하세요.</div>
+
+  {% if error %}
+    <div class="error-msg">❌ {{error}}</div>
+  {% endif %}
+
+  <form method="post" class="form-area">
+    <input type="password" name="password" placeholder="관리자 암호를 입력하세요">
+    <button type="submit">통계 페이지로 이동</button>
+  </form>
+
+  <a href="/login" class="back-link">로그인 페이지로 돌아가기</a>
+</div>
+</body>
+</html>
+"""
+
+
+
+# =========================
+# 로그인 라우트
+# =========================
+@app.route("/", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        pw = request.form.get("password", "")
+
+        if USER_PASSWORD_HASH and check_password_hash(USER_PASSWORD_HASH, pw):
+            session["logged_in"] = True
+            return redirect(url_for("home"))
+        else:
+            # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
+            return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
+
+    return render_template_string(LOGIN_HTML, error="", total=0, today=0)
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        pw = request.form.get("password", "")
+
+        if ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH, pw):
+            session["is_admin"] = True
+            return redirect(url_for("stats"))
+        else:
+            return render_template_string(
+                ADMIN_LOGIN_HTML,
+                error="관리자 암호가 올바르지 않습니다."
+            )
+
+    return render_template_string(ADMIN_LOGIN_HTML, error="")
+
+# =========================
+# 서버 오류 안내 페이지
+# =========================
+ERROR_500_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서버 오류 안내</title>
+<style>
+body{
+  margin:0;
+  min-height:100vh;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  color:#111827;
+}
+.error-box{
+  width:100%;
+  max-width:460px;
+  background:white;
+  border-radius:18px;
+  padding:26px 22px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.08);
+  text-align:center;
+}
+.error-icon{
+  font-size:38px;
+  margin-bottom:12px;
+}
+.error-title{
+  font-size:20px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+.error-msg{
+  font-size:14px;
+  line-height:1.7;
+  color:#4b5563;
+  word-break:keep-all;
+  margin-bottom:20px;
+}
+.home-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  height:34px;
+  padding:0 15px;
+  border-radius:8px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  color:#6b7280;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:600;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08);
+  transition:all .15s;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+  <div class="error-box">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title">일시적인 오류가 발생했습니다</div>
+    <div class="error-msg">
+      서버 사용량이 많거나 일시적인 오류로 요청을 처리하지 못했습니다.<br>
+      잠시 후 다시 시도해 주세요.
+    </div>
+    <a href="/home" class="home-btn">홈으로 이동</a>
+  </div>
+</body>
+</html>
+"""
+
+# =========================
+# 점검 모드 안내 페이지
+# =========================
+MAINTENANCE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서버 점검 중입니다</title>
+<style>
+body{
+  margin:0;
+  min-height:100vh;
+  min-height:100dvh;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  color:#111827;
+}
+.box{
+  width:100%;
+  max-width:460px;
+  background:white;
+  border-radius:18px;
+  padding:32px 24px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.08);
+  text-align:center;
+}
+.icon{ font-size:40px; margin-bottom:12px; }
+.title{ font-size:20px; font-weight:800; margin-bottom:12px; }
+.msg{
+  font-size:14px;
+  line-height:1.7;
+  color:#4b5563;
+  word-break:keep-all;
+  white-space:pre-line;
+  margin-bottom:14px;
+}
+.resume{
+  font-size:13px;
+  color:#2563eb;
+  font-weight:700;
+  background:#eff6ff;
+  border-radius:10px;
+  padding:10px 12px;
+  margin-bottom:16px;
+}
+.admin-link{
+  display:inline-block;
+  margin-top:6px;
+  font-size:12px;
+  color:#9ca3af;
+  text-decoration:none;
+}
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">🛠️</div>
+    <div class="title">서버 점검 중입니다</div>
+    <div class="msg">{{ message if message else "더 나은 서비스 제공을 위해 시스템 점검을 진행하고 있습니다.\\n잠시 후 다시 이용해 주세요." }}</div>
+    {% if resume_at %}
+      <div class="resume">예상 재개 시간: {{ resume_at }}</div>
+    {% endif %}
+    <a href="/admin" class="admin-link">관리자 로그인</a>
+  </div>
+</body>
+</html>
+"""
+
+# =========================
+# 점검 모드 관리자 패널
+# =========================
+MAINTENANCE_ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>점검 모드 관리</title>
+<style>
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:'Pretendard',sans-serif;
+  background:#e8ecf4;
+  color:#1f2937;
+  display:flex;
+  justify-content:center;
+  padding:40px 16px;
+}
+.box{
+  width:100%;
+  max-width:460px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:22px;
+  padding:28px 24px;
+  box-shadow:0 16px 38px rgba(15,23,42,0.12);
+}
+h1{ font-size:19px; font-weight:800; margin:0 0 6px 0; }
+.status{
+  display:inline-block;
+  font-size:13px;
+  font-weight:700;
+  padding:4px 10px;
+  border-radius:999px;
+  margin-bottom:20px;
+}
+.on{ background:#fee2e2; color:#dc2626; }
+.off{ background:#dcfce7; color:#16a34a; }
+label{ font-size:13px; font-weight:600; color:#374151; display:block; margin:14px 0 6px; }
+textarea, input[type=text]{
+  width:100%;
+  border:1px solid #d1d5db;
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:14px;
+  font-family:inherit;
+  resize:vertical;
+}
+textarea{ min-height:80px; }
+.btn-row{ display:flex; gap:8px; margin-top:20px; }
+button{
+  flex:1;
+  height:48px;
+  border:none;
+  border-radius:12px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+}
+.btn-on{ background:linear-gradient(135deg,#ef4444,#b91c1c); color:#fff; }
+.btn-off{ background:linear-gradient(135deg,#334155,#0f172a); color:#fff; }
+.back-link{
+  display:inline-block;
+  margin-top:16px;
+  font-size:13px;
+  color:#6b7280;
+  text-decoration:none;
+}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>점검 모드 관리</h1>
+  <span class="status {{ 'on' if mode.on else 'off' }}">{{ '점검 중 (사용자 접근 차단됨)' if mode.on else '정상 운영 중' }}</span>
+
+  <form method="post" action="/admin/maintenance/on">
+    <label>점검 안내 문구 (선택)</label>
+    <textarea name="message" placeholder="예: 서버 데이터 정비 작업 중입니다.">{{ mode.message }}</textarea>
+    <label>예상 재개 시간 (선택)</label>
+    <input type="text" name="resume_at" placeholder="예: 오늘 밤 11시" value="{{ mode.resume_at }}">
+    <div class="btn-row">
+      <button type="submit" class="btn-on">점검 모드 켜기</button>
+    </div>
+  </form>
+
+  <form method="post" action="/admin/maintenance/off">
+    <div class="btn-row">
+      <button type="submit" class="btn-off">점검 모드 끄기</button>
+    </div>
+  </form>
+
+  <a href="/stats" class="back-link">통계 페이지로 돌아가기</a>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/admin/maintenance", methods=["GET"])
+def maintenance_panel():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    maint = _load_maintenance_state()
+    return render_template_string(MAINTENANCE_ADMIN_HTML, mode=maint)
+
+@app.route("/admin/maintenance/on", methods=["POST"])
+def maintenance_on():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    message = request.form.get("message", "").strip()
+    resume_at = request.form.get("resume_at", "").strip()
+    _save_maintenance_state(True, message, resume_at)
+    return redirect(url_for("maintenance_panel"))
+
+@app.route("/admin/maintenance/off", methods=["POST"])
+def maintenance_off():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    maint = _load_maintenance_state()
+    _save_maintenance_state(False, maint["message"], maint["resume_at"])
+    return redirect(url_for("maintenance_panel"))
+
+@app.errorhandler(404)
+def handle_404(e):
+    return "", 204
+
+@app.errorhandler(Exception)
+def handle_all_errors(e):
+    app.logger.exception(e)
+    return render_template_string(ERROR_500_HTML), 500
+
+
+# =========================
+# 서버 오류 테스트용
+# =========================
+@app.route("/test500")
+def test500():
+    raise Exception("서버 오류 테스트")
+
+# =========================
+# 공통 CSS
+# =========================
+BASE_STYLE = """
+
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+
+.container{
+  max-width:860px;
+  margin:auto;
+  padding:30px 20px 40px 20px;
+}
+
+
+h2{
+  margin-top:0;
+  margin-bottom:20px;
+}
+
+label{
+  display:block;
+  margin-top:14px;
+  font-size:14px;
+  font-weight:600;
+}
+
+input, select{
+  width:100%;
+  padding:12px;
+  margin-top:6px;
+  border-radius:8px;
+  border:1px solid #d1d5db;
+  font-size:14px;
+}
+
+.small{
+  font-size:12px;
+  color:#6b7280;
+  margin-top:4px;
+}
+
+.menu-btn{
+  margin-top:16px;
+  width:100%;
+  height:46px;
+  border:none;
+  border-radius:10px;
+  background:#2563eb;
+  color:white;
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.menu-btn:hover{
+  background:#1e40af;
+}
+
+.result{
+  margin-top:24px;
+  background:white;
+  padding:20px;
+  border-radius:14px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+
+.item{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  padding:8px 0;
+  cursor:pointer;
+  line-height:1.6;
+  color:#111827;
+}
+
+.item::before{
+  content:"-";
+  flex:0 0 auto;
+  margin-top:0;
+}
+
+.item-text{
+  flex:1;
+  min-width:0;
+  white-space:normal;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+.item:hover{
+  color:#2563eb;
+}
+
+.top-bar{
+  margin-bottom:20px;
+}
+
+.home-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  height:34px;
+  padding:0 15px;
+  border-radius:8px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  color:#6b7280;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:600;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08);
+  transition:all .15s;
+}
+
+.home-button:hover{
+  background:#f3f4f6;
+  color:#374151;
+}
+
+/* 앱(standalone/CareNaviApp) 모드: 상단 여백 축소 */
+body.app-mode .container{
+  padding-top:6px !important;
+}
+
+/* =========================
+   모바일 최적화 (핵심)
+========================= */
+@media (max-width:480px){
+
+  /* 전체 여백 줄이기 */
+  .container{
+    padding:12px 12px 20px 12px;
+  }
+
+  /* 타이틀 */
+  h1{
+    font-size:20px !important;
+  }
+
+  h2{
+    font-size:18px !important;
+  }
+
+  /* 카드 */
+  .card{
+    padding:14px !important;
+    gap:12px;
+    border-radius:14px;
+  }
+
+  /* 아이콘 */
+  .icon{
+    width:42px;
+    height:42px;
+    font-size:20px;
+  }
+
+  /* 카드 텍스트 */
+  .text b{
+    font-size:14px;
+  }
+
+  .text span{
+    font-size:12px;
+    line-height:1.4;
+    word-break:keep-all;   /* 🔥 핵심 */
+  }
+
+  /* 하단 카드 */
+  .bottom-card{
+    padding:12px;
+    font-size:13px;
+  }
+
+  /* 버튼 */
+  button, .menu-btn{
+    height:48px;
+    font-size:15px;
+  }
+
+  /* 입력창 */
+  input, select, textarea{
+    font-size:15px;
+  }
+
+  textarea{
+    height:100px;
+    line-height:1.5;
+    word-break:keep-all;   /* 🔥 핵심 */
+  }
+
+
+  /* 안내문 */
+  .notice{
+    font-size:12px;
+    line-height:1.5;
+    padding:0 4px;
+    word-break:keep-all;   /* 🔥 핵심 */
+  }
+
+  /* 결과 카드 */
+  .result-card{
+    padding:14px;
+  }
+
+  /* 홈 버튼 */
+  .home-button{
+    height:30px;
+    font-size:11.5px;
+    padding:0 10px;
+  }
+
+}
+
+
+"""
+# =========================
+# 엑셀 로드 + 컬럼 공백 제거
+# =========================
+df = pd.read_excel(FILE_PATH).fillna("")
+df.columns = [
+    str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+    for c in df.columns
+]
+
+def find_col(*names):
+    for name in names:
+        clean_name = str(name).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+        for c in df.columns:
+            clean_c = str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+            if clean_c == clean_name:
+                return c
+    return None
+
+
+# =========================
+# 조건기반 검색용 옵션 정리
+# =========================
+def sorted_unique_values(column_name):
+    real_col = None
+
+    for c in df.columns:
+        clean_c = str(c).replace("\ufeff", "").replace("\n", "").replace("\r", "").replace(" ", "").strip()
+        if clean_c == column_name:
+            real_col = c
+            break
+
+    if real_col is None:
+        return []
+
+    values = (
+        df[real_col]
+        .fillna("")
+        .astype(str)
+        .str.replace("\ufeff", "", regex=False)
+        .str.replace("\n", "", regex=False)
+        .str.replace("\r", "", regex=False)
+        .str.strip()
+    )
+
+    values = [v for v in values if v]
+
+    unique_values = list(set(values))
+    unique_values.sort(key=lambda x: (x == "기타", x))
+
+    return unique_values
+
+
+def normalize_sido(text):
+    t = str(text or "")
+
+    t = (
+        t.replace("\u00a0", "")
+         .replace("\ufeff", "")
+         .replace("\n", "")
+         .replace("\r", "")
+         .strip()
+    )
+
+    mapping = {
+        "광주": "전남광주통합특별시",
+        "광주시": "전남광주통합특별시",
+        "광주 광역시": "전남광주통합특별시",
+        "광주광역시": "전남광주통합특별시",
+        "전남": "전남광주통합특별시",
+        "전라남도": "전남광주통합특별시",
+        "전남광주통합특별시": "전남광주통합특별시",
+
+        "전북": "전북특별자치도",
+        "전라북도": "전북특별자치도",
+        "전북특별자치도": "전북특별자치도",
+
+        "제주": "제주특별자치도",
+        "제주도": "제주특별자치도",
+        "제주특별자치도": "제주특별자치도"
     }
 
+    return mapping.get(t, t)
 
 
+def normalize_sigungu(text):
+    t = str(text or "").strip()
+
+    mapping = {
+        "나주": "나주시",
+        "목포": "목포시",
+        "순천": "순천시",
+        "여수": "여수시",
+        "광양": "광양시",
+        "담양": "담양군",
+        "곡성": "곡성군",
+        "구례": "구례군",
+        "고흥": "고흥군",
+        "보성": "보성군",
+        "화순": "화순군",
+        "장흥": "장흥군",
+        "강진": "강진군",
+        "해남": "해남군",
+        "영암": "영암군",
+        "무안": "무안군",
+        "함평": "함평군",
+        "영광": "영광군",
+        "장성": "장성군",
+        "완도": "완도군",
+        "진도": "진도군",
+        "신안": "신안군",
+        "전주": "전주시",
+        "군산": "군산시",
+        "익산": "익산시",
+        "정읍": "정읍시",
+        "남원": "남원시",
+        "김제": "김제시",
+        "완주": "완주군",
+        "진안": "진안군",
+        "무주": "무주군",
+        "장수": "장수군",
+        "임실": "임실군",
+        "순창": "순창군",
+        "고창": "고창군",
+        "부안": "부안군",
+        "제주": "제주시",
+        "서귀포": "서귀포시"
+    }
+
+    return mapping.get(t, t)
 
 
-HTML = r"""
+SIDO_PRIORITY_ORDER = ["전남광주통합특별시", "전북특별자치도", "제주특별자치도"]
 
+SIGUNGU_PRIORITY = {
+    "전남광주통합특별시": ["광주동구", "광주서구", "광주남구", "광주북구", "광주광산구"],
+    "전북특별자치도": ["전주시 덕진구", "전주시 완산구"],
+    "제주특별자치도": ["제주시", "서귀포시"],
+}
+
+
+def _order_sigungu(sido_val, values):
+    priority = SIGUNGU_PRIORITY.get(sido_val, [])
+    ordered = [v for v in priority if v in values]
+    ordered += sorted(v for v in values if v not in priority)
+    return ordered
+
+
+def _build_region_options():
+    """실제 엑셀의 시도/시군구 컬럼 값에서만 옵션을 생성 (하드코딩·기본값 없음).
+    엑셀에 값이 없으면 드롭박스도 비게 되고, 이는 엑셀 데이터 오류를 바로 알아챌 수 있게 하기 위한 의도."""
+    sido_col = find_col("시도", "시도명", "광역시도")
+    sigungu_col = find_col("시군구")
+
+    if not sido_col:
+        return [], {}
+
+    sido_series = df[sido_col].fillna("").astype(str).apply(normalize_sido).str.strip()
+
+    if sigungu_col:
+        sigungu_series = df[sigungu_col].fillna("").astype(str).apply(normalize_sigungu).str.strip()
+    else:
+        sigungu_series = pd.Series([""] * len(df))
+
+    grouped = {}
+    for sido_val, sigungu_val in zip(sido_series, sigungu_series):
+        if not sido_val:
+            continue
+        grouped.setdefault(sido_val, set())
+        if sigungu_val:
+            grouped[sido_val].add(sigungu_val)
+
+    ordered_sido = [s for s in SIDO_PRIORITY_ORDER if s in grouped]
+    ordered_sido += sorted(s for s in grouped if s not in SIDO_PRIORITY_ORDER)
+
+    sigungu_map = {
+        sido_val: _order_sigungu(sido_val, vals)
+        for sido_val, vals in grouped.items()
+    }
+
+    return ordered_sido, sigungu_map
+
+
+SIDO_OPTIONS, SIGUNGU_MAP = _build_region_options()
+SIGUNGU_OPTIONS = sorted(set(
+    normalize_sigungu(v) for v in sorted_unique_values("시군구") if str(v).strip()
+))
+
+
+def clean_notices_for_template(notices):
+    """공지사항 날짜값이 없거나 None이어도 템플릿이 터지지 않게 정리"""
+    cleaned = []
+    for n in notices or []:
+        if not isinstance(n, dict):
+            continue
+
+        item = dict(n)
+        raw = item.get("created_at") or item.get("inserted_at") or item.get("updated_at") or ""
+        raw = str(raw) if raw is not None else ""
+
+        kst_date = ""
+        kst_dt = ""
+        if raw:
+            try:
+                s = raw.replace("Z", "+00:00")
+                dt = datetime.datetime.fromisoformat(s)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=datetime.timezone.utc)
+                dt = dt.astimezone(ZoneInfo("Asia/Seoul"))
+                kst_date = dt.strftime("%Y-%m-%d")
+                kst_dt = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                kst_date = raw[:10]
+                kst_dt = raw[:19].replace("T", " ")
+
+        item["created_date"] = kst_date
+        item["created_datetime"] = kst_dt
+        item["title"] = item.get("title") or "제목 없음"
+        item["content"] = item.get("content") or ""
+        item["content_lines"] = item["content"].split("\n")
+        item["is_active"] = bool(item.get("is_active", True))
+        cleaned.append(item)
+    return cleaned
+
+MAIN_CATEGORY_OPTIONS = sorted_unique_values("대분류")
+MIDDLE_CATEGORY_OPTIONS = sorted_unique_values("중분류")
+MANAGER_OPTIONS = sorted_unique_values("관리주체")
+
+# =========================
+# HOME
+# =========================
+HOME_HTML = """
 <!DOCTYPE html>
-
 <html lang="ko">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 서비스 자원검색</title>
 
-<title>장기요양 안전로드</title>
+<style>
 
-
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
-
-<!-- 로드뷰용 카카오맵 SDK (JS키 사용) -->
-
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey={{kakao_js_key}}&libraries=services,roadview"></script>
+.bottom-img{
+  width:100%;
+  margin-top:-120px;
+  margin-bottom:-140px;
+  pointer-events:none;
+  position:relative;
+  z-index:0;
+}
 
 
+.bottom-row{
+  position:relative;
+  z-index:2;
+}
 
+@media (max-width:480px){
 
+  .bottom-img{
+    margin-top:-40px;
+    margin-bottom:-40px;
+  }
 
-{% raw %}<style>
-
-/* ══ 리셋 ══ */
-
-*{box-sizing:border-box;margin:0;padding:0;}
-
-html,body{
-
-  width:100%;height:100%;
-
-  font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
-
-  font-size:14px;
-
-  background:#f4f5f7;
-
-  color:#1a202c;
-
-  -webkit-font-smoothing:antialiased;
+  .bottom-footer{
+    margin-top:-10px;
+  }
 
 }
 
 
-
-/* ══ 레이아웃 ══ */
-
-.page{display:flex;flex-direction:row;width:100%;height:100vh;overflow:hidden;}
-
-
-
-/* ══ 사이드바 - 소프트 그레이 + 인디고 ══ */
-
-.sidebar{
-
-  width:300px;min-width:300px;
-
-  background:#f4f5f7;
-
-  display:flex;flex-direction:column;
-
-  overflow:hidden;
-
-  border-right:1px solid #e5e7eb;
-
-}
-
-.sidebar-scroll{
-
-  flex:1;overflow-y:auto;
-
-  padding:12px;
-
-  scrollbar-width:thin;
-
-  scrollbar-color:#e5e7eb transparent;
-
-}
-
-.sidebar-scroll::-webkit-scrollbar{width:3px;}
-
-.sidebar-scroll::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:3px;}
-
-
-
-/* ══ 브랜드 헤더 ══ */
-
-.brand{
-
-  padding:14px 14px 12px;
-
-  border-bottom:1px solid #f1f1f1;
-
-  display:flex;align-items:center;gap:10px;
-
-  background:#ffffff;
-
-  flex-shrink:0;
-
-}
-
-.brand-accent{width:3px;height:36px;background:#3b82f6;border-radius:2px;flex-shrink:0;}
-
-.brand-left{display:flex;flex-direction:column;gap:2px;flex:1;}
-
-.brand-title{
-
-  font-size:15px;font-weight:900;
-
-  color:#1a202c;cursor:pointer;
-
-  letter-spacing:-0.3px;
-
-}
-
-.brand-sub{font-size:10px;color:#9ca3af;}
-
-.ci-logo{height:32px;object-fit:contain;flex-shrink:0;opacity:.95;}
-
-@media(max-width:900px){.ci-logo{height:28px;}}
-
-
-
-/* ══ 섹션 카드 ══ */
-
-.s-card{
-
-  background:#ffffff;
-
-  border-radius:14px;
-
-  padding:13px;
-
-  margin-bottom:8px;
-
-  box-shadow:0 1px 4px rgba(0,0,0,.07);
-
-}
-
-.s-card-label{
-
-  font-size:14px;
-
-  font-weight:900;
-
-  color:#1a2f5a;
-
-  letter-spacing:-0.2px;
-
-  margin-bottom:12px;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:space-between;
-
-  padding-bottom:8px;
-
-  border-bottom:2.5px solid #93c5fd;
-
-}
-
-.s-card-label > span:first-child{
-
-  display:flex;align-items:center;gap:6px;
-
-}
-
-.s-card-label > span:first-child::before{
-
-  content:'';display:inline-block;
-
-  width:3px;height:14px;
-
-  background:#2563eb;border-radius:2px;flex-shrink:0;
-
-}
-
-
-
-/* ══ 폼 요소 ══ */
-
-.form-label{
-
-  font-size:11px;font-weight:600;
-
-  color:#6b7280;
-
-  margin:8px 0 4px;
-
-  display:block;
-
-}
-
-.form-label:first-child{margin-top:0;}
-
-.form-select{
-
-  width:100%;height:38px;
-
-  background:#f9fafb;
-
-  border:1.5px solid #e5e7eb;
-
-  border-radius:9px;
-
-  color:#1f2937;
-
-  font-size:13px;
-
-  padding:0 10px;
-
-  appearance:none;
-
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-
-  background-repeat:no-repeat;background-position:right 9px center;
-
-  cursor:pointer;transition:border-color .15s;
-
-}
-
-.form-select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15);}
-
-
-
-.town-multi-wrap{
-
-  max-height:120px;overflow-y:auto;
-
-  background:#f9fafb;border:1.5px solid #e5e7eb;
-
-  border-radius:9px;padding:4px 6px;
-
-}
-
-.town-check-item{
-
-  display:flex;align-items:center;gap:7px;
-
-  padding:5px 5px;font-size:12px;color:#6b7280;
-
-  cursor:pointer;border-radius:5px;transition:background .1s;
-
-}
-
-.town-check-item:hover{background:#f3f4f6;}
-
-.town-check-item input{accent-color:#3b82f6;width:13px;height:13px;flex-shrink:0;}
-
-
-
-/* ══ 카테고리 체크박스 ══ */
-
-.check-grid{display:flex;flex-direction:column;gap:5px;}
-
-.check-item{
-
-  display:flex;align-items:center;gap:9px;
-
-  padding:8px 10px;
-
-  background:#f9fafb;border:1.5px solid #e5e7eb;
-
-  border-radius:9px;font-size:13px;color:#374151;
-
-  cursor:pointer;transition:border-color .15s,background .15s;
-
-}
-
-.check-item:has(input:checked){border-color:#3b82f6;background:#eff6ff;}
-
-.dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px;}
-
-
-
-/* ══ 버튼 ══ */
-
-.btn-main{
-
-  width:100%;height:44px;
-
-  background:linear-gradient(135deg,#2563eb,#3b82f6);
-
-  color:#fff;border:none;border-radius:11px;
-
-  font-size:15px;font-weight:800;
-
-  cursor:pointer;margin-top:12px;
-
-  display:flex;align-items:center;justify-content:center;
-
-  box-shadow:0 4px 14px rgba(37,99,235,.35);
-
-  transition:opacity .15s,transform .1s;
-
-  letter-spacing:-0.2px;
-
-}
-
-.btn-main:hover{opacity:.92;}
-
-.btn-main:active{transform:scale(.98);}
-
-
-
-.btn-reset{
-
-  height:26px;
-
-  padding:0 12px;
-
-  border:1.5px solid #d1d5db;
-
-  border-radius:999px;
-
-  background:#fff;
-
-  color:#374151;
-
-  font-size:11px;
-
-  font-weight:400;
-
-  cursor:pointer;
-
-  box-shadow:0 1px 4px rgba(0,0,0,.08);
-
-  transition:background .15s,color .15s;
-
-}
-
-.btn-reset:hover{
-
-  background:#f3f4f6;
-
+/* 전체 배경 */
+body{
+  margin:0;
+  padding:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
   color:#111827;
-
 }
 
+/* 컨테이너 */
+.container{
+  max-width:700px;
+  margin:auto;
+  padding:calc(28px + env(safe-area-inset-top)) 20px 20px 20px;
 
+  position:relative;
+}
 
-/* 2열 버튼 그리드 */
+/* 앱(CareNaviApp/PWA) 모드: 상단 여백 축소 */
+body.app-mode .container{
+  padding-top:28px !important;
+}
+/* 타이틀 */
+/* 타이틀 */
+.title{
+  position:relative;
+  text-align:center;
+  margin-bottom:24px;
+}
 
-.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:0;}
+.home-admin-hidden{
+  position:absolute;
+  top:-14px;
+  left:-2px;
+  font-size:9px;
+  color:#94a3b8;
+  text-decoration:none;
+  font-weight:500;
+  opacity:0.8;
+}
 
-.btn-grid .btn-action{height:40px;font-size:12px;}
+.home-admin-hidden:hover{
+  color:#64748b;
+  opacity:1;
+}
 
-
-
-.btn-action{
-
-  width:100%;height:40px;
-
-  border-radius:9px;border:1.5px solid #e5e7eb;
-
-  background:#f9fafb;color:#374151;
-
-  font-size:13px;font-weight:700;
-
+/* 사용설명서 버튼 (동그란 ? 버튼) */
+.home-help-btn{
+  position:absolute;
+  top:-2px;
+  right:0;
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#93c5fd;
+  border:none;
+  border-radius:50%;
+  color:#1e40af;
+  font-size:18px;
+  font-weight:900;
+  line-height:1;
   cursor:pointer;
-
-  display:flex;align-items:center;justify-content:center;
-
-  transition:border-color .15s,background .15s,color .15s;
-
+  text-decoration:none;
+  z-index:5;
+  box-shadow:0 2px 6px rgba(37,99,235,0.3);
+  transition:background 0.15s, transform 0.1s;
+}
+.home-help-btn:hover{
+  background:#1d4ed8;
+}
+.home-help-btn:active{
+  transform:scale(0.94);
 }
 
-.btn-action:hover{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8;}
-
-.btn-action:active{transform:scale(.98);}
-
-.btn-action.fab-on{background:#3b82f6;border-color:#3b82f6;color:#fff;}
-
-#facilityFabMenu.fab-dim{position:relative;z-index:30;box-shadow:0 0 0 100vmax rgba(15,23,42,0.5);}
-
-
-
-.btn-kakao{
-
-  background:#FEE500;color:#191919;border:none;
-
+/* 공지사항 버튼 */
+.home-notice-btn{
+  position:absolute;
+  top:-2px;
+  right:42px;
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#2563eb;
+  border:none;
+  border-radius:50%;
+  color:#fff;
+  font-size:16px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+  text-decoration:none;
+  z-index:5;
+  box-shadow:0 2px 6px rgba(37,99,235,0.3);
+  transition:background 0.15s, transform 0.1s;
+}
+.home-notice-btn:hover{ background:#1d4ed8; }
+.home-notice-btn:active{ transform:scale(0.94); }
+.home-notice-btn .notice-dot{
+  position:absolute;
+  top:0px;
+  right:0px;
+  width:9px;
+  height:9px;
+  background:#ef4444;
+  border-radius:50%;
+  border:2px solid #fff;
 }
 
-.btn-kakao:hover{background:#f5dc00;color:#191919;}
+/* 공지사항 버튼 임시 숨김 */
+.home-notice-btn{
+  display:none !important;
+}
 
+/* 모바일: 종+물음표 버튼 축소 */
+@media (max-width:480px){
+  .home-help-btn{
+    width:27px !important;
+    height:27px !important;
+    font-size:14px !important;
+    top:-10px !important;
+    right:0 !important;
+  }
 
+  .home-notice-btn{
+    width:27px !important;
+    height:27px !important;
+    top:-10px !important;
+    right:34px !important;
+  }
 
-.btn-green{
+  .home-notice-btn svg{
+    width:13px !important;
+    height:13px !important;
+  }
 
+  .home-notice-btn .notice-dot{
+    width:6px;
+    height:6px;
+    top:-1px;
+    right:-1px;
+  }
+}
+
+/* 공지사항 모달 */
+.notice-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  z-index:10000;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.notice-modal.open{ display:flex; }
+.notice-box{
+  background:#fff;
+  border-radius:18px;
+  max-width:480px;
+  width:100%;
+  max-height:80vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  box-shadow:0 20px 50px rgba(15,23,42,0.22);
+}
+.notice-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 20px;
+  border-bottom:1px solid #e5e7eb;
+}
+.notice-header-title{
+  font-size:16px;
+  font-weight:800;
+  color:#111827;
+}
+.notice-close{
+  background:none;
+  border:none;
+  font-size:22px;
+  color:#6b7280;
+  cursor:pointer;
+  padding:4px 8px;
+}
+.notice-body{
+  flex:1;
+  overflow-y:auto;
+  padding:16px 20px;
+}
+.notice-item{
+  padding:14px 0;
+  border-bottom:1px solid #f3f4f6;
+}
+.notice-item:last-child{ border-bottom:none; }
+.notice-item-title{
+  font-size:14px;
+  font-weight:700;
+  color:#111827;
+  margin-bottom:5px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.notice-item-title::after{
+  content:'▾';
+  font-size:12px;
+  color:#9ca3af;
+  flex-shrink:0;
+  transition:transform 0.15s;
+}
+.notice-item.open .notice-item-title::after{
+  transform:rotate(180deg);
+}
+.notice-item-date{
+  font-size:11px;
+  color:#9ca3af;
+  margin-bottom:6px;
+}
+.notice-item-content{
+  display:none;
+  font-size:13px;
+  color:#4b5563;
+  line-height:1.65;
+  word-break:keep-all;
+  margin-top:8px;
+}
+.notice-item.open .notice-item-content{
+  display:block;
+}
+/* 본문 한 줄씩 — 하이픈 줄은 마커+텍스트 분리해 wrap 시 글자 아래로 정확히 정렬 */
+.notice-line:empty{
+  height:0.5em;
+}
+.notice-line.bullet{
+  display:flex;
+  gap:5px;
+}
+.notice-line.bullet .b-mark{
+  flex-shrink:0;
+  font-weight:800;
+  color:#111827;
+}
+.notice-line.bullet .b-text{
+  flex:1;
+  min-width:0;
+}
+/* 공지 페이지네이션 */
+.notice-pagination{
+  display:none;
+  justify-content:center;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  padding:12px 20px 14px;
+  border-top:1px solid #f3f4f6;
+}
+.notice-page-btn{
+  min-width:30px;
+  height:30px;
+  padding:0 8px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:700;
+  color:#6b7280;
+  cursor:pointer;
+}
+.notice-page-btn.active{
+  background:#2563eb;
+  border-color:#2563eb;
+  color:#fff;
+}
+.notice-empty{
+  text-align:center;
+  color:#9ca3af;
+  font-size:13px;
+  padding:30px 0;
+}
+
+/* 가이드(설명서) 모달 */
+.guide-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.75);
+  z-index:10000;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.guide-modal.open{ display:flex; }
+.guide-box{
+  background:#fff;
+  border-radius:16px;
+  max-width:560px;
+  width:100%;
+  max-height:92vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.guide-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 16px;
+  border-bottom:1px solid #e5e7eb;
+}
+.guide-title{
+  font-size:15px;
+  font-weight:800;
+  color:#111827;
+}
+.guide-close{
+  background:none;
+  border:none;
+  font-size:22px;
+  color:#6b7280;
+  cursor:pointer;
+  padding:4px 8px;
+}
+.guide-image-wrap{
+  flex:1;
+  overflow:auto;
   background:#f9fafb;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding:8px;
+}
+.guide-image-wrap img{
+  max-width:100%;
+  height:auto;
+  display:block;
+}
+.guide-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px;
+  border-top:1px solid #e5e7eb;
+  background:#fff;
+}
+.guide-nav-btn{
+  padding:8px 16px;
+  border-radius:10px;
+  background:#2563eb;
+  color:#fff;
+  border:none;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+}
+.guide-nav-btn:disabled{
+  background:#cbd5e1;
+  cursor:not-allowed;
+}
+.guide-page-indicator{
+  font-size:13px;
+  color:#6b7280;
+  font-weight:600;
+}
 
-  color:#374151;
+/* 첫방문 가이드 투어 */
+.tour-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.65);
+  z-index:9998;
+  pointer-events:auto;
+}
+.tour-overlay.open{ display:block; }
+.tour-spotlight{
+  position:fixed;
+  border-radius:24px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,0.65);
+  pointer-events:none;
+  z-index:9999;
+  transition:all 0.25s ease;
+}
+.tour-popup{
+  display:none;
+  position:fixed;
+  z-index:10001;
+  background:#fff;
+  border-radius:14px;
+  padding:18px 18px 14px;
+  max-width:300px;
+  box-shadow:0 12px 36px rgba(0,0,0,0.3);
+}
+.tour-popup.open{ display:block; }
+.tour-popup-title{
+  font-size:15px;
+  font-weight:800;
+  color:#111827;
+  margin-bottom:6px;
+}
+.tour-popup-text{
+  font-size:13px;
+  color:#475569;
+  line-height:1.5;
+  margin-bottom:14px;
+  word-break:keep-all;
+}
+.tour-popup-buttons{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+.tour-btn{
+  border:none;
+  border-radius:8px;
+  padding:7px 12px;
+  font-size:12.5px;
+  font-weight:700;
+  cursor:pointer;
+}
+.tour-btn-primary{
+  background:#2563eb;
+  color:#fff;
+}
+.tour-btn-secondary{
+  background:#f1f5f9;
+  color:#475569;
+}
+.tour-btn-dismiss{
+  background:transparent;
+  color:#94a3b8;
+  font-weight:600;
+}
 
-  border:1.5px solid #e5e7eb;
+/* 팝업 안내문구의 미니 ? 아이콘 (실제 버튼처럼 보이게) */
+.tour-q-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#93c5fd;
+  color:#1e40af;
+  font-size:11px;
+  font-weight:900;
+  vertical-align:middle;
+  line-height:1;
+}
 
+/* PC: 가이드 투어 팝업 더 크게 */
+@media (min-width:601px){
+  .tour-popup{
+    width:480px;
+    max-width:none;
+    padding:30px 32px 22px;
+    border-radius:18px;
+  }
+  .tour-popup-title{ font-size:21px; margin-bottom:10px; }
+  .tour-popup-text{ font-size:16px; line-height:1.6; margin-bottom:20px; }
+  .tour-btn{ font-size:14.5px; padding:10px 18px; border-radius:10px; }
+  .tour-q-icon{ width:20px; height:20px; font-size:12px; }
+}
+
+.title + .card{
+  margin-top:18px;   /* 👈 여기 추가 */
+}
+
+.title h1{
+  margin:0;
+  font-size:32px;
+  font-weight:900;
+  letter-spacing:-1px;
+  color:#111827;
+}
+
+.title h1 span{
+  color:#2563eb;
+}
+
+.title p{
+  margin-top:6px;
+  color:#6b7280;
+  font-size:14px;
+}
+
+/* 메뉴 카드 */
+.card{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  background:white;
+  padding:13px 16px;
+  border-radius:14px;
+  margin-bottom:9px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.07);
+  text-decoration:none;
+  color:inherit;
+  transition:0.18s;
+}
+
+.card:hover{
+  transform:translateY(-3px);
+  box-shadow:0 14px 32px rgba(0,0,0,0.12);
+}
+.main-menu-card{
+  background:white;
+  border:1px solid #e5e7eb;
+  border-left:8px solid #3b82f6;
+  color:#111827;
 }
 
 
+.main-menu-card span{
+  color:#4b5563;
+}
 
-/* ══ 방문자 ══ */
+.main-menu-card .icon{
+  background:#eff6ff;
+}
 
-.visitor-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
+.main-menu-card:hover{
+  background:#f8fbff;
+  border-left-color:#3b82f6;
+}
+
+.sub-card{
+  background:white;
+  border:1px solid #e5e7eb;
+  border-left:8px solid #fb7185;
+  color:#111827;
+}
+
+.sub-card span{
+  color:#4b5563;
+}
+
+.sub-card .icon{
+  background:#fff1f2;
+}
+
+.sub-card:hover{
+  background:#fff7f8;
+  border-left-color:#f43f5e;
+}
+
+/* 아이콘 */
+.icon{
+  width:44px;
+  height:44px;
+  flex-shrink:0;
+  border-radius:12px;
+  background:#e8f1ff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+}
+
+/* 텍스트 */
+.text{
+  flex:1;
+}
+
+.text b{
+  font-size:14.5px;
+  display:block;
+  margin-bottom:2px;
+}
+
+.text span{
+  font-size:12px;
+  color:#6b7280;
+}
+
+/* 하단 카드 */
+.bottom-row{
+  display:flex;
+  gap:12px;
+  margin-top:10px;
+  margin-bottom:12px;   /* 🔥 이거 추가 */
+}
+.bottom-card{
+  flex:1;
+  background:white;
+  border-radius:12px;
+  padding:11px 10px;
+  text-align:center;
+  text-decoration:none;
+  color:#111827;
+  box-shadow:0 4px 12px rgba(0,0,0,0.07);
+  transition:0.15s;
+}
+
+.bottom-card:hover{
+  transform:translateY(-2px);
+}
+
+.bottom-card img{
+  width:26px;
+  margin-bottom:4px;
+}
+
+.bottom-card div{
+  font-size:13px;
+}
+
+/* 모바일 */
+@media (max-width:480px){
+
+.container{
+    padding-top:calc(26px + env(safe-area-inset-top)) !important;
+  }
+
+.main-menu-card,
+.sub-card{
+  height:65px !important;
+  min-height:0 !important;
+  padding:0 12px !important;
+  align-items:center !important;
+  box-sizing:border-box !important;
+}
+.main-menu-card .icon,
+.sub-card .icon{
+  width:40px !important;
+  height:40px !important;
+  flex-shrink:0 !important;
+  font-size:19px !important;
+}
+.main-menu-card .text b,
+.sub-card .text b{
+  font-size:13px !important;
+  margin-bottom:1px !important;
+}
+.main-menu-card .text span,
+.sub-card .text span{
+  font-size:11px !important;
+  overflow:visible !important;
+  display:block !important;
+  white-space:normal !important;
+}
+
+.bottom-card{
+  flex:1;
+  background:white;
+  border-radius:14px;
+  height:65px !important;
+  min-height:0 !important;
+  padding:0 10px !important;
+  box-sizing:border-box !important;
+  text-align:center;
+  text-decoration:none;
+  color:#111827;
+  box-shadow:0 6px 16px rgba(0,0,0,0.08);
+  transition:0.15s;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center !important;
+  align-items:center !important;
+}
+
+.bottom-card img{
+  width:20px !important;
+  margin-bottom:2px !important;
+}
+  .title h1{
+    font-size:22px;
+  }
+
+.card{
+  padding:10px 12px !important;
+  margin-bottom:8px !important;
+}
+
+  .icon{
+    width:44px;
+    height:44px;
+    font-size:20px;
+  }
+
+}
+.text span{
+  display:block;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.5;
+
+  word-break:keep-all;      /* 🔥 단어 안깨짐 (핵심) */
+  overflow-wrap:break-word; /* 🔥 줄 필요하면 자연스럽게 */
+}
+
+@media (max-width:480px){
+  .text span{
+    font-size:12.5px;
+    line-height:1.45;
+  }
+}
+
+/* ===== 카피라이트 (HOME 전용 추가) ===== */
+.copyright{
+  text-align:right;
+  margin-top:22px;
+  margin-bottom:6px;
+  padding:0 12px;
+}
+
+.copyright-line{
+  width:44px;
+  height:2px;
+  margin:0 0 12px auto;
+  border-radius:999px;
+  background:linear-gradient(135deg,#93c5fd,#2563eb);
+  opacity:0.9;
+}
+
+.copyright-main{
+  font-size:12.5px;
+  color:#9ca3af;
+  line-height:1.5;
+  font-weight:500;
+  word-break:keep-all;
+}
+
+.copyright-sub{
+  margin-top:4px;
+  font-size:15px;
+  color:#374151;
+  font-weight:600;
+  letter-spacing:-0.2px;
+}
+
+.copyright-sub .brand{
+  color:#2563eb;
+  font-weight:800;
+}
+
+.copyright-sub .tf-label{
+  font-size:13px;
+}
+
+
+.bottom-footer{
+  margin-top:-40px;
+  padding:0 12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+}
 
 .visitor-box{
-
-  background:#f9fafb;border-radius:10px;padding:10px;
-
-  text-align:center;border:1px solid #e5e7eb;
-
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
 }
 
-.visitor-num{font-size:22px;font-weight:900;color:#374151;line-height:1;margin-bottom:3px;}
-
-.visitor-lbl{font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;}
-
-
-
-/* ══ 푸터 ══ */
-
-.sidebar-footer{
-
-  padding:10px 14px;border-top:1px solid #f1f1f1;
-
-  text-align:center;font-size:10px;color:#9ca3af;
-
-  line-height:1.6;flex-shrink:0;background:#fff;
-
+.visitor-box-top{
+  justify-content:center;
+  margin-top:0;
 }
 
-
-
-/* ══ 지도 영역 ══ */
-
-.map-wrap{position:relative;flex:1;min-width:0;}
-
-#map{width:100%;height:100vh;}
-
-
-
-.top-badge{
-
-  position:absolute;top:14px;right:14px;z-index:999;
-
-  background:rgba(255,255,255,.96);border:1px solid #e5e7eb;
-
-  border-radius:12px;padding:8px 12px;font-size:12px;
-
-  box-shadow:0 4px 14px rgba(0,0,0,.10);
-
+.visitor-box div{
+  padding:4px 10px;
+  border-radius:999px;
+  background:transparent;
+  color:#6b7280;
+  font-size:12px;
+  line-height:1.2;
+  white-space:nowrap;
 }
 
-@media(max-width:900px){.top-badge{display:none!important;}}
-
-
-
-.map-legend{
-
-  position:absolute;top:20px;right:20px;
-
-  background:rgba(255,255,255,.97);
-
-  padding:10px 12px;border-radius:12px;
-
-  box-shadow:0 4px 16px rgba(0,0,0,.12);
-
-  font-size:12px;z-index:999;
-
+.copyright .visitor-box{
+  width:100%;
+  justify-content:flex-end;
+  margin-top:10px;
 }
 
-.map-legend-item{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
-
-.map-legend-item:last-child{margin-bottom:0;}
-
-.map-legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-
-@media(max-width:900px){.map-legend{display:none;}}
-
-
-
-.loading{
-
-  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-
-  z-index:1000;background:rgba(15,23,42,.9);color:#fff;
-
-  padding:12px 18px;border-radius:14px;font-size:13px;font-weight:600;display:none;
-
-}
-
-
-
-/* ══ 마커 / 위치 ══ */
-
-.custom-marker{
-
-  width:15px;height:15px;border-radius:50%;
-
-  border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);
-
-}
-
-.user-marker-wrap{position:relative;width:28px;height:28px;}
-
-.user-marker-pulse{
-
-  position:absolute;left:50%;top:50%;width:28px;height:28px;
-
-  transform:translate(-50%,-50%);border-radius:50%;
-
-  background:rgba(59,130,246,.22);animation:userPulse 1.8s ease-out infinite;
-
-}
-
-.user-marker-dot{
-
-  position:absolute;left:50%;top:50%;width:13px;height:13px;
-
-  transform:translate(-50%,-50%);border-radius:50%;
-
-  background:#3b82f6;border:2.5px solid #fff;
-
-  box-shadow:0 2px 6px rgba(0,0,0,.25);
-
-}
-
-@keyframes userPulse{
-
-  0%{transform:translate(-50%,-50%) scale(.7);opacity:.9;}
-
-  100%{transform:translate(-50%,-50%) scale(1.8);opacity:0;}
-
-}
-
-
-
-/* ══ locBtn ══ */
-
-#locBtn{
-
-  position:absolute;bottom:20px;right:20px;z-index:3500;
-
-  width:44px;height:44px;border-radius:50%;border:none;
-
-  background:#fff;
-
-  display:flex;align-items:center;justify-content:center;
-
-  box-shadow:0 4px 14px rgba(0,0,0,.18);cursor:pointer;transition:box-shadow .15s;
-
-}
-
-#locBtn:hover{box-shadow:0 6px 20px rgba(59,130,246,.25);}
-
-@media(max-width:900px){#locBtn{display:none!important;}}
-
-
-
-/* ══ Leaflet 팝업 ══ */
-
-.leaflet-popup-content-wrapper{
-
-  overflow:visible!important;border-radius:16px!important;
-
-  box-shadow:0 8px 32px rgba(0,0,0,.15)!important;
-
-}
-
-.leaflet-popup-content{overflow:visible!important;margin:14px 16px!important;}
-
-.popup-title{font-size:15px;font-weight:900;margin-bottom:5px;line-height:1.35;}
-
-.popup-meta{font-size:12px;color:#64748b;line-height:1.5;margin-bottom:6px;}
-
-
-
-/* ══ 모바일 지도 팝업 ══ */
-
-.mobile-map-popup{position:fixed;inset:0;background:#fff;z-index:2000;display:none;flex-direction:column;}
-
-.mobile-map-header{
-
-  height:54px;display:flex;align-items:center;justify-content:space-between;
-
-  padding:0 14px;border-bottom:1px solid #e5e7eb;background:#fff;flex-shrink:0;
-
-}
-
-.mobile-map-close{
-
-  border:none;background:#3b82f6;color:#fff;
-
-  padding:7px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;
-
-}
-
-.mobile-map{flex:1;}
-
-
-
-
-
-/* ══ 모바일 결과 패널 ══ */
-
-.mobile-result-panel{
-
-  position:absolute;left:0;right:0;bottom:0;
-
-  width:100%;height:180px;max-height:40%;
-
-  background:#fff;
-
-  border-top-left-radius:18px;border-top-right-radius:18px;
-
-  box-shadow:0 -4px 20px rgba(0,0,0,.12);
-
-  z-index:3000;display:none;flex-direction:column;
-
-}
-
-@media(max-width:900px){.mobile-result-panel{position:fixed;}}
-
-.mobile-result-header{padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-
-.mobile-result-list{overflow:auto;flex:1;}
-
-.mobile-result-item{padding:10px 14px;border-bottom:1px solid #f8fafc;font-size:13px;cursor:pointer;}
-
-.mobile-result-item:hover{background:#f8fafc;}
-
-.mobile-result-distance{font-size:12px;color:#3b82f6;font-weight:600;}
-
-
-
-/* ══ mobileLocBtn ══ */
-
-#mobileLocBtn{
-
-  position:absolute;bottom:200px;right:12px;z-index:4500;
-
-  width:48px;height:48px;border-radius:50%;border:none;
-
-  background:linear-gradient(135deg,#3b82f6,#60a5fa);
-
-  display:flex;align-items:center;justify-content:center;
-
-  box-shadow:0 4px 16px rgba(59,130,246,.4);cursor:pointer;
-
-}
-
-
-
-/* ══ 알약 필터 바 ══ */
-
-@media(max-width:900px){#pcPillBar{display:none!important;}}
-
-.mobile-pill-bar{
-
-  position:absolute;top:14px;left:50%;transform:translateX(-50%);
-
-  right:auto;z-index:3500;
-
-  display:flex;gap:7px;padding:0 8px;
-
-  overflow-x:auto;-webkit-overflow-scrolling:touch;
-
-  scrollbar-width:none;flex-wrap:nowrap;white-space:nowrap;
-
-}
-
-.mobile-pill-bar::-webkit-scrollbar{display:none;}
-
-.mobile-pill{
-
-  flex-shrink:0;height:28px;padding:0 10px;
-
-  border-radius:999px;border:1.5px solid rgba(255,255,255,.85);
-
-  background:rgba(255,255,255,.93);
-
-  font-size:11px;font-weight:700;cursor:pointer;
-
-  white-space:nowrap;display:flex;align-items:center;gap:4px;
-
-  box-shadow:0 2px 8px rgba(0,0,0,.10);transition:all .15s;
-
-  backdrop-filter:blur(8px);
-
-}
-
-.mobile-pill.active{color:#1a202c;border-width:2px;background:rgba(255,255,255,.98);}
-
-.mobile-pill.active svg{opacity:1;}
-
-
-
-/* ══ 나침반 버튼 ══ */
-
-.map-compass-btn{
-
-  position:absolute;bottom:72px;right:20px;z-index:1000;
-
-  width:44px;height:44px;border-radius:50%;border:none;
-
-  background:#fff;display:flex;align-items:center;justify-content:center;
-
-  box-shadow:0 4px 14px rgba(0,0,0,.15);cursor:pointer;transition:transform .3s;
-
-}
-
-
-
-/* ══ 모바일 레이아웃 ══ */
-
-@media(max-width:900px){
-
-  .page{display:block;height:auto;min-height:100vh;}
-
-  .sidebar{width:100%;min-width:0;box-shadow:none;}
-
-  .map-wrap{display:block;position:static;width:100%;height:0;overflow:visible;}
-
-  #map{display:none;}
-
-  .mobile-map-popup .map-legend{
-
-    display:none!important;
-
+@media (max-width:480px){
+  .bottom-footer{
+    flex-direction:column-reverse;
+    align-items:flex-end;
+    gap:10px;
+    padding:0 8px;
   }
 
+  .visitor-box{
+    width:100%;
+    justify-content:flex-end;
+  }
+
+  .visitor-box div{
+    font-size:11px;
+    padding:4px 8px;
+  }
+
+  .copyright{
+    width:100%;
+    text-align:right;
+    margin-top:0;
+    margin-bottom:4px;
+    padding:0;
+  }
 }
 
 
 
-/* ══ 기타 ══ */
 
-.leaflet-control-attribution{display:none!important;}
+/* 메인 메뉴 카드: 솟은 버튼 + 누르면 들어감 (디자인 전용) */
+.main-menu-card, .sub-card, .bottom-card { box-shadow:0 2px 5px rgba(15,23,42,0.08); transition:transform .12s ease; }
 
-
-
-/* ══ 모바일 지도 줌 컨트롤: 알약 메뉴 아래로 이동 ══ */
-
-@media(max-width:900px){
-
-  #mobileMapPopup .leaflet-top.leaflet-left{
-
-    top:112px !important;
-
-  }
-
-  #mobileMapPopup .leaflet-control-zoom{
-
-    margin-top:0 !important;
-
-  }
-
+/* 길게눌러(상세메뉴)·뒤로가기 후 호버가 끼어 간격·띠지색이 틀어지는 것 방지
+   — 브라우저 hover 감지(@media hover)에 의존하지 않고, 모든 기기에서 hover를 평상시와 동일하게 고정 */
+.main-menu-card, .sub-card, .bottom-card{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
 }
+.card:hover, .main-menu-card:hover, .sub-card:hover, .bottom-card:hover{
+  transform:none !important;
+  box-shadow:0 2px 5px rgba(15,23,42,0.08) !important;
+}
+.main-menu-card:hover, .sub-card:hover, .bottom-card:hover{ background:#fff !important; }
+.main-menu-card:hover{ border-left-color:#3b82f6 !important; }
+.sub-card:hover{ border-left-color:#fb7185 !important; }
+/* 누름 효과: 다른 버튼과 통일(살짝 작아짐). 호버 규칙보다 뒤에 둬서 탭 시 우선 적용 */
+.main-menu-card:active, .sub-card:active, .bottom-card:active{ transform:translateY(2px) scale(0.97) !important; box-shadow:0 1px 2px rgba(15,23,42,0.05) !important; }
+html.tap-reset .main-menu-card, html.tap-reset .sub-card, html.tap-reset .bottom-card{ transform:none !important; }
 
-.sexoffender-btn{width:100%;}
-
-@keyframes floatChar{0%{transform:translateY(0);}50%{transform:translateY(-6px);}100%{transform:translateY(0);}}
-
-.char{width:80px;animation:floatChar 2.2s ease-in-out infinite;}
-
-.loading-dots::after{content:"";animation:dots 1.4s steps(3,end) infinite;}
-
-@keyframes dots{0%{content:"";}33%{content:".";}66%{content:"..";}100%{content:"...";}}</style>{% endraw %}
-
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
 </head>
 
 <body>
 
-
-
-<div class="page">
-
-  <aside class="sidebar">
-
-
-
-    <!-- 브랜드 헤더 -->
-
-    <div class="brand">
-
-      <div class="brand-accent"></div>
-
-      <div class="brand-left">
-
-        <div class="brand-title" onclick="goHome()">장기요양 안전로드</div>
-
-        <div class="brand-sub">자료제공: 행정안전부(생활안전지도)</div>
-
-      </div>
-
-      <img src="/ci" class="ci-logo">
-
-    </div>
-
-
-
-    <div class="sidebar-scroll">
-
-
-
-      <!-- 조회 조건 -->
-
-      <div class="s-card">
-
-        <div class="s-card-label">
-
-          <span>조회 조건</span>
-
-          <button class="btn-reset" onclick="resetFilters()">초기화</button>
-
-        </div>
-
-
-
-        <label class="form-label">시도</label>
-
-        <select id="province" class="form-select">
-
-          <option value="">전체</option>
-
-        </select>
-
-
-
-        <label class="form-label">시군구</label>
-
-        <select id="city" class="form-select">
-
-          <option value="">전체</option>
-
-        </select>
-
-
-
-        <label class="form-label">읍면동 <span style="font-weight:400;color:#475569;font-size:10px;">(복수선택 가능)</span></label>
-
-        <div class="town-multi-wrap" id="townMultiWrap">
-
-          <div class="town-check-item" style="color:#475569;font-size:11px;">시군구를 먼저 선택하세요</div>
-
-        </div>
-
-
-
-        <label class="form-label">구분</label>
-
-        <div class="check-grid" id="categoryBox"></div>
-
-
-
-        <button class="btn-main" onclick="loadData()">조회</button>
-
-      </div>
-
-
-
-      <!-- 빠른 찾기 -->
-
-      <div class="s-card">
-
-        <div class="s-card-label"><span>빠른 찾기</span></div>
-
-        <div class="btn-grid" style="margin-bottom:6px;">
-
-          <button class="btn-action btn-kakao" onclick="openRouteSearch()">경로주변 찾기</button>
-
-          <button class="btn-action btn-kakao" onclick="openAddressSearch()">주소로 찾기</button>
-
-          <button id="facilityFabBtn" class="btn-action" onclick="toggleFacilityFab()">내 주변 찾기</button>
-
-          <button class="btn-action sexoffender-btn" onclick="openSexOffenderApp()">성범죄자 알림e</button>
-
-        </div>
-
-        <button id="apkDownloadBtn" class="btn-action btn-green" style="display:none;" onclick="downloadApk()">안전로드 앱 다운로드 (Android)</button>
-
-        {% raw %}<script>
-
-        (function(){
-
-  const params = new URLSearchParams(window.location.search);
-
-  const fromApp = params.get("from_app") === "1";
-
-
-
-  if(!fromApp && /Android/i.test(navigator.userAgent || "")){
-
-    document.getElementById("apkDownloadBtn").style.display = "flex";
-
-  }
-
-})();
-
-        function downloadApk(){
-
-          window.location.href="/download-apk";
-
-        }
-
-        </script>{% endraw %}
-
-      </div>
-
-
-
-      <!-- 방문자 수 -->
-
-      <div class="s-card">
-
-        <div class="s-card-label"><span>방문자 수</span></div>
-
-        <div class="visitor-row">
-
-          <div class="visitor-box">
-
-            <div class="visitor-num">{{total_visit}}</div>
-
-            <div class="visitor-lbl">총 방문자</div>
-
-          </div>
-
-          <div class="visitor-box">
-
-            <div class="visitor-num">{{today_visit}}</div>
-
-            <div class="visitor-lbl">오늘</div>
-
-          </div>
-
-        </div>
-
-        <button class="btn-action" onclick="openAdminStats()">관리자 통계</button>
-
-      </div>
-
-
-
-    </div><!-- /sidebar-scroll -->
-
-
-
-    <div class="sidebar-footer">
-
-      © 국민건강보험공단 광주전라제주지역본부 요양운영부
-
-    </div>
-
-
-
-  </aside>
-
-
-
-  <main class="map-wrap">
-
-  <div id="map"></div>
-
-
-
-  <!-- 알약형 카테고리 필터 (PC+모바일 공통) -->
-
-  <div class="mobile-pill-bar" id="pcPillBar">
-
-    <button class="mobile-pill active" id="pc_pill_all"
-
-      style="border-color:#475569;color:#1a202c;"
-
-      onclick="pcPillFilter('전체')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-
-      전체
-
-    </button>
-
-    <button class="mobile-pill" id="pc_pill_ice"
-
-      style="color:#1a202c;"
-
-      onclick="pcPillFilter('상습결빙지역')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07l14.14-14.14"/><circle cx="12" cy="12" r="3"/></svg>
-
-      상습결빙지역
-
-    </button>
-
-    <button class="mobile-pill" id="pc_pill_toilet"
-
-      style="color:#1a202c;"
-
-      onclick="pcPillFilter('공중화장실')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6v2H9zM12 4v4M9 8H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-4"/><path d="M10 12v4M14 12v4"/></svg>
-
-      공중화장실
-
-    </button>
-
-    <button class="mobile-pill" id="pc_pill_accident"
-
-      style="color:#1a202c;"
-
-      onclick="pcPillFilter('교통사고위험지역')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-
-      교통사고위험지역
-
-    </button>
-
-    <button class="mobile-pill" id="pc_pill_parking"
-
-      style="color:#1a202c;"
-
-      onclick="pcPillFilter('주차장')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>
-
-      주차장
-
-    </button>
-
-  </div>
-
-
-
-  <div class="mobile-result-panel" id="mobileResultPanel">
-
-    <div class="mobile-result-header">
-
-      <span style="white-space:nowrap;">검색 결과 <span id="mobileResultCount">0</span>건</span><span id="ccbyBadge" style="display:none;align-items:center;gap:6px;font-weight:600;flex-shrink:0;"><span style="font-size:9px;color:#94a3b8;line-height:1.15;text-align:right;white-space:nowrap;">출처: 한국지능정보사회진흥원</span><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJ8AAAA4CAIAAABsYL3hAAABMmlDQ1BJQ0MgUHJvZmlsZQAAeJx9kD9Lw0AYxn+Wgv8H0dEhYxelKuigLlUsOkmNYHVK0zQVmhiSlCK4+QX8EIKzowi6CjoIgpvgRxAH1/qkQdIlvsd797vnHu7ufaEwhqJYBs+Pw1q1YhzVj43RT0Y0BmHZUUB+yPXznnrfFv7x5cV404lsrV/KZqjHdaUpnnNTbifcSPki4V4cxOKrhEOztiW+FpfcIW4MsR2Eif9FvOF1unb2b6Yc//BA645ynm1OiQjoYHGOwT4rmqvaeXSJxT05YtqiiJpOKiKTUA5fSgtHTNK/9InLD9h86Pf795m29wi3azBxl2mldZiZhKfnTMt6GlihNZCKykKrBd83MF2H2Vfdc/LXyJzajEFtVc40XNXmSNnVf20WRcuUWWL1Fx+iTfmvd1mpAAAfVklEQVR42u18eVhUR7p3VZ3TezfdNNjsoLKDBEFE0Yj6JcQti4kTo9GYqDNmlvskT2L0jt9MojEYZ8y9jtcY7zzGbRyTODHmid4Yt0RRQFFAEJRNwyKrCnTTe/c5p+r7o6BtupFNTbzfk/pD6XPq1Km33rfe5fe+dSAhpLy8fM/uPdXV1QQQ8Ev739sIABAQAIICAxcvXjx12lRYWVn59ttvV1ReGx0VSTAgGAM4lMF+Jhp+mgZ73kb+V5BJCECQZZmmxia5RP7hxo3sgQMHrpSVvvPHVWNTx1ptNkAIpKN6UwYBIKD7NukRFAgBAIR4LwKE7osEAKF9idvP3h08L7oTCHve6HqJ29sIABD2zMz1DOk9jtvFXuPQ/yGAveYOeggioOefPngPIX3Ufa3uDt7XnAkhEEK3n913CZ2A90IRQID7I55k0hWjbyGEAACkUumttraNH2zctm0b29TUNEI3Ii4hzmq1OBwOhFAPMdB9hSEEva93D0dHvEskgAAADAi8u3LEfR3A3ZWCbovvLk0ecushw8RrXw1Gzr0H6a8/JQ0TAiFEEIlEIpYVQYQYhAAAGGOCCSdwnJPDWOhhM7z3S/siZ1AKob953mMAwnFcSGhYTGxs3fU6FkIIAbTbHRASnucRQoQQyk8X59y42y2zhBBCMICIZRiGZUUiEUIIdW8Q124mhBCO43me43meYAwRgj17HfaM78kl13WvP/qlauAHvUegHdxJ61EhBAIgEkukUinDMAaDwdCpt1isFouZEKBQyhVyuY9G7av1g4DY7XaHw0EIgRC5NpDrJR66ZvCTHD51ENntNowxYhALqVKDAELYvcUgdNc8roYQIAQCQDDGCCGZXCFixRjjLmNXXW29yWi2WS1mk8lms4klEqVSqVDI5QqFLiBAq/WVyxUYC3a7neM4hFC3DEHYWzED2Pul95oJvPcS9P+g9wg9JLtLLRGLxQqF0mQyXS66XFVZVXmtsrW51ck5eZ4HhLAilhWxOp0uPiEhJi4mPiHOz9/fZrM5HDYAkNsb+6BuwEn2w+xBUtetRwgAALBDstl0O8oVCrFYrO/orKwoulp2tfbH2uamFpPRzAscwYQQAiBAECKGkctlQUFB4SPD4xMSkpKTAoMCZTKZxWKh8tEnGQMK8iCFfUg93QwNlskUAIDCS4Unj50qKbpsMpn6HKS1ue1KSZlMIU8ck5A1Iyt9wniVysdkMgNA7iVSP7FPNgTuQggxFhhGpFAqDZ2dJ3Pz887m3bh+w2Qy99lfAABwvMPu0HcaKq5Vnj55JmJUxLjx46Y9MW3k6FFOh91us0GEhjPvQTNs8D2p7BJCfHw0BkPXl1/86/T3pw2dBnorLCwsMTHR39/fx8cHIWQ0GvV6fVVVVV1dnc1iLbpYVHG1YvKUSS8tWhAeHtHVpSeAQICG52gPac79OftwKNwVBEEqlYnF4sKCi19/+fW18mtOjoMQugwyhJBlWYZh6KYUBIHneYwxfZzjues116/XXC84fyFr1lNPzXxKpVabjMZHQcwhgAQQQohK5dPU2LR3197zuecxxiKRKDU15cUX50+aNCksLEwul6tUKoSQyWSy2WwtLS0lJSVfffVVXl6exWI5dfz7psamZb9ZnjT2MaPJSDD5WSnrFhHWPUy4Z19MlEqlgMnXXx76+uDXHR2d1EhTE6XT6aKjoxMSEgICArRarY+Pj91u7+zs7OjouHHjRkVFRUtLi8lkAgAghOrrGvZ+ureqovrlJQtHjx5tMhkxxvewHwPpVW93aOgKmQZ3GGMftbqluXXblm2ll0sBABEREStWrJg/f35kZKRrelarled5jUaj0WiCgoLGjRs3Z86cI0eObN26taKiovJa1Zb/2PLG22+kpqUaDPqHJYuDoq57ZVhw10Pvm7uYEJVKaTZb9u/954mjJxxOJ0KIinZGRsbs2bPT09OTkpJ8fX0hhKhH2RJCMMYOh6O6urqkpOT06dMnTpxob2+HEPI8n5tzrrmp6Te//c249HHGrq5+zPBgJPQ+lRvGWCaTm7qMez/dTVmblJS0fv36Z599FvWEQAihoqKiPXv2WK3WxYsXT58+nS50UFDQ66+/PmbMmHfffffMmTPNTc07//7pyj++EzEywmQanmZ6INhJt+1nxo0b19zSPO2J6RACQRA8JoQxVihVXV1d27duO3nsewFjKjvx8fErV65cs2bNM888M2rUKLlcjhDy8P0QQiKRKCgoKCUlJSsrKyEhwWq11tXVCYKAEOrs6LxWfjU4NCQyMtLhcPTjIg5lXYZj50SsiGVFn+/7/OTxk4SQhISEv/3tb3PmzHG50AihpqamVatWffbZZ6WlpTU1NY8//rhOp3OJUXh4+IQJE6qrq2trazs7Og16feq4FKlUxvNONKBvAYe8dwfsIJFICy8WGruMqM8tQIfABMvlcoEX9u7cc+5MHqQhEYTPPvvsnj17Vq1aNXr0aIwx6WneC0cbxlilUr3wwgs7dux49913dTod3Q1trbc+2bKttKRErdY8CG+CDDIc8pikQqm4Wl7+/akfBAGHhoauW7cuKyuLztw1QlNTU2VlJf27pqbm5s2brldACDHGcXFxH3744WOPPQYAuHjh0tkz52RSKYTILfwdkgK6L7fLlS9A93qzS6i/Pnjoh5OnEUKAEKlUumzZsu3bt0+YMMEl17CneYsIbVTrYoyDgoLWrFnz0UcfRUZGuhi88++7mhqbVCqVywW7T+/R9eBAI0BCsEQisZitJ4+f0nfqRSLRsmXLXnjhBRdc4LJzMTExTz75pEKhkEgkTz31VGJiovvg1FSNHz9+9erVGo2G47gfTv3Q3NwilUoJwT8LGj+AZoYQqnx8cn7I+efufXa7HUDAMMzy5cs3bNgQGBhIeTN45enywhiGSU5ODg8PLygoMBgMCKH2O+1mi3nc+PEiVkTBsuGYquEqN7lcUX6l7OAXBx0Ox7hx47Kzs/38/DwUAIRQLBZPmjQpJibmiSee+MMf/hAcHOxNPoRw9OjR5eXllZWVHR0doeEhCYkJDgc3xAgY3j9fxT2amfUeF0KAMVGpVE03Gw98fsBoMlHZfHbus3/+85/9/f0pa+/H35s7d25HR8eqVav0ej2EMO9s3pikMbOfnu10OoazZUkvf2RAr7LnLmEQAyGsqqgyGo0Mw7z44osjR4503/oQQpvNtm/fvtzcXLVaLZFICCHXrl3T6/XJycnLly/XarW0G32pUql87bXXjh8/bjaba6qvcxzPsgzHccP254frM3fnetg+H2YYBkL03f8cq6+tp3Zl/Pjx69evDw4OHjZre2PUZMmSJXV1dZs2bRIE7LA7jn17LDUt1d/fz2w2I8QMy28kQ1LphABGxHR1dV2vuQEACAgImD59OpVjdwIbGhr+8pe/1NfXezx+6tSp9PT0qVOn9kKnIRwzZkxsbGxxcfH1qpq21lZdQADHcS7JGwxjHgTc0Z3xQt7jYozlcsWNmhv5ufn0ikqleuuttxITE90pJ16tz6l496FqSiQSvf7665MnT8ZYQAjdqLlxIe88y4oYhunZgg/dOLEsq+/obGpsAgAkJyeHhoZ6+2JWq9XhcDAMQ4EahBD9mxBisVi8Fb5Wq01NTQUA3L7TfvvWbZZl3d2cnxCi8eRuNz8YhgUA5J7Lu33rNt1qM2fOnDlzprsP6VJH7s2Dwf30ofogLCzs5UUvq1Qq6nOdz7+g13dS7dcDaw8nJBi83WUYxmw2W60WAEBoaKhcLvfuTDkqCAJ2a4Ig0Me9+8vl8sDAQAAA5gWrxUo3A/zJWUvlie2VMoUQY6xQyDs7OstKr1AUacSIEa+++qqvr6/7xoUQOp3OhoaGlpYWkUik0+nCwsIkEonHItpstvr6+lu3bkkkkoCAgLCwMJFI5K6in5/7/FcHvzp58iQA4Eb19eqqmgkZE2w228O3TAACiBBjsVgcdgfdcx7zH957GYZRq9UAAAELVqt1SL7ng8QhXTgzdNfpEIpEooa6+tbmFjrd9PT0tLQ0l8jTHXnx4sU9e/YUFBRQf0Qul6ekpCxYsODJJ59kWZYq4XPnzu3Zs6ekpMRsNrMsq1Ao0tPTFy5cOHXqVFew4e/vP23atDNnznAcZ7XaaqpqJmZM7B+3GpBzg+xA8540Xqda+l7+hCuo87jSj8KnugcLGLrqMcDPoJs9fWYGMRjj6urqrq5uIC01NTUgIKBHWxII4TfffPOnP/2poqLCfbCysrKcnJw1a9YsWbJEKpXu37///fffr62tde9TWlqak5Ozdu3aefPmicViOmZGRoZarW5vbwcA1NXWWsxmlmWdTuewsMmhAdGCgOVyuVgstlpter3e4XC4VIt7+sRqtXqA4YQQijl7WyJCiNFoBAAwDJLKZB5B/IBA4/071XedRg+fmRBCPfi2tlt0/wUGBo4fP97diJaUlLz77ruUtf7+/pmZmTqdrrS0tLi4uKGhYfPmzRkZGU6nc926dXV1dQCA4ODgzMxMlUpVWFhYVlZWU1Pz0UcfpaamxsXFCYLAMExsbGx0dDTlbktzq6GrS6fTOZ3OB+CJkAGAaAELCoVCKpcBQ9ft27ftdrtSqfToPGLEiBUrVuTn558/f57iAYSQtLS0KVOmREREeA9OMygAAASRXC7FmAzRJX5giS8P7hIAAESI5zmruTtrGxgQ6KKBErZv375r165BCGUy2erVq5ctW6ZWq2tqalavXt3V1fXrX/86ICCAshZC6Ofnl52dPW/ePJlMVlxc/M477yiVyqVLlwYFBblUvVwuj4yMvHDhAgDAarHa7Q6EEAAEAkTAcFJAgxd/gefVvpoR/iPaWtrKr5a3t7f7+/u7FCn9NyQkZOPGjZ999tmlS5dc3F20aNEbb7xB96WH1jUYDNeuXQMAKH2UGj8t9b/uPzUyJDJ7eVXuQo0gdAqCxWqlV6QyiUqlcnVobW0tLCykg6amps6fP9/Pz48i75988gkhZOTIkY2NjXl5eXS0zMzM559/3sfHBwAwceLEvXv3yuXy4OBgd99VJBJpNBp6hed4u82GEOovHUkeSEQIIAQ8z2u12ujYqPKy8ob6hqKiori4uJ5iq15gNTWlHnbXg6/0qYaGhtLSUgBAVNTokJAQjnM+SH07ODJdASXysLsQIbvdYbF0c1epVFHeuLir13dnLqOiotRqtSuQjYiIoEBPY2OjuWfrx8XFyWQyGvAQQqKioige4j4zlmW1Wm03dwXeYrEgBAEBD3w5vPmLMWYYJjo2RiwW2+32gwcPUqU6YON5vs/wj+f5Q4cOdXR0AACiY6OVSoXACz9jhYJnjggCIPC8wHXrE4lEIhaLXXedTqfLlRCJRAzDuAeylG3ulEskElcfF7jhkXJACLlCEYwxz3G0kO9BIen9i7/T6RyTNCY+MR4AkJOTc/To0cHsM++sCaWrsLDw4MGDGOPAoMDklLEczwtYcN9nD5DTAw1FvHNEkBAilUplMin9bTab3REZlUollXbfok4mje7p7GlA7OPj49Jj7e3tHMfRPu4BlYdTSp1MAADLMFKpFGNyjwrhITNvwBEcDntAgC5rZpZUJjMajVu3br18+TLFI/tUxX0mxCjhLS0tmzZtamxsBABkTp0SGx9vt9mHZzXuOxXYXWnjgUQSjDErEsmVchcOR4tmaAsLC6NADACguLi4qqqKInMQwoMHD7733ntXrlzR6XTBwcGU/vz8/Pr6etqH5/ldu3ZlZ2dXVla6A+scxxkMhm7wiGXlCkX3ykLykLZsr2XA2O6wZ0zOSEtPpUS99957N27coAx2raDT6bTZbLRejBDimj/VWAihzs7ODRs2fPvttxjj6JioJ2dmAUJ4nrsfTP7+9y7bJ9oil8noFYvF4jK0hBC1Wj1z5szTp08LglBfX5+dnf3666+HhISUlpZu3ry5pqbm6NGjO3fu/NWvfpWbmwshLCsrW7du3auvvurn53f+/PnNmze3tLR89913O3bseOyxx6jZ4ziOhkMAAJGIlUql3b4oGEA/P5B9ABGy2W1KhWrxq6/cudVeXVV97NgxkUi0fv36pKQkqloghAqFIjo6mu5ajuNoaojqIYRQQ0PDhg0b/vGPf/A87+enfXnJy+Ejw01G4zBC9sH7XwNmr/vIEQkCFkvEPmo1fVNjY2NFRUV6erqrw4IFC86ePXv48GEAwIkTJy5evKjRaG7dumWz2SCEsbGxISEhL7zwwuHDh0+fPs3z/JdffvnDDz+oVKqWlhan08kwzJgxY3Q6nUv62tvbXcCIxlctl8vo8Y2Ho7L6aAxirFbLqNGjlq9YunXLtqabTd98801HR8fKlStpxh4AkJmZuXfvXmpfMMZRUVEuTl8ouLD5PzcfOXKEEKJSKRe+snDS45MtFhMhBEE0VAfigVW8EgA8svf0hIxMLuu40365qIRg7HA4QkJCsrKyKGIOIVSpVGPHju3q6mpsbOQ4zmazGQwGjLGvr+/SpUuzs7NDQkJ8fHySk5Pb29ubm5s5jrNarVT3+vv7//73v1+7di0tSqILdObMmX379jmdTgBA2vi0qdOnUlP9QBTvYEJ+OqDD4QgNCwsND2mor9d36m/evJmTk1NbWyuRSNRqtUajiYiICA8PDw8Pj4iIUCgURqPx0qVL27Zt27RpEw3WdQEjXlm6ZOacWXa7jef5Ic2zj8qW+9DYEonEO3tP8/YYEBAdG+0/wq+luRUAUFh4qba2Ni4uDveUzMXFxX388ccLFy7Mzc1tbm6GEIaGhk6ZMmXy5Mk04QMhHDt27I4dO86dO5efn9/W1saybHh4eGZmZkZGhlwud88U5ebmWq1W6jxHRkWKJWKb3dbP0jxIx8Qt50oIsVgtaePHazS+u3fsKistb2tr27lz57fffhsbG5uSkhIREUHrPg2GrpaW5rKysqtXrzY3N9NliYoe/crSJRMyMiwWM89zEA6tWr2PqrT7qI0kPdUgfWTv7XZ7cEjIyNGjW5pbIYSlpVdOnjwZHR3dncyCkBCi0Whmz56dlZVFAySWZSlC63KJCSFarXbu3Llz5syhfUQiUQ+8fveIWFlZ2ffff48xBgD6+fvFJsTSgOqnjxEhhIAQo9E4avSot1a/nfNDzpnvz9T+WNvW1tbW1nbu3DmxWOwqgHXXLqFhIZOmTHpqxlOh4WFms5FWfPZzFujhx/HdsY9nFoEQmtpzaDS+kyZPLCm6TM917dy1a8aMGbGxsa5yKvqwSCRywe7umXl3Mvrs0wPiC/v27aOON8Y4OeWxiJEjHQ7n4PD2gR2TIS8lBIAQk9nko/b51Uvz0iakFeQXVFdW36xvuHOn3b0sl2XZETr/8IjwqJioCZMmRMfEAAJMJiMA5AEkP4aGSPb98D1wZgAJIHa7fXxGesyJU1dKyiCEV8vLd+/evX79eppad0cn+rMc9+5DiylzcnIOHTpENZtKpcyclimVSru6DN0w73ARjQFrIj2PjLp+EgAAQBDabTan3REWFhb+crjZbG6+2dTc1GwymaxWKyBEJpcrlMrg4KCwiHAfHx8IodVq6an3g/3v0WEzfmgn3noWj+0d/narbLvd5qvxnf30rOvV1202OyBg165dMTExS5cudYdhB6M/vftQBVBVVZWdnX3z5s3uctGJ6ckpY2lMCSEkdz8CAfuJ1of3mQVvENF7zphgs9mIGFYsEkXHxsQlxsNudUdolTLGAs/zVqtVEHiPQxheYw54Nnzg0+X0OLRXOZLng25H/sFd7kIIIESuTYkJsVjMGY9PLikuPf7dCYRQR0fHhg0bdDrdM88841HJPaRGWdvU1LR27dqcnBzK2qDgoOeef04ikRgMeoZl3WAq2E8w56G7B8NnL6G4p/aHEAKACABOp5MmmwGE9PsChBBACE3tQQg96m/6+lQA7H3Fe+FgvyRA1zBeHaA3he58ZGnAJ5FK6eF5iBCAAAuCzWZTKiULXlnY3NRcXnaVYZi6urrVq1cLgjB37lwXn4a6YxBCP/7447p16w4dOuQ6ZzbvpXnxiXEGg0EikYpEYkwwegTOBrovOAHE3RZCCH6eL8IMYpERQjKpjGVYAACLEKqrq9uxfQehOBsgAIBp/2dafEK82WwKCg76ze9+/dFf/rOxoZFhmKqqqrfeequjo2Px4sUU+qdWs/997O5wFRYWrl279tixYz2f0gBPP/f0zNkzLRaLVCbraO84fvSYyWgWiViX9ewtpz3fTSGw77t9/Ox1i7h9v2OgB0HvrU76ukt6Bc900rDHrSGkrzF7dwbeuBwkkEAyjPl0JzjEIvHlomKNr5aFEOo7DYcPfYPdPvhwq7Vt9f/9d7lCoe/sjE9MXL5i2fb/+u/bt28zDFNfX79mzZqamprFixePGTPGFST0w2B669atW0ePHt22bVtJSQlVyBChmXNmLlqyCGOB5wW5XPHd/xw99OXXWMDgl3bfLXWcL5OWllZcXAQh6hY7CCGErS1tKpVybGoKx3N2my0yKiooJPDHGz8aDF0IIYvFkp+fn5+fb7VafXx8NBoNy7Lw3q2pqen48eMbN278+OOPGxsbKWslUslz8557bdlrEqnYYrH4+fkVnC/Yv3e/3WaHCALibWIHieHAvsxznw/2Y9T7pAP1uJJuaaI+skZw0LOF/c9hEI97eMq9TscEBQZ1V+/R4MUFNWCMv/n6cMTIkRmPT+rsbDebTZOnPO6r9f307zuvXrlKny8rK/vjH//4xRdfpKamTpgwIS4uTqvVqtVqlUrlcDj0er3JZKqtrS0qKiouLi4uLqaHSujgfv5+CxYvmPP0bAELJpNJq9XerG/4bN9nXYYuCCHBxCvuI4MOA/t5dvARZd/hTM89jwiZDDSBYYS0gwl+SF/IWy8C2D4pgxB2tHfs/nS3Vusbnxjf3tGu13fGJyasXL3ywOcHcs90Y4cYY8q5AwcOBAYGymQyhUJBz94bjUaHw9He3n779m33iA1BmJCUuGDRSxMmTrDYrDar1ddX22U07t65p7qy+mFCOWRIPUeNGpWRkUErFGiZ45UrV27cuJGcnDxx4sQrV64UFRVRWG3s2LEpKSm1tbVnz5591JQzey/RhRDW19Vv3/bJG2+9GRkdqdfr9Z2dAYEBv/u3340dm3zi2Mnqqmqb1UbdYJPJ5J4Gdm+uTDiEIDwiPHPa1CdnPBkYFNhlMvGc01ertZgte3bszs89/2Ax5PuBJGkV95YtWwgher0eIaTRaOrr6998802pVLpmzRqDwbB06dKSkpLQ0NAPP/wwPT195cqVZ8+e/amAxkGnv9LS0oqKivqcFoTwzu32muqayKjI8JERvJOzWC0iERsbF5eSlhIUEgQA4DnearMS3F9xudZPGxk1OmtW1uJXF2dOnyqRSkwmIwFE6+en79B/+t+fnjp+6tFZFGpBk5KSlixZcvr06b/+9a+nTp0SiUSzZ882Go379+/38fGZP38+xvj48eOLFi168803jxw5smnTJqfTCR+NQI5OIygoiO0/koEQ1lRf37zpb68tfzU9Y4JYKrGYzQ6HQ6lUzpo9a8qUxxtvNlZX1dysbzAaTVarxWqx2Ww2CIFEIlaqVH5+fsGhITGx0REjR/pqfQEgRmOXIAhSmUwuk9dU1ezf88+LBZceKXl3oS6EkNraWlpuERISMnfu3JaWFovFsnv37lmzZs2fP7+qquqll15qaWnZsmWLyWR61DYuGPCLRpTBdbV1W/7jv2bNmfHs88/56fytVqvVZrFaLVKpNDYhLi4xnnNyHMcJAu90OC0WK4JQKpNKpFKJRCISiWiW22QyChhLxBIftdrpcH535LuDBw42NzffT8Lg4TWEEMdxL7/88rhx4wAAcXFxVVVVx44dAwDU1dVt375906ZNH3zwgUwm++CDD4qLiyF8FMGN/jSz+0632WzXrlZUV1ezDAoMDNJofFmWdTidVouFczppvY5IxEplMrXaR+mjkkiliEFYEOx2u9VqEQQslctVSiUkoOxK2ef7Pj/89eHOzs5HcFHolBITE+fNm9fa2lpWVkZNb1hYmNPpvHjxIs/z169fj4uLGz9+fF5e3vr16ykhj5pxGUAze+xgjHFZaXl1ZU1KWkrm9MykpDFaPz+xWiwIvN3uEASe4zDFYF1RIMOwcoVCLBLzPN9lNF4tLc87m3vhfIG+Uw9+umTnMCE9lmUPHz68evVqAEB0dPS//vWvFStW7N27t7a21mw25+XlLVy4sKCggJYF9lNM8uhqZm800eFwFOQXlF4uGTlqVMKY+KTkxwIDAjRajVyuoN+aYxiEMaEfmrPbbHfu3Om40155rbK8rLyutt6gN3TzFZBHlrUu8Q8LC0tNTeV5Pi0tTafT6fV6WiEEempgf5YDnA+eux48ttscVRVVVRVVp459r1Aq/Ef4BQcFK31UCqVCJpM5HE6LxWy1WG61tt26ddtsthgNRkzunrp5lPnabbEYxmKxzJgxIzk5mVaNEUK2bt3a2tpKO0gkEnrK7Wc6wPkQuOumqLuRMBrptrW2XS275hJn6nB6FXwj8GjvV3cJLisry87Olkql9ChGR0dHQUFBYWGh69RXfn7++++/T+vlHl2ifvvb3/Z/1rh/9dWNv6I+KvRdH6saMIn0S3sYZiU1NZX1PvA0VDG/VzDTV5XCL+2nUz8cx7GjRo1y/+ThL+3/GwbHx8f/P3JZDC4wR5sQAAAAAElFTkSuQmCC" alt="CC BY 저작자표시" title="저작자표시(CC BY) · 출처: 한국지능정보사회진흥원" style="height:18px;width:auto;display:block;flex-shrink:0;"></span>
-
-    </div>
-
-    <div class="mobile-result-list" id="mobileResultList"></div>
-
-  </div>
-
-
-
-  </main>
-
-
-
-  <button id="locBtn"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7" stroke-dasharray="2 2"/></svg></button>
-
-  <div class="top-badge">모바일 / PC 지원</div>
-
-  <div class="map-legend">
-
-  
-
-    <div class="map-legend-item">
-
-      <span class="map-legend-dot" style="background:#06b6d4"></span>
-
-      상습결빙지역
-
-    </div>
-
-
-
-    <div class="map-legend-item">
-
-      <span class="map-legend-dot" style="background:#f59e0b"></span>
-
-      공중화장실
-
-    </div>
-
-
-
-    <div class="map-legend-item">
-
-      <span class="map-legend-dot" style="background:#ef4444"></span>
-
-      교통사고위험지역
-
-    </div>
-
-    <div class="map-legend-item">
-
-      <span class="map-legend-dot" style="background:#8b5cf6"></span>
-
-      주차장
-
-    </div>
-
-
-
-    <div class="map-legend-item">
-
-      <span class="map-legend-dot" style="background:#2563eb"></span>
-
-      내 위치
-
-    </div>
-
-  </div>
-
-
-
-  <div class="loading" id="loadingBox">데이터를 불러오는 중입니다...</div>
-
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-
-
-
-{% raw %}<script>
-
-let ALL_DATA_CACHE = null;
-
-
-
-
-
-const CATEGORY_COLORS = {
-
-  "상습결빙지역": "#06b6d4",
-
-  "공중화장실": "#f59e0b",
-
-  "교통사고위험지역": "#ef4444",
-
-  "주차장": "#8b5cf6",
-
-  "자동심장충격기": "#16a34a"
-
-};
-
-
-
-const CATEGORY_LIST = [
-
-  "상습결빙지역",
-
-  "공중화장실",
-
-  "교통사고위험지역",
-
-  "주차장"
-
-];
-
-
-
-// "주차장" = 공영주차장 + 민영주차장 묶음 (화면엔 1개, 데이터/마커는 두 구분값)
-
-const CATEGORY_GROUP = { "주차장": ["공영주차장", "민영주차장"], "위험지역": ["상습결빙지역", "교통사고위험지역"] };
-
-function expandCats(cats){
-
-  const out = [];
-
-  cats.forEach(function(c){ var g = CATEGORY_GROUP[c]; if(g){ g.forEach(function(x){ out.push(x); }); } else { out.push(c); } });
-
-  return out;
-
-}
-
-function catMatch(gubun, cat){
-
-  var g = CATEGORY_GROUP[cat];
-
-  return g ? (g.indexOf(gubun) >= 0) : (gubun === cat);
-
-}
-
-
-
-// 목록용: 주차장이면 "주차장 + 공영/민영 배지" 로, 그 외는 구분 그대로
-
-function gubunLabel(g){
-
-  if(g === "공영주차장" || g === "민영주차장"){
-
-    var t = g.substring(0,2);
-
-    var c = (t === "공영") ? "#2563eb" : "#db2777";
-
-    return '주차장<sup style="background:' + c + ';color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:super;white-space:nowrap;'+'">' + t + '</sup>';
-
-  }
-
-  return g;
-
-}
-
-
-
-
-
-const map = L.map("map", { zoomControl:true }).setView([34.85, 126.90], 9);
-
-
-
-setTimeout(()=>{
-
-  map.invalidateSize();
-
-},500);
-
-
-
-let userLat = null;
-
-let userLng = null;
-
-function showMsg(text){
-
-
-
-  const modal = document.getElementById("msgModal");
-
-  const txt = document.getElementById("msgText");
-
-  const btn = document.getElementById("msgBtn");
-
-
-
-  if(!modal || !txt) return;
-
-
-
-  txt.innerText = text;
-
-
-
-  if(btn){
-
-    btn.style.display = "inline-block";
-
-  }
-
-
-
-  modal.style.display = "flex";
-
-
-
-}
-
-
-
-function showLoadingLocation(){
-
-
-
-  loadingStartTime = Date.now();
-
-
-
-  const modal = document.getElementById("msgModal");
-
-  const txt = document.getElementById("msgText");
-
-  const btn = document.getElementById("msgBtn");
-
-
-
-  if(!modal || !txt) return;
-
-
-
-  txt.innerHTML = `
-
-  <div style="
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  gap:18px;
-
-  ">
-
-
-
-  <img src="/char_left" class="char">
-
-
-
-  <div style="
-
-  font-size:16px;
-
-  font-weight:700;
-
-  padding:10px 14px;
-
-  white-space:nowrap;
-
-  ">
-
-  📍 위치 확인 중<span class="loading-dots"></span>
-
-  </div>
-
-
-
-  <img src="/char_right" class="char">
-
-
-
-  </div>
-
-<div style="
-
-margin-top:10px;
-
-font-size:13px;
-
-color:#64748b;
-
-">
-
-※ 최초 검색 시 위치 정보를 찾는데 시간이 조금 걸릴 수 있습니다.
-
-</div>
-
-  `;
-
-
-
-  if(btn){
-
-    btn.style.display = "none";
-
-  }
-
-
-
-  modal.style.display = "flex";
-
-}
-
-
-
-function preloadLocation(){
-
-  if(!navigator.geolocation){
-
-    return;
-
-  }
-
-
-
-navigator.geolocation.getCurrentPosition(
-
-
-
-  function(pos){
-
-
-
-    userLat = pos.coords.latitude;
-
-    userLng = pos.coords.longitude;
-
-    console.log("사전 위치:", userLat, userLng, "정확도:", pos.coords.accuracy);
-
-    drawUserLocation(userLat, userLng);
-
-
-
-  },
-
-
-
-  function(err){
-
-    console.log("위치 사전 요청 실패", err);
-
-  },
-
-
-
-  {
-
-    enableHighAccuracy:true,
-
-    timeout:10000,
-
-    maximumAge:0
-
-  }
-
-
-
-);}
-
-
-
-
-
-L.tileLayer(
-
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-
-  {
-
-    maxZoom: 19,
-
-    attribution: "&copy; OpenStreetMap"
-
-  }
-
-).addTo(map);
-
-
-
-let markerGroup = L.markerClusterGroup({
-
-  showCoverageOnHover:false,
-
-  spiderfyOnMaxZoom:true,
-
-  disableClusteringAtZoom:15,
-
-  chunkedLoading:true
-
-});
-
-
-
-let routeLine = null;
-
-map.addLayer(markerGroup);
-
-
-
-function clearRoute(){
-
-
-
-  if(routeLine){
-
-    map.removeLayer(routeLine);
-
-    routeLine = null;
-
-  }
-
-
-
-  if(window.mobileRouteLine && window.mobileLeafletMap){
-
-    window.mobileLeafletMap.removeLayer(window.mobileRouteLine);
-
-    window.mobileRouteLine = null;
-
-  }
-
-
-
-}
-
-
-
-function setLoading(show){
-
-  document.getElementById("loadingBox").style.display = show ? "block" : "none";
-
-}
-
-
-
-function calcDistance(lat1, lng1, lat2, lng2){
-
-
-
-  const R = 6371000;
-
-
-
-  const dLat = (lat2-lat1) * Math.PI/180;
-
-  const dLng = (lng2-lng1) * Math.PI/180;
-
-
-
-  const a =
-
-    Math.sin(dLat/2)*Math.sin(dLat/2) +
-
-    Math.cos(lat1*Math.PI/180) *
-
-    Math.cos(lat2*Math.PI/180) *
-
-    Math.sin(dLng/2)*Math.sin(dLng/2);
-
-
-
-  const c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-
-
-
-  return R*c;
-
-
-
-}
-
-
-
-
-
-function closeMsg(){
-
-  const modal = document.getElementById("msgModal");
-
-  if(modal){
-
-    modal.style.display = "none";
-
-  }
-
-}
-
-
-
-function showMobileResults(items, userLat, userLng){
-
-  
-
-
-  const panel = document.getElementById("mobileResultPanel");
-
-  const list = document.getElementById("mobileResultList");
-
-
-
-  if(!panel || !list) return;
-
-
-
-  panel.style.display = "flex";
-
-  list.innerHTML = "";
-
-
-
-  items.forEach(item => {
-
-    let distText = "";
-
-
-
-    if(userLat !== null && userLng !== null){
-
-      const dist = Math.round(
-
-        calcDistance(userLat, userLng, item.위도, item.경도)
-
-      );
-
-      distText = `<span class="mobile-result-distance">${dist} m</span>`;
-
-    }
-
-
-
-    const el = document.createElement("div");
-
-    el.className = "mobile-result-item";
-
-    el.dataset.gubun = item.구분;
-
-    el.innerHTML = `
-
-      <b>${gubunLabel(item.구분)}</b><br>
-
-      ${item.시군구} ${item.읍면동}<br>
-
-      ${distText}
-
-    `;
-
-
-
-    el.onclick = function(){
-
-
-
-  if(isMobile() && window.mobileLeafletMap){
-
-
-
-    window.mobileLeafletMap.flyTo(
-
-      [item.위도,item.경도],
-
-      16,
-
-      {
-
-        duration:1.2,
-
-        easeLinearity:0.25
-
-      }
-
-    );
-
-
-
-    window.mobileLeafletMap.once("moveend", function(){
-
-      // 팝업이 화면 중앙에 오도록 지도 오른쪽으로 이동
-      if(window.mobileMarkerGroup){
-        var __found = false;
-        window.mobileMarkerGroup.eachLayer(function(layer){
-          if(layer.itemData && layer.itemData.순번 === item.순번){
-            __found = true;
-            window._skipPopupAutoPan = true;
-            layer.openPopup();
-          }
-        });
-        if(!__found){
-          // 위치찾기 등으로 결과 마커가 지워진 경우 다시 만들어 팝업 표시
-          var __mk = L.marker([item.위도,item.경도],{icon: buildMarkerIcon(item.마커색상)});
-          __mk.itemData = item;
-          __mk.bindPopup(buildPopupHtml(item),{maxWidth: isMobile() ? 310 : 650, autoPan: false});
-          window.mobileMarkerGroup.addLayer(__mk);
-          window._skipPopupAutoPan = true;
-          setTimeout(function(){ __mk.openPopup(); }, 0);
-        }
-      }
-
-
-
-    });
-
-
-
-  }
-
-
-
-};
-
-
-
-    list.appendChild(el);
-
-  });
-
-
-
-  document.getElementById("mobileResultCount").textContent = items.length;
-
-}
-
-
-
-function createCategoryChecks(){
-
-  const box = document.getElementById("categoryBox");
-
-  box.innerHTML = "";
-
-  CATEGORY_LIST.forEach(cat => {
-
-    const color = CATEGORY_COLORS[cat] || "#334155";
-
-    const item = document.createElement("label");
-
-    item.className = "check-item";
-
-    item.innerHTML = `
-
-      <input type="checkbox" class="category-check" value="${cat}">
-
-      <span class="dot" style="background:${color}"></span>
-
-      <span>${cat === "주차장" ? '주차장<span style="font-size:11px;color:#9ca3af;">(공영/민영)</span>' : cat}</span>
-
-    `;
-
-    box.appendChild(item);
-
-  });
-
-}
-
-
-
-function fillProvinces(provinces){
-
-
-
-  const select = document.getElementById("province");
-
-
-
-  select.innerHTML = '<option value="">전체</option>';
-
-
-
-  provinces.forEach(p=>{
-
-
-
-    const op = document.createElement("option");
-
-
-
-    op.value = p;
-
-
-
-    op.textContent = p;
-
-
-
-    select.appendChild(op);
-
-
-
-  });
-
-
-
-}
-
-
-
-function fillCities(cities){
-
-  const select = document.getElementById("city");
-
-  const current = select.value;
-
-  select.innerHTML = '<option value="">전체</option>';
-
-  cities.forEach(city => {
-
-    const op = document.createElement("option");
-
-    op.value = city;
-
-    op.textContent = city;
-
-    select.appendChild(op);
-
-  });
-
-  if(cities.includes(current)) select.value = current;
-
-}
-
-
-
-function fillTowns(towns){
-
-  const wrap = document.getElementById("townMultiWrap");
-
-  if(!wrap) return;
-
-  wrap.innerHTML = "";
-
-  if(!towns || towns.length === 0){
-
-    wrap.innerHTML = '<div class="town-check-item" style="color:#94a3b8;font-size:12px;">읍면동 없음</div>';
-
-    return;
-
-  }
-
-  towns.forEach(town => {
-
-    const lbl = document.createElement("label");
-
-    lbl.className = "town-check-item";
-
-    lbl.innerHTML = `<input type="checkbox" class="town-check" value="${escapeHtml(town)}"><span>${escapeHtml(town)}</span>`;
-
-    wrap.appendChild(lbl);
-
-  });
-
-}
-
-
-
-function getSelectedTowns(){
-
-  return Array.from(document.querySelectorAll(".town-check:checked")).map(el => el.value);
-
-}
-
-
-
-function getCheckedCategories(){
-
-  return Array.from(document.querySelectorAll(".category-check:checked")).map(el => el.value);
-
-}
-
-
-
-function buildMarkerIcon(color){
-
-  return L.divIcon({
-
-    className: "",
-
-    html: `<div class="custom-marker" style="background:${color};"></div>`,
-
-    iconSize: [18, 18],
-
-    iconAnchor: [9, 9],
-
-    popupAnchor: [0, -8]
-
-  });
-
-}
-
-
-
-// 7번: 팝업 HTML 빌더 (모바일은 티맵 포함, PC는 카카오+네이버만)
-
-function buildPopupHtml(item){
-
-  if(!window._popupItems) window._popupItems = {};
-
-  window._popupItems[item.순번] = item;
-
-  const addr = encodeURIComponent(item.주소);
-
-  const tmapBtn = isMobile() ? `
-
-  <a href="tmap://search?name=${addr}" target="_blank"
-
-  style="display:flex;align-items:center;justify-content:center;height:36px;background:#4b8fe2;color:#fff;font-weight:700;border-radius:8px;text-decoration:none;font-size:13px;">
-
-  티맵
-
-  </a>` : "";
-
-  const gridCols = isMobile() ? "1fr 1fr 1fr" : "1fr 1fr";
-
-  const sid = escapeHtml(item.순번);
-
-  const rvId = "rv_" + sid;
-
-  // PC는 더 넓은 팝업, 모바일은 기본
-
-  const rvHeight = isMobile() ? "220px" : "340px";
-
-  const popupWidth = isMobile() ? 290 : 600;
-
-  return `
-
-  <div class="popup-wrap" style="width:${popupWidth}px;">
-
-
-
-  <!-- 로드뷰 컨테이너 -->
-
-  <div id="${rvId}" style="width:100%;height:${rvHeight};border-radius:10px;border:1px solid #e5e7eb;margin-bottom:8px;background:#f1f5f9;overflow:hidden;position:relative;">
-
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#94a3b8;" id="${rvId}_msg">로드뷰 불러오는 중...</div>
-
-  </div>
-
-
-
-  <div class="popup-title">${gubunLabel(item.구분)}</div>
-
-  <div class="popup-meta">
-
-  주소: ${escapeHtml(item.주소)}
-
-  </div>
-
-
-
-  <!-- 별점 UI: 평가하기 버튼 -->
-
-  <div id="rating_wrap_${sid}" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-
-    <button onclick="openRatingModal('${sid}')" style="
-
-      height:30px;padding:0 12px;border:1px solid #f59e0b;border-radius:8px;
-
-      background:#fffbeb;font-size:12px;cursor:pointer;font-weight:700;color:#b45309;">
-
-      ★ 평가하기
-
-    </button>
-
-    <span id="avg_${sid}" style="font-size:12px;color:#f59e0b;font-weight:700;"></span>
-
-  </div>
-
-
-
-  <!-- 코멘트 + 공유 (한 줄) -->
-
-  <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-
-    <button onclick="openComments('${sid}')" style="height:34px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:13px;cursor:pointer;font-weight:600;color:#374151;">💬 코멘트</button>
-
-    <button onclick="shareSpot('${sid}')" style="height:34px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:13px;cursor:pointer;font-weight:600;color:#374151;">🔗 공유</button>
-
-  </div>
-
-
-
-  <div style="margin-top:8px;display:grid;grid-template-columns:${gridCols};gap:6px;">
-
-  <a href="https://map.naver.com/v5/search/${addr}" target="_blank"
-
-  style="display:flex;align-items:center;justify-content:center;height:36px;background:#03C75A;color:#fff;font-weight:700;border-radius:8px;text-decoration:none;font-size:13px;">
-
-  네이버
-
-  </a>
-
-  <a href="https://map.kakao.com/link/search/${addr}" target="_blank"
-
-  style="display:flex;align-items:center;justify-content:center;height:36px;background:#FEE500;color:#191919;font-weight:700;border-radius:8px;text-decoration:none;font-size:13px;">
-
-  카카오
-
-  </a>
-
-  ${tmapBtn}
-
-  </div>
-
-  </div>`;
-
-}
-
-
-
-async function shareSpot(sid){
-  const item = (window._popupItems || {})[sid];
-  if(!item) return;
-  const name = item.구분 || "위치";
-  const addr = item.주소 || ((item.시군구||"") + " " + (item.읍면동||""));
-  const mapUrl = "https://map.kakao.com/link/map/" + encodeURIComponent(name) + "," + item.위도 + "," + item.경도;
-  const shareText = name + "\n" + addr + "\n" + mapUrl;
-  const canNativeShare = navigator.share && navigator.maxTouchPoints > 0;
-  if(canNativeShare){
-    try {
-      await navigator.share({ title: "안전로드 - " + name, text: name + "\n" + addr, url: mapUrl });
-      return;
-    } catch(e){
-      if(e && e.name === "AbortError") return;
-    }
-  }
-  copyShareText(shareText);
-}
-
-function copyShareText(text){
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(function(){ showMsg("공유 링크가 복사되었습니다."); }).catch(function(){ legacyCopyText(text); });
-  } else {
-    legacyCopyText(text);
-  }
-}
-
-function legacyCopyText(text){
-  try {
-    var ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.top = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-    showMsg("공유 링크가 복사되었습니다.");
-  } catch(e){ showMsg(text); }
-}
-
-
-
-// 로드뷰 초기화 함수 (팝업 열릴 때 호출)
-
-function initRoadview(containerId, lat, lng, category){
-
-  const msg = document.getElementById(containerId + "_msg");
-
-
-
-  function doInit(){
-
-    const container = document.getElementById(containerId);
-
-    if(!container) return;
-
-    try{
-
-      const rvClient = new kakao.maps.RoadviewClient();
-
-      const roadview = new kakao.maps.Roadview(container);
-
-      const position = new kakao.maps.LatLng(lat, lng);
-
-      rvClient.getNearestPanoId(position, 100, function(panoId){
-
-        if(panoId === null){
-
-          if(msg) msg.textContent = "📷 이 위치는 로드뷰가 없습니다.";
-
-        } else {
-
-          if(msg) msg.style.display = "none";
-
-          roadview.setPanoId(panoId, position);
-
-          // 공중화장실/주차장: 로드뷰 위치 → 시설 좌표 방향으로 카메라 회전
-
-          if(true){   // 모든 시설: 로드뷰 카메라가 해당 시설 방향을 바라보도록 회전
-
-            kakao.maps.event.addListener(roadview, 'init', function(){
-
-              try{
-
-                const rvPos = roadview.getPosition();
-
-                if(!rvPos) return;
-
-                const rvLat = rvPos.getLat();
-
-                const rvLng = rvPos.getLng();
-
-                // 방위각(bearing) 계산: 북=0, 시계방향 (카카오 pan 규격과 동일)
-
-                const toRad = Math.PI / 180;
-
-                const phi1 = rvLat * toRad;
-
-                const phi2 = lat * toRad;
-
-                const dLng = (lng - rvLng) * toRad;
-
-                const y = Math.sin(dLng) * Math.cos(phi2);
-
-                const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLng);
-
-                const pan = ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
-
-                roadview.setViewpoint({ pan: pan, tilt: 0, zoom: 0 });
-
-              }catch(err){
-
-                // 실패 시 기본 시야각 유지
-
-              }
-
-            });
-
-          } else {
-
-            // 그 외 카테고리: 초기 시야각 정북
-
-            roadview.setViewpoint({
-
-              pan: 0,
-
-              tilt: 0,
-
-              zoom: 0
-
-            });
-
-          }
-
-        }
-
-      });
-
-    }catch(e){
-
-      if(msg) msg.textContent = "📷 로드뷰를 불러올 수 없습니다.";
-
-    }
-
-  }
-
-
-
-  // kakao SDK 로드 대기
-
-  if(window.kakao && window.kakao.maps && window.kakao.maps.RoadviewClient){
-
-    doInit();
-
-  } else {
-
-    let tries = 0;
-
-    const timer = setInterval(function(){
-
-      tries++;
-
-      if(window.kakao && window.kakao.maps && window.kakao.maps.RoadviewClient){
-
-        clearInterval(timer);
-
-        doInit();
-
-      } else if(tries > 20){
-
-        clearInterval(timer);
-
-        if(msg) msg.textContent = "📷 카카오 SDK 로드 실패";
-
-      }
-
-    }, 300);
-
-  }
-
-}
-
-
-
-function buildUserIcon(){
-
-  return L.divIcon({
-
-    className:"",
-
-    html:`
-
-      <div class="user-marker-wrap">
-
-        <div class="user-marker-pulse"></div>
-
-        <div class="user-marker-dot"></div>
-
-      </div>
-
-    `,
-
-    iconSize:[28,28],
-
-    iconAnchor:[14,14]
-
-  });
-
-}
-
-
-
-function drawUserLocation(lat,lng){
-
-
-
-  // 기존 위치 마커 제거
-
-  if(window.userCircle){
-
-    map.removeLayer(window.userCircle);
-
-  }
-
-
-
-  if(window.userMarker){
-
-    map.removeLayer(window.userMarker);
-
-  }
-
-
-
-  // 내 위치 원 (크게)
-
-  window.userCircle = L.circle(
-
-    [lat,lng],
-
-    {
-
-      radius:180,        // ⭐ 크기 (미터)
-
-      color:"#22c55e",
-
-      fillColor:"#22c55e",
-
-      fillOpacity:0.25,
-
-      weight:2
-
-    }
-
-  ).addTo(map);
-
-
-
-  // 내 위치 점
-
-  window.userMarker = L.marker(
-
-    [lat,lng],
-
-    { icon: buildUserIcon() }
-
-  ).addTo(map);
-
-
-
-}
-
-
-
-
-
-
-
-
-
-function escapeHtml(text){
-
-  if(text === null || text === undefined) return "";
-
-  return String(text)
-
-    .replaceAll("&", "&amp;")
-
-    .replaceAll("<", "&lt;")
-
-    .replaceAll(">", "&gt;")
-
-    .replaceAll('"', "&quot;")
-
-    .replaceAll("'", "&#039;");
-
-}
-
-
-
-async function loadMeta(){
-
-  const res = await fetch("/meta");
-
-  const data = await res.json();
-
-  fillProvinces(data.provinces || []);
-
-  fillCities([]);   // 초기엔 비움
-
-  fillTowns([]);    // 초기엔 비움
-
-
-
-  // 10번: 저장된 값 복원
-
-  const savedProvince = sessionStorage.getItem("sel_province") || "";
-
-  const savedCity = sessionStorage.getItem("sel_city") || "";
-
-
-
-  if(savedProvince){
-
-    document.getElementById("province").value = savedProvince;
-
-    const r2 = await fetch("/cities?province=" + encodeURIComponent(savedProvince));
-
-    const d2 = await r2.json();
-
-    fillCities(d2.cities || []);
-
-    if(savedCity){
-
-      document.getElementById("city").value = savedCity;
-
-      const r3 = await fetch(`/towns?province=${encodeURIComponent(savedProvince)}&city=${encodeURIComponent(savedCity)}`);
-
-      const d3 = await r3.json();
-
-      fillTowns(d3.towns || []);
-
-    }
-
-  }
-
-}
-
-
-
-async function updateCities(){
-
-  const province = document.getElementById("province").value;
-
-  if(!province){
-
-    fillCities([]);
-
-    fillTowns([]);
-
-    return;
-
-  }
-
-  const res = await fetch("/cities?province=" + encodeURIComponent(province));
-
-  const data = await res.json();
-
-  fillCities(data.cities || []);
-
-  fillTowns([]);  // 시도 바뀌면 읍면동 초기화
-
-}
-
-
-
-async function updateTowns(){
-
-  const province = document.getElementById("province").value;
-
-  const city = document.getElementById("city").value;
-
-  if(!city){
-
-    fillTowns([]);
-
-    return;
-
-  }
-
-  const res = await fetch(`/towns?province=${encodeURIComponent(province)}&city=${encodeURIComponent(city)}`);
-
-  const data = await res.json();
-
-  fillTowns(data.towns || []);
-
-}
-
-
-
-async function loadAllMarkers(){
-
-
-
-  if(!ALL_DATA_CACHE){
-
-  const res = await fetch("/data/all");
-
-  const result = await res.json();
-
-  ALL_DATA_CACHE = result.data || [];
-
-}
-
-
-
-const data = ALL_DATA_CACHE;
-
-
-
-  markerGroup.clearLayers();
-
-
-
-  const bounds = [];
-
-
-
-  // 내 위치가 있으면 먼저 표시
-
-  if(userLat !== null && userLng !== null){
-
-    drawUserLocation(userLat, userLng);
-
-  }
-
-
-
-  data.forEach(item=>{
-
-
-
-    const icon = buildMarkerIcon(item.마커색상);
-
-
-
-    const marker = L.marker([item.위도,item.경도],{icon});
-
-    marker.itemData = item;
-
-    const popupHtml = buildPopupHtml(item);
-
-
-
-    marker.bindPopup(popupHtml,{maxWidth: isMobile() ? 310 : 650});
-
-
-
-    markerGroup.addLayer(marker);
-
-
-
-    bounds.push([item.위도,item.경도]);
-
-
-
-  });
-
-
-
-  if(bounds.length>0){
-
-    map.setView([34.85,126.90],9);
-
-}
-
-
-
-}
-
-
-
-async function loadData(){
-
-
-
-  clearRoute();
-
-
-
-  if(isMobile()){
-
-    openMobileMap();
-
-  }
-
-
-
-  setLoading(true);
-
-
-
-map.once("moveend", () => {
-
-  setLoading(false);
-
-});
-
-
-
-    markerGroup.clearLayers();
-
-
-
-  const province = document.getElementById("province").value;
-
-  const city = document.getElementById("city").value;
-
-  const towns = getSelectedTowns();
-
-  const categories = getCheckedCategories();
-
-
-
-  // 10번: 선택값 세션에 저장
-
-  sessionStorage.setItem("sel_province", province);
-
-  sessionStorage.setItem("sel_city", city);
-
-  sessionStorage.setItem("sel_town", "");
-
-
-
-  const params = new URLSearchParams();
-
-  if(province) params.append("province", province);
-
-  if(city) params.append("city", city);
-
-  towns.forEach(t => params.append("town", t));
-
-  expandCats(categories).forEach(cat => params.append("category", cat));
-
-
-
-  try{
-
-
-
-    const res = await fetch("/data?" + params.toString());
-
-    const result = await res.json();
-
-    const data = result.data;
-
-    const total = result.total;
-
-
-
-    // 5000개 초과 시 서버 부하 방지 팝업
-    if(result.too_many){
-      setLoading(false);
-      showMsg(`🚨 검색 결과가 너무 많습니다 (${total.toLocaleString()}건)\n\n시도 → 시군구 → 읍면동으로 범위를 좁히거나 위험지역 구분을 선택해 주세요.`);
-      return;
-    }
-
-
-
-fetch("/log_search", {
-
-  method:"POST",
-
-  headers:{
-
-    "Content-Type":"application/json"
-
-  },
-
-  body:JSON.stringify({
-
-    province:province,
-
-    city:city,
-
-    categories:categories,
-
-    result_count:total
-
-  })
-
-});
-
-
-
-    const bounds = [];
-
-
-
-    data.forEach(item => {
-
-
-
-  
-
-    const icon = buildMarkerIcon(item.마커색상);
-
-    const marker = L.marker([item.위도, item.경도], { icon });
-
-    marker.itemData = item;
-
-    const popupHtml = buildPopupHtml(item);
-
-
-
-      marker.bindPopup(popupHtml, { maxWidth: isMobile() ? 310 : 650 });
-
-      markerGroup.addLayer(marker);
-
-bounds.push([item.위도, item.경도]);
-
-
-
-});
-
-
-
-
-
-  if(bounds.length > 0){
-
-    // 2번: 내 위치가 있으면 bounds에 포함해서 함께 보이도록
-
-    const allBounds = [...bounds];
-
-    if(userLat !== null && userLng !== null){
-
-      allBounds.push([userLat, userLng]);
-
-      drawUserLocation(userLat, userLng);
-
-    }
-
-    map.fitBounds(allBounds, { padding:[40,40] });
-
-    map.once("moveend", closeMsg);
-
-  }else{
-
-    map.setView([34.85, 126.90], 9);
-
-    showMsg("조건에 맞는 데이터가 없습니다.");
-
-  }
-
-
-
-
-
-if(isMobile()){
-
-  syncToMobileMap(data);
-
-}
-
-
-
-// 조회 결과 목록 표시 (최대 10개)
-
-// 결과가 5000개 미만일 때만 목록 표시
-
-// 조회 결과 목록 표시 (5000개 미만일 때만)
-
-// 조회 결과 목록 표시 (5000개 미만일 때만)
-
-if(!isMobile()){
-
-  if(total < 5000){
-
-    showResultList(data, userLat, userLng);
-
-  }else{
-
-    const panel = document.getElementById("mobileResultPanel");
-
-    if(panel){
-
-      panel.style.display = "none";
-
-    }
-
-  }
-
-}  }catch(e){
-
-    showMsg("데이터를 불러오는 중 오류가 발생했습니다.");
-
-    console.error(e);
-
-
-
-
-
-  }finally{
-
-  }
-
-}
-
-
-
-function resetFilters(){
-
-
-
-  // 시도 초기화
-
-  document.getElementById("province").value = "";
-
-
-
-  // 시군구 초기화 (옵션 목록도 전체만 남기기)
-
-  const cityEl = document.getElementById("city");
-
-  cityEl.innerHTML = '<option value="">전체</option>';
-
-  cityEl.value = "";
-
-
-
-  // 읍면동 목록 초기화
-
-  const townWrap = document.getElementById("townMultiWrap");
-
-  if(townWrap){
-
-    townWrap.innerHTML = '<div class="town-check-item" style="color:#475569;font-size:11px;">시군구를 먼저 선택하세요</div>';
-
-  }
-
-
-
-  // 읍면동 체크박스 해제
-
-  document.querySelectorAll(".town-check")
-
-  .forEach(el => el.checked = false);
-
-
-
-  // 구분 체크 해제
-
-  document.querySelectorAll(".category-check")
-
-  .forEach(el => el.checked = false);
-
-
-
-  // sessionStorage도 함께 초기화
-
-  sessionStorage.removeItem("sel_province");
-
-  sessionStorage.removeItem("sel_city");
-
-  sessionStorage.removeItem("sel_town");
-
-
-
-
-
-  // PC 지도 마커 삭제
-
-  if(markerGroup){
-
-    markerGroup.clearLayers();
-
-  }
-
-
-
-  // 모바일 지도 마커 삭제
-
-  if(window.mobileMarkerGroup){
-
-    window.mobileMarkerGroup.clearLayers();
-
-  }
-
-
-
-  // 지도 위치 초기화
-
-  map.setView([34.85,126.90],9);
-
-
-
-  // ⭐ 경로선 삭제
-
-  if(routeLine){
-
-    map.removeLayer(routeLine);
-
-    routeLine = null;
-
-  }
-
-
-
-  // 모바일 결과 패널 닫기
-
-  const result = document.getElementById("mobileResultPanel");
-
-  if(result){
-
-    result.style.display = "none";
-
-  }
-
-
-
-  // 초기화 후 재조회는 사용자가 직접 조회 버튼을 눌러야 함 (자동 전체 조회 제거)
-
-
-
-}
-
-
-
-window.addEventListener("load", function(){
-
-  setTimeout(()=>{
-
-    map.invalidateSize();
-
-  },1000);
-
-});
-
-
-
-window.addEventListener("DOMContentLoaded", function(){
-
-  // WebView IME 강제 활성화
-  setTimeout(function(){
-    var tmp = document.createElement("input");
-    tmp.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
-    document.body.appendChild(tmp);
-    tmp.focus();
-    setTimeout(function(){
-      tmp.blur();
-      document.body.removeChild(tmp);
-    }, 300);
-  }, 1000);
-
-  preloadLocation();
-
-
-
-  createCategoryChecks();
-
-
-
-  loadMeta().then(()=>{
-
-    // 시군구 선택 시 읍면동 갱신 + sessionStorage 즉시 저장 (조회는 버튼으로)
-
-    document.getElementById("city").addEventListener("change", async function(){
-
-      await updateTowns();
-
-      sessionStorage.setItem("sel_city", document.getElementById("city").value);
-
-    });
-
-    // 시도 선택 시 시군구 갱신 + sessionStorage 즉시 저장
-
-    document.getElementById("province").addEventListener("change", async function(){
-
-      await updateCities();
-
-      sessionStorage.setItem("sel_province", document.getElementById("province").value);
-
-      // 시도 바뀌면 시군구 초기화
-
-      sessionStorage.setItem("sel_city", "");
-
-    });
-
-    // 자동 loadAllMarkers 제거 — 조회 버튼을 눌러야만 데이터 로드
-
-  });
-
-
-
-  const destInput = document.getElementById("destInput");
-
-
-
-if(destInput){
-
-  destInput.addEventListener(
-
-  "input",
-
-  debounce(function(){
-
-    searchPlaceSuggestions(this.value, "destInput");
-
-  }, 400)
-
-);
-
-}
-
-
-
-const startInput = document.getElementById("startInput");
-
-
-
-if(startInput){
-
-  startInput.addEventListener(
-
-  "input",
-
-  debounce(function(){
-
-    searchPlaceSuggestions(this.value, "startInput");
-
-  }, 400)
-
-);
-
-}
-
-
-
-
-
-});
-
-
-
-function goHome(){
-
-
-
-  window.location.href = "/";
-
-
-
-}
-
-
-
-function openAdminStats(){
-
-
-
-  const modal = document.getElementById("adminPwModal");
-
-  const input = document.getElementById("adminPwInput");
-
-  const msg = document.getElementById("adminPwMsg");
-
-
-
-  if(!modal || !input){
-
-    return;
-
-  }
-
-
-
-  input.value = "";
-
-  msg.textContent = "";
-
-  modal.style.display = "flex";
-
-
-
-  setTimeout(()=>{
-
-    activateIme("adminPwInput");
-
-  },100);
-
-
-
-}
-
-function closeAdminPwModal(){
-
-
-
-  const modal = document.getElementById("adminPwModal");
-
-
-
-  if(modal){
-
-    modal.style.display = "none";
-
-  }
-
-
-
-}
-
-
-
-function submitAdminPw(){
-
-
-
-  const input = document.getElementById("adminPwInput");
-
-  const msg = document.getElementById("adminPwMsg");
-
-
-
-  if(!input){
-
-    return;
-
-  }
-
-
-
-  if(input.value !== "qwer"){
-
-    if(msg){
-
-      msg.textContent = "암호가 틀렸습니다.";
-
-    }
-
-    input.focus();
-
-    return;
-
-  }
-
-
-
-  window.location.href = "/stats";
-
-
-
-}
-
-
-
-function isMobile(){
-
-  if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return true;
-
-  return window.innerWidth < 900;
-
-}
-
-
-
-function openSexOffenderApp(){
-
-
-
-  const ua = navigator.userAgent || "";
-
-  const isAndroid = /Android/i.test(ua);
-
-  const isIOS = /iPhone|iPad|iPod/i.test(ua);
-
-
-
-  const pcUrl = "https://www.sexoffender.go.kr";
-
-  const playStoreUrl = "https://play.google.com/store/apps/details?id=com.mogef_android1.app";
-
-  const appStoreUrl = "https://apps.apple.com/kr/app/%EC%84%B1%EB%B2%94%EC%A3%84%EC%9E%90-%EC%95%8C%EB%A6%BCe/id896534884";
-
-
-
-  if(!isAndroid && !isIOS){
-
-    window.open(pcUrl, "_blank");
-
-    return;
-
-  }
-
-
-
-  if(isAndroid){
-
-
-
-    const intentUrl =
-
-      "intent://#Intent;"
-
-      + "scheme=sexoffender;"
-
-      + "package=com.mogef_android1.app;"
-
-      + "S.browser_fallback_url=" + encodeURIComponent(playStoreUrl) + ";"
-
-      + "end";
-
-
-
-    window.location.href = intentUrl;
-
-    return;
-
-  }
-
-
-
-  if(isIOS){
-
-    window.location.href = appStoreUrl;
-
-    return;
-
-  }
-
-}
-
-
-
-function openMobileMap(){
-
-
-
-
-
-  if(!isMobile()) return;
-
-
-
-  const popup = document.getElementById("mobileMapPopup");
-
-  popup.style.display = "flex";
-
-
-
-  // 뒤로가기 시 홈(조건 선택 화면)으로 돌아오도록 히스토리 상태 push
-
-  if(!window._mobileMapHist){
-
-    window._mobileMapHist = true;
-
-    history.pushState({mobileMap:true}, "", location.href);
-
-  }
-
-
-
-  const mapDiv = document.getElementById("mobileMap");
-
-
-
-  if(!window.mobileLeafletMap){
-
-
-
-    
-
-
-
-    window.mobileLeafletMap = L.map(mapDiv, {zoomControl: false}).setView([34.85, 126.90], 9);
-
-
-
-    // 줌 컨트롤을 알약 메뉴 아래(왼쪽)에 배치
-
-    L.control.zoom({position: 'topleft'}).addTo(window.mobileLeafletMap);
-
-
-
-    L.tileLayer(
-
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-
-      { maxZoom: 19 }
-
-    ).addTo(window.mobileLeafletMap);
-
-
-
-    window.mobileMarkerGroup = L.markerClusterGroup({
-
-      showCoverageOnHover:false,
-
-      spiderfyOnMaxZoom:true,
-
-      disableClusteringAtZoom:15,
-
-      chunkedLoading:true
-
-    });
-
-
-
-    window.mobileLeafletMap.addLayer(window.mobileMarkerGroup);
-
-
-
-    // 5번: 모바일 팝업 열릴 때 별점 + 로드뷰 로드
-
-    window.mobileLeafletMap.on("popupopen", onPopupOpen);
-
-    window.mobileLeafletMap.on("popupclose", onPopupClose);
-
-  }
-
-
-
-  setTimeout(()=>{
-
-    window.mobileLeafletMap.invalidateSize();
-
-  }, 200);
-
-}
-
-
-
-function closeMobileMap(){
-
-
-
-  document.getElementById("mobileMapPopup").style.display = "none";
-
-
-
-  const result = document.getElementById("mobileResultPanel");
-
-
-
-  if(result){
-
-    result.style.display = "none";
-
-  }
-
-
-
-}
-
-
-window.safeBack = function(){
-
-  const mobileMap = document.getElementById("mobileMapPopup");
-
-  const result = document.getElementById("mobileResultPanel");
-
-  const routePopup = document.getElementById("routePopup");
-
-  const addrPopup = document.getElementById("addressPopup");
-
-  const msgModal = document.getElementById("msgModal");
-
-
-
-  function isOpen(el){
-
-    if(!el) return false;
-
-    const style = window.getComputedStyle(el);
-
-    return style.display !== "none" && style.visibility !== "hidden";
-
-  }
-
-
-
-  if(isOpen(msgModal)){
-
-    msgModal.style.display = "none";
-
-    return "handled";
-
-  }
-
-
-
-  if(isOpen(routePopup)){
-
-    routePopup.style.display = "none";
-
-    return "handled";
-
-  }
-
-
-
-  if(isOpen(addrPopup)){
-
-    addrPopup.style.display = "none";
-
-    return "handled";
-
-  }
-
-
-
-  if(isOpen(mobileMap)){
-
-    mobileMap.style.display = "none";
-
-    if(result) result.style.display = "none";
-
-    return "handled";
-
-  }
-
-
-
-  return "exit";
-
-};
-
-
-
-
-function syncToMobileMap(items, userLat=null, userLng=null, radiusMeter=null){
-
-
-
-  if(!isMobile()) return;
-
-
-
-  if(userLat && userLng){
-
-
-
-    items.sort((a,b)=>{
-
-
-
-      const da = calcDistance(userLat,userLng,a.위도,a.경도);
-
-      const db = calcDistance(userLat,userLng,b.위도,b.경도);
-
-
-
-      return da-db;
-
-
-
-    });
-
-
-
-  }
-
-
-
-
-
-
-
-
-
-  openMobileMap();
-
-
-
-  window.mobileMarkerGroup.clearLayers();
-
-
-
-
-
-  const bounds = [];
-
-
-
-  if(userLat !== null && userLng !== null){
-
-
-
-  const userCircle = L.circle(
-
-    [userLat, userLng],
-
-    {
-
-      radius: 160,
-
-      color:"#22c55e",
-
-      fillColor:"#22c55e",
-
-      fillOpacity:0.28,
-
-      weight:3
-
-    }
-
-  );
-
-
-
-  const userMarker = L.marker(
-
-    [userLat, userLng],
-
-    { icon: buildUserIcon() }
-
-  );
-
-
-
-  window.mobileMarkerGroup.addLayer(userCircle);
-
-  window.mobileMarkerGroup.addLayer(userMarker);
-
-
-
-  bounds.push([userLat, userLng]);
-
-
-
-  if(radiusMeter){
-
-    const circle = L.circle(
-
-      [userLat, userLng],
-
-      {
-
-        radius: radiusMeter,
-
-        color:"#2563eb",
-
-        fillColor:"#2563eb",
-
-        fillOpacity:0.08
-
-      }
-
-    );
-
-    window.mobileMarkerGroup.addLayer(circle);
-
-  }
-
-}
-
-
-
-items.forEach(item=>{
-
-
-
-  const icon = buildMarkerIcon(item.마커색상);
-
-
-
-  const marker = L.marker([item.위도,item.경도],{icon});
-
-  marker.itemData = item;
-
-
-
-  const popupHtml = buildPopupHtml(item);
-
-
-
-  marker.bindPopup(popupHtml,{maxWidth: isMobile() ? 310 : 650, autoPan: false});
-
-
-
-  window.mobileMarkerGroup.addLayer(marker);
-
-
-
-  bounds.push([item.위도,item.경도]);
-
-
-
-});
-
-
-
-
-
-  setTimeout(()=>{
-
-    window.mobileLeafletMap.invalidateSize();
-
-
-
-    if(bounds.length > 0){
-
-      window.mobileLeafletMap.fitBounds(bounds, { padding:[40,40] });
-
-    }else{
-
-      window.mobileLeafletMap.flyTo(
-
-  [34.85,126.90],
-
-  9,
-
-  {
-
-    duration:1.2,
-
-    easeLinearity:0.25
-
-  }
-
-);
-
-    }
-
-
-
-  }, 250);
-
-
-
-
-
-// 🔵 여기 추가
-
-showMobileResults(items,userLat,userLng);
-
-}
-
-
-
-async function findNearestToilet(){
-
-
-
-  clearRoute();   // ⭐ 추가
-
-
-
-  showLoadingLocation();   // 추가
-
-
-
-  if(!navigator.geolocation){
-
-    showMsg("GPS를 지원하지 않는 기기입니다.");
-
-    return;
-
-  }
-
-
-
-  navigator.geolocation.getCurrentPosition(
-
-
-
-    pos=>{
-
-
-
-      const lat = pos.coords.latitude;
-
-      const lng = pos.coords.longitude;
-
-
-
-      userLat = lat;
-
-      userLng = lng;
-
-
-
-      runNearestSearch(lat,lng,"공중화장실");
-
-
-
-    },
-
-
-
-    err=>{
-
-      closeMsg();
-
-      showMsg("위치를 가져올 수 없습니다.");
-
-    },
-
-
-
-    {
-
-      enableHighAccuracy:true,
-
-      timeout:10000,
-
-      maximumAge:0
-
-    }
-
-
-
-  );
-
-
-
-}
-
-
-
-
-
-
-
-async function findNearestFacility(targetType){
-  closeFacilityFab();
-  clearRoute();
-  showLoadingLocation();
-  if(!navigator.geolocation){ showMsg("GPS를 지원하지 않는 기기입니다."); return; }
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      userLat = lat; userLng = lng;
-      runNearestSearch(lat,lng,targetType);
-    },
-    err=>{ closeMsg(); showMsg("위치를 가져올 수 없습니다."); },
-    { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
-  );
-}
-
-function toggleFacilityFab(){
-  const m = document.getElementById("facilityFabMenu");
-  if(!m) return;
-  const open = (m.style.display !== "flex");
-  m.style.display = open ? "flex" : "none";
-  document.body.style.overflow = open ? "hidden" : "";
-}
-
-function closeFacilityFab(){
-  const m = document.getElementById("facilityFabMenu");
-  if(m) m.style.display = "none";
-  document.body.style.overflow = "";
-}
-
-
-
-async function findNearestDanger(){
-
-
-
-  clearRoute();   // ⭐ 추가
-
-
-
-  showLoadingLocation();
-
-
-
-  if(!navigator.geolocation){
-
-    showMsg("GPS를 지원하지 않는 기기입니다.");
-
-    return;
-
-  }
-
-
-
-  navigator.geolocation.getCurrentPosition(
-
-
-
-    pos=>{
-
-
-
-      const lat = pos.coords.latitude;
-
-      const lng = pos.coords.longitude;
-
-
-
-      userLat = lat;
-
-      userLng = lng;
-
-
-
-      runNearestSearch(lat,lng,"상습결빙지역");
-
-
-
-    },
-
-
-
-    err=>{
-
-      closeMsg();
-
-      showMsg("위치를 가져올 수 없습니다.");
-
-    },
-
-
-
-    {
-
-      enableHighAccuracy:true,
-
-      timeout:10000,
-
-      maximumAge:0
-
-    }
-
-
-
-  );
-
-
-
-}
-
-
-
-async function runNearestSearch(lat,lng,targetType){
-
-
-
-  if(!ALL_DATA_CACHE){
-
-  const res = await fetch("/data/all");
-
-  const result = await res.json();
-
-  ALL_DATA_CACHE = result.data || [];
-
-}
-
-
-
-const data = ALL_DATA_CACHE;
-
-
-
-  const radius = 5000;
-
-
-
-  const filtered = [];
-
-
-
-  data.forEach(item=>{
-
-    
-
-    console.log(item.구분,targetType);
-
-
-
-    if(!catMatch(item.구분, targetType)) return;
-
-
-
-    const dist = map.distance(
-
-      [lat,lng],
-
-      [item.위도,item.경도]
-
-    );
-
-
-
-    if(dist <= radius){
-
-
-
-      item._dist = dist;
-
-
-
-      filtered.push(item);
-
-
-
-    }
-
-
-
-  });
-
-
-
-  filtered.sort((a,b)=>a._dist-b._dist);
-
-  filtered.splice(10);
-
-
-
-  if(filtered.length === 0){
-
-    closeMsg();   // ⭐ 추가
-
-    showMsg("주변에 데이터가 없습니다.");
-
-
-
-    return;
-
-
-
-  }
-
-
-
-if(isMobile()){
-
-  syncToMobileMap(filtered,lat,lng,5000);
-
-  closeMsg();   // ⭐ 이거 추가
-
-  return;
-
-}
-
-
-
-const bounds = [];
-
-
-
-bounds.push([lat,lng]);
-
-
-
-filtered.forEach(item=>{
-
-  bounds.push([item.위도,item.경도]);
-
-});
-
-
-
-map.fitBounds(bounds,{
-
-  padding:[60,60]
-
-});
-
-
-
-map.once("moveend", closeMsg);
-
-
-
-// ⭐ moveend 안 생길 경우 대비
-
-setTimeout(closeMsg, 800);
-
-
-
-markerGroup.clearLayers();
-
-
-
-drawUserLocation(lat, lng);
-
-L.circle(
-
-  [lat,lng],
-
-  {
-
-    radius: radius,
-
-    color:"#2563eb",
-
-    fillColor:"#2563eb",
-
-    fillOpacity:0.08
-
-  }
-
-).addTo(markerGroup);
-
-
-
-filtered.forEach(item=>{
-
-
-
-  const icon = buildMarkerIcon(item.마커색상);
-
-
-
-const marker = L.marker(
-
-  [item.위도,item.경도],
-
-  {icon}
-
-);
-
-marker.itemData = item;
-
-
-
-const popupHtml = buildPopupHtml(item);
-
-
-
-marker.bindPopup(popupHtml,{maxWidth: isMobile() ? 310 : 650, autoPan: false});
-
-
-
-markerGroup.addLayer(marker);
-
-
-
-
-
-});
-
-
-
-showResultList(filtered,lat,lng);
-
-
-
-}
-
-
-
-
-
-
-
-async function findRadius(km){
-
-
-
-  if(userLat && userLng){
-
-    runRadius(userLat,userLng,km);
-
-    return;
-
-  }
-
-
-
-  if(!navigator.geolocation){
-
-    showMsg("GPS를 지원하지 않는 기기입니다.");
-
-    return;
-
-  }
-
-
-
-  navigator.geolocation.getCurrentPosition(
-
-
-
-    pos=>{
-
-
-
-      closeMsg();
-
-      userLat = pos.coords.latitude;
-
-      userLng = pos.coords.longitude;
-
-
-
-      runRadius(userLat,userLng,km);
-
-
-
-    },
-
-
-
-    err=>{
-
-     closeMsg();   // ⭐ 추가
-
-
-
-      showMsg("위치를 가져올 수 없습니다.");
-
-    },
-
-
-
-    {
-
-      enableHighAccuracy:true,
-
-      timeout:10000,
-
-      maximumAge:0
-
-    }
-
-
-
-  );
-
-
-
-}
-
-
-
-
-
-/* CC BY (주차장 출처) 배지: 결과 목록이 전부 주차장일 때만 표시 */
-function updateCcbyBadge(){
-  var el = document.getElementById('ccbyBadge');
-  if(!el) return;
-  var nodes = document.querySelectorAll('#mobileResultList .mobile-result-item');
-  var hasVisible = false, allParking = true;
-  nodes.forEach(function(n){
-    if(n.style.display === 'none') return;
-    hasVisible = true;
-    if(!catMatch(n.dataset.gubun || '', '주차장')) allParking = false;
-  });
-  el.style.display = (hasVisible && allParking) ? 'flex' : 'none';
-}
-(function(){
-  function setup(){
-    var list = document.getElementById('mobileResultList');
-    if(!list){ setTimeout(setup, 300); return; }
-    try{
-      var obs = new MutationObserver(function(){ updateCcbyBadge(); });
-      obs.observe(list, {childList:true, subtree:true, attributes:true, attributeFilter:['style']});
-    }catch(e){}
-    updateCcbyBadge();
-  }
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', setup);
-  } else { setup(); }
-}());
-
-function showResultList(items, userLat, userLng){
-
-
-
-  const panel = document.getElementById("mobileResultPanel");
-
-  const list = document.getElementById("mobileResultList");
-
-
-
-  panel.style.display = "flex";
-
-  list.innerHTML = "";
-
-
-
-  items.forEach(item=>{
-
-
-
-    let distText = "";
-
-
-
-    if(userLat && userLng){
-
-      const dist = Math.round(
-
-        calcDistance(userLat,userLng,item.위도,item.경도)
-
-      );
-
-      distText = dist + " m";
-
-    }
-
-
-
-    const el = document.createElement("div");
-
-
-
-    el.className = "mobile-result-item";
-
-    el.dataset.gubun = item.구분;
-
-
-
-    el.innerHTML = `
-
-      <b>${gubunLabel(item.구분)}</b><br>
-
-      ${item.시군구} ${item.읍면동}<br>
-
-      <span class="mobile-result-distance">${distText}</span>
-
-    `;
-
-    el.onclick = function(){
-
-
-
-  map.flyTo([item.위도,item.경도],16);
-
-
-
-  map.once("moveend", function(){
-
-    map.panBy([0, -150], {animate: false});
-
-    markerGroup.eachLayer(function(layer){
-
-
-
-      if(layer.itemData && layer.itemData.순번 === item.순번){
-
-        layer.openPopup();
-
-      }
-
-
-
-    });
-
-
-
-  });
-
-
-
-  if(isMobile() && window.mobileLeafletMap){
-
-
-
-    window.mobileLeafletMap.flyTo(
-
-      [item.위도,item.경도],
-
-      16,
-
-      {
-
-        duration:1.2,
-
-        easeLinearity:0.25
-
-      }
-
-    );
-
-
-
-    window.mobileLeafletMap.once("moveend", function(){
-
-      // 팝업이 화면 중앙에 오도록 지도 오른쪽으로 이동
-      if(window.mobileMarkerGroup){
-
-
-
-        window.mobileMarkerGroup.eachLayer(function(layer){
-
-
-
-          if(layer.itemData && layer.itemData.순번 === item.순번){
-
-            window._skipPopupAutoPan = true;
-
-            layer.openPopup();
-
-          }
-
-
-
-        });
-
-
-
-      }
-
-
-
-    });
-
-
-
-  }
-
-
-
-};
-
-
-
-
-
-    list.appendChild(el);
-
-
-
-  });
-
-
-
-  document.getElementById("mobileResultCount").textContent = items.length;
-
-
-
-}
-
-
-
-async function runRadius(lat,lng,km){
-
-
-
-  if(!ALL_DATA_CACHE){
-
-  const res = await fetch("/data/all");
-
-  const result = await res.json();
-
-  ALL_DATA_CACHE = result.data || [];
-
-}
-
-
-
-const data = ALL_DATA_CACHE;
-
-
-
-  markerGroup.clearLayers();
-
-
-
-  const radiusMeter = km * 1000;
-
-
-
-  drawUserLocation(lat,lng);
-
-
-
-  L.circle(
-
-    [lat,lng],
-
-    {
-
-      radius: radiusMeter,
-
-      color:"#2563eb",
-
-      fillColor:"#2563eb",
-
-      fillOpacity:0.08
-
-    }
-
-  ).addTo(markerGroup);
-
-
-
-  const filtered = [];
-
-
-
-  data.forEach(item=>{
-
-
-
-    const dist = map.distance(
-
-      [lat,lng],
-
-      [item.위도,item.경도]
-
-    );
-
-
-
-    if(dist <= radiusMeter){
-
-      filtered.push(item);
-
-    }
-
-
-
-  });
-
-
-
-  if(filtered.length === 0){
-
-    showMsg(`${km}km 안에 위험지역이 없습니다.`);
-
-    return;
-
-  }
-
-
-
-  if(isMobile()){
-
-    syncToMobileMap(filtered,lat,lng,radiusMeter);
-
-  }
-
-
-
-}
-
-
-
-window.addEventListener("DOMContentLoaded", function(){
-
-
-
-  const locBtn = document.getElementById("locBtn");
-
-
-
-  if(locBtn){
-
-    locBtn.onclick = function(){
-
-
-
-      if(!navigator.geolocation){
-
-        showMsg("GPS를 지원하지 않는 기기입니다.");
-
-        return;
-
-      }
-
-
-
-navigator.geolocation.getCurrentPosition(
-
-
-
-pos=>{
-
-
-
-const lat = pos.coords.latitude;
-
-const lng = pos.coords.longitude;
-
-
-
-userLat = lat;
-
-userLng = lng;
-
-
-
-console.log("내 위치 버튼:", lat, lng, "정확도:", pos.coords.accuracy);
-
-
-
-markerGroup.clearLayers();
-
-
-
-map.flyTo([lat, lng], 17);
-
-
-
-// ⭐ 내 위치 표시
-
-drawUserLocation(lat,lng);
-
-
-
-if(isMobile() && window.mobileLeafletMap){
-
-  window.mobileLeafletMap.flyTo(
-
-  [lat,lng],
-
-  17,
-
-  {
-
-    duration:1.2,
-
-    easeLinearity:0.25
-
-  }
-
-);
-
-}
-
-
-
-if(window.mobileMarkerGroup){
-
-  // 결과 마커(itemData 있는 것)는 유지하고, 이전 '내 위치' 표시만 제거
-  var __rm = [];
-  window.mobileMarkerGroup.eachLayer(function(l){ if(!l.itemData) __rm.push(l); });
-  __rm.forEach(function(l){ window.mobileMarkerGroup.removeLayer(l); });
-
-
-
-  const userCircle = L.circle(
-
-    [lat, lng],
-
-    {
-
-      radius:180,
-
-      color:"#22c55e",
-
-      fillColor:"#22c55e",
-
-      fillOpacity:0.28,
-
-      weight:3
-
-    }
-
-  );
-
-
-
-  const userMarker = L.marker(
-
-    [lat, lng],
-
-    { icon: buildUserIcon() }
-
-  );
-
-
-
-  window.mobileMarkerGroup.addLayer(userCircle);
-
-  window.mobileMarkerGroup.addLayer(userMarker);
-
-}
-
-},
-
-
-
-err=>{
-
-  showMsg("위치를 가져올 수 없습니다.");
-
-},
-
-
-
-{
-
-  enableHighAccuracy:true,
-
-  timeout:10000,
-
-  maximumAge:0
-
-}
-
-
-
-);
-
-
-
-    };
-
-  }
-
-
-
-});
-
-window.addEventListener("popstate", function(){
-
-window._mobileMapHist = false;
-
-clearRoute();   // ⭐ 추가
-
-
-
-const popup = document.getElementById("mobileMapPopup");
-
-const result = document.getElementById("mobileResultPanel");
-
-
-
-if(result){
-
-  result.style.display = "none";
-
-}
-
-
-
-if(popup){
-
-  popup.style.display = "none";
-
-}
-
-
-
-});
-
-
-
-
-
-window.addEventListener("DOMContentLoaded", function(){
-
-
-
-const mobileBtn = document.getElementById("mobileLocBtn");
-
-
-
-if(mobileBtn){
-
-
-
-mobileBtn.onclick = function(){
-
-
-
-if(!navigator.geolocation){
-
-  alert("GPS를 지원하지 않습니다.");
-
-  return;
-
-}
-
-
-
-navigator.geolocation.getCurrentPosition(
-
-
-
-pos=>{
-
-const lat = pos.coords.latitude;
-
-const lng = pos.coords.longitude;
-
-
-
-userLat = lat;
-
-userLng = lng;
-
-
-
-console.log("모바일 위치 버튼:", lat, lng, "정확도:", pos.coords.accuracy);
-
-
-
-if(isMobile() && window.mobileLeafletMap){
-
-
-
-  window.mobileLeafletMap.flyTo(
-
-  [lat,lng],
-
-  17,
-
-  {
-
-    duration:1.2,
-
-    easeLinearity:0.25
-
-  }
-
-);
-
-
-
-  if(window.mobileMarkerGroup){
-
-  window.mobileMarkerGroup.clearLayers();
-
-
-
-  const userCircle = L.circle(
-
-    [lat, lng],
-
-    {
-
-      radius: 160,
-
-      color:"#22c55e",
-
-      fillColor:"#22c55e",
-
-      fillOpacity:0.28,
-
-      weight:3
-
-    }
-
-  );
-
-
-
-  const userMarker = L.marker(
-
-    [lat, lng],
-
-    { icon: buildUserIcon() }
-
-  );
-
-
-
-  window.mobileMarkerGroup.addLayer(userCircle);
-
-  window.mobileMarkerGroup.addLayer(userMarker);
-
-}
-
-
-
-}},
-
-
-
-err=>{
-
-  closeMsg();
-
-  showMsg("위치를 가져올 수 없습니다.");
-
-},
-
-
-
-{
-
-  enableHighAccuracy:true,
-
-  timeout:10000,
-
-  maximumAge:0
-
-}
-
-
-
-);
-
-};
-
-
-
-}
-
-
-
-});
-
-
-
-let loadingStartTime = 0;
-
-
-
-
-function activateIme(inputId){
-  var inp = document.getElementById(inputId);
-  if(!inp) return;
-  inp.focus();
-  setTimeout(function(){
-    inp.blur();
-    setTimeout(function(){ inp.focus(); }, 50);
-  }, 30);
-}
-// 자판이 뜨면 경로/주소 팝업 카드를 자판 위로 올리고, 자판 끄면 다시 중앙
-(function(){
-  if(!window.visualViewport) return;
-  var vv = window.visualViewport;
-  function adjustPopupForKeyboard(){
-    var kb = window.innerHeight - vv.height - vv.offsetTop;
-    var shift = (kb > 80) ? -Math.round(kb/2) : 0;
-    ["routePopup","addrSearchPopup"].forEach(function(id){
-      var p = document.getElementById(id);
-      if(!p || getComputedStyle(p).display === "none") return;
-      var card = p.firstElementChild;
-      if(card){ card.style.transition = "transform .2s ease"; card.style.transform = "translateY(" + shift + "px)"; }
-    });
-  }
-  vv.addEventListener("resize", adjustPopupForKeyboard);
-  vv.addEventListener("scroll", adjustPopupForKeyboard);
-})();
-
-
-
-function openRouteSearch(){
-
-  var popup = document.getElementById("routePopup");
-
-  popup.style.display = "none";
-
-  setTimeout(function(){
-
-    popup.style.display = "flex";
-
-    document.getElementById("startInput").value = "";
-
-    document.getElementById("destInput").value = "";
-
-    activateIme("startInput");
-
-  }, 200);
-
-}
-
-
-function closeRoutePopup(){
-
-  document.getElementById("routePopup").style.display="none";
-
-
-
-  const box = document.getElementById("destSuggestBox");
-
-  if(box){
-
-    box.style.display = "none";
-
-    box.innerHTML = "";
-
-  }
-
-}
-
-
-
-
-
-document.addEventListener("click", function(e){
-
-
-
-  const input = document.getElementById("destInput");
-
-  const box = document.getElementById("destSuggestBox");
-
-
-
-  if(!input || !box){
-
-    return;
-
-  }
-
-
-
-
-
-  if(e.target !== input && !box.contains(e.target)){
-
-    box.style.display = "none";
-
-  }
-
-
-
-});
-
-
-
-
-
-async function searchPlaceSuggestions(query, inputId){
-
-
-
-  const box = document.getElementById("destSuggestBox");
-
-
-
-  if(!box){
-
-    return;
-
-  }
-
-
-
-  query = query.trim();
-
-
-
-  if(query.length < 3){
-
-    box.style.display = "none";
-
-    box.innerHTML = "";
-
-    return;
-
-  }
-
-
-
-  try{
-
-
-
-    const res = await fetch("/search_place?q=" + encodeURIComponent(query));
-
-    const data = await res.json();
-
-
-
-    box.innerHTML = "";
-
-
-
-    if(!data.documents || data.documents.length === 0){
-
-      box.innerHTML = `
-
-        <div style="padding:12px;font-size:13px;color:#64748b;">
-
-          검색 결과가 없습니다.
-
-        </div>
-
-      `;
-
-      box.style.display = "block";
-
-      return;
-
-    }
-
-
-
-    data.documents.slice(0,5).forEach(place=>{
-
-
-
-      const item = document.createElement("div");
-
-
-
-      item.style.padding="10px 12px";
-
-      item.style.borderBottom="1px solid #f1f5f9";
-
-      item.style.cursor="pointer";
-
-      item.style.fontSize="13px";
-
-      item.style.lineHeight="1.45";
-
-
-
-      // 3번: 도로명주소(신주소)와 지번주소(구주소) 모두 표시
-
-      const roadAddr = place.road_address_name || "";
-
-const jibunAddr = place.address_name || "";
-
-
-
-const addrLineHtml = roadAddr
-
-  ? `<div style="margin-top:3px;color:#64748b;font-size:11px;font-weight:600;">
-
-       ${escapeHtml(roadAddr)}
-
-     </div>
-
-     <div style="margin-top:1px;color:#94a3b8;font-size:10.5px;">
-
-       ${escapeHtml(jibunAddr)}
-
-     </div>`
-
-  : `<div style="margin-top:3px;color:#64748b;font-size:11px;">
-
-       ${escapeHtml(jibunAddr)}
-
-     </div>`;
-
-
-
-item.innerHTML = `
-
-  <div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:2px;">
-
-    ${escapeHtml(place.place_name || "")}
-
-  </div>
-
-  ${addrLineHtml}
-
-`;
-
-
-
-      item.onclick=function(){
-
-        const input=document.getElementById(inputId);
-
-        if(input){
-
-          input.value=place.place_name || "";
-
-          // 4번: 좌표를 data 속성에 저장해서 정확한 위치 사용
-
-          input.dataset.lat = place.y || "";
-
-          input.dataset.lng = place.x || "";
-
-          input.dataset.addr = jibunAddr;
-
-        }
-
-        box.style.display="none";
-
-        box.innerHTML="";
-
-      };
-
-
-
-      box.appendChild(item);
-
-
-
-    });
-
-
-
-    box.style.display="block";
-
-
-
-  }catch(err){
-
-
-
-    console.error("자동완성 검색 오류:",err);
-
-    box.style.display="none";
-
-    box.innerHTML="";
-
-
-
-  }
-
-
-
-}
-
-
-
-async function geocodeAddress(query, inputId){
-
-
-
-  query = query.trim();
-
-
-
-  if(!query){
-
-    return null;
-
-  }
-
-
-
-  // 4번: 자동완성으로 선택한 경우 저장된 좌표를 우선 사용 (다른 지역 혼동 방지)
-
-  if(inputId){
-
-    const el = document.getElementById(inputId);
-
-    if(el && el.dataset.lat && el.dataset.lng && el.value === query){
-
-      return {
-
-        lat: parseFloat(el.dataset.lat),
-
-        lng: parseFloat(el.dataset.lng)
-
-      };
-
-    }
-
-  }
-
-
-
-  const res = await fetch("/search_place?q=" + encodeURIComponent(query));
-
-  const data = await res.json();
-
-
-
-  if(data.documents && data.documents.length > 0){
-
-    return {
-
-      lat: parseFloat(data.documents[0].y),
-
-      lng: parseFloat(data.documents[0].x)
-
-    };
-
-  }
-
-
-
-  return null;
-
-
-
-}
-
-
-
-
-
-function distancePointToLine(px,py,x1,y1,x2,y2){
-
-
-
-  const A = px-x1;
-
-  const B = py-y1;
-
-  const C = x2-x1;
-
-  const D = y2-y1;
-
-
-
-  const dot = A*C + B*D;
-
-  const len = C*C + D*D;
-
-
-
-  let param = -1;
-
-
-
-  if(len!==0){
-
-    param = dot/len;
-
-  }
-
-
-
-  let xx,yy;
-
-
-
-  if(param<0){
-
-    xx=x1;
-
-    yy=y1;
-
-  }else if(param>1){
-
-    xx=x2;
-
-    yy=y2;
-
-  }else{
-
-    xx=x1 + param*C;
-
-    yy=y1 + param*D;
-
-  }
-
-
-
-  return calcDistance(px,py,xx,yy);
-
-
-
-}
-
-
-
-
-
-async function getRoadRoute(startLat,startLng,endLat,endLng){
-
-
-
-  const url =
-
-  "https://router.project-osrm.org/route/v1/driving/"
-
-  + startLng + "," + startLat + ";"
-
-  + endLng + "," + endLat
-
-  + "?overview=full&geometries=geojson";
-
-
-
-  const res = await fetch(url);
-
-  const data = await res.json();
-
-
-
-  if(!data.routes || data.routes.length === 0){
-
-    return null;
-
-  }
-
-
-
-  return data.routes[0].geometry.coordinates;
-
-
-
-}
-
-
-
-function distancePointToRoute(lat, lng, routeLatLngs){
-
-
-
-  let minDist = Infinity;
-
-
-
-  for(let i = 0; i < routeLatLngs.length - 1; i++){
-
-
-
-    const p1 = routeLatLngs[i];
-
-    const p2 = routeLatLngs[i + 1];
-
-
-
-    const dist = distancePointToLine(
-
-      lng, lat,
-
-      p1[1], p1[0],
-
-      p2[1], p2[0]
-
-    );
-
-
-
-    if(dist < minDist){
-
-      minDist = dist;
-
-    }
-
-
-
-  }
-
-
-
-  return minDist;
-
-}
-
-
-
-async function runRouteSearch(){
-
-  showLoadingLocation();   // ⭐ 추가
-
-
-
-  closeRoutePopup();   // ⭐ 여기 추가
-
-
-
-
-
-  clearRoute();
-
-
-
-  if(isMobile()){
-
-    openMobileMap();
-
-    await new Promise(r => setTimeout(r,300));
-
-  }
-
-
-
-  const start = document.getElementById("startInput").value.trim();
-
-  const dest = document.getElementById("destInput").value.trim();
-
-
-
-  if(!dest){
-
-    showMsg("도착지를 입력하세요.");
-
-    return;
-
-  }
-
-
-
-  let startLat = userLat;
-
-  let startLng = userLng;
-
-
-
-  if(start){
-
-    const startGeo = await geocodeAddress(start, "startInput");
-
-
-
-    if(!startGeo){
-
-      showMsg("출발지를 찾을 수 없습니다.");
-
-      return;
-
-    }
-
-
-
-    startLat = startGeo.lat;
-
-    startLng = startGeo.lng;
-
-  }else{
-
-    if(userLat === null || userLng === null){
-
-      showMsg("출발지를 입력하거나 내 위치를 먼저 확인해주세요.");
-
-      return;
-
-    }
-
-  }
-
-
-
-  const endGeo = await geocodeAddress(dest, "destInput");
-
-
-
-  if(!endGeo){
-
-    showMsg("도착지를 찾을 수 없습니다.");
-
-    return;
-
-  }
-
-
-
-  const endLat = endGeo.lat;
-
-  const endLng = endGeo.lng;
-
-  const road = await getRoadRoute(startLat,startLng,endLat,endLng);
-
-
-
-let routeLatLngs = [];
-
-
-
-if(road){
-
-  routeLatLngs = road.map(c => [c[1], c[0]]);
-
-}else{
-
-  routeLatLngs = [
-
-    [startLat, startLng],
-
-    [endLat, endLng]
-
-  ];
-
-}
-
-
-
- if(!ALL_DATA_CACHE){
-
-  const res = await fetch("/data/all");
-
-  const result = await res.json();
-
-  ALL_DATA_CACHE = result.data || [];
-
-}
-
-
-
-const data = ALL_DATA_CACHE;
-
-
-
-const radius = 50;
-
-
-
-const filtered = [];
-
-
-
-data.forEach(item=>{
-
-
-
-  const dist = distancePointToRoute(
-
-    item.위도,
-
-    item.경도,
-
-    routeLatLngs
-
-  );
-
-  
-
-  if(dist <= radius){
-
-    filtered.push(item);
-
-  }
-
-
-
-});
-
-
-
-  markerGroup.clearLayers();
-
-
-
-  filtered.forEach(item=>{
-
-    const icon = buildMarkerIcon(item.마커색상);
-
-    const marker = L.marker([item.위도, item.경도], {icon});
-
-    marker.itemData = item;
-
-    const popupHtml = buildPopupHtml(item);
-
-    marker.bindPopup(popupHtml,{maxWidth: isMobile() ? 310 : 650, autoPan: false});
-
-    markerGroup.addLayer(marker);
-
-  });
-
-
-
-  if(routeLine){
-
-    map.removeLayer(routeLine);
-
-  }
-
-
-
-routeLine = L.polyline(
-
-  routeLatLngs,
-
-  {color:"#2563eb", weight:5}
-
-).addTo(map);
-
-
-
-if(isMobile() && window.mobileLeafletMap){
-
-
-
-  if(window.mobileRouteLine){
-
-    window.mobileLeafletMap.removeLayer(window.mobileRouteLine);
-
-  }
-
-
-
-  window.mobileRouteLine = L.polyline(
-
-    routeLatLngs,
-
-    {color:"#2563eb", weight:5}
-
-  ).addTo(window.mobileLeafletMap);
-
-
-
-}
-
-
-
-  map.fitBounds(
-
-    [
-
-      [startLat, startLng],
-
-      [endLat, endLng]
-
-    ],
-
-    {padding:[60,60]}
-
-  );
-
-
-
-  // map.once("moveend", closeMsg);
-
-  // setTimeout(closeMsg,800);
-
-
-
-  const toiletCount = filtered.filter(x=>x.구분==="공중화장실").length;
-
-  const iceCount = filtered.filter(x=>x.구분==="상습결빙지역").length;
-
-  const accidentCount = filtered.filter(x=>x.구분==="교통사고위험지역").length;
-
-  const parkingCount = filtered.filter(x=>x.구분==="공영주차장"||x.구분==="민영주차장").length;
-
-
-
-  showMsg(
-
-      `경로 주변 시설\n\n공중화장실 ${toiletCount}개\n상습결빙지역 ${iceCount}개\n교통사고위험지역 ${accidentCount}개\n주차장 ${parkingCount}개`
-
-  );
-
-
-
-  showResultList(filtered, userLat !== null ? userLat : startLat, userLng !== null ? userLng : startLng);
-
-
-
-  if(isMobile()){
-
-  syncToMobileMap(filtered, userLat !== null ? userLat : startLat, userLng !== null ? userLng : startLng);
-
-}
-
-
-
-
-
-
-
-
-
-
-
-  if(isMobile()){
-
-  document.getElementById("mobileResultPanel").style.display="flex";
-
-}
-
-
-
-
-
-}
-
-
-
-
-
-// 9번: 주소로 근처 위험지역 검색
-
-function openAddressSearch(){
-
-  document.getElementById("addrSearchPopup").style.display="flex";
-
-  document.getElementById("addrSearchInput").value="";
-
-  document.getElementById("addrSuggestBox").style.display="none";
-
-  document.getElementById("addrSuggestBox").innerHTML="";
-
-  setTimeout(()=>activateIme("addrSearchInput"),100);
-
-}
-
-
-
-function closeAddressSearch(){
-
-  document.getElementById("addrSearchPopup").style.display="none";
-
-}
-
-
-
-window.addEventListener("DOMContentLoaded", function(){
-
-  const addrInput = document.getElementById("addrSearchInput");
-
-  if(addrInput){
-
-    addrInput.addEventListener("input", debounce(function(){
-
-      searchAddrSuggestions(this.value);
-
-    }, 400));
-
-  }
-
-});
-
-
-
-async function searchAddrSuggestions(query){
-
-  const box = document.getElementById("addrSuggestBox");
-
-  if(!box) return;
-
-  query = query.trim();
-
-  if(query.length < 2){ box.style.display="none"; box.innerHTML=""; return; }
-
-  try{
-
-    const res = await fetch("/search_place?q=" + encodeURIComponent(query));
-
-    const data = await res.json();
-
-    box.innerHTML="";
-
-    if(!data.documents || data.documents.length===0){
-
-      box.innerHTML='<div style="padding:10px;font-size:13px;color:#94a3b8;">결과 없음</div>';
-
-      box.style.display="block"; return;
-
-    }
-
-    data.documents.slice(0,5).forEach(place=>{
-
-      const d = document.createElement("div");
-
-      d.style.cssText="padding:9px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:13px;";
-
-      
-
-      const roadA = place.road_address_name || "";
-
-const jibunA = place.address_name || "";
-
-
-
-const addrLineHtml = roadA
-
-  ? `<div style="margin-top:3px;color:#64748b;font-size:11px;font-weight:600;">
-
-       ${escapeHtml(roadA)}
-
-     </div>
-
-     <div style="margin-top:1px;color:#94a3b8;font-size:10.5px;">
-
-       ${escapeHtml(jibunA)}
-
-     </div>`
-
-  : `<div style="margin-top:3px;color:#64748b;font-size:11px;">
-
-       ${escapeHtml(jibunA)}
-
-     </div>`;
-
-
-
-d.innerHTML = `
-
-  <div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:2px;">
-
-    ${escapeHtml(place.place_name || "")}
-
-  </div>
-
-  ${addrLineHtml}
-
-`;
-
-
-
-      d.onclick=function(){
-
-        const inp=document.getElementById("addrSearchInput");
-
-        inp.value=place.place_name||"";
-
-        inp.dataset.lat=place.y||"";
-
-        inp.dataset.lng=place.x||"";
-
-        box.style.display="none"; box.innerHTML="";
-
-      };
-
-      box.appendChild(d);
-
-    });
-
-    box.style.display="block";
-
-  }catch(e){ box.style.display="none"; }
-
-}
-
-
-
-async function runAddressSearch(){
-
-  const inp = document.getElementById("addrSearchInput");
-
-  const query = inp.value.trim();
-
-  if(!query){ showMsg("주소를 입력하세요."); return; }
-
-
-
-  closeAddressSearch();
-
-  showLoadingLocation();
-
-
-
-  let lat, lng;
-
-  if(inp.dataset.lat && inp.dataset.lng){
-
-    lat = parseFloat(inp.dataset.lat);
-
-    lng = parseFloat(inp.dataset.lng);
-
-  } else {
-
-    const geo = await geocodeAddress(query);
-
-    if(!geo){ showMsg("주소를 찾을 수 없습니다."); return; }
-
-    lat = geo.lat; lng = geo.lng;
-
-  }
-
-
-
-  if(!ALL_DATA_CACHE){
-
-    const res = await fetch("/data/all");
-
-    const result = await res.json();
-
-    ALL_DATA_CACHE = result.data || [];
-
-  }
-
-  const data = ALL_DATA_CACHE;
-
-  const radius = 5000;
-
-  const filtered = data.filter(item => {
-
-    return calcDistance(lat, lng, item.위도, item.경도) <= radius;
-
-  }).sort((a,b) =>
-
-    calcDistance(lat,lng,a.위도,a.경도) - calcDistance(lat,lng,b.위도,b.경도)
-
-  );
-
-
-
-  if(filtered.length===0){
-
-    closeMsg(); showMsg("5km 이내에 위험지역이 없습니다."); return;
-
-  }
-
-
-
-  if(isMobile()){
-
-    syncToMobileMap(filtered, lat, lng, radius);
-
-    closeMsg(); return;
-
-  }
-
-
-
-  markerGroup.clearLayers();
-
-  // 주소 기준점 마커 (파란 원)
-
-  L.circle([lat,lng],{radius:radius,color:"#2563eb",fillColor:"#2563eb",fillOpacity:0.07}).addTo(markerGroup);
-
-  L.marker([lat,lng],{icon:L.divIcon({className:"",html:'<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(markerGroup);
-
-
-
-  const bounds = [[lat,lng]];
-
-  filtered.forEach(item=>{
-
-    const icon = buildMarkerIcon(item.마커색상);
-
-    const marker = L.marker([item.위도,item.경도],{icon});
-
-    marker.itemData = item;
-
-    marker.bindPopup(buildPopupHtml(item),{maxWidth: isMobile() ? 310 : 650});
-
-    markerGroup.addLayer(marker);
-
-    bounds.push([item.위도,item.경도]);
-
-  });
-
-  map.fitBounds(bounds,{padding:[50,50]});
-
-  map.once("moveend", closeMsg);
-
-  setTimeout(closeMsg,800);
-
-  showResultList(filtered, lat, lng);
-
-}
-
-
-
-// 1번 알약 필터 JS 끝
-
-let mobilePillActive = "전체";
-
-const PILL_COLORS = {
-
-  "상습결빙지역": "#06b6d4",
-
-  "공중화장실": "#f59e0b",
-
-  "교통사고위험지역": "#ef4444",
-
-  "주차장": "#8b5cf6",
-
-  "전체": "#475569"
-
-};
-
-const PILL_IDS = {
-
-  "전체": "pill_all",
-
-  "상습결빙지역": "pill_ice",
-
-  "공중화장실": "pill_toilet",
-
-  "교통사고위험지역": "pill_accident",
-
-  "주차장": "pill_parking"
-
-};
-
-
-
-function mobilePillFilter(cat){
-
-  mobilePillActive = cat;
-
-  // 알약 활성화 스타일
-
-  Object.keys(PILL_IDS).forEach(k => {
-
-    const el = document.getElementById(PILL_IDS[k]);
-
-    if(!el) return;
-
-    if(k === cat){
-
-      el.classList.add("active");
-
-      el.style.background = "rgba(255,255,255,.98)";
-
-      el.style.borderColor = PILL_COLORS[k];
-
-      el.style.borderWidth = "2px";
-
-      el.style.color = "#1a202c";
-
-    } else {
-
-      el.classList.remove("active");
-
-      el.style.background = "rgba(255,255,255,.93)";
-
-      el.style.borderColor = "rgba(255,255,255,.85)";
-
-      el.style.borderWidth = "1.5px";
-
-      el.style.color = "#1a202c";
-
-    }
-
-  });
-
-
-
-  // 마커 필터링
-
-  if(window.mobileMarkerGroup && window.mobileLeafletMap){
-
-    window.mobileMarkerGroup.eachLayer(function(layer){
-
-      if(!layer.itemData) return;
-
-      if(cat === "전체"){
-
-        if(layer._icon) layer._icon.style.display="";
-
-      } else {
-
-        if(catMatch(layer.itemData.구분, cat)){
-
-          layer._icon && (layer._icon.style.display="");
-
-        } else {
-
-          layer._icon && (layer._icon.style.display="none");
-
-        }
-
-      }
-
-    });
-
-  }
-
-
-
-  // 2번: 결과 목록도 필터링
-
-  const list = document.getElementById("mobileResultList");
-
-  if(!list) return;
-
-  const items = list.querySelectorAll(".mobile-result-item");
-
-  items.forEach(el => {
-
-    if(cat === "전체"){
-
-      el.style.display = "";
-
-    } else {
-
-      if(catMatch(el.dataset.gubun || "", cat)){
-
-        el.style.display = "";
-
-      } else {
-
-        el.style.display = "none";
-
-      }
-
-    }
-
-  });
-
-
-
-  // 결과 건수 업데이트
-
-  const visible = cat === "전체"
-
-    ? items.length
-
-    : [...items].filter(el => el.style.display !== "none").length;
-
-  const countEl = document.getElementById("mobileResultCount");
-
-  if(countEl) countEl.textContent = visible;
-
-}
-
-
-
-// PC 알약 필터
-
-const PC_PILL_COLORS = {
-
-  "상습결빙지역": "#06b6d4",
-
-  "공중화장실": "#f59e0b",
-
-  "교통사고위험지역": "#ef4444",
-
-  "주차장": "#8b5cf6",
-
-  "전체": "#475569"
-
-};
-
-let pcPillActive = "전체";
-
-
-
-function pcPillFilter(cat){
-
-  pcPillActive = cat;
-
-  ["전체","상습결빙지역","공중화장실","교통사고위험지역","주차장"].forEach(k=>{
-
-    const id = "pc_pill_" + (k==="전체"?"all":k==="상습결빙지역"?"ice":k==="공중화장실"?"toilet":k==="교통사고위험지역"?"accident":"parking");
-
-    const el = document.getElementById(id);
-
-    if(!el) return;
-
-    if(k===cat){
-
-      el.classList.add("active");
-
-      el.style.background = "rgba(255,255,255,.98)";
-
-      el.style.borderColor = PC_PILL_COLORS[k];
-
-      el.style.borderWidth = "2px";
-
-      el.style.color = "#1a202c";
-
-    } else {
-
-      el.classList.remove("active");
-
-      el.style.background = "rgba(255,255,255,.93)";
-
-      el.style.borderColor = "rgba(255,255,255,.85)";
-
-      el.style.borderWidth = "1.5px";
-
-      el.style.color = "#1a202c";
-
-    }
-
-  });
-
-  // PC 마커 필터링
-
-  markerGroup.eachLayer(function(layer){
-
-    if(!layer.itemData) return;
-
-    if(cat==="전체"){
-
-      if(layer._icon) layer._icon.style.display="";
-
-    } else {
-
-      if(layer._icon) layer._icon.style.display = catMatch(layer.itemData.구분, cat) ? "" : "none";
-
-    }
-
-  });
-
-  // 결과 목록 필터 + 건수 업데이트
-
-  const list = document.getElementById("mobileResultList");
-
-  if(!list) return;
-
-  const items = list.querySelectorAll(".mobile-result-item");
-
-  items.forEach(el=>{
-
-    const b = el.querySelector("b");
-
-    el.style.display = (cat==="전체" || catMatch(el.dataset.gubun || "", cat)) ? "" : "none";
-
-  });
-
-  const visible = cat==="전체"
-
-    ? items.length
-
-    : [...items].filter(el => el.style.display !== "none").length;
-
-  const countEl = document.getElementById("mobileResultCount");
-
-  if(countEl) countEl.textContent = visible;
-
-}
-
-
-
-// ===== 5번: 별점 + 코멘트 =====
-
-
-
-// 팝업 열릴 때 별점 + 로드뷰 자동 초기화, 검색결과 패널 숨김
-
-function onPopupOpen(e){
-
-  var __mlb=document.getElementById('mobileLocBtn'); if(__mlb) __mlb.style.display='none';
-
-  const popup = e.popup;
-
-  const marker = popup._source;
-
-  const item = marker && marker.itemData;
-
-  if(!item) return;
-
-  const sid = String(item.순번);
-
-  loadRating(sid);
-
-  // 로드뷰: 약간 딜레이 후 DOM 안정되면 초기화
-
-  setTimeout(()=> initRoadview("rv_" + sid, item.위도, item.경도, item.구분), 200);
-
-  // 검색결과 패널 숨기기
-
-  const panel = document.getElementById("mobileResultPanel");
-
-  if(panel && panel.style.display !== "none"){
-
-    panel._wasVisible = true;
-
-    panel.style.display = "none";
-
-  }
-
-  // 모바일: 팝업이 실제로 화면 어디에 떴는지 측정해 정확히 중앙으로 panBy 보정
-  if(isMobile()){
-
-    // 팝업 DOM이 그려진 뒤 위치를 측정해야 하므로 약간의 딜레이를 둔다
-    setTimeout(function(){
-
-      const targetMap = (popup && popup._map) || window.mobileLeafletMap;
-      if(!targetMap) return;
-
-      const popupEl = popup.getElement ? popup.getElement() : null;
-      if(!popupEl) return;
-
-      const popupRect = popupEl.getBoundingClientRect();
-      const mapEl = targetMap.getContainer();
-      const mapRect = mapEl.getBoundingClientRect();
-
-      // 팝업 높이가 0이면 아직 렌더링 전 — 한 번 더 시도
-      if(popupRect.height < 10){
-        setTimeout(function(){
-          const r2 = popupEl.getBoundingClientRect();
-          const m2 = mapEl.getBoundingClientRect();
-          if(r2.height < 10) return;
-          const popupCenterY = (r2.top + r2.bottom) / 2 - m2.top;
-          const mapCenterY = m2.height / 2;
-          const offsetY = popupCenterY - mapCenterY;
-          if(Math.abs(offsetY) > 5){
-            targetMap.panBy([0, offsetY], {animate: true, duration: 0.35});
-          }
-        }, 200);
-        return;
-      }
-
-      // 팝업의 세로 중심이 지도 컨테이너의 세로 중심에 오도록 지도 패닝
-      const popupCenterY = (popupRect.top + popupRect.bottom) / 2 - mapRect.top;
-      const mapCenterY = mapRect.height / 2;
-      const offsetY = popupCenterY - mapCenterY;
-
-      if(Math.abs(offsetY) > 5){
-        targetMap.panBy([0, offsetY], {animate: true, duration: 0.35});
-      }
-
-    }, 150);
-
-  }
-
-  window._skipPopupAutoPan = false;
-
-}
-
-
-
-function onPopupClose(e){
-
-  var __mlb=document.getElementById('mobileLocBtn'); if(__mlb) __mlb.style.display='flex';
-
-  // 팝업 닫히면 결과 패널 복원
-
-  const panel = document.getElementById("mobileResultPanel");
-
-  if(panel && panel._wasVisible){
-
-    panel.style.display = "flex";
-
-    panel._wasVisible = false;
-
-  }
-
-}
-
-
-
-map.on("popupopen", onPopupOpen);
-
-map.on("popupclose", onPopupClose);
-
-
-
-// 별점 렌더 함수
-
-function renderStars(sid, myScore, avgScore, count){
-
-  const avg = document.getElementById("avg_"+sid);
-
-  if(avg && count>0) avg.textContent = `${avgScore.toFixed(1)}점 (${count}명)`;
-
-  else if(avg) avg.textContent = "아직 평가없음";
-
-}
-
-
-
-async function loadRating(sid){
-
-  try{
-
-    const res = await fetch("/api/rating?spot_id="+encodeURIComponent(sid));
-
-    const d = await res.json();
-
-    const myScore = parseInt(localStorage.getItem("rating_"+sid)||"0");
-
-    renderStars(sid, myScore, d.avg||0, d.count||0);
-
-  }catch(e){}
-
-}
-
-
-
-// 별점 모달
-
-let _ratingModalSid = null;
-
-let _ratingSelected = 0;
-
-
-
-function openRatingModal(sid){
-
-  _ratingModalSid = sid;
-
-  _ratingSelected = parseInt(localStorage.getItem("rating_"+sid)||"0");
-
-  renderRatingStars(_ratingSelected);
-
-  document.getElementById("ratingModal").style.display = "flex";
-
-}
-
-
-
-function closeRatingModal(){
-
-  document.getElementById("ratingModal").style.display = "none";
-
-  _ratingModalSid = null;
-
-  _ratingSelected = 0;
-
-}
-
-
-
-function selectRatingStar(n){
-
-  _ratingSelected = n;
-
-  renderRatingStars(n);
-
-}
-
-
-
-function renderRatingStars(n){
-
-  const row = document.getElementById("ratingStarRow");
-
-  if(!row) return;
-
-  row.querySelectorAll("span").forEach(s=>{
-
-    const sn = parseInt(s.dataset.n);
-
-    s.textContent = sn <= n ? "★" : "☆";
-
-    s.style.color = sn <= n ? "#f59e0b" : "#cbd5e1";
-
-  });
-
-}
-
-
-
-async function submitRating(){
-
-  if(!_ratingModalSid){ closeRatingModal(); return; }
-
-  if(_ratingSelected < 1){ alert("별점을 선택해주세요."); return; }
-
-  const sid = _ratingModalSid;
-
-  const score = _ratingSelected;
-
-  closeRatingModal();
-
-  try{
-
-    const res = await fetch("/api/rating", {
-
-      method:"POST",
-
-      headers:{"Content-Type":"application/json"},
-
-      body: JSON.stringify({spot_id: sid, score: score})
-
-    });
-
-    const d = await res.json();
-
-    if(d.ok){
-
-      localStorage.setItem("rating_"+sid, score);
-
-      await loadRating(sid);
-
-    } else {
-
-      alert("별점 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
-
-    }
-
-  }catch(e){
-
-    alert("네트워크 오류로 별점 저장에 실패했습니다.");
-
-  }
-
-}
-
-
-
-// 코멘트 모달
-
-function openComments(sid){
-
-  const modal = document.getElementById("commentModal");
-
-  if(!modal) return;
-
-  modal.dataset.sid = sid;
-
-  modal.style.display = "flex";
-
-  loadComments(sid);
-
-}
-
-
-
-function closeComments(){
-
-  const modal = document.getElementById("commentModal");
-
-  if(modal) modal.style.display = "none";
-
-}
-
-
-
-async function loadComments(sid){
-
-  const list = document.getElementById("commentList");
-
-  if(!list) return;
-
-  list.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:10px;">불러오는 중...</div>';
-
-  try{
-
-    const res = await fetch("/api/comments?spot_id="+encodeURIComponent(sid));
-
-    const d = await res.json();
-
-    if(!d.comments || d.comments.length===0){
-
-      list.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:10px;">아직 코멘트가 없습니다.</div>';
-
-      return;
-
-    }
-
-    list.innerHTML = d.comments.map(c=>`
-
-      <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
-
-        <div style="font-size:13px;color:#1e293b;">${escapeHtml(c.content)}</div>
-
-        <div style="font-size:11px;color:#94a3b8;margin-top:3px;">${c.created_at ? c.created_at.slice(0,16).replace("T"," ") : ""}</div>
-
-      </div>
-
-    `).join("");
-
-  }catch(e){
-
-    list.innerHTML='<div style="color:#ef4444;font-size:13px;padding:10px;">로드 실패</div>';
-
-  }
-
-}
-
-
-
-async function submitComment(){
-
-  const modal = document.getElementById("commentModal");
-
-  const input = document.getElementById("commentInput");
-
-  if(!modal||!input) return;
-
-  const sid = modal.dataset.sid;
-
-  const content = input.value.trim();
-
-  if(!content){ alert("내용을 입력하세요."); return; }
-
-  try{
-
-    await fetch("/api/comments", {
-
-      method:"POST",
-
-      headers:{"Content-Type":"application/json"},
-
-      body: JSON.stringify({spot_id: sid, content: content})
-
-    });
-
-    input.value = "";
-
-    loadComments(sid);
-
-  }catch(e){ alert("저장 실패"); }
-
-}
-
-
-
-// ===== 11번: 지도 회전 (CSS transform 방식, 플러그인 불필요) =====
-
-let mapRotation = 0;
-
-
-
-function resetMapBearing(){
-
-  mapRotation = 0;
-
-  applyMapRotation();
-
-}
-
-
-
-function resetMobileMapBearing(){
-
-  mapRotation = 0;
-
-  applyMapRotation();
-
-}
-
-
-
-function applyMapRotation(){
-
-  // PC 지도
-
-  const mapPane = document.querySelector("#map .leaflet-map-pane");
-
-  if(mapPane) mapPane.style.transform = `rotate(${mapRotation}deg)`;
-
-  const mapEl = document.getElementById("map");
-
-  if(mapEl) mapEl.style.transform = `rotate(0deg)`; // 외부는 고정
-
-
-
-  // 나침반 버튼 반대 회전 표시
-
-  const btn = document.getElementById("compassBtn");
-
-  if(btn) btn.style.transform = `rotate(${-mapRotation}deg)`;
-
-  const mBtn = document.getElementById("mobileCompassBtn");
-
-  if(mBtn) mBtn.style.transform = `rotate(${-mapRotation}deg)`;
-
-
-
-  // 모바일 지도
-
-  const mMapPane = document.querySelector("#mobileMap .leaflet-map-pane");
-
-  if(mMapPane) mMapPane.style.transform = `rotate(${mapRotation}deg)`;
-
-}
-
-
-
-// 두 손가락 회전 제스처 (모바일 전용)
-
-(function setupRotateGesture(){
-
-  // 모바일이 아니면 등록하지 않음
-
-  if(!('ontouchstart' in window) && !navigator.maxTouchPoints) return;
-
-
-
-  let startAngle = null;
-
-  let startRotation = 0;
-
-
-
-  function getAngle(t1, t2){
-
-    return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
-
-  }
-
-
-
-  function onTouchStart(e){
-
-    if(e.touches.length === 2){
-
-      startAngle = getAngle(e.touches[0], e.touches[1]);
-
-      startRotation = mapRotation;
-
-    }
-
-  }
-
-
-
-  function onTouchMove(e){
-
-    if(e.touches.length === 2 && startAngle !== null){
-
-      const angle = getAngle(e.touches[0], e.touches[1]);
-
-      mapRotation = startRotation + (angle - startAngle);
-
-      applyMapRotation();
-
-    }
-
-  }
-
-
-
-  function onTouchEnd(e){
-
-    if(e.touches.length < 2) startAngle = null;
-
-  }
-
-
-
-  ["map","mobileMap"].forEach(id => {
-
-    const el = document.getElementById(id);
-
-    if(!el) return;
-
-    el.addEventListener("touchstart", onTouchStart, {passive:true});
-
-    el.addEventListener("touchmove",  onTouchMove,  {passive:true});
-
-    el.addEventListener("touchend",   onTouchEnd,   {passive:true});
-
-  });
-
-})();
-
-
-
-function debounce(fn, delay){
-
-
-
-  let timer;
-
-
-
-  return function(...args){
-
-
-
-    clearTimeout(timer);
-
-
-
-    timer = setTimeout(()=>{
-
-      fn.apply(this, args);
-
-    }, delay);
-
-
-
-  };
-
-
-
-}
-
-
-
-// 관리자 페이지에서 이동 시 해당 지점 로드뷰 팝업 자동 열기
-
-window.addEventListener("load", function(){
-
-  const params = new URLSearchParams(window.location.search);
-
-  const gotoSpot = params.get("goto_spot");
-
-  const gotoLat = parseFloat(params.get("lat"));
-
-  const gotoLng = parseFloat(params.get("lng"));
-
-  if(gotoSpot && !isNaN(gotoLat) && !isNaN(gotoLng)){
-
-    // 데이터 로드 완료 후 이동하는 함수
-
-    async function doGotoSpot(){
-
-      if(!ALL_DATA_CACHE){
-
-        const res = await fetch("/data/all");
-
-        const result = await res.json();
-
-        ALL_DATA_CACHE = result.data || [];
-
-      }
-
-      const found = ALL_DATA_CACHE.find(d => String(d.순번) === String(gotoSpot));
-
-      if(!found){
-
-        alert("해당 지점을 데이터에서 찾을 수 없습니다. (지점번호: " + gotoSpot + ")");
-
-        return;
-
-      }
-
-      const targetLat = found.위도;
-
-      const targetLng = found.경도;
-
-
-
-      // 클러스터 그룹에서 해당 마커를 찾아 팝업을 여는 함수
-      // markerClusterGroup은 eachLayer가 클러스터 객체를 포함하므로
-      // getAllChildMarkers로 실제 마커를 직접 탐색한다
-
-      function openMarkerPopup(mGroup){
-
-        let targetMarker = null;
-
-        mGroup.eachLayer(function(layer){
-
-          // 클러스터면 자식 마커 탐색
-          if(layer.getAllChildMarkers){
-
-            layer.getAllChildMarkers().forEach(function(child){
-
-              if(child.itemData && String(child.itemData.순번) === String(gotoSpot)){
-
-                targetMarker = child;
-
-              }
-
-            });
-
-          }
-
-          // 일반 마커인 경우
-          if(layer.itemData && String(layer.itemData.순번) === String(gotoSpot)){
-
-            targetMarker = layer;
-
-          }
-
-        });
-
-        if(targetMarker){
-
-          // zoomToShowLayer: 클러스터가 펼쳐지면서 팝업 오픈
-          mGroup.zoomToShowLayer(targetMarker, function(){
-
-            targetMarker.openPopup();
-
-          });
-
-        }
-
-      }
-
-
-
-      if(isMobile()){
-
-        openMobileMap();
-
-        // 모바일 지도에 전체 마커가 없으면 먼저 로드
-
-        const needsLoad = !window.mobileMarkerGroup ||
-
-          window.mobileMarkerGroup.getLayers().length === 0;
-
-        async function doMobileGoto(){
-
-          if(needsLoad){
-
-            // 전체 데이터를 모바일 마커 그룹에 로드
-
-            ALL_DATA_CACHE.forEach(item=>{
-
-              const icon = buildMarkerIcon(item.마커색상);
-
-              const marker = L.marker([item.위도, item.경도], {icon});
-
-              marker.itemData = item;
-
-              marker.bindPopup(buildPopupHtml(item), {maxWidth: isMobile() ? 310 : 650});
-
-              window.mobileMarkerGroup.addLayer(marker);
-
-            });
-
-          }
-
-          setTimeout(()=>{
-
-            if(isMobile() && window.mobileLeafletMap){
-
-              window.mobileLeafletMap.flyTo([targetLat, targetLng], 17);
-
-              window.mobileLeafletMap.once("moveend", function(){
-
-                if(window.mobileMarkerGroup) openMarkerPopup(window.mobileMarkerGroup);
-
-              });
-
-            }
-
-          }, 400);
-
-        }
-
-        setTimeout(doMobileGoto, 600);
-
-      } else {
-
-        // PC: markerGroup에 마커가 없으면 전체 마커를 먼저 추가
-
-        if(markerGroup.getLayers().length === 0){
-
-          ALL_DATA_CACHE.forEach(item=>{
-
-            const icon = buildMarkerIcon(item.마커색상);
-
-            const marker = L.marker([item.위도, item.경도], {icon});
-
-            marker.itemData = item;
-
-            marker.bindPopup(buildPopupHtml(item), {maxWidth: 650});
-
-            markerGroup.addLayer(marker);
-
-          });
-
-        }
-
-        map.flyTo([targetLat, targetLng], 17);
-
-        map.once("moveend", function(){
-
-          openMarkerPopup(markerGroup);
-
-        });
-
-      }
-
-    }
-
-
-
-    // loadAllMarkers 완료 후 실행되도록 충분히 기다림
-
-    setTimeout(doGotoSpot, 2000);
-
-  }
-
-});
-
-
-
-</script>{% endraw %}
-
-
-
-
-
-
-
-<div class="mobile-map-popup" id="mobileMapPopup">
-
-
-
-  <div class="mobile-map-header">
-
-  <button class="mobile-map-close" onclick="goHome()">
-
-  홈으로
-
-  </button>
-
-  <span style="font-size:15px;font-weight:700;">지도 보기</span>
-
-  <div style="width:70px;"></div>
-
-</div>
-
-
-
-  <div id="mobileMap" class="mobile-map"></div>
-
-  <button id="mobileLocBtn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7" stroke-dasharray="2 2"/></svg></button>
-
-
-
-  <!-- 알약형 카테고리 필터 -->
-
-  <div class="mobile-pill-bar" id="mobilePillBar" style="top:62px;left:8px;right:8px;transform:none;justify-content:flex-start;gap:5px;">
-
-    <button class="mobile-pill active" id="pill_all"
-
-      style="border-color:#475569;color:#1a202c;"
-
-      onclick="mobilePillFilter('전체')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-
-      전체
-
-    </button>
-
-    <button class="mobile-pill" id="pill_ice"
-
-      style="color:#1a202c;"
-
-      onclick="mobilePillFilter('상습결빙지역')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07l14.14-14.14"/><circle cx="12" cy="12" r="3"/></svg>
-
-      상습결빙지역
-
-    </button>
-
-    <button class="mobile-pill" id="pill_toilet"
-
-      style="color:#1a202c;"
-
-      onclick="mobilePillFilter('공중화장실')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6v2H9zM12 4v4M9 8H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-4"/><path d="M10 12v4M14 12v4"/></svg>
-
-      공중화장실
-
-    </button>
-
-    <button class="mobile-pill" id="pill_accident"
-
-      style="color:#1a202c;"
-
-      onclick="mobilePillFilter('교통사고위험지역')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-
-      교통사고위험지역
-
-    </button>
-
-    <button class="mobile-pill" id="pill_parking"
-
-      style="color:#1a202c;"
-
-      onclick="mobilePillFilter('주차장')">
-
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>
-
-      주차장
-
-    </button>
-
-  </div>
-
-
-
-  <div class="map-legend">
-
-
-
-
-
-    <div class="map-legend-item">
-
-      <span class="map-legend-dot" style="background:#06b6d4"></span>
-
-      상습결빙지역
-
-    </div>
-
-
-
-    <div class="map-legend-item">
-
-      <span class="map-legend-dot" style="background:#f59e0b"></span>
-
-      공중화장실
-
-    </div>
-
-
-
-<div class="map-legend-item">
-
-  <span class="map-legend-dot" style="background:#ef4444"></span>
-
-  교통사고위험지역
-
-</div>
-
-<div class="map-legend-item">
-
-  <span class="map-legend-dot" style="background:#8b5cf6"></span>
-
-  주차장
-
-</div>
-
-
-
-<div class="map-legend-item">
-
-  <span class="map-legend-dot" style="background:#2563eb"></span>
-
-  내 위치
-
-</div>
-
-
-
-
-
-  </div>
-
-
-
-</div>
-
-
-
-
-
-
-
-<div id="msgModal" style="
-
-position:fixed;
-
-inset:0;
-
-background:rgba(0,0,0,0.45);
-
-display:none;
-
-align-items:center;
-
-justify-content:center;
-
-z-index:5000;
-
-">
-
-
-
-<div id="msgBox" style="
-
-background:#ffffff;
-
-padding:24px 22px;
-
-border-radius:18px;
-
-min-width:320px;
-
-max-width:90vw;
-
-text-align:center;
-
-box-shadow:0 18px 40px rgba(0,0,0,0.18);
-
-">
-
-
-
-<div id="msgText" style="
-
-font-size:15px;
-
-margin-bottom:18px;
-
-line-height:1.6;
-
-white-space:pre-line;
-
-color:#0f172a;
-
-font-weight:600;
-
-word-break:keep-all;
-
-"></div>
-
-
-
-<button id="msgBtn" onclick="closeMsg()" style="
-
-background:#2563eb;
-
-border:none;
-
-color:white;
-
-padding:8px 16px;
-
-border-radius:8px;
-
-font-weight:700;
-
-cursor:pointer;
-
-">
-
-확인
-
+<div class="container">
+
+<div class="title">
+<a href="/admin" class="home-admin-hidden">관리자</a>
+<button type="button" class="home-notice-btn" onclick="openNotice()" aria-label="공지사항">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4V4.29C7.12 5.14 5 7.82 5 11V17L3 19V20H21V19L19 17V11C19 7.82 16.88 5.14 14 4.29V4C14 2.9 13.1 2 12 2Z" fill="white"/><path d="M12 24C13.66 24 15 22.66 15 21H9C9 22.66 10.34 24 12 24Z" fill="white"/></svg>
+  {% if notices %}<span class="notice-dot"></span>{% endif %}
 </button>
+<button type="button" class="home-help-btn" onclick="openGuide()" aria-label="사용설명서">?</button>
+<h1>NHIS-G <span>케어네비</span></h1>
+<p>통합돌봄 자원 검색 및 안내 서비스</p>
+</div>
 
+<a href="/desc" class="card main-menu-card">
 
+<div class="icon">🤖</div>
+
+<div class="text">
+<b>사례별 AI 추천 서비스 찾기</b>
+<span>사례분석을 통해 적합한 서비스를 추천합니다.</span>
+</div>
+
+</a>
+
+<a href="/combo" class="card main-menu-card">
+
+<div class="icon">🔎</div>
+
+<div class="text">
+<b>통합돌봄 서비스 기관 찾기</b>
+<span>시도, 대분류 등 조건으로 서비스 자원을 검색합니다.</span>
+</div>
+
+</a>
+
+<a href="/survey" class="card sub-card">
+
+<div class="icon">📋</div>
+
+<div class="text">
+<b>통합돌봄 지자체 조사 서식</b>
+<span>사전조사, 자체조사, 연계조사를 진행하고 저장합니다.</span>
+</div>
+
+</a>
+
+<div class="bottom-row">
+
+<a href="/guide" class="bottom-card">
+
+<img src="/static/pdf_icon.png">
+
+<div>통합돌봄 사업 안내</div>
+
+</a>
+
+<a href="/nhis25" class="bottom-card">
+
+<img src="/static/nhis_heart.png">
+
+<div>건강보험 25시</div>
+
+</a>
 
 </div>
 
-</div>
 
 
+<img src="/static/bottom.png" class="bottom-img">
+<div class="bottom-footer">
 
-<div id="facilityFabMenu" onclick="if(event.target===this) closeFacilityFab();" style="
-position:fixed;inset:0;background:rgba(0,0,0,.5);
-display:none;align-items:center;justify-content:center;z-index:6000;
-backdrop-filter:blur(4px);">
-<div style="background:#fff;border-radius:18px;width:340px;max-width:94vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25);">
-  <div style="background:#0f172a;padding:18px 20px 14px;">
-    <div style="font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:2px;">내 주변에서 찾기</div>
-    <div style="font-size:12px;color:#64748b;">찾을 시설을 선택하세요</div>
-  </div>
-  <div style="padding:16px 20px 18px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <button onclick="findNearestFacility('공중화장실')" style="display:flex;align-items:center;justify-content:center;gap:5px;height:48px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;font-size:13px;font-weight:700;color:#374151;cursor:pointer;"><span style="width:9px;height:9px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>화장실</button>
-      <button onclick="findNearestFacility('주차장')" style="display:flex;align-items:center;justify-content:center;gap:5px;height:48px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;font-size:13px;font-weight:700;color:#374151;cursor:pointer;"><span style="width:9px;height:9px;border-radius:50%;background:#8b5cf6;flex-shrink:0;"></span>주차장</button>
-      <button onclick="findNearestFacility('위험지역')" style="display:flex;align-items:center;justify-content:center;gap:5px;height:48px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;font-size:13px;font-weight:700;color:#374151;cursor:pointer;"><span style="width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0;"></span>위험지역</button>
-      <button onclick="findNearestFacility('자동심장충격기')" style="display:flex;align-items:center;justify-content:center;gap:5px;height:48px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;font-size:12px;font-weight:700;color:#374151;cursor:pointer;line-height:1.2;text-align:center;padding:0 6px;"><span style="width:9px;height:9px;border-radius:50%;background:#16a34a;flex-shrink:0;"></span>자동심장충격기(AED)</button>
+  <div class="visitor-left">
+    <div id="reportBtn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+        <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+      </svg>
     </div>
-    <button onclick="closeFacilityFab()" style="width:100%;height:42px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;font-weight:700;font-size:14px;cursor:pointer;color:#475569;">취소</button>
+    <div id="singleReportBtn" style="display:none;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+        <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+      </svg>
+    </div>
+    <div id="fabWrap" style="display:none;">
+      <div id="fabItems" style="display:none;">
+        <div id="fabItem_notice" class="fab-item">
+          <div class="fab-item-btn" style="position:relative;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.9 2 10 2.9 10 4V4.29C7.12 5.14 5 7.82 5 11V17L3 19V20H21V19L19 17V11C19 7.82 16.88 5.14 14 4.29V4C14 2.9 13.1 2 12 2Z" fill="white"/><path d="M12 24C13.66 24 15 22.66 15 21H9C9 22.66 10.34 24 12 24Z" fill="white"/></svg>
+            {% if notices %}<span class="fab-item-dot"></span>{% endif %}
+          </div>
+          <span class="fab-item-label">공지사항</span>
+        </div>
+        <div id="fabItem_report" class="fab-item">
+          <div class="fab-item-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+              <path d="M21 6h-2V3H5v3H3v15h18V6zM7 5h10v1H7V5zm12 14H5V8h14v11z"/>
+            </svg>
+          </div>
+          <span class="fab-item-label">의견보내기</span>
+        </div>
+        <div id="fabItem_apk" class="fab-item">
+          <div class="fab-item-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+              <path d="M17.5 2.5L15.5 1l-1.3 2.1C13.5 2.8 12.8 2.6 12 2.6s-1.5.2-2.2.5L8.5 1 6.5 2.5l1.2 2C6.1 5.7 5 7.5 5 9.5h14c0-2-.9-3.8-2.7-5l1.2-2zM9 7.5c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm6 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1z"/>
+              <rect x="2" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
+              <rect x="19.5" y="11" width="2.5" height="6" rx="1.2" fill="white"/>
+              <path d="M5 11v8c0 1.1.9 2 2 2h1v3h2v-3h4v3h2v-3h1c1.1 0 2-.9 2-2v-8H5z"/>
+            </svg>
+          </div>
+          <span class="fab-item-label">앱 설치</span>
+        </div>
+      </div>
+      <div id="fabMain">
+        {% if notices %}<span id="fabMainDot" class="fab-main-dot"></span>{% endif %}
+        <svg id="fabIconPlus" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
+          <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+        <svg id="fabIconClose" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24" style="display:none;">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </div>
+    </div>
   </div>
-</div>
-</div>
 
-
-
-<div id="routePopup" style="
-
-position:fixed;inset:0;
-
-background:rgba(0,0,0,.5);
-
-display:none;align-items:center;justify-content:center;z-index:6000;
-
-backdrop-filter:blur(4px);">
-
-<div style="
-
-background:#fff;border-radius:18px;width:360px;max-width:94vw;
-
-overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25);">
-
-  <div style="background:#0f172a;padding:18px 20px 14px;">
-
-    <div style="font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:2px;">경로 설정</div>
-
-    <div style="font-size:12px;color:#64748b;">출발지와 도착지를 입력하세요</div>
-
+  <div class="copyright">
+    <div class="copyright-line"></div>
+    <div class="copyright-main">
+      ©국민건강보험공단 광주전라제주지역본부
+    </div>
+    <div class="copyright-sub">
+      통합돌봄부<span class="tf-label">(TF)</span> &amp; 연구반 <span class="brand">돌봄곳간</span>
+    </div>
+    <div class="visitor-box">
+      <div>총 {{total}}</div>
+      <div>오늘 {{today}}</div>
+    </div>
+    <div style="text-align:right;padding:8px 0 0;">
+      <a href="/privacy" style="font-size:11px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
+    </div>
   </div>
 
-  <div style="padding:18px 20px;">
+</div>
 
-    <input id="startInput"
+<style>
 
-      placeholder="출발지 (예: 광주전라제주지역본부)"
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
 
-      style="width:100%;height:42px;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;margin-bottom:8px;outline:none;transition:border-color .15s;"
 
-      onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">
+<!-- ===== 단일 의견보내기 버튼 (PC/아이폰/앱) ===== -->
 
-    <input id="destInput"
 
-      placeholder="도착지 (예: 전라남도청)"
 
-      style="width:100%;height:42px;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;margin-bottom:10px;outline:none;transition:border-color .15s;"
 
-      onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">
+<!-- ===== Modal ===== -->
 
-    <div id="destSuggestBox" style="
+<!-- ===== 앱 설치 안내 모달 ===== -->
+<div id="apkInstallModal" onclick="closeApkInstallModalByBg(event)">
+  <div class="apk-install-box">
 
-      display:none;width:100%;max-height:180px;overflow-y:auto;
+    <div class="apk-install-icon">📱</div>
 
-      border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;
+    <div class="apk-install-title">케어네비 앱 설치 안내</div>
 
-      margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.08);"></div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-
-      <button onclick="closeRoutePopup()" style="
-
-        height:42px;border:1.5px solid #e2e8f0;border-radius:10px;
-
-        background:#fff;font-weight:700;font-size:14px;cursor:pointer;color:#475569;">취소</button>
-
-      <button type="button" onclick="runRouteSearch()" style="
-
-        height:42px;border:none;border-radius:10px;
-
-        background:linear-gradient(135deg,#3b82f6,#2563eb);
-
-        color:#fff;font-weight:800;font-size:14px;cursor:pointer;">조회</button>
-
+    <div class="apk-install-subtitle">
+      안드로이드용 설치 파일을 다운로드합니다.
     </div>
 
-  </div>
-
-</div>
-
-</div>
-
-
-
-<div id="adminPwModal" style="
-
-display:none;
-
-position:fixed;
-
-inset:0;
-
-background:rgba(15,23,42,0.45);
-
-z-index:5000;
-
-align-items:center;
-
-justify-content:center;
-
-padding:20px;
-
-">
-
-  <div style="
-
-  width:100%;
-
-  max-width:360px;
-
-  background:#ffffff;
-
-  border-radius:18px;
-
-  padding:22px;
-
-  box-shadow:0 18px 45px rgba(0,0,0,0.25);
-
-  ">
-
-    <div style="
-
-    font-size:18px;
-
-    font-weight:900;
-
-    margin-bottom:8px;
-
-    color:#111827;
-
-    ">
-
-    관리자 통계
-
+    <div class="apk-install-text">
+      다운로드 후 설치 화면이 나오면<br>
+      <b>'설치'</b>를 눌러주세요.<br><br>
+      휴대폰 설정에 따라<br>
+      <b>'출처를 알 수 없는 앱 설치 허용'</b>이<br>
+      필요할 수 있습니다.
     </div>
 
+    <div class="apk-install-buttons">
+  <button type="button" class="apk-confirm-btn" onclick="confirmApkDownload()">다운로드</button>
+  <button type="button" class="apk-cancel-btn" onclick="closeApkInstallModal()">취소</button>
+</div>
 
+  </div>
+</div>
 
-    <div style="
+<div id="reportModal">
+  <div id="reportBox">
 
+    <div class="report-header">
+      오류제보 / 의견보내기
+      <span onclick="closeReport()">✕</span>
+    </div>
+
+    <iframe 
+      src="https://docs.google.com/forms/d/e/1FAIpQLSfDa2M6edO0btvy5tWsOlE_H5Y2u0WaBSLfP2yz58_DwMfwWA/viewform?embedded=true"
+      frameborder="0">
+    </iframe>
+
+  </div>
+</div>
+
+<style>
+
+/* ===== visitor-left 컨테이너 ===== */
+.visitor-left{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  padding-bottom:40px;
+}
+
+/* PC/아이폰/앱 단일 의견보내기 버튼 */
+#singleReportBtn{
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  box-shadow:0 8px 20px rgba(37,99,235,0.4);
+  cursor:pointer;
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  transition:transform 0.2s;
+  flex-shrink:0;
+}
+#singleReportBtn:hover{
+  transform:scale(1.08);
+}
+
+/* 모바일/앱: fixed 왼쪽 하단 (+ 버튼 위치) */
+@media (max-width:600px){
+  #singleReportBtn{
+    position:fixed;
+    left:14px;
+    bottom:60px;
+    width:54px;
+    height:54px;
+    border-radius:50%;
+  }
+}
+
+/* PC: bottom-footer 안 static, 알약 모양 */
+@media (min-width:601px){
+  #singleReportBtn{
+    position:static;
+    width:auto;
+    height:38px;
+    border-radius:999px;
+    padding:0 16px 0 12px;
+    gap:7px;
     font-size:13px;
+    font-weight:700;
+    color:#fff;
+    letter-spacing:-0.2px;
+    white-space:nowrap;
+    align-self:flex-end;
+  }
+  #singleReportBtn::after{
+    content:'의견보내기';
+  }
+}
 
-    color:#64748b;
+/* PC 오류제보 버튼 (visitor-left 안 구버튼 - 숨김) */
+#reportBtn{
+  display:none !important;
+}
 
-    margin-bottom:14px;
+#reportBtn:hover{
+  transform:scale(1.08);
+}
 
-    ">
+/* ===== 스피드다이얼 FAB ===== */
+#fabWrap{
+  position:fixed;
+  left:14px;
+  bottom:60px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:12px;
+  z-index:9999;
+}
 
-    관리자 암호를 입력하세요.
+/* 메인 버튼 */
+#fabMain{
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 8px 20px rgba(37,99,235,0.4);
+  cursor:pointer;
+  transition:transform 0.2s, box-shadow 0.2s;
+  flex-shrink:0;
+}
 
-    </div>
+#fabMain:hover{
+  transform:scale(1.08);
+}
 
+#fabMain.open{
+  background:linear-gradient(135deg,#64748b,#475569);
+  box-shadow:0 8px 20px rgba(0,0,0,0.25);
+}
 
+/* 서브 아이템 */
+/* 서브 아이템 감싸는 박스 */
+#fabItems{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  border-radius:16px;
+  padding:10px 12px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.18);
+  min-width:120px;
+}
 
-    <input id="adminPwInput" type="password" onkeydown="if(event.key==='Enter'){submitAdminPw();}" style="
+#fabItems:empty{
+  display:none;
+}
 
+.fab-item{
+  display:none;
+  align-items:center;
+  gap:10px;
+  flex-direction:row;
+}
+
+.fab-item.show{
+  display:flex;
+  animation:fabItemIn 0.18s ease;
+}
+
+@keyframes fabItemIn{
+  from{ opacity:0; transform:translateY(8px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+.fab-item-btn{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 12px rgba(37,99,235,0.35);
+  cursor:pointer;
+  transition:transform 0.15s;
+  flex-shrink:0;
+}
+
+.fab-item-btn:hover{
+  transform:scale(1.08);
+}
+
+.fab-item-label{
+  color:#1e293b;
+  font-size:13px;
+  font-weight:700;
+  white-space:nowrap;
+  pointer-events:none;
+}
+
+/* PC에서 visitor-left 안 reportBtn은 그대로 표시 */
+/* 모바일에서 visitor-left 안 reportBtn 숨김 */
+@media (max-width:600px){
+  .visitor-left #reportBtn{
+    display:none !important;
+  }
+  .visitor-left{
+    flex-direction:row;
+    align-items:center;
+    padding-bottom:0;
+  }
+  #reportBox{
     width:100%;
+    height:100%;
+    border-radius:0;
+  }
+}
 
-    height:44px;
-
-    border:1px solid #cbd5e1;
-
-    border-radius:12px;
-
-    padding:0 12px;
-
-    font-size:16px;
-
-    outline:none;
-
-    ">
-
-
-
-    <div id="adminPwMsg" style="
-
-    min-height:20px;
-
-    margin-top:8px;
-
-    font-size:13px;
-
-    color:#ef4444;
-
-    "></div>
+/* PC: + 버튼을 원래 의견보내기 자리(푸터 visitor-left)로 — fixed 해제 */
+@media (min-width:601px){
+  #fabWrap{
+    display:inline-flex !important;
+    position:relative !important;
+    left:auto !important;
+    bottom:auto !important;
+    z-index:1;
+    align-self:flex-start;
+    gap:0;
+  }
+  /* 메뉴는 + 버튼 위로 떠서 펼쳐짐 (푸터 레이아웃 안 밀림) */
+  #fabItems{
+    position:absolute;
+    bottom:calc(100% + 12px);
+    left:0;
+  }
+}
 
 
+/* 단일 의견보내기 버튼/알약 완전 폐지 */
+#singleReportBtn{ display:none !important; }
 
-    <div style="
+/* 공지 빨간점 — 메뉴 안 공지사항 항목 */
+.fab-item-dot{
+  position:absolute;
+  top:-2px;
+  right:-2px;
+  width:11px;
+  height:11px;
+  background:#ef4444;
+  border-radius:50%;
+  border:2px solid #fff;
+}
 
-    display:grid;
+/* 공지 빨간점 — 메인 + 버튼 */
+#fabMain{ position:relative; }
+.fab-main-dot{
+  position:absolute;
+  top:-3px;
+  right:-3px;
+  width:15px;
+  height:15px;
+  background:#ef4444;
+  border-radius:50%;
+  border:2.5px solid #fff;
+  box-shadow:0 1px 3px rgba(0,0,0,0.25);
+  z-index:2;
+}
 
-    grid-template-columns:1fr 1fr;
+/* 모바일 웹에서 fabWrap 위치 */
+@media (max-width:600px){
+  #fabWrap{
+    bottom:60px !important;
+  }
+}
 
-    gap:10px;
+/* ===== 앱 설치 안내 모달 ===== */
+#apkInstallModal{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:10050;
+  backdrop-filter:blur(3px);
+  -webkit-backdrop-filter:blur(3px);
+}
 
-    margin-top:14px;
+.apk-install-box{
+  background:#ffffff;
+  border-radius:22px;
+  padding:34px 28px 26px;
+  width:88%;
+  max-width:360px;
+  text-align:center;
+  box-shadow:0 18px 50px rgba(0,0,0,0.24);
+  font-family:inherit;
+  animation:apkModalIn 0.2s ease;
+}
 
-    ">
+.apk-install-icon{
+  font-size:38px;
+  margin-bottom:12px;
+}
 
-      <button onclick="closeAdminPwModal()" style="
+.apk-install-title{
+  font-size:18px;
+  font-weight:900;
+  color:#111827;
+  margin-bottom:8px;
+  letter-spacing:-0.3px;
+}
 
-      height:42px;
+.apk-install-subtitle{
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.5;
+  margin-bottom:18px;
+}
 
-      border:1px solid #cbd5e1;
+.apk-install-text{
+  font-size:13.5px;
+  color:#374151;
+  line-height:1.7;
+  word-break:keep-all;
+  margin-bottom:22px;
+}
 
-      border-radius:12px;
+.apk-install-text b{
+  color:#2563eb;
+  font-weight:800;
+}
 
-      background:#ffffff;
+.apk-install-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
 
-      font-weight:800;
+.apk-cancel-btn,
+.apk-confirm-btn{
+  height:42px;
+  border-radius:10px;
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  border:none;
+}
 
-      cursor:pointer;
+.apk-cancel-btn{
+  background:#f3f4f6;
+  color:#4b5563;
+}
 
-      ">
+.apk-confirm-btn{
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#ffffff;
+  box-shadow:0 6px 16px rgba(37,99,235,0.28);
+}
 
-      취소
+@keyframes apkModalIn{
+  from{
+    opacity:0;
+    transform:translateY(14px) scale(0.98);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
 
-      </button>
+
+/* ===== 모달 ===== */
+#reportModal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.55);
+  z-index:9998;
+  justify-content:center;
+  align-items:center;
+}
+
+/* ===== 박스 ===== */
+#reportBox{
+  width:90%;
+  max-width:520px;
+  height:80vh;
+  background:white;
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  animation:fadeUp 0.25s ease;
+}
+
+/* ===== 헤더 ===== */
+.report-header{
+  padding:14px 16px;
+  font-weight:700;
+  background:#f3f6fb;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.report-header span{
+  cursor:pointer;
+  font-size:18px;
+}
+
+/* ===== iframe ===== */
+#reportBox iframe{
+  flex:1;
+  width:100%;
+  border:none;
+}
+
+/* ===== 애니메이션 ===== */
+@keyframes fadeUp{
+  from{
+    opacity:0;
+    transform:translateY(20px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
 
 
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
 
-      <button onclick="submitAdminPw()" style="
+<script>
+/* ===== FAB 초기화 (항상 + 버튼, 환경별 항목만 분기) ===== */
+(function(){
+  var ua = navigator.userAgent || "";
+  var isAndroid    = /Android/i.test(ua);
+  var isIOS        = /iPhone|iPad|iPod/i.test(ua);
+  var isApp        = ua.indexOf("CareNaviApp") !== -1;
+  var isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
 
-      height:42px;
+  // 앱 모드 body 클래스 (상단 여백 축소용)
+  if(isApp || isStandalone){
+    document.body.classList.add("app-mode");
+  }
 
-      border:none;
+  // 앱다운(APK)은 안드로이드 일반 브라우저에서만 (아이폰/앱/PWA 제외)
+  var showApk = isAndroid && !isIOS && !isApp && !isStandalone;
 
-      border-radius:12px;
+  var fabWrap       = document.getElementById("fabWrap");
+  var fabMain       = document.getElementById("fabMain");
+  var fabItems      = document.getElementById("fabItems");
+  var fabItemNotice = document.getElementById("fabItem_notice");
+  var fabItemRep    = document.getElementById("fabItem_report");
+  var fabItemApk    = document.getElementById("fabItem_apk");
+  var fabIconPlus   = document.getElementById("fabIconPlus");
+  var fabIconClose  = document.getElementById("fabIconClose");
+  var singleBtn     = document.getElementById("singleReportBtn");
+  var isOpen        = false;
 
-      background:#2563eb;
+  // 단일버튼/PC 알약 폐지 → 모든 환경에서 + FAB
+  if(singleBtn) singleBtn.style.display = "none";
+  if(fabWrap)   fabWrap.style.display   = "flex";
 
-      color:#ffffff;
+  // 앱다운 항목은 안드로이드 일반 브라우저에서만 노출
+  if(fabItemApk) fabItemApk.style.display = showApk ? "" : "none";
 
-      font-weight:800;
+  // 열렸을 때 보여줄 항목 (공지/의견은 항상, 앱다운은 조건부)
+  var activeItems = [fabItemNotice, fabItemRep];
+  if(showApk) activeItems.push(fabItemApk);
 
-      cursor:pointer;
+  function openFab(){
+    isOpen = true;
+    if(fabMain)      fabMain.classList.add("open");
+    if(fabIconPlus)  fabIconPlus.style.display  = "none";
+    if(fabIconClose) fabIconClose.style.display = "";
+    if(fabItems)     fabItems.style.display = "flex";
+    activeItems.forEach(function(it){ if(it) it.classList.add("show"); });
+  }
+  function closeFab(){
+    isOpen = false;
+    if(fabMain)      fabMain.classList.remove("open");
+    if(fabIconPlus)  fabIconPlus.style.display  = "";
+    if(fabIconClose) fabIconClose.style.display = "none";
+    if(fabItems)     fabItems.style.display = "none";
+    activeItems.forEach(function(it){ if(it) it.classList.remove("show"); });
+  }
 
-      ">
+  if(fabMain){
+    fabMain.addEventListener("click", function(e){
+      e.stopPropagation();
+      isOpen ? closeFab() : openFab();
+    });
+  }
+  if(fabItemNotice){
+    fabItemNotice.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      openNotice();
+    });
+  }
+  if(fabItemRep){
+    fabItemRep.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      location.href = "/board/write";
+    });
+  }
+  if(fabItemApk){
+    fabItemApk.addEventListener("click", function(e){
+      e.stopPropagation();
+      closeFab();
+      openApkInstallModal();
+    });
+  }
 
-      확인
+  document.addEventListener("click", function(){ if(isOpen) closeFab(); });
+})();
 
-      </button>
+/* ===== 공지 빨간점 읽음 처리 (localStorage) ===== */
+(function(){
+  var KEY = "carenavi_seen_notice";
+  var latest = {{ latest_notice_key|tojson }};
+  function hideDots(){
+    var d1 = document.getElementById("fabMainDot");
+    var d2 = document.querySelector("#fabItem_notice .fab-item-dot");
+    if(d1) d1.style.display = "none";
+    if(d2) d2.style.display = "none";
+  }
+  // 이미 본 최신 공지면 점 숨김
+  try{
+    if(!latest || localStorage.getItem(KEY) === latest){
+      hideDots();
+    }
+  }catch(e){}
+  // 공지 열면 본 것으로 기록 + 점 제거
+  window.__careNaviMarkNoticeSeen = function(){
+    try{ if(latest) localStorage.setItem(KEY, latest); }catch(e){}
+    hideDots();
+  };
+})();
 
+/* 홈 진입 시 현재 상태를 홈으로 고정하고, 홈 상태를 하나 더 쌓아둠 */
+history.replaceState({ page: "home-root" }, "", location.href);
+history.pushState({ page: "home" }, "", location.href);
+
+/* 오류제보 버튼 클릭 → 모달 열기 */
+reportBtn.onclick = () => {
+  location.href = "/board";
+};
+
+function openApkInstallModal(){
+  var modal = document.getElementById("apkInstallModal");
+  if(modal){
+    modal.style.display = "flex";
+  }
+}
+
+function closeApkInstallModal(){
+  var modal = document.getElementById("apkInstallModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+}
+
+function closeApkInstallModalByBg(e){
+  if(e.target && e.target.id === "apkInstallModal"){
+    closeApkInstallModal();
+  }
+}
+
+function confirmApkDownload(){
+  closeApkInstallModal();
+  window.location.href = "/static/carenavi.apk";
+}
+
+function openReport(){
+  location.href = "/board/write";
+}
+
+function closeReport(){
+  var reportModal = document.getElementById("reportModal");
+  if(reportModal) reportModal.style.display = "none";
+}
+
+/* 배경 클릭 시 닫기 */
+document.addEventListener("click", function(e){
+  var reportModal = document.getElementById("reportModal");
+  if(reportModal && e.target === reportModal){
+    closeReport();
+  }
+});
+
+/* 뒤로가기 처리 */
+window.addEventListener("popstate", function (e) {
+  /* 모달 상태에서 뒤로가기 → 모달만 닫고 홈 유지 */
+  if (e.state && e.state.page === "home") {
+    if (reportModal.style.display === "flex") {
+      reportModal.style.display = "none";
+    }
+    return;
+  }
+
+  /* 홈에서 뒤로가기 → 다시 홈 상태를 쌓아서 로그인으로 못 가게 함 */
+  if (e.state && e.state.page === "home-root") {
+    if (reportModal.style.display === "flex") {
+      reportModal.style.display = "none";
+    }
+    history.pushState({ page: "home" }, "", location.href);
+    return;
+  }
+
+  /* 혹시 예외 상태여도 홈 유지 */
+  if (reportModal.style.display === "flex") {
+    reportModal.style.display = "none";
+  }
+  history.pushState({ page: "home" }, "", location.href);
+});
+</script>
+
+<!-- 공지사항 모달 -->
+<div id="noticeModal" class="notice-modal" onclick="if(event.target===this)closeNotice()">
+  <div class="notice-box" onclick="event.stopPropagation()">
+    <div class="notice-header">
+      <div class="notice-header-title">공지사항</div>
+      <button type="button" class="notice-close" onclick="closeNotice()">×</button>
     </div>
-
-  </div>
-
-</div>
-
-
-
-<!-- 9번: 주소로 근처 위험지역 검색 팝업 -->
-
-<div id="addrSearchPopup" style="
-
-position:fixed;inset:0;background:rgba(0,0,0,.5);
-
-display:none;align-items:center;justify-content:center;z-index:6000;
-
-backdrop-filter:blur(4px);">
-
-<div style="background:#fff;border-radius:18px;width:360px;max-width:94vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25);">
-
-  <div style="background:#0f172a;padding:18px 20px 14px;">
-
-    <div style="font-size:15px;font-weight:900;color:#f8fafc;margin-bottom:2px;">주소로 찾기</div>
-
-    <div style="font-size:12px;color:#64748b;">입력한 주소 5km 이내 위험지역을 표시합니다</div>
-
-  </div>
-
-  <div style="padding:18px 20px;">
-
-    <input id="addrSearchInput"
-
-      placeholder="주소 입력 (예: 광주시 서구 치평동)"
-
-      style="width:100%;height:42px;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;margin-bottom:8px;outline:none;transition:border-color .15s;"
-
-      onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">
-
-    <div id="addrSuggestBox" style="
-
-      display:none;width:100%;max-height:160px;overflow-y:auto;
-
-      border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;
-
-      margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,.08);"></div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-
-      <button onclick="closeAddressSearch()" style="
-
-        height:42px;border:1.5px solid #e2e8f0;border-radius:10px;
-
-        background:#fff;font-weight:700;font-size:14px;cursor:pointer;color:#475569;">취소</button>
-
-      <button type="button" onclick="runAddressSearch()" style="
-
-        height:42px;border:none;border-radius:10px;
-
-        background:linear-gradient(135deg,#3b82f6,#2563eb);
-
-        color:#fff;font-weight:800;font-size:14px;cursor:pointer;">조회</button>
-
+    <div class="notice-body">
+      {% if notices %}
+        {% for n in notices %}
+        <div class="notice-item">
+          <div class="notice-item-date">{{ n.created_date }}</div>
+          <div class="notice-item-title">{{ n.title }}</div>
+          <div class="notice-item-content">
+            {% for line in n.content_lines %}{% set t = line.lstrip() %}{% if t[:1] == '-' %}<div class="notice-line bullet"><span class="b-mark">-</span><span class="b-text">{{ t[1:].lstrip() }}</span></div>{% else %}<div class="notice-line">{{ line }}</div>{% endif %}{% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="notice-empty">등록된 공지사항이 없습니다.</div>
+      {% endif %}
     </div>
-
+    <div class="notice-pagination" id="noticePagination"></div>
   </div>
-
 </div>
 
+<!-- 사용설명서 모달 -->
+<div id="guideModal" class="guide-modal" onclick="onGuideBgClick(event)">
+  <div class="guide-box" onclick="event.stopPropagation()">
+    <div class="guide-header">
+      <div class="guide-title">사용설명서</div>
+      <button type="button" class="guide-close" onclick="closeGuide()">×</button>
+    </div>
+    <div class="guide-image-wrap">
+      <img id="guideImage" src="" alt="사용설명서" />
+    </div>
+    <div class="guide-nav">
+      <button type="button" class="guide-nav-btn" id="guidePrev" onclick="prevGuidePage()">이전</button>
+      <div class="guide-page-indicator" id="guidePageIndicator">1</div>
+      <button type="button" class="guide-nav-btn" id="guideNext" onclick="nextGuidePage()">다음</button>
+    </div>
+  </div>
 </div>
 
-
-
-<!-- 5번: 코멘트 모달 -->
-
-<div id="commentModal" style="
-
-position:fixed;inset:0;background:rgba(0,0,0,.45);
-
-display:none;align-items:center;justify-content:center;z-index:7000;">
-
-<div style="background:white;border-radius:18px;padding:22px;width:360px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;">
-
-  <div style="font-size:17px;font-weight:900;margin-bottom:14px;">💬 코멘트 게시판</div>
-
-  <div id="commentList" style="flex:1;overflow-y:auto;max-height:260px;margin-bottom:14px;border:1px solid #f1f5f9;border-radius:10px;padding:8px 10px;"></div>
-
-  <textarea id="commentInput" placeholder="이 지점에 대한 의견을 남겨주세요..." style="
-
-    width:100%;height:72px;border:1px solid #cbd5e1;border-radius:10px;
-
-    padding:10px;font-size:13px;resize:none;margin-bottom:10px;
-
-    font-family:inherit;"></textarea>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-
-    <button onclick="closeComments()" style="height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-weight:700;cursor:pointer;">닫기</button>
-
-    <button onclick="submitComment()" style="height:42px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">등록</button>
-
+<!-- 첫방문 가이드 투어 -->
+<div id="tourOverlay" class="tour-overlay" onclick="closeTour()"></div>
+<div id="tourSpotlight" class="tour-spotlight" style="display:none;"></div>
+<div id="tourPopup" class="tour-popup">
+  <div class="tour-popup-title">케어네비를 처음 방문해주셨네요 👋</div>
+  <div class="tour-popup-text">사용법은 우측 상단 <span style="white-space:nowrap;"><span class="tour-q-icon">?</span> 버튼을</span> 눌러보세요.</div>
+  <div class="tour-popup-buttons">
+    <button type="button" class="tour-btn tour-btn-primary" onclick="openGuideFromTour()">설명서 보기</button>
+    <button type="button" class="tour-btn tour-btn-dismiss" onclick="dismissTourForever()">다시 보지 않기</button>
   </div>
-
-</div>
-
-</div>
-
-
-
-<!-- 별점 평가 모달 -->
-
-<div id="ratingModal" style="
-
-position:fixed;inset:0;background:rgba(0,0,0,.45);
-
-display:none;align-items:center;justify-content:center;z-index:7500;">
-
-<div style="background:white;border-radius:18px;padding:24px 22px;width:320px;max-width:94vw;text-align:center;">
-
-  <div style="font-size:17px;font-weight:900;margin-bottom:6px;">이 지점 평가</div>
-
-  <div style="font-size:13px;color:#64748b;margin-bottom:16px;">별점을 선택하고 등록을 눌러주세요.</div>
-
-  <div id="ratingStarRow" style="font-size:28px;letter-spacing:2px;margin-bottom:18px;cursor:pointer;display:flex;justify-content:center;gap:2px;flex-wrap:nowrap;white-space:nowrap;">
-
-    <span onclick="selectRatingStar(1)" data-n="1" style="display:inline-block;padding:2px;">☆</span>
-
-    <span onclick="selectRatingStar(2)" data-n="2" style="display:inline-block;padding:2px;">☆</span>
-
-    <span onclick="selectRatingStar(3)" data-n="3" style="display:inline-block;padding:2px;">☆</span>
-
-    <span onclick="selectRatingStar(4)" data-n="4" style="display:inline-block;padding:2px;">☆</span>
-
-    <span onclick="selectRatingStar(5)" data-n="5" style="display:inline-block;padding:2px;">☆</span>
-
-  </div>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-
-    <button onclick="closeRatingModal()" style="height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-weight:700;cursor:pointer;">취소</button>
-
-    <button onclick="submitRating()" style="height:42px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">등록</button>
-
-  </div>
-
-</div>
-
-</div>
-
-
-
-<!-- 개인정보 안내 팝업 -->
-
-<div id="privacyNoticeModal" style="
-
-position:fixed;inset:0;background:rgba(15,23,42,0.55);
-
-display:none;align-items:center;justify-content:center;z-index:9999;
-
-backdrop-filter:blur(3px);">
-
-<div style="
-
-background:#ffffff;border-radius:22px;
-
-padding:36px 32px 28px;
-
-width:min(460px,92vw);
-
-box-shadow:0 20px 60px rgba(0,0,0,0.25);
-
-text-align:center;
-
-">
-
-  <!-- 알림 아이콘 (SVG) -->
-
-  <div style="margin-bottom:16px;display:flex;justify-content:center;">
-
-    <svg xmlns='http://www.w3.org/2000/svg' width='52' height='52' viewBox='0 0 24 24' fill='none' stroke='#2563eb' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'>
-
-      <path d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'/>
-
-      <path d='M13.73 21a2 2 0 0 1-3.46 0'/>
-
-    </svg>
-
-  </div>
-
-  <div style="font-size:clamp(16px,2.2vw,20px);font-weight:900;color:#1a202c;margin-bottom:14px;line-height:1.4;">
-
-    장기요양 안전로드 안내
-
-  </div>
-
-  <div style="font-size:clamp(13px,1.5vw,15px);color:#374151;line-height:1.9;margin-bottom:26px;word-break:keep-all;">
-
-    '장기요양 안전로드'는 내부직원 업무지원을 위해 제작되었으며,
-
-    사용자의 위치 정보를 수집하지 않습니다.
-
-  </div>
-
-  <button onclick="closePrivacyNotice()" style="
-
-    width:100%;height:clamp(44px,6vw,52px);border:none;border-radius:13px;
-
-    background:linear-gradient(135deg,#2563eb,#3b82f6);
-
-    color:#fff;font-size:clamp(14px,1.6vw,16px);font-weight:800;
-
-    cursor:pointer;
-
-    box-shadow:0 4px 14px rgba(37,99,235,.35);
-
-  ">확인</button>
-
-</div>
-
 </div>
 
 <script>
-
-(function(){
-
-  if(!sessionStorage.getItem("privacyNoticeSeen")){
-
-    const modal = document.getElementById("privacyNoticeModal");
-
-    if(modal){ modal.style.display = "flex"; document.body.style.overflow = "hidden"; }
-
+/* ===== 공지사항 ===== */
+/* ===== 공지 아코디언 + 페이지네이션 ===== */
+var NoticePager = (function(){
+  var PER_PAGE = 5;
+  var inited = false, items = [], pager = null, body = null, pages = 1, current = 1;
+  function collapseAll(){ items.forEach(function(it){ it.classList.remove('open'); }); }
+  function renderButtons(){
+    if(!pager) return;
+    if(pages <= 1){ pager.style.display = 'none'; return; }
+    pager.style.display = 'flex';
+    pager.innerHTML = '';
+    for(var p = 1; p <= pages; p++){
+      (function(p){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'notice-page-btn' + (p === current ? ' active' : '');
+        b.textContent = p;
+        b.onclick = function(){ collapseAll(); showPage(p); };
+        pager.appendChild(b);
+      })(p);
+    }
   }
-
+  function showPage(p){
+    current = p;
+    items.forEach(function(it, i){
+      it.style.display = (Math.floor(i / PER_PAGE) + 1 === p) ? '' : 'none';
+    });
+    renderButtons();
+    if(body) body.scrollTop = 0;
+  }
+  function init(){
+    if(inited) return;
+    body = document.querySelector('#noticeModal .notice-body');
+    pager = document.getElementById('noticePagination');
+    items = body ? Array.prototype.slice.call(body.querySelectorAll('.notice-item')) : [];
+    pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+    // 제목 클릭 시 본문 펼치기/접기
+    items.forEach(function(it){
+      var t = it.querySelector('.notice-item-title');
+      if(t){ t.addEventListener('click', function(){ it.classList.toggle('open'); }); }
+    });
+    inited = true;
+  }
+  function open(){ init(); collapseAll(); showPage(1); }
+  return { open: open };
 })();
 
-function closePrivacyNotice(){
-
-  sessionStorage.setItem("privacyNoticeSeen","1");
-
-  const modal = document.getElementById("privacyNoticeModal");
-
-  if(modal) modal.style.display = "none";
-
-  document.body.style.overflow = "";
-
+function openNotice(){
+  if(window.__careNaviMarkNoticeSeen) window.__careNaviMarkNoticeSeen();
+  NoticePager.open();
+  document.getElementById('noticeModal').classList.add('open');
 }
+function closeNotice(){
+  document.getElementById('noticeModal').classList.remove('open');
+}
+
+/* ===== 사용설명서 ===== */
+var guideTotalPages = 0;       // 동적으로 탐지됨
+var guideCurrentPage = 1;
+var guideMaxKnown = 0;          // 지금까지 존재 확인된 최대 페이지
+
+function openGuide(){
+  closeTour();
+  try{ if(navigator.sendBeacon){ navigator.sendBeacon('/pv/guide'); } else { fetch('/pv/guide'); } }catch(e){}
+  guideCurrentPage = 1;
+  loadGuidePage(1);
+  document.getElementById('guideModal').classList.add('open');
+}
+function closeGuide(){
+  document.getElementById('guideModal').classList.remove('open');
+}
+function onGuideBgClick(e){
+  if(e.target && e.target.id === 'guideModal'){ closeGuide(); }
+}
+function loadGuidePage(n){
+  var img = document.getElementById('guideImage');
+  var indicator = document.getElementById('guidePageIndicator');
+  var nextBtn = document.getElementById('guideNext');
+  var prevBtn = document.getElementById('guidePrev');
+
+  img.onload = function(){
+    if(n > guideMaxKnown) guideMaxKnown = n;
+    indicator.textContent = n + (guideTotalPages ? ' / ' + guideTotalPages : '');
+    prevBtn.disabled = (n <= 1);
+    /* 다음 페이지 존재 여부 미리 확인 */
+    var probe = new Image();
+    probe.onload = function(){ nextBtn.disabled = false; };
+    probe.onerror = function(){
+      nextBtn.disabled = true;
+      guideTotalPages = n;
+      indicator.textContent = n + ' / ' + guideTotalPages;
+    };
+    probe.src = '/static/' + (n + 1) + '.jpg?v=' + Date.now();
+  };
+  img.onerror = function(){
+    /* 페이지가 없으면 이전 페이지로 */
+    if(n > 1){
+      guideTotalPages = n - 1;
+      guideCurrentPage = n - 1;
+      loadGuidePage(guideCurrentPage);
+    }
+  };
+  img.src = '/static/' + n + '.jpg?v=' + Date.now();
+}
+function nextGuidePage(){
+  guideCurrentPage += 1;
+  loadGuidePage(guideCurrentPage);
+}
+function prevGuidePage(){
+  if(guideCurrentPage > 1){
+    guideCurrentPage -= 1;
+    loadGuidePage(guideCurrentPage);
+  }
+}
+
+/* ===== 첫방문 가이드 투어 ===== */
+var TOUR_STORAGE_KEY = 'careNaviTourDismissed';        /* 영구 - "다시 보지 않기" */
+var TOUR_SESSION_KEY = 'careNaviTourSessionDismissed'; /* 세션 - 그냥 닫음 (재로그인 전까지) */
+
+function tourDismissed(){
+  try {
+    if(localStorage.getItem(TOUR_STORAGE_KEY) === '1') return true;
+    if(sessionStorage.getItem(TOUR_SESSION_KEY) === '1') return true;
+  } catch(e){}
+  return false;
+}
+function dismissTourForever(){
+  try { localStorage.setItem(TOUR_STORAGE_KEY, '1'); } catch(e){}
+  try { sessionStorage.removeItem(TOUR_SESSION_KEY); } catch(e){}
+  closeTour();
+}
+function dismissTourThisSession(){
+  try { sessionStorage.setItem(TOUR_SESSION_KEY, '1'); } catch(e){}
+}
+function openTour(){
+  var btn = document.querySelector('.home-help-btn');
+  if(!btn) return;
+  var rect = btn.getBoundingClientRect();
+
+  var spotlight = document.getElementById('tourSpotlight');
+  var pad = 6;
+  spotlight.style.display = 'block';
+  spotlight.style.top    = (rect.top  - pad) + 'px';
+  spotlight.style.left   = (rect.left - pad) + 'px';
+  spotlight.style.width  = (rect.width  + pad*2) + 'px';
+  spotlight.style.height = (rect.height + pad*2) + 'px';
+
+  var popup = document.getElementById('tourPopup');
+  popup.classList.add('open');
+
+  /* 팝업을 화면 중앙에 배치 (버튼 아래쪽) */
+  var viewportW = window.innerWidth;
+  var actualWidth = popup.offsetWidth || 300;
+  var top  = rect.bottom + 14;
+  var left = (viewportW - actualWidth) / 2;
+  if(left < 12) left = 12;
+  popup.style.top  = top + 'px';
+  popup.style.left = left + 'px';
+
+  document.getElementById('tourOverlay').classList.add('open');
+}
+function closeTour(){
+  document.getElementById('tourOverlay').classList.remove('open');
+  document.getElementById('tourPopup').classList.remove('open');
+  document.getElementById('tourSpotlight').style.display = 'none';
+  /* "그냥 닫기"는 이번 세션 동안만 안 보이게 (재로그인 시 다시 보임) */
+  dismissTourThisSession();
+}
+function openGuideFromTour(){
+  closeTour();
+  openGuide();
+}
+
+/* 페이지 로드시 첫방문 체크 */
+window.addEventListener('load', function(){
+  if(!tourDismissed()){
+    /* 약간 딜레이 줘서 레이아웃 안정화 후 띄움 */
+    setTimeout(openTour, 350);
+  }
+});
+
+/* 뒤로가기(bfcache) 복귀 시 끼어있는 누름 상태 초기화 */
+window.addEventListener('pageshow', function(e){
+  if(e.persisted){
+    document.documentElement.classList.add('tap-reset');
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ document.documentElement.classList.remove('tap-reset'); });
+    });
+  }
+});
 
 </script>
 
 
-
 </body>
+</html>
+"""
+@app.route("/home")
+@login_required
+def home():
+    total, today = update_visitors()
 
+    notices = []
+    try:
+        if os.getenv("RENDER") is not None:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/notices?select=*&is_active=eq.true&order=created_at.desc&limit=100",
+                headers=SUPABASE_HEADERS
+            )
+            if res.ok:
+                notices = res.json()
+        else:
+            notices = [{"id":1,"title":"테스트 공지","content":"로컬 테스트용 공지사항입니다.","created_at":"2026-06-04T00:00:00"}]
+    except Exception as e:
+        app.logger.exception(e)
+        notices = []
+
+    notices = clean_notices_for_template(notices)
+    latest_notice_key = ""
+    if notices:
+        n0 = notices[0]
+        latest_notice_key = str(
+            n0.get("id")
+            or n0.get("created_at")
+            or n0.get("created_datetime")
+            or ""
+        )
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key)
+
+STATS_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통계 페이지</title>
+<style>
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:900px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+  margin-bottom:18px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 2px 8px 2px;
+}
+
+.top-right-menu{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  flex-shrink:0;
+  margin-left:auto;
+}
+
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  height:34px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
+}
+
+.home-button:hover{
+  background:#f3f4f6 !important;
+  color:#374151 !important;
+}
+.maint-btn{
+  background:#fee2e2 !important;
+  border:1px solid #fecaca !important;
+  color:#dc2626 !important;
+}
+.maint-btn:hover{
+  background:#fecaca !important;
+  color:#b91c1c !important;
+}
+.card{
+  background:#ffffff;
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:16px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+.summary-row{
+  display:flex;
+  gap:12px;
+  flex-wrap:nowrap;
+}
+.summary-box{
+  flex:1;
+  min-width:0;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:14px;
+}
+.summary-label{
+  font-size:13px;
+  color:#6b7280;
+  margin-bottom:6px;
+}
+.summary-value{
+  font-size:24px;
+  font-weight:800;
+  color:#111827;
+}
+
+.table-scroll{
+  max-height:360px;
+  overflow-y:auto;
+  overflow-x:auto;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+th, td{
+  padding:10px 8px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:left;
+  font-size:14px;
+}
+th{
+  background:#f8fafc;
+  font-weight:700;
+}
+h2{
+  margin:0 0 10px 0;
+  font-size:18px;
+}
+.small{
+  font-size:12px;
+  color:#6b7280;
+}
+@media (max-width:480px){
+  .container{
+    padding:16px 10px 28px 10px;
+  }
+
+  .top-bar{
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    justify-content:flex-start !important;
+    overflow-x:auto !important;
+    white-space:nowrap !important;
+    margin-bottom:14px !important;
+    padding-bottom:8px !important;
+  }
+
+  .top-right-menu{
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    flex-shrink:0 !important;
+  }
+
+  .home-button{
+    height:34px !important;
+    padding:0 12px !important;
+    font-size:13px !important;
+    white-space:nowrap !important;
+    flex:0 0 auto !important;
+  }
+
+  th, td{
+    font-size:13px;
+    padding:8px 6px;
+  }
+  .summary-value{
+    font-size:22px;
+  }
+}
+
+@media (max-width:380px){
+  .home-button{
+    padding:0 10px !important;
+    font-size:12.5px !important;
+  }
+  .top-bar,
+  .top-right-menu{
+    gap:5px !important;
+  }
+}
+
+.pager{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  margin-top:12px;
+  flex-wrap:wrap;
+}
+
+.pager button{
+  min-width:32px;
+  height:32px;
+  border:1px solid #d1d5db;
+  background:#ffffff;
+  color:#374151;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.pager button.active{
+  background:#2563eb;
+  color:#ffffff;
+  border-color:#2563eb;
+}
+
+.pager button:hover{
+  background:#eff6ff;
+}
+
+.pager button.active:hover{
+  background:#2563eb;
+}
+
+/* 막대 그래프 (외부 라이브러리 없이 CSS) */
+.chart{
+  display:flex;
+  align-items:flex-end;
+  gap:6px;
+  padding:22px 4px 0;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.chart-col{
+  flex:1 0 26px;
+  min-width:26px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.chart-bar{
+  width:62%;
+  max-width:32px;
+  min-height:4px;
+  background:linear-gradient(180deg,#60a5fa,#2563eb);
+  border-radius:6px 6px 0 0;
+  position:relative;
+}
+.chart-bar.pv{
+  background:linear-gradient(180deg,#34d399,#059669);
+}
+.chart-bar.page{
+  background:linear-gradient(180deg,#818cf8,#4f46e5);
+}
+.chart.pages .chart-col{
+  flex:1 0 56px;
+  min-width:56px;
+}
+.chart.pages .chart-xlabel{
+  white-space:normal;
+  text-align:center;
+  line-height:1.2;
+}
+.chart-count{
+  position:absolute;
+  top:-16px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:10px;
+  font-weight:700;
+  color:#374151;
+  white-space:nowrap;
+}
+.chart-xlabel{
+  margin-top:6px;
+  font-size:10px;
+  color:#9ca3af;
+  white-space:nowrap;
+}
+
+/* 접속 환경 도넛 그래프 */
+.env-wrap{
+  display:flex;
+  align-items:center;
+  gap:24px;
+  flex-wrap:wrap;
+  padding:10px 4px 4px;
+}
+.env-donut{
+  width:170px;
+  height:170px;
+  border-radius:50%;
+  position:relative;
+  flex:0 0 auto;
+  box-shadow:inset 0 0 0 1px rgba(15,23,42,0.05);
+}
+.env-donut::after{
+  content:"";
+  position:absolute;
+  inset:34px;
+  background:#ffffff;
+  border-radius:50%;
+  box-shadow:0 0 0 1px #e5e7eb;
+}
+.env-center{
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  z-index:1;
+  pointer-events:none;
+}
+.env-total-label{
+  font-size:11px;
+  color:#9ca3af;
+  margin-bottom:3px;
+}
+.env-total-value{
+  font-size:22px;
+  font-weight:900;
+  color:#111827;
+}
+.env-legend{
+  flex:1;
+  min-width:220px;
+}
+.env-row{
+  display:grid;
+  grid-template-columns:14px 1fr auto auto;
+  gap:8px;
+  align-items:center;
+  padding:7px 0;
+  border-bottom:1px solid #f1f5f9;
+  font-size:13px;
+}
+.env-row:last-child{ border-bottom:none; }
+.env-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+}
+.env-name{ color:#374151; font-weight:700; }
+.env-count{ color:#6b7280; text-align:right; }
+.env-percent{ color:#111827; font-weight:800; text-align:right; }
+
+@media (max-width:480px){
+  .env-wrap{
+    justify-content:center;
+    gap:16px;
+  }
+  .env-donut{
+    width:150px;
+    height:150px;
+  }
+  .env-donut::after{
+    inset:30px;
+  }
+}
+
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/home" class="home-button">홈으로</a>
+
+    <div class="top-right-menu">
+      <a href="/board/admin" class="home-button">의견확인</a>
+      <a href="/notice/admin" class="home-button">공지관리</a>
+      <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀받기</a>
+      <a href="/admin/maintenance" class="home-button maint-btn">점검모드</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>요약 통계</h2>
+    <div class="summary-row">
+      <div class="summary-box">
+        <div class="summary-label">총 방문자수</div>
+        <div class="summary-value">{{ total_count }}</div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-label">오늘 방문자수</div>
+        <div class="summary-value">{{ today_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>방문 추세 <span class="small">(최근 {{ chart_visits|length }}일)</span></h2>
+    <div class="chart">
+      {% if chart_visits %}
+        {% for r in chart_visits %}
+        <div class="chart-col">
+          <div class="chart-bar" style="height:{% if chart_visits_max %}{{ [ (r.count * 130 // chart_visits_max), 4 ]|max }}{% else %}4{% endif %}px;"><span class="chart-count">{{ r.count }}</span></div>
+          <div class="chart-xlabel">{{ r.date[5:] }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="small">데이터가 없습니다.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>페이지별 조회수</h2>
+    <div class="chart pages">
+      {% if top_pages %}
+        {% for r in top_pages %}
+        <div class="chart-col">
+          <div class="chart-bar page" style="height:{% if top_pages_max %}{{ [ (r.count * 130 // top_pages_max), 4 ]|max }}{% else %}4{% endif %}px;"><span class="chart-count">{{ r.count }}</span></div>
+          <div class="chart-xlabel">{{ r.page }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="small">아직 페이지뷰 데이터가 없습니다. (Supabase에 page_view_logs 테이블 생성 후 집계됩니다)</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>접속 환경 <span class="small">(총 방문자수 기준)</span></h2>
+    <div class="env-wrap">
+      <div class="env-donut" style="background:{{ env_chart_style }};">
+        <div class="env-center">
+          <div class="env-total-label">총 방문</div>
+          <div class="env-total-value">{{ env_total }}</div>
+        </div>
+      </div>
+      <div class="env-legend">
+        {% if env_total > 0 %}
+          {% for r in env_stats %}
+          <div class="env-row">
+            <span class="env-dot" style="background:{{ r.color }};"></span>
+            <span class="env-name">{{ r.label }}</span>
+            <span class="env-count">{{ r.count }}</span>
+            <span class="env-percent">{{ r.percent }}%</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="small">아직 접속 환경 데이터가 없습니다. (Supabase에 env_stats 테이블 생성 후 집계됩니다)</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+<div class="card">
+    <h2>일자별 방문자수</h2>
+    <div>
+    <table>
+      <thead>
+        <tr>
+          <th>날짜</th>
+          <th>방문자수</th>
+        </tr>
+      </thead>
+      <tbody id="visitTableBody">
+        {% for row in daily_visits %}
+        <tr>
+          <td>{{ row["date"] }}</td>
+          <td>{{ row["count"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div id="visitPager" class="pager"></div>
+  </div>
+
+<div class="card">
+    <h2>지역 클릭 내역</h2>
+    <div>
+    <table>
+      <thead>
+        <tr>
+          <th>일시</th>
+          <th>시도</th>
+          <th>시군구</th>
+          <th>검색구분</th>
+        </tr>
+      </thead>
+      <tbody id="regionTableBody">
+        {% for row in daily_regions %}
+        <tr>
+          <td>{{ row["datetime"] }}</td>
+          <td>{{ row["sido"] }}</td>
+          <td>{{ row["sigungu"] }}</td>
+          <td>{{ row["search_type"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div id="regionPager" class="pager"></div>
+  </div>
+
+  <div class="card">
+    <h2>AI 토큰 사용량 <span class="small">(GPT-4.1-mini)</span></h2>
+    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+      <thead>
+        <tr style="color:#6b7280;">
+          <th style="text-align:left; padding:8px 6px; border-bottom:1px solid #e5e7eb;"></th>
+          <th style="text-align:right; padding:8px 6px; border-bottom:1px solid #e5e7eb;">입력 토큰</th>
+          <th style="text-align:right; padding:8px 6px; border-bottom:1px solid #e5e7eb;">출력 토큰</th>
+          <th style="text-align:right; padding:8px 6px; border-bottom:1px solid #e5e7eb;">사용 요금</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:10px 6px;">총 누적</td>
+          <td style="text-align:right; padding:10px 6px;">{{ "{:,}".format(tok_total_in) }}</td>
+          <td style="text-align:right; padding:10px 6px;">{{ "{:,}".format(tok_total_out) }}</td>
+          <td style="text-align:right; padding:10px 6px; color:#2563eb; font-weight:700;">₩{{ "{:,}".format(tok_total_krw) }}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 6px; border-top:1px solid #f1f5f9;">오늘</td>
+          <td style="text-align:right; padding:10px 6px; border-top:1px solid #f1f5f9;">{{ "{:,}".format(tok_today_in) }}</td>
+          <td style="text-align:right; padding:10px 6px; border-top:1px solid #f1f5f9;">{{ "{:,}".format(tok_today_out) }}</td>
+          <td style="text-align:right; padding:10px 6px; border-top:1px solid #f1f5f9; color:#2563eb; font-weight:700;">₩{{ "{:,}".format(tok_today_krw) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="small" style="margin-top:8px; color:#9ca3af;">단가 입력 ${{ price_in }} / 출력 ${{ price_out }} (1M토큰당) · 환율 ₩{{ "{:,}".format(usd_krw) }}/$ 기준 · 근사치</div>
+  </div>
+
+
+</div>
+<script>
+function setupPagination(tbodyId, pagerId, rowsPerPage){
+  const tbody = document.getElementById(tbodyId);
+  const pager = document.getElementById(pagerId);
+
+  if(!tbody || !pager) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const totalPages = Math.ceil(rows.length / rowsPerPage);
+
+  if(totalPages <= 1){
+    pager.style.display = "none";
+    return;
+  }
+
+  let currentPage = 1;
+
+  function renderPage(page){
+    currentPage = page;
+
+    rows.forEach(function(row, index){
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      row.style.display = index >= start && index < end ? "" : "none";
+    });
+
+    renderPager();
+  }
+
+  function renderPager(){
+    pager.innerHTML = "";
+
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+    if(endPage - startPage < maxVisible - 1){
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.textContent = "‹";
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = function(){
+      if(currentPage > 1) renderPage(currentPage - 1);
+    };
+    pager.appendChild(prevBtn);
+
+    for(let i = startPage; i <= endPage; i++){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = i;
+      if(i === currentPage){
+        btn.classList.add("active");
+      }
+      btn.onclick = function(){
+        renderPage(i);
+      };
+      pager.appendChild(btn);
+    }
+
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.textContent = "›";
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = function(){
+      if(currentPage < totalPages) renderPage(currentPage + 1);
+    };
+    pager.appendChild(nextBtn);
+  }
+
+  renderPage(1);
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  setupPagination("visitTableBody", "visitPager", 10);
+  setupPagination("regionTableBody", "regionPager", 10);
+});
+</script>
+</body>
 </html>
 
 """
-
-
-
-@app.route("/char_left")
-
-def char_left():
-
-    return send_file("left.png", mimetype="image/png")
-
-
-
-@app.route("/char_right")
-
-def char_right():
-
-    return send_file("right.png", mimetype="image/png")
-
-
-
-@app.route("/ci")
-
-def ci():
-
-    return send_file("ci.png", mimetype="image/png")
-
-
-
-@app.route("/photo/111")
-
-def photo_toilet():
-
-    return send_file("111.png", mimetype="image/png")
-
-
-
-@app.route("/photo/222")
-
-def photo_ice():
-
-    return send_file("222.png", mimetype="image/png")
-
-
-
-@app.route("/photo/333")
-
-def photo_accident():
-
-    return send_file("333.png", mimetype="image/png")
-
-
-
-@app.route("/download-apk")
-
-def download_apk():
-
-    apk_path = os.path.join(BASE_DIR, "safeload.apk")
-
-    if not os.path.exists(apk_path):
-
-        return "APK 파일 없음 - safeload.apk를 app.py와 같은 폴더에 넣어주세요.", 404
-
+# =========================
+# 페이지뷰/차트 집계 헬퍼 (관리자 통계용)
+# =========================
+def _kst_date_str(s):
     try:
+        x = str(s).replace("Z", "+00:00")
+        dt = datetime.datetime.fromisoformat(x)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+    except Exception:
+        return str(s)[:10]
 
-        now_time = time.time()
-        last_dl_at = session.get("last_download_counted_at", 0)
-        is_range_request = bool(request.headers.get("Range"))
-
-        if SUPABASE_URL and SUPABASE_KEY and not is_range_request and now_time - float(last_dl_at) > 10:
-
-            requests.post(
-                f"{SUPABASE_URL}/rest/v1/download_logs",
-                headers={
-                    "apikey": SUPABASE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={"downloaded_at": datetime.now(KST).isoformat()}
-            )
-
-            session["last_download_counted_at"] = now_time
-
-    except Exception as e:
-
-        print("download_logs 기록 실패:", e)
-
-    return send_file(apk_path, as_attachment=True, download_name="safeload.apk", mimetype="application/vnd.android.package-archive")
-
-
-
-@app.route("/")
-
-def index():
-
-
-
-    visitor = update_visitors()
-
-
-
-    return render_template_string(
-
-        HTML,
-
-        total_visit=visitor["total"],
-
-        today_visit=visitor["today_count"],
-
-        kakao_key=KAKAO_KEY or "",
-
-        kakao_js_key=KAKAO_JS_KEY or ""
-
-    )
-
-
-
-
-
-@app.route("/log_search", methods=["POST"])
-
-def log_search():
-
-
-
-    data = request.get_json() or {}
-
-
-
-    save_search_log(data)
-
-
-
-    return jsonify({"ok": True})
-
-
-
-
-
-# ===== 5번: 별점 API =====
-
-@app.route("/api/rating", methods=["GET"])
-
-def get_rating():
-
-    spot_id = request.args.get("spot_id", "")
-
-    if not spot_id or not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"avg": 0, "count": 0})
-
+def _kst_datetime_str(s):
+    """UTC created_at → KST 'YYYY-MM-DD HH:MM:SS' 문자열."""
     try:
+        x = str(s).replace("Z", "+00:00")
+        dt = datetime.datetime.fromisoformat(x)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(s)[:19].replace("T", " ")
 
-        headers = {
+app.jinja_env.filters['kst'] = _kst_datetime_str
 
-            "apikey": SUPABASE_KEY,
+import re as _re_pii
+_PII_PATTERNS = [
+    r'[\w.+-]+@[\w-]+\.[\w.-]+',              # 이메일
+    r'\d{6}\s*-\s*\d{7}',                     # 주민등록번호
+    r'01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}',  # 휴대폰
+    r'\d{2,3}[-\s.]\d{3,4}[-\s.]\d{4}',       # 일반전화
+]
+def _contains_pii(text):
+    """자유입력에 식별정보(주민번호·전화·이메일) 패턴이 있으면 True 반환.
+    탐지 시 GPT로 전송하지 않고 차단. (이름은 패턴이 없어 탐지 못 함 → 경고문이 보완)"""
+    if not text:
+        return False
+    t = str(text)
+    return any(_re_pii.search(p, t) for p in _PII_PATTERNS)
 
-            "Authorization": f"Bearer {SUPABASE_KEY}",
+def _friendly_page(path):
+    return _PV_TRACK.get(path)
 
-            "Content-Type": "application/json"
-
-        }
-
-        r = requests.get(
-
-            f"{SUPABASE_URL}/rest/v1/spot_ratings?spot_id=eq.{quote(spot_id)}&select=score",
-
-            headers=headers
-
+def _compute_pv_stats():
+    """페이지뷰 통계 (화이트리스트 6개만 집계). 테이블 없거나 오류면 0/빈값."""
+    try:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/page_view_logs?select=created_at,path&order=created_at.desc",
+            headers=SUPABASE_HEADERS,
+            timeout=8
         )
-
-        rows = r.json()
-
-        if not rows or not isinstance(rows, list) or len(rows) == 0:
-
-            return jsonify({"avg": 0, "count": 0})
-
-        scores = [int(row["score"]) for row in rows if "score" in row]
-
-        avg = round(sum(scores) / len(scores), 1) if scores else 0
-
-        return jsonify({"avg": avg, "count": len(scores)})
-
-    except Exception as e:
-
-        return jsonify({"avg": 0, "count": 0})
-
-
-
-
-
-@app.route("/api/rating", methods=["POST"])
-
-def post_rating():
-
-    data = request.get_json() or {}
-
-    spot_id = str(data.get("spot_id", ""))
-
-    score = int(data.get("score", 0))
-
-    if not spot_id or score < 1 or score > 5 or not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"ok": False})
-
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json",
-
-            "Prefer": "return=representation"
-
-        }
-
-        r = requests.post(
-
-            f"{SUPABASE_URL}/rest/v1/spot_ratings",
-
-            headers=headers,
-
-            json={"spot_id": spot_id, "score": score}
-
-        )
-
-        if r.status_code >= 400:
-
-            print("별점 저장 실패:", r.status_code, r.text)
-
-            return jsonify({"ok": False, "error": r.text})
-
-        return jsonify({"ok": True})
-
-    except Exception as e:
-
-        return jsonify({"ok": False})
-
-
-
-
-
-# ===== 5번: 코멘트 API =====
-
-@app.route("/api/comments", methods=["GET"])
-
-def get_comments():
-
-    spot_id = request.args.get("spot_id", "")
-
-    if not spot_id or not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"comments": []})
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json"
-
-        }
-
-        r = requests.get(
-
-            f"{SUPABASE_URL}/rest/v1/spot_comments?spot_id=eq.{quote(spot_id)}&order=created_at.desc&limit=50",
-
-            headers=headers
-
-        )
-
-        rows = r.json()
-
+        rows = res.json() if res.ok else []
         if not isinstance(rows, list):
+            rows = []
+    except Exception:
+        rows = []
 
-            return jsonify({"comments": []})
+    today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+    daily_map = defaultdict(int)
+    page_map = defaultdict(int)
+    pv_today = 0
+    pv_total = 0
+    for r in rows:
+        name = _friendly_page(str(r.get("path", "") or ""))
+        if name is None:        # 허용목록 밖(과거 데이터 등) → 무시
+            continue
+        d = _kst_date_str(r.get("created_at", ""))
+        daily_map[d] += 1
+        page_map[name] += 1
+        pv_total += 1
+        if d == today_kst:
+            pv_today += 1
 
-        return jsonify({"comments": rows})
+    daily_pv = [{"date": d, "count": daily_map[d]} for d in sorted(daily_map.keys(), reverse=True)]
+    top_pages = sorted(
+        [{"page": p, "count": c} for p, c in page_map.items()],
+        key=lambda x: x["count"], reverse=True
+    )[:10]
+    return pv_total, pv_today, daily_pv, top_pages
 
-    except Exception as e:
+def _chart_data(daily_list, n=14):
+    """일자별 {date,count} desc 리스트 → 최근 n일 asc + 최댓값."""
+    asc = sorted(daily_list, key=lambda r: r["date"])[-n:]
+    mx = max([r["count"] for r in asc], default=0)
+    return asc, mx
 
-        return jsonify({"comments": []})
 
 
-
-
-
-@app.route("/api/comments", methods=["POST"])
-
-def post_comment():
-
-    data = request.get_json() or {}
-
-    spot_id = str(data.get("spot_id", ""))
-
-    content = str(data.get("content", "")).strip()
-
-    if not spot_id or not content or not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"ok": False})
+def _compute_env_stats():
+    """접속 환경 통계. User-Agent 원문 없이 env_stats의 집계값만 사용."""
+    env_meta = [
+        {"env": "PC", "label": "PC", "color": "#2563eb"},
+        {"env": "Android", "label": "모바일(안드로이드)", "color": "#059669"},
+        {"env": "iOS", "label": "모바일(iOS)", "color": "#7c3aed"},
+        {"env": "Other", "label": "기타", "color": "#f59e0b"},
+    ]
+    counts = {m["env"]: 0 for m in env_meta}
 
     try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json",
-
-            "Prefer": "return=representation"
-
-        }
-
-        requests.post(
-
-            f"{SUPABASE_URL}/rest/v1/spot_comments",
-
-            headers=headers,
-
-            json={"spot_id": spot_id, "content": content}
-
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/env_stats?select=env,count",
+            headers=SUPABASE_HEADERS,
+            timeout=8
         )
-
-        return jsonify({"ok": True})
-
-    except Exception as e:
-
-        return jsonify({"ok": False})
-
-
-
-
-
-@app.route("/api/spot_location")
-
-def spot_location():
-
-    spot_id = request.args.get("spot_id", "")
-
-    try:
-
-        df = load_df()
-
-        row = df[df["순번"].astype(str) == str(spot_id)]
-
-        if row.empty:
-
-            return jsonify({"lat": None, "lng": None})
-
-        r = row.iloc[0]
-
-        return jsonify({"lat": float(r["위도"]), "lng": float(r["경도"])})
-
-    except Exception as e:
-
-        return jsonify({"lat": None, "lng": None})
-
-
-
-
-
-# ===== 관리자: 코멘트 전체 조회 =====
-
-@app.route("/api/admin/comments", methods=["GET"])
-
-def admin_get_comments():
-
-    if not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"comments": []})
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json"
-
-        }
-
-        r = requests.get(
-
-            f"{SUPABASE_URL}/rest/v1/spot_comments?order=created_at.desc&limit=1000",
-
-            headers=headers
-
-        )
-
-        rows = r.json()
-
+        rows = res.json() if res.ok else []
         if not isinstance(rows, list):
-
-            return jsonify({"comments": []})
-
-        return jsonify({"comments": rows})
-
-    except Exception as e:
-
-        return jsonify({"comments": []})
-
-
-
-
-
-# ===== 관리자: 코멘트 삭제 =====
-
-@app.route("/api/admin/comments/<int:comment_id>", methods=["DELETE"])
-
-def admin_delete_comment(comment_id):
-
-    if not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"ok": False})
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json"
-
-        }
-
-        r = requests.delete(
-
-            f"{SUPABASE_URL}/rest/v1/spot_comments?id=eq.{comment_id}",
-
-            headers=headers
-
-        )
-
-        return jsonify({"ok": r.status_code < 300})
-
-    except Exception as e:
-
-        return jsonify({"ok": False})
-
-
-
-
-
-# ===== 관리자: 별점 전체 조회 =====
-
-@app.route("/api/admin/ratings", methods=["GET"])
-
-def admin_get_ratings():
-
-    if not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"ratings": []})
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json"
-
-        }
-
-        r = requests.get(
-
-            f"{SUPABASE_URL}/rest/v1/spot_ratings?order=created_at.desc&limit=1000",
-
-            headers=headers
-
-        )
-
-        rows = r.json()
-
-        if not isinstance(rows, list):
-
-            return jsonify({"ratings": []})
-
-        return jsonify({"ratings": rows})
-
-    except Exception as e:
-
-        return jsonify({"ratings": []})
-
-
-
-
-
-# ===== 관리자: 별점 삭제 =====
-
-@app.route("/api/admin/ratings/<int:rating_id>", methods=["DELETE"])
-
-def admin_delete_rating(rating_id):
-
-    if not SUPABASE_URL or not SUPABASE_KEY:
-
-        return jsonify({"ok": False})
-
-    try:
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json"
-
-        }
-
-        r = requests.delete(
-
-            f"{SUPABASE_URL}/rest/v1/spot_ratings?id=eq.{rating_id}",
-
-            headers=headers
-
-        )
-
-        return jsonify({"ok": r.status_code < 300})
-
-    except Exception as e:
-
-        return jsonify({"ok": False})
-
-
-
-
+            rows = []
+        for row in rows:
+            env = str(row.get("env", "") or "")
+            cnt = int(row.get("count", 0) or 0)
+            if env in counts:
+                counts[env] += cnt
+            else:
+                counts["Other"] += cnt
+    except Exception:
+        pass
+
+    total = sum(counts.values())
+    stats = []
+    start = 0.0
+    segments = []
+
+    for meta in env_meta:
+        count = counts.get(meta["env"], 0)
+        percent = round((count / total * 100), 1) if total else 0
+        end = start + (count / total * 360) if total else start
+        if total and count > 0:
+            segments.append(f'{meta["color"]} {start:.2f}deg {end:.2f}deg')
+        stats.append({
+            "env": meta["env"],
+            "label": meta["label"],
+            "color": meta["color"],
+            "count": count,
+            "percent": percent,
+        })
+        start = end
+
+    chart_style = "conic-gradient(" + ", ".join(segments) + ")" if segments else "#e5e7eb"
+    return stats, total, chart_style
 
 @app.route("/stats")
 def stats():
 
-    try:
-        if not SUPABASE_URL or not SUPABASE_KEY:
-            return """
-            <h2>조회 통계</h2>
-            <p>Supabase 환경변수가 없습니다.</p>
-            <p><a href="/">돌아가기</a></p>
-            """
-
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json"
-        }
-
-        res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/search_logs?select=*&order=created_at.desc&limit=10000",
-            headers=headers
-        )
-
-        print("Supabase 관리자페이지 조회 상태:", res.status_code, res.text)
-
-        if res.status_code >= 400:
-            return f"""
-            <h2>조회 통계 오류</h2>
-            <p>Supabase 조회 실패</p>
-            <pre>{res.status_code}</pre>
-            <pre>{res.text}</pre>
-            <p><a href="/">돌아가기</a></p>
-            """
-
-        logs = res.json()
-
-        if not isinstance(logs, list) or len(logs) == 0:
-            region_stats = pd.DataFrame(columns=["날짜", "시도", "시군구", "읍면동", "조회수"])
-            category_stats = pd.DataFrame(columns=["날짜", "위험지역 구분", "체크 수"])
-        else:
-            df = pd.DataFrame(logs)
-
-            if df.empty or "created_at" not in df.columns:
-                region_stats = pd.DataFrame(columns=["날짜", "시도", "시군구", "읍면동", "조회수"])
-                category_stats = pd.DataFrame(columns=["날짜", "위험지역 구분", "체크 수"])
-            else:
-                for col in ["province", "city", "town", "categories", "result_count"]:
-                    if col not in df.columns:
-                        df[col] = ""
-
-                df["day"] = pd.to_datetime(
-                    df["created_at"],
-                    errors="coerce"
-                ).dt.strftime("%Y-%m-%d")
-
-                df["day"] = df["day"].fillna("날짜없음")
-
-                region_stats = (
-                    df.groupby(["day", "province", "city", "town"], dropna=False)
-                    .size()
-                    .reset_index(name="조회수")
-                    .sort_values(["day", "조회수"], ascending=[False, False])
-                )
-
-                region_stats.columns = ["날짜", "시도", "시군구", "읍면동", "조회수"]
-
-                category_rows = []
-
-                for _, row in df.iterrows():
-                    categories = row.get("categories", [])
-
-                    if isinstance(categories, str):
-                        try:
-                            categories = json.loads(categories)
-                        except Exception:
-                            categories = [categories] if categories else []
-
-                    if not categories:
-                        category_rows.append({
-                            "day": row.get("day", ""),
-                            "category": "전체",
-                            "search_count": 1
-                        })
-                    else:
-                        for cat in categories:
-                            category_rows.append({
-                                "day": row.get("day", ""),
-                                "category": cat,
-                                "search_count": 1
-                            })
-
-                category_df = pd.DataFrame(category_rows)
-
-                if category_df.empty:
-                    category_stats = pd.DataFrame(
-                        columns=["날짜", "위험지역 구분", "체크 수"]
-                    )
-                else:
-                    category_stats = (
-                        category_df.groupby(["day", "category"], dropna=False)["search_count"]
-                        .sum()
-                        .reset_index()
-                        .sort_values(["day", "search_count"], ascending=[False, False])
-                    )
-
-                    category_stats.columns = ["날짜", "위험지역 구분", "체크 수"]
-
-        # 날짜별 앱 다운로드 수
-        try:
-            dl_res = requests.get(
-                f"{SUPABASE_URL}/rest/v1/download_logs?select=*&order=downloaded_at.desc&limit=10000",
-                headers=headers
-            )
-
-            if dl_res.status_code >= 400:
-                download_stats = pd.DataFrame(columns=["날짜", "다운로드 수"])
-            else:
-                dl_logs = dl_res.json()
-
-                if not isinstance(dl_logs, list) or len(dl_logs) == 0:
-                    download_stats = pd.DataFrame(columns=["날짜", "다운로드 수"])
-                else:
-                    dl_df = pd.DataFrame(dl_logs)
-
-                    if "downloaded_at" not in dl_df.columns:
-                        download_stats = pd.DataFrame(columns=["날짜", "다운로드 수"])
-                    else:
-                        dl_df["day"] = pd.to_datetime(
-                            dl_df["downloaded_at"],
-                            errors="coerce"
-                        ).dt.strftime("%Y-%m-%d")
-
-                        dl_df["day"] = dl_df["day"].fillna("날짜없음")
-
-                        download_stats = (
-                            dl_df.groupby("day", dropna=False)
-                            .size()
-                            .reset_index(name="다운로드 수")
-                            .sort_values("day", ascending=False)
-                        )
-
-                        download_stats.columns = ["날짜", "다운로드 수"]
-
-        except Exception as e:
-            print("download_logs 조회 실패:", e)
-            download_stats = pd.DataFrame(columns=["날짜", "다운로드 수"])
-
-        # 총/오늘 방문자 수 (읽기 전용 조회, 카운트 증가 없음)
-        try:
-            vs_res = requests.get(
-                f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1",
-                headers=headers
-            )
-            vs_rows = vs_res.json() if vs_res.status_code < 400 else []
-            if isinstance(vs_rows, list) and vs_rows:
-                total_visit_count = int(vs_rows[0].get("total_count", 0))
-                today_visit_count = int(vs_rows[0].get("today_count", 0))
-            else:
-                total_visit_count = 0
-                today_visit_count = 0
-        except Exception as e:
-            print("visit_stats 조회 실패:", e)
-            total_visit_count = 0
-            today_visit_count = 0
-
-        # 일자별 방문자수 (visit_logs)
-        try:
-            vl_res = requests.get(
-                f"{SUPABASE_URL}/rest/v1/visit_logs?select=created_at&order=created_at.desc&limit=10000",
-                headers=headers
-            )
-            if vl_res.status_code >= 400:
-                visit_daily_df = pd.DataFrame(columns=["날짜", "방문수"])
-            else:
-                vl_logs = vl_res.json()
-                if not isinstance(vl_logs, list) or len(vl_logs) == 0:
-                    visit_daily_df = pd.DataFrame(columns=["날짜", "방문수"])
-                else:
-                    vldf = pd.DataFrame(vl_logs)
-                    if "created_at" not in vldf.columns:
-                        visit_daily_df = pd.DataFrame(columns=["날짜", "방문수"])
-                    else:
-                        dt_utc = pd.to_datetime(vldf["created_at"], errors="coerce", utc=True)
-                        vldf["day"] = dt_utc.dt.tz_convert(KST).dt.strftime("%Y-%m-%d")
-                        vldf["day"] = vldf["day"].fillna("날짜없음")
-                        visit_daily_df = vldf.groupby("day", dropna=False).size().reset_index(name="방문수")
-                        visit_daily_df.columns = ["날짜", "방문수"]
-        except Exception as e:
-            print("visit_logs 조회 실패:", e)
-            visit_daily_df = pd.DataFrame(columns=["날짜", "방문수"])
-
-        def _daily_chart_json(df, value_cols, limit_days=10):
-            if df is None or df.empty:
-                return "[]"
-            d = df[df["날짜"] != "날짜없음"].copy()
-            d = d.sort_values("날짜").tail(limit_days)
-            records = []
-            for _, row in d.iterrows():
-                rec = {"date": row["날짜"]}
-                for col in value_cols:
-                    rec[col] = row[col]
-                records.append(rec)
-            return json.dumps(records, ensure_ascii=False)
-
-        visit_chart_data = _daily_chart_json(visit_daily_df, ["방문수"])
-
-        return render_template_string("""
-        <!DOCTYPE html>
-        <html lang="ko">
-        <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-        <title>조회 통계</title>
-        <style>
-        *{ touch-action: pan-x pan-y pinch-zoom; }
-        body{
-          font-family:Malgun Gothic, sans-serif;
-          padding:24px;
-          background:#f8fafc;
-        }
-        table{
-          border-collapse:collapse;
-          width:100%;
-          background:white;
-          margin-bottom:30px;
-        }
-        .table-wrap{
-          overflow-x:auto;
-          margin-bottom:12px;
-          border:1px solid #ddd;
-          border-radius:6px;
-        }
-        .table-wrap table{
-          margin-bottom:0;
-        }
-        .table-wrap table tbody tr{
-          display:none;
-        }
-        .table-wrap table tbody tr.pg-visible{
-          display:table-row;
-        }
-        .pg-controls{
-          display:flex;
-          gap:6px;
-          margin:0 0 26px;
-          flex-wrap:nowrap;
-          overflow-x:auto;
-          -webkit-overflow-scrolling:touch;
-          padding-bottom:6px;
-        }
-        @media (min-width:769px){
-          .pg-controls{
-            justify-content:center;
-          }
-        }
-        @media (max-width:480px){
-          body{
-            padding:12px;
-          }
-          .pg-controls{
-            gap:4px;
-          }
-          .pg-num{
-            padding:5px 7px;
-            font-size:12px;
-          }
-          .pg-nav{
-            padding-left:4px;
-            padding-right:4px;
-            min-width:20px;
-          }
-        }
-        .pg-num{
-          flex:0 0 auto;
-          padding:6px 12px;
-          border:1px solid #cbd5e1;
-          background:white;
-          color:#334155;
-          border-radius:6px;
-          cursor:pointer;
-          font-size:13px;
-        }
-        .pg-num.active{
-          background:#2563eb;
-          border-color:#2563eb;
-          color:white;
-          font-weight:700;
-        }
-        .pg-nav{
-          font-weight:700;
-          color:#2563eb;
-          padding-left:6px;
-          padding-right:6px;
-          min-width:26px;
-        }
-        .pg-num:disabled{
-          opacity:0.35;
-          cursor:default;
-        }
-        th,td{
-          border:1px solid #ddd;
-          padding:8px;
-          font-size:14px;
-          text-align:left;
-        }
-        th{
-          background:#e5e7eb;
-        }
-        .btn{
-          display:inline-block;
-          padding:10px 14px;
-          background:#2563eb;
-          color:white;
-          text-decoration:none;
-          border-radius:8px;
-          margin-bottom:18px;
-        }
-        .btn-del{
-          padding:4px 10px;
-          background:#ef4444;
-          color:white;
-          border:none;
-          border-radius:6px;
-          cursor:pointer;
-          font-size:13px;
-          margin-right:4px;
-        }
-        .btn-goto{
-          padding:4px 10px;
-          background:#2563eb;
-          color:white;
-          border:none;
-          border-radius:6px;
-          cursor:pointer;
-          font-size:13px;
-        }
-        pre{
-          white-space:pre-wrap;
-          background:#111827;
-          color:#f9fafb;
-          padding:12px;
-          border-radius:8px;
-        }
-        .page-nav{
-          display:flex;
-          gap:6px;
-          margin:18px 0 22px;
-          flex-wrap:nowrap;
-          overflow-x:auto;
-          -webkit-overflow-scrolling:touch;
-          padding-bottom:4px;
-        }
-        .page-btn{
-          flex:1 1 0;
-          min-width:0;
-          padding:10px 4px;
-          border:1px solid #cbd5e1;
-          background:white;
-          color:#334155;
-          border-radius:8px;
-          cursor:pointer;
-          font-size:12px;
-          font-weight:600;
-          white-space:nowrap;
-          overflow:hidden;
-          text-overflow:ellipsis;
-        }
-        .page-btn.active{
-          background:#2563eb;
-          border-color:#2563eb;
-          color:white;
-        }
-        .page-panel{
-          display:none;
-        }
-        .page-panel.active{
-          display:block;
-        }
-        .stat-cards{
-          display:flex;
-          gap:14px;
-          margin-bottom:18px;
-          flex-wrap:nowrap;
-        }
-        .stat-card{
-          flex:1 1 0;
-          min-width:0;
-          background:white;
-          border:1px solid #e2e8f0;
-          border-radius:10px;
-          padding:14px 16px;
-          text-align:center;
-        }
-        .stat-card .num{
-          font-size:24px;
-          font-weight:800;
-          color:#2563eb;
-        }
-        .stat-card .lbl{
-          font-size:12.5px;
-          color:#64748b;
-          margin-top:2px;
-        }
-        @media (max-width:600px){
-          .page-nav{
-            flex-wrap:nowrap;
-            gap:4px;
-          }
-          .page-btn{
-            flex:0 0 auto;
-            padding:8px 10px;
-            font-size:11.5px;
-            overflow:visible;
-            text-overflow:clip;
-          }
-          .stat-cards{
-            gap:8px;
-          }
-          .stat-card{
-            padding:10px 6px;
-          }
-          .stat-card .num{
-            font-size:19px;
-          }
-          .stat-card .lbl{
-            font-size:11px;
-            white-space:nowrap;
-          }
-        }
-        .chart-box{
-          background:white;
-          border:1px solid #e2e8f0;
-          border-radius:10px;
-          padding:16px;
-          margin-bottom:22px;
-        }
-        .chart-box canvas{
-          max-height:280px;
-        }
-        </style>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-        </head>
-        <body>
-
-        <h2>조회 통계</h2>
-
-        <a class="btn" href="/">돌아가기</a>
-        <a class="btn" href="/stats_excel">엑셀 다운로드</a>
-
-        <div class="page-nav">
-          <button class="page-btn active" data-page="0" onclick="goToPage(0)">0.방문자</button>
-          <button class="page-btn" data-page="1" onclick="goToPage(1)">1.지역</button>
-          <button class="page-btn" data-page="2" onclick="goToPage(2)">2.위험</button>
-          <button class="page-btn" data-page="3" onclick="goToPage(3)">3.코멘트</button>
-          <button class="page-btn" data-page="4" onclick="goToPage(4)">4.별점</button>
-          <button class="page-btn" data-page="5" onclick="goToPage(5)">5.다운</button>
-        </div>
-
-        <div class="page-panel active" data-page="0">
-          <h3>👥 방문자 통계</h3>
-          <div class="stat-cards">
-            <div class="stat-card">
-              <div class="num">{{ total_visit_count }}</div>
-              <div class="lbl">총 방문자</div>
-            </div>
-            <div class="stat-card">
-              <div class="num">{{ today_visit_count }}</div>
-              <div class="lbl">오늘 방문자</div>
-            </div>
-          </div>
-          <div class="chart-box">
-            <canvas id="visitChart"></canvas>
-          </div>
-        </div>
-
-        <div class="page-panel" data-page="1">
-          <h3>날짜별·지역별 조회 수</h3>
-          <div class="table-wrap">{{ region_table|safe }}</div>
-          <div class="pg-controls" id="pg-regionTable"></div>
-        </div>
-
-        <div class="page-panel" data-page="2">
-          <h3>날짜별·위험지역 체크 수</h3>
-          <div class="table-wrap">{{ category_table|safe }}</div>
-          <div class="pg-controls" id="pg-categoryTable"></div>
-        </div>
-
-        <div class="page-panel" data-page="3">
-          <h3>💬 코멘트 관리</h3>
-          <div id="commentAdminArea">불러오는 중...</div>
-        </div>
-
-        <div class="page-panel" data-page="4">
-          <h3>⭐ 별점 관리</h3>
-          <div id="ratingAdminArea">불러오는 중...</div>
-        </div>
-
-        <div class="page-panel" data-page="5">
-          <h3>📥 날짜별 앱 다운로드 수</h3>
-          <div class="table-wrap">{{ download_table|safe }}</div>
-          <div class="pg-controls" id="pg-downloadTable"></div>
-        </div>
-
-        <script>
-        function goToPage(n){
-          document.querySelectorAll('.page-btn').forEach(b=>{
-            b.classList.toggle('active', b.dataset.page == n);
-          });
-          document.querySelectorAll('.page-panel').forEach(p=>{
-            p.classList.toggle('active', p.dataset.page == n);
-          });
-          setTimeout(()=>{
-            if(window._dailyCharts){
-              Object.values(window._dailyCharts).forEach(c=>{ try{ c.resize(); }catch(e){} });
-            }
-          }, 0);
-        }
-
-        function paginateTable(tableId, pageSize){
-          pageSize = pageSize || 10;
-          const windowSize = window.innerWidth <= 480 ? 5 : 10;
-          const table = document.getElementById(tableId);
-          if(!table) return;
-          const tbody = table.querySelector('tbody');
-          if(!tbody) return;
-          const rows = Array.from(tbody.querySelectorAll('tr'));
-          const controls = document.getElementById('pg-' + tableId);
-          const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-          let currentPage = 1;
-
-          function makeBtn(label, page, disabled, extraClass){
-            const b = document.createElement('button');
-            b.textContent = label;
-            b.className = 'pg-num' + (extraClass ? ' ' + extraClass : '');
-            if(disabled){
-              b.disabled = true;
-            } else {
-              b.onclick = ()=>{ currentPage = page; render(); };
-            }
-            return b;
-          }
-
-          function render(){
-            rows.forEach((r,i)=>{
-              r.classList.toggle('pg-visible', i >= (currentPage-1)*pageSize && i < currentPage*pageSize);
-            });
-            if(controls){
-              controls.innerHTML = '';
-
-              const windowStart = Math.floor((currentPage-1)/windowSize) * windowSize + 1;
-              const windowEnd = Math.min(windowStart + windowSize - 1, totalPages);
-
-              controls.appendChild(makeBtn('«', 1, currentPage===1, 'pg-nav'));
-              controls.appendChild(makeBtn('‹', Math.max(1, windowStart-1), windowStart===1, 'pg-nav'));
-
-              for(let p=windowStart; p<=windowEnd; p++){
-                controls.appendChild(makeBtn(String(p), p, false, p===currentPage ? 'active' : ''));
-              }
-
-              controls.appendChild(makeBtn('›', Math.min(totalPages, windowEnd+1), windowEnd===totalPages, 'pg-nav'));
-              controls.appendChild(makeBtn('»', totalPages, windowEnd===totalPages, 'pg-nav'));
-
-              controls.scrollLeft = 0;
-            }
-          }
-          render();
-        }
-
-        async function loadAdminComments(){
-          const res = await fetch('/api/admin/comments');
-          const d = await res.json();
-          const area = document.getElementById('commentAdminArea');
-          if(!d.comments || d.comments.length===0){
-            area.innerHTML='<p style="color:#94a3b8;">등록된 코멘트가 없습니다.</p>';
-            return;
-          }
-          let html = '<div class="table-wrap"><table id="commentsTable"><thead><tr><th>ID</th><th>지점번호</th><th>내용</th><th>작성일시</th><th>삭제/이동</th></tr></thead><tbody>';
-          d.comments.forEach(c=>{
-            html += `<tr>
-              <td>${c.id}</td>
-              <td>${c.spot_id}</td>
-              <td style="max-width:300px;word-break:break-all;">${c.content}</td>
-              <td>${c.created_at ? c.created_at.slice(0,16).replace('T',' ') : ''}</td>
-              <td style="white-space:nowrap;">
-                <button class="btn-del" onclick="deleteComment(${c.id}, this)">삭제</button>
-                <button class="btn-goto" onclick="gotoSpot('${c.spot_id}')">이동</button>
-              </td>
-            </tr>`;
-          });
-          html += '</tbody></table></div><div class="pg-controls" id="pg-commentsTable"></div>';
-          area.innerHTML = html;
-          paginateTable('commentsTable', 10);
-        }
-
-        async function deleteComment(id, btn){
-          if(!confirm('이 코멘트를 삭제하시겠습니까?')) return;
-          btn.disabled = true;
-          btn.textContent = '삭제중...';
-          const res = await fetch('/api/admin/comments/' + id, {method:'DELETE'});
-          const d = await res.json();
-          if(d.ok){
-            loadAdminComments();
-          } else {
-            btn.disabled = false;
-            btn.textContent = '삭제';
-            alert('삭제 실패');
-          }
-        }
-
-        async function loadAdminRatings(){
-          const res = await fetch('/api/admin/ratings');
-          const d = await res.json();
-          const area = document.getElementById('ratingAdminArea');
-          if(!d.ratings || d.ratings.length===0){
-            area.innerHTML='<p style="color:#94a3b8;">등록된 별점이 없습니다.</p>';
-            return;
-          }
-          let html = '<div class="table-wrap"><table id="ratingsTable"><thead><tr><th>ID</th><th>지점번호</th><th>별점</th><th>작성일시</th><th>삭제/이동</th></tr></thead><tbody>';
-          d.ratings.forEach(r=>{
-            const stars = '★'.repeat(r.score||0) + '☆'.repeat(5-(r.score||0));
-            html += `<tr>
-              <td>${r.id}</td>
-              <td>${r.spot_id}</td>
-              <td style="color:#f59e0b;font-weight:700;letter-spacing:1px;">${stars} (${r.score}점)</td>
-              <td>${r.created_at ? r.created_at.slice(0,16).replace('T',' ') : ''}</td>
-              <td style="white-space:nowrap;">
-                <button class="btn-del" onclick="deleteRating(${r.id}, this)">삭제</button>
-                <button class="btn-goto" onclick="gotoSpot('${r.spot_id}')">이동</button>
-              </td>
-            </tr>`;
-          });
-          html += '</tbody></table></div><div class="pg-controls" id="pg-ratingsTable"></div>';
-          area.innerHTML = html;
-          paginateTable('ratingsTable', 10);
-        }
-
-        async function deleteRating(id, btn){
-          if(!confirm('이 별점을 삭제하시겠습니까?')) return;
-          btn.disabled = true;
-          btn.textContent = '삭제중...';
-          const res = await fetch('/api/admin/ratings/' + id, {method:'DELETE'});
-          const d = await res.json();
-          if(d.ok){
-            loadAdminRatings();
-          } else {
-            btn.disabled = false;
-            btn.textContent = '삭제';
-            alert('삭제 실패');
-          }
-        }
-
-        async function gotoSpot(spotId){
-          try{
-            const res = await fetch('/api/spot_location?spot_id=' + encodeURIComponent(spotId));
-            const d = await res.json();
-            if(d.lat && d.lng){
-              window.location.href = '/?goto_spot=' + encodeURIComponent(spotId) + '&lat=' + d.lat + '&lng=' + d.lng;
-            } else {
-              alert('해당 지점의 좌표를 찾을 수 없습니다. (지점번호: ' + spotId + ')');
-            }
-          }catch(e){
-            alert('이동 오류: ' + e.message);
-          }
-        }
-
-        window._dailyCharts = {};
-
-        function renderDailyChart(canvasId, labels, dataSets, chartType){
-          const el = document.getElementById(canvasId);
-          if(!el || typeof Chart === 'undefined') return;
-          if(!labels.length){
-            el.parentElement.innerHTML = '<p style="color:#94a3b8;">표시할 데이터가 없습니다.</p>';
-            return;
-          }
-          window._dailyCharts[canvasId] = new Chart(el, {
-            type: chartType || 'bar',
-            data: {
-              labels: labels,
-              datasets: dataSets
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: dataSets.length > 1 } },
-              scales: { y: { beginAtZero: true } }
-            }
-          });
-        }
-
-        function initCharts(){
-          const visitData = {{ visit_chart_data|safe }};
-          renderDailyChart(
-            'visitChart',
-            visitData.map(r => r.date),
-            [{ label: '방문수', data: visitData.map(r => r['방문수']), backgroundColor: '#2563eb' }]
-          );
-        }
-
-        paginateTable('regionTable', 10);
-        paginateTable('categoryTable', 10);
-        paginateTable('downloadTable', 10);
-        loadAdminComments();
-        loadAdminRatings();
-        initCharts();
-        </script>
-
-        </body>
-        </html>
-        """,
-        region_table=region_stats.to_html(index=False, table_id="regionTable"),
-        category_table=category_stats.to_html(index=False, table_id="categoryTable"),
-        download_table=download_stats.to_html(index=False, table_id="downloadTable"),
-        total_visit_count=total_visit_count,
-        today_visit_count=today_visit_count,
-        visit_chart_data=visit_chart_data
-        )
-
-    except Exception as e:
-        return f"""
-        <h2>조회 통계 오류</h2>
-        <p>관리자페이지 처리 중 오류가 발생했습니다.</p>
-        <pre>{str(e)}</pre>
-        <p><a href="/">돌아가기</a></p>
-        """
-
-
-@app.route("/stats_excel")
-
-def stats_excel():
-
-
-
-    try:
-
-        if not SUPABASE_URL or not SUPABASE_KEY:
-
-            return "Supabase 환경변수가 없습니다.", 500
-
-
-
-        headers = {
-
-            "apikey": SUPABASE_KEY,
-
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-
-            "Content-Type": "application/json"
-
-        }
-
-
-
-        res = requests.get(
-
-            f"{SUPABASE_URL}/rest/v1/search_logs?select=*&order=created_at.desc&limit=10000",
-
-            headers=headers
-
-        )
-
-
-
-        if res.status_code >= 400:
-
-            return f"Supabase 조회 실패: {res.status_code} / {res.text}", 500
-
-
-
-        logs = res.json()
-
-
-
-        if not isinstance(logs, list) or len(logs) == 0:
-
-            return "다운로드할 조회 기록이 없습니다.", 404
-
-
-
-        df = pd.DataFrame(logs)
-
-
-
-        for col in ["created_at", "province", "city", "town", "categories", "result_count", "ip"]:
-
-            if col not in df.columns:
-
-                df[col] = ""
-
-
-
-        df["날짜"] = pd.to_datetime(
-
-            df["created_at"],
-
-            errors="coerce"
-
-        ).dt.strftime("%Y-%m-%d")
-
-
-
-        df["조회일시"] = pd.to_datetime(
-
-            df["created_at"],
-
-            errors="coerce"
-
-        ).dt.strftime("%Y-%m-%d %H:%M:%S")
-
-
-
-        def category_text(v):
-
-            if isinstance(v, list):
-
-                return ", ".join([str(x) for x in v])
-
-            if isinstance(v, str):
-
-                try:
-
-                    parsed = json.loads(v)
-
-                    if isinstance(parsed, list):
-
-                        return ", ".join([str(x) for x in parsed])
-
-                except Exception:
-
-                    return v
-
-            return ""
-
-
-
-        df["위험지역 구분"] = df["categories"].apply(category_text)
-
-
-
-        raw_df = df[[
-
-            "조회일시",
-
-            "날짜",
-
-            "province",
-
-            "city",
-
-            "town",
-
-            "위험지역 구분",
-
-            "result_count"
-
-        ]].copy()
-
-
-
-        raw_df.columns = [
-
-            "조회일시",
-
-            "날짜",
-
-            "시도",
-
-            "시군구",
-
-            "읍면동",
-
-            "위험지역 구분",
-
-            "조회결과수"
-
+    if os.getenv("RENDER") is None:
+        total_count = 100
+        today_count = 5
+
+        daily_visits = [
+            {"date": "2026-06-03", "count": 12},
+            {"date": "2026-06-04", "count": 18},
+            {"date": "2026-06-05", "count": 5}
         ]
 
+        daily_regions = [
+            {"datetime": "2026-06-04 14:32:10", "sido": "전남광주통합특별시", "sigungu": "북구", "search_type": "조건기반"},
+            {"datetime": "2026-06-04 11:05:47", "sido": "전남광주통합특별시", "sigungu": "나주시", "search_type": "사례기반"},
+            {"datetime": "2026-06-05 09:18:22", "sido": "전남광주통합특별시", "sigungu": "서구", "search_type": "조건기반"}
+        ]
 
-
-        region_stats = (
-
-            raw_df.groupby(["날짜", "시도", "시군구", "읍면동"], dropna=False)
-
-            .size()
-
-            .reset_index(name="조회수")
-
-            .sort_values(["날짜", "조회수"], ascending=[False, False])
-
+        pv_total, pv_today = 173, 41
+        daily_pv = [
+            {"date": "2026-06-03", "count": 58},
+            {"date": "2026-06-04", "count": 74},
+            {"date": "2026-06-05", "count": 41}
+        ]
+        top_pages = [
+            {"page": "기관검색", "count": 64},
+            {"page": "사례검색", "count": 52},
+            {"page": "메인", "count": 41},
+            {"page": "공지사항", "count": 16},
+        ]
+        env_stats = [
+            {"env": "PC", "label": "PC", "color": "#2563eb", "count": 46, "percent": 46.0},
+            {"env": "Android", "label": "모바일(안드로이드)", "color": "#059669", "count": 38, "percent": 38.0},
+            {"env": "iOS", "label": "모바일(iOS)", "color": "#7c3aed", "count": 14, "percent": 14.0},
+            {"env": "Other", "label": "기타", "color": "#f59e0b", "count": 2, "percent": 2.0},
+        ]
+        env_total = 100
+        env_chart_style = "conic-gradient(#2563eb 0deg 165.60deg, #059669 165.60deg 302.40deg, #7c3aed 302.40deg 352.80deg, #f59e0b 352.80deg 360.00deg)"
+    else:
+        stats_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
+            headers=SUPABASE_HEADERS
         )
+        stats_rows = stats_res.json() if stats_res.ok else []
+        stats_row = stats_rows[0] if stats_rows else {}
 
+        total_count = int(stats_row.get("total_count", 0))
+        today_count = int(stats_row.get("today_count", 0))
 
+        visit_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
+            headers=SUPABASE_HEADERS
+        )
+        visit_rows = visit_res.json() if visit_res.ok else []
 
-        category_rows = []
-
-
-
-        for _, row in df.iterrows():
-
-            categories = row.get("categories", [])
-
-
-
-            if isinstance(categories, str):
-
-                try:
-
-                    categories = json.loads(categories)
-
-                except Exception:
-
-                    categories = [categories] if categories else []
-
-
-
-            if not categories:
-
-                category_rows.append({
-
-                    "날짜": row.get("날짜", ""),
-
-                    "위험지역 구분": "전체",
-
-                    "체크 수": 1
-
+        daily_visits = []
+        for row in visit_rows:
+            date_str = str(row.get("visit_date", ""))
+            if date_str:
+                daily_visits.append({
+                    "date": date_str,
+                    "count": int(row.get("count", 0) or 0)
                 })
 
+        region_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        region_rows = region_res.json() if region_res.ok else []
+
+        # 클릭별 상세 내역 — KST 일시 표시. region_rows는 created_at desc 정렬이라 최신순.
+        daily_regions = []
+        for row in region_rows:
+            created_at = str(row.get("created_at", ""))
+            dt_str = _kst_datetime_str(created_at) if created_at else ""
+            sido = str(row.get("sido", "") or "")
+            sigungu = str(row.get("sigungu", "") or "")
+            raw_search_type = str(row.get("search_type", "") or "").strip()
+
+            if raw_search_type == "combo":
+                search_type = "조건기반"
+            elif raw_search_type == "desc":
+                search_type = "사례기반"
             else:
+                search_type = raw_search_type or "-"
 
-                for cat in categories:
+            daily_regions.append({
+                "datetime": dt_str,
+                "sido": sido,
+                "sigungu": sigungu,
+                "search_type": search_type
+            })
 
-                    category_rows.append({
+        pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
+        env_stats, env_total, env_chart_style = _compute_env_stats()
 
-                        "날짜": row.get("날짜", ""),
+    chart_visits, chart_visits_max = _chart_data(daily_visits, 10)
+    chart_pv, chart_pv_max = _chart_data(daily_pv)
+    top_pages_max = max([r["count"] for r in top_pages], default=0)
 
-                        "위험지역 구분": cat,
-
-                        "체크 수": 1
-
-                    })
-
-
-
-        category_df = pd.DataFrame(category_rows)
-
-
-
-        if category_df.empty:
-
-            category_stats = pd.DataFrame(columns=["날짜", "위험지역 구분", "체크 수"])
-
-        else:
-
-            category_stats = (
-
-                category_df.groupby(["날짜", "위험지역 구분"], dropna=False)["체크 수"]
-
-                .sum()
-
-                .reset_index()
-
-                .sort_values(["날짜", "체크 수"], ascending=[False, False])
-
+    # AI 토큰 사용량 집계 (token_usage) — 격리: 실패해도 통계 페이지엔 영향 없음
+    tok_total_in = tok_total_out = tok_today_in = tok_today_out = 0
+    try:
+        today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+        if os.getenv("RENDER") is not None:
+            _tr = requests.get(
+                f"{SUPABASE_URL}/rest/v1/token_usage?select=usage_date,input_tokens,output_tokens",
+                headers=SUPABASE_HEADERS, timeout=8
             )
+            _trows = _tr.json() if _tr.ok else []
+        else:
+            _trows = [
+                {"usage_date": today_kst, "input_tokens": 12000, "output_tokens": 3000},
+                {"usage_date": "2026-06-05", "input_tokens": 50000, "output_tokens": 9000},
+            ]
+        for _row in _trows:
+            _i = int(_row.get("input_tokens", 0) or 0)
+            _o = int(_row.get("output_tokens", 0) or 0)
+            tok_total_in += _i
+            tok_total_out += _o
+            if str(_row.get("usage_date", "")) == today_kst:
+                tok_today_in += _i
+                tok_today_out += _o
+    except Exception as e:
+        app.logger.exception(e)
+
+    def _tok_krw(inp, outp):
+        usd = inp / 1_000_000 * GPT_PRICE_INPUT_USD + outp / 1_000_000 * GPT_PRICE_OUTPUT_USD
+        return int(round(usd * USD_TO_KRW))
+    tok_total_krw = _tok_krw(tok_total_in, tok_total_out)
+    tok_today_krw = _tok_krw(tok_today_in, tok_today_out)
+
+    return render_template_string(
+        STATS_HTML,
+        total_count=total_count,
+        today_count=today_count,
+        daily_visits=daily_visits,
+        daily_regions=daily_regions,
+        pv_total=pv_total,
+        pv_today=pv_today,
+        daily_pv=daily_pv,
+        top_pages=top_pages,
+        top_pages_max=top_pages_max,
+        chart_visits=chart_visits,
+        chart_visits_max=chart_visits_max,
+        chart_pv=chart_pv,
+        chart_pv_max=chart_pv_max,
+        tok_total_in=tok_total_in,
+        tok_total_out=tok_total_out,
+        tok_total_krw=tok_total_krw,
+        tok_today_in=tok_today_in,
+        tok_today_out=tok_today_out,
+        tok_today_krw=tok_today_krw,
+        price_in=GPT_PRICE_INPUT_USD,
+        price_out=GPT_PRICE_OUTPUT_USD,
+        usd_krw=USD_TO_KRW,
+        env_stats=env_stats,
+        env_total=env_total,
+        env_chart_style=env_chart_style
+    )
+
+@app.route("/stats/export/visits")
+def export_stats_visits():
+
+    if os.getenv("RENDER") is None:
+        daily_visits = [
+            {"날짜": "2026-04-17", "방문자수": 12},
+            {"날짜": "2026-04-18", "방문자수": 18},
+            {"날짜": "2026-04-19", "방문자수": 5}
+        ]
+    else:
+        visit_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
+            headers=SUPABASE_HEADERS
+        )
+        visit_rows = visit_res.json() if visit_res.ok else []
+
+        daily_visits = []
+        for row in visit_rows:
+            date_str = str(row.get("visit_date", ""))
+            if date_str:
+                daily_visits.append({
+                    "날짜": date_str,
+                    "방문자수": int(row.get("count", 0) or 0)
+                })
+
+    df_export = pd.DataFrame(daily_visits)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_export.to_excel(writer, index=False, sheet_name="일자별방문자수")
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="일자별_방문자수.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.route("/stats/export/regions")
+def export_stats_regions():
+
+    if os.getenv("RENDER") is None:
+        daily_regions = [
+            {"날짜": "2026-04-18", "시도": "전남광주통합특별시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
+            {"날짜": "2026-04-18", "시도": "전남광주통합특별시", "시군구": "나주시", "검색구분": "사례기반", "클릭수": 2},
+            {"날짜": "2026-04-19", "시도": "전남광주통합특별시", "시군구": "서구", "검색구분": "조건기반", "클릭수": 1}
+        ]
+    else:
+        region_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        region_rows = region_res.json() if region_res.ok else []
+
+        daily_region_map = defaultdict(int)
+        for row in region_rows:
+            created_at = str(row.get("created_at", ""))
+            date_str = _kst_date_str(created_at) if created_at else ""
+            sido = str(row.get("sido", "") or "")
+            sigungu = str(row.get("sigungu", "") or "")
+            raw_search_type = str(row.get("search_type", "") or "").strip()
+
+            if raw_search_type == "combo":
+                search_type = "조건기반"
+            elif raw_search_type == "desc":
+                search_type = "사례기반"
+            else:
+                search_type = raw_search_type or "-"
+
+            key = (date_str, sido, sigungu, search_type)
+            daily_region_map[key] += 1
+
+        daily_regions = []
+        for key in sorted(daily_region_map.keys(), reverse=True):
+            date_str, sido, sigungu, search_type = key
+            daily_regions.append({
+                "날짜": date_str,
+                "시도": sido,
+                "시군구": sigungu,
+                "검색구분": search_type,
+                "클릭수": daily_region_map[key]
+            })
+
+    df_export = pd.DataFrame(daily_regions)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_export.to_excel(writer, index=False, sheet_name="일자별지역클릭수")
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="일자별_지역클릭수.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.route("/stats/export/all")
+@app.route("/stats/export/xlsx/<path:fname>")
+def export_stats_all(fname=None):
+    """방문/페이지뷰/지역 통계를 시트별로 묶어 하나의 엑셀로 일괄 다운로드."""
+    if os.getenv("RENDER") is None:
+        total_count, today_count = 100, 5
+        daily_visits = [
+            {"날짜": "2026-06-04", "방문자수": 18},
+            {"날짜": "2026-06-05", "방문자수": 5},
+        ]
+        daily_regions = [
+            {"날짜": "2026-06-04", "시도": "전남광주통합특별시", "시군구": "북구", "검색구분": "조건기반", "클릭수": 3},
+        ]
+        pv_total, pv_today = 173, 41
+        daily_pv = [{"date": "2026-06-05", "count": 41}]
+        top_pages = [{"page": "기관검색", "count": 64}, {"page": "사례검색", "count": 52}]
+    else:
+        stats_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
+            headers=SUPABASE_HEADERS
+        )
+        stats_rows = stats_res.json() if stats_res.ok else []
+        stats_row = stats_rows[0] if stats_rows else {}
+        total_count = int(stats_row.get("total_count", 0))
+        today_count = int(stats_row.get("today_count", 0))
+
+        visit_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
+            headers=SUPABASE_HEADERS
+        )
+        visit_rows = visit_res.json() if visit_res.ok else []
+        daily_visits = [
+            {"날짜": str(row.get("visit_date", "")), "방문자수": int(row.get("count", 0) or 0)}
+            for row in visit_rows if row.get("visit_date")
+        ]
+
+        region_res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        region_rows = region_res.json() if region_res.ok else []
+        drm = defaultdict(int)
+        for row in region_rows:
+            ca = str(row.get("created_at", ""))
+            ds = _kst_date_str(ca) if ca else ""
+            sido = str(row.get("sido", "") or "")
+            sigungu = str(row.get("sigungu", "") or "")
+            rst = str(row.get("search_type", "") or "").strip()
+            st = "조건기반" if rst == "combo" else "사례기반" if rst == "desc" else (rst or "-")
+            drm[(ds, sido, sigungu, st)] += 1
+        daily_regions = [
+            {"날짜": k[0], "시도": k[1], "시군구": k[2], "검색구분": k[3], "클릭수": drm[k]}
+            for k in sorted(drm.keys(), reverse=True)
+        ]
+
+        pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
+
+    summary_df = pd.DataFrame([
+        {"항목": "총 방문자수", "값": total_count},
+        {"항목": "오늘 방문자수", "값": today_count},
+        {"항목": "총 페이지뷰", "값": pv_total},
+        {"항목": "오늘 페이지뷰", "값": pv_today},
+    ])
+    visits_df = pd.DataFrame(daily_visits) if daily_visits else pd.DataFrame(columns=["날짜", "방문자수"])
+    pv_df = pd.DataFrame(
+        [{"날짜": r["date"], "페이지뷰": r["count"]} for r in daily_pv]
+    ) if daily_pv else pd.DataFrame(columns=["날짜", "페이지뷰"])
+    pages_df = pd.DataFrame(
+        [{"페이지": r["page"], "조회수": r["count"]} for r in top_pages]
+    ) if top_pages else pd.DataFrame(columns=["페이지", "조회수"])
+    regions_df = pd.DataFrame(daily_regions) if daily_regions else pd.DataFrame(columns=["날짜", "시도", "시군구", "검색구분", "클릭수"])
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        summary_df.to_excel(writer, index=False, sheet_name="요약")
+        visits_df.to_excel(writer, index=False, sheet_name="일자별방문자수")
+        regions_df.to_excel(writer, index=False, sheet_name="일자별지역클릭수")
+        pv_df.to_excel(writer, index=False, sheet_name="일자별페이지뷰")
+        pages_df.to_excel(writer, index=False, sheet_name="페이지별조회수")
+    output.seek(0)
+
+    # 파일명을 헤더에 넣지 않고(attachment만), URL 마지막 경로(케어네비_통계.xlsx)를
+    # 파일명으로 쓰게 함 → PC 브라우저·모바일 브라우저·웹앱(WebView) 모두 동일하게 한글 파일명.
+    resp = Response(
+        output.read(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    resp.headers["Content-Disposition"] = "attachment"
+    return resp
+
+BOARD_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>비공개 게시판</title>
+<style>
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+}
+
+.home-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  height:34px;
+  padding:0 15px;
+  border-radius:8px;
+  background:#5b7ee5;
+  border:none;
+  color:#fff;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:500;
+  transition:all .15s;
+}
+.home-button:hover{
+  background:#f3f4f6;
+  color:#374151;
+}
+h2{
+  margin:0 0 8px 0;
+  font-size:22px;
+}
+.desc{
+  margin:0 0 18px 0;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+label{
+  display:block;
+  margin-top:14px;
+  font-size:14px;
+  font-weight:700;
+}
+input, textarea{
+  width:100%;
+  box-sizing:border-box;
+  margin-top:7px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  padding:12px;
+  font-size:15px;
+  font-family:inherit;
+}
+textarea{
+  min-height:180px;
+  resize:vertical;
+  line-height:1.6;
+}
+button{
+  width:100%;
+  height:50px;
+  margin-top:18px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  font-size:16px;
+  font-weight:800;
+  cursor:pointer;
+}
+.success{
+  padding:18px;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  border-radius:14px;
+  color:#1d4ed8;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.6;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/stats" class="home-button">통계로</a>
+  </div>
+
+  <div class="card">
+    {% if saved %}
+      <div class="success">
+        의견이 등록되었습니다.<br>
+        남겨주신 내용은 관리자만 확인할 수 있습니다.
+      </div>
+      <a href="/home" class="home-button" style="margin-top:16px;">홈으로 돌아가기</a>
+    {% else %}
+      <h2>오류제보 / 의견보내기</h2>
+      <p class="desc">
+        작성하신 내용은 공개되지 않으며 관리자만 확인할 수 있습니다.
+      </p>
+
+      <form method="post">
+        <label>작성자</label>
+        <input type="text" name="writer" placeholder="이름 또는 소속을 입력하세요">
+
+        <label>제목</label>
+        <input type="text" name="title" placeholder="제목을 입력하세요" required>
+
+        <label>내용</label>
+        <textarea name="content" placeholder="오류 내용이나 의견을 입력하세요" required></textarea>
+
+        <button type="submit">등록하기</button>
+      </form>
+    {% endif %}
+  </div>
+
+</div>
+</body>
+</html>
+"""
+
+BOARD_LIST_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>비공개 게시판</title>
+<style>
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:760px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+  margin-bottom:18px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 2px 8px 2px;
+}
+
+.top-right-menu{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  flex-shrink:0;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  height:34px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
+}
+.home-button:hover{
+  background:#f3f4f6 !important;
+  color:#374151 !important;
+}
+h2{
+  margin:0 0 16px 0;
+  font-size:24px;
+}
+.board-card{
+  background:#fff;
+  border-radius:16px;
+  padding:16px 18px;
+  margin-bottom:10px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+  text-decoration:none;
+  color:#111827;
+  display:block;
+}
+.board-title{
+  font-size:16px;
+  font-weight:800;
+  margin-bottom:7px;
+}
+.board-meta{
+  font-size:12px;
+  color:#6b7280;
+}
+.empty{
+  background:#fff;
+  border-radius:16px;
+  padding:24px;
+  text-align:center;
+  color:#6b7280;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/home" class="home-button">홈으로</a>
+    <a href="/board/write" class="home-button">의견보내기</a>
+  </div>
+
+  <h2>오류제보 / 의견게시판</h2>
+
+  {% if posts %}
+    {% for post in posts %}
+      <a href="/board/view/{{ post['id'] }}" class="board-card">
+        <div class="board-title">{{ post["title"] }}</div>
+        <div class="board-meta">
+          {{ post["created_at"] | kst }}
+          · 작성자: {{ post["writer"] or "미입력" }}
+        </div>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty">등록된 글이 없습니다.</div>
+  {% endif %}
+
+</div>
+</body>
+</html>
+"""
+
+BOARD_WRITE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>의견보내기</title>
+<style>
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  height:34px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
+}
+h2{
+  margin:0 0 8px 0;
+  font-size:22px;
+}
+.desc{
+  margin:0 0 18px 0;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+label{
+  display:block;
+  margin-top:14px;
+  font-size:14px;
+  font-weight:700;
+}
+input, textarea{
+  width:100%;
+  box-sizing:border-box;
+  margin-top:7px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  padding:12px;
+  font-size:15px;
+  font-family:inherit;
+}
+textarea{
+  min-height:180px;
+  resize:vertical;
+  line-height:1.6;
+}
+button{
+  width:100%;
+  height:50px;
+  margin-top:18px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  font-size:16px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/home" class="home-button">⌂ 홈으로</a>
+  </div>
+
+  <div class="card">
+    <h2>의견보내기</h2>
+    <p class="desc">작성하신 내용은 관리자만 확인할 수 있습니다.</p>
+
+    <form method="post">
+      <label>소속기관 <span style="color:#ef4444;">*</span></label>
+      <select name="org_type" required style="width:100%;box-sizing:border-box;margin-top:7px;border:1px solid #d1d5db;border-radius:12px;padding:12px;font-size:15px;font-family:inherit;background:#fff;color:#111827;">
+        <option value="" disabled selected>소속기관을 선택하세요</option>
+        <option value="지자체">지자체</option>
+        <option value="공단">공단</option>
+      </select>
+
+      <label>작성자</label>
+      <input type="text" name="writer" placeholder="이름 또는 소속을 입력하세요">
+
+      <label>제목 <span style="color:#ef4444;">*</span></label>
+      <input type="text" name="title" placeholder="제목을 입력하세요" required>
+
+      <label>내용 <span style="color:#ef4444;">*</span></label>
+      <textarea name="content" placeholder="오류 내용이나 의견을 입력하세요" required></textarea>
+
+      <label>회신연락처</label>
+      <div style="font-size:12px;color:#9ca3af;margin-top:2px;margin-bottom:4px;">회신이 필요한 경우만 작성해주세요</div>
+      <input type="text" name="reply_contact" placeholder="이메일 또는 전화번호">
+
+      <button type="submit">등록하기</button>
+      <div style="text-align:center;margin-top:14px;">
+        <a href="/privacy" style="font-size:12px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
+      </div>
+    </form>
+  </div>
+
+</div>
+</body>
+</html>
+"""
+BOARD_SUCCESS_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>등록 완료</title>
+<style>
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:640px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+.success{
+  padding:18px;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  border-radius:14px;
+  color:#1d4ed8;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.6;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  height:34px !important;
+  padding:0 15px !important;
+  margin-top:16px;
+  border-radius:8px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="success">
+      의견이 등록되었습니다.<br>
+      남겨주신 내용은 관리자만 확인할 수 있습니다.
+    </div>
+    <a href="/home" class="home-button">⌂ 홈으로</a>
+  </div>
+</div>
+</body>
+</html>
+"""
 
 
 
-        output = BytesIO()
+BOARD_VIEW_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게시글 보기</title>
+<style>
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:760px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+  margin-bottom:18px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 2px 8px 2px;
+}
+
+.top-right-menu{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  flex-shrink:0;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  height:34px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
+}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:22px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+.title{
+  font-size:22px;
+  font-weight:900;
+  margin-bottom:10px;
+}
+.meta{
+  font-size:12px;
+  color:#6b7280;
+  margin-bottom:18px;
+}
+.content{
+  font-size:15px;
+  line-height:1.8;
+  white-space:pre-wrap;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
 
 
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
 
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+  <div class="top-bar">
+    <a href="/board/admin" class="home-button">목록으로</a>
+  </div>
 
-            raw_df.to_excel(writer, index=False, sheet_name="전체 조회기록")
+  <div class="card">
+    <div class="title">{{ post["title"] }}</div>
+    <div class="meta">
+      {{ post["created_at"] | kst }}
+      · 작성자: {{ post["writer"] or "미입력" }}
+    </div>
+    <div class="content">{{ post["content"] }}</div>
+  </div>
 
-            region_stats.to_excel(writer, index=False, sheet_name="지역별 통계")
+</div>
+</body>
+</html>
+"""
 
-            category_stats.to_excel(writer, index=False, sheet_name="구분별 통계")
+BOARD_ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게시판 관리자</title>
+<style>
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+.container{
+  max-width:900px;
+  margin:0 auto;
+  padding:24px 16px 40px 16px;
+}
+.top-bar{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  margin-bottom:16px;
+}
+.home-button{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  height:34px !important;
+  padding:0 15px !important;
+  border-radius:8px !important;
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#6b7280 !important;
+  text-decoration:none !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+  transition:all .15s !important;
+}
+.card{
+  background:#fff;
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:14px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+  cursor:pointer;
+}
+.meta{
+  font-size:12px;
+  color:#6b7280;
+  margin-bottom:8px;
+}
+.title{
+  font-size:17px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+.content{
+  font-size:14px;
+  line-height:1.7;
+  word-break:keep-all;
+  margin-bottom:14px;
+
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:normal;
+}
+.delete-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:32px;
+  padding:0 12px;
+  border:none;
+  border-radius:999px;
+  background:#fee2e2;
+  color:#b91c1c;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+}
+.empty{
+  background:#fff;
+  border-radius:16px;
+  padding:22px;
+  color:#6b7280;
+  text-align:center;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <a href="/stats" class="home-button">통계로</a>
+  </div>
+
+  <h2>비공개 게시판 관리</h2>
+
+  {% if posts %}
+    {% for post in posts %}
+    <div class="card" onclick="location.href='/board/admin/view/{{ post['id'] }}'">
+      <div class="meta">
+        {{ post["created_at"] | kst }}
+        · 작성자: {{ post["writer"] or "미입력" }}
+        {% if post.get("org_type") %} · 소속: {{ post["org_type"] }}{% endif %}
+        {% if post.get("reply_contact") %}<br>회신연락처: {{ post["reply_contact"] }}{% endif %}
+      </div>
+      <div class="title">{{ post["title"] }}</div>
+      <div class="content">{{ post["content"] }}</div>
+
+      <form method="post" action="/board/delete/{{ post['id'] }}" onclick="event.stopPropagation();" onsubmit="return confirm('이 글을 삭제할까요?');">
+        <button type="submit" class="delete-btn">삭제</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">등록된 글이 없습니다.</div>
+  {% endif %}
+
+</div>
+</body>
+</html>
+"""
 
 
+PRIVACY_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>개인정보 처리방침</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:#f1f5f9;color:#1f2937;margin:0;padding:20px;line-height:1.55;}
+  .wrap{max-width:760px;margin:0 auto;background:#fff;border-radius:16px;padding:24px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.05);}
+  h1{font-size:22px;margin:0 0 6px;}
+  .updated{color:#94a3b8;font-size:13px;margin-bottom:18px;}
+  h2{font-size:16px;margin:20px 0 6px;color:#111827;}
+  p{font-size:14px;color:#374151;margin:6px 0;}
+  li{font-size:14px;color:#374151;margin:3px 0;}
+  ul{padding-left:18px;margin:6px 0;}
+  .notice{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;color:#9a3412;margin:10px 0;}
+  a.back{display:inline-block;margin-top:24px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;}
+  .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0;}
+  table{width:100%;min-width:720px;border-collapse:collapse;margin:0;font-size:12px;}
+  th,td{border:1px solid #e5e7eb;padding:7px 8px;text-align:left;vertical-align:top;word-break:keep-all;}
+  th{background:#f8fafc;}
+  @media (max-width:480px){
+    body{padding:12px;}
+    .wrap{padding:20px 14px;}
+    .table-scroll{margin:8px 0 10px 0;padding-bottom:4px;}
+    table{font-size:11.5px;min-width:760px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>개인정보 처리방침</h1>
+  <div class="updated">시행일: 2026년 6월 14일</div>
 
-        output.seek(0)
+  <p>케어네비(이하 "서비스")는 「개인정보 보호법」을 준수하며, 이용자의 개인정보를 다음과 같이 처리합니다.</p>
+
+  <div class="notice">
+    본 서비스는 업무 참고용 서비스입니다. 이름, 주민등록번호, 연락처, 상세주소, 진단서·처방전 원본 등 직접 식별 가능한 개인정보나 민감정보는 입력 또는 업로드하지 않도록 주의해 주세요.
+  </div>
+
+  <h2>1. 처리하는 개인정보 항목 및 목적</h2>
+  <div class="table-scroll">
+  <table>
+    <tr><th>기능</th><th>처리 항목</th><th>이용 목적</th><th>보유기간</th></tr>
+    <tr><td>의견보내기</td><td>작성자, 회신연락처, 제목·문의내용</td><td>오류제보·의견 접수 및 회신</td><td>접수일로부터 1년</td></tr>
+    <tr><td>사례별 AI 추천</td><td>이용자가 입력한 사례 내용</td><td>통합돌봄 서비스 추천 결과 생성</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
+    <tr><td>이미지 OCR</td><td>이용자가 업로드한 이미지 및 이미지에서 추출된 텍스트</td><td>사진 속 사례 내용 추출</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
+    <tr><td>조사서식 작성·PDF 발송</td><td>이용자가 입력한 조사 내용, 수신 이메일 주소, 생성된 PDF</td><td>조사서식 PDF 생성 및 이메일 발송</td><td>서버 DB에 저장하지 않음. 메일 발송 과정에서 일시 이용</td></tr>
+  </table>
+  </div>
+
+  <h2>2. 통계 정보</h2>
+  <p>서비스는 운영 통계를 위해 아래 정보를 처리합니다. IP, 검색어, User-Agent 원문은 저장하지 않으며 특정 개인을 식별하지 않는 형태로 집계합니다.</p>
+  <ul>
+    <li>방문자수, 페이지별 조회수, 지역별 클릭수, AI 토큰 사용량</li>
+    <li>접속환경 분류값: PC, Android, iOS, 기타</li>
+  </ul>
+
+  <h2>3. 처리위탁 및 국외 처리</h2>
+  <p>서비스 운영을 위해 아래 외부 서비스를 이용하며, 일부 정보는 국외에서 처리될 수 있습니다.</p>
+  <div class="table-scroll">
+  <table>
+    <tr>
+      <th>수탁자</th>
+      <th>처리 국가</th>
+      <th>처리 항목</th>
+      <th>처리 목적</th>
+      <th>보유기간</th>
+    </tr>
+    <tr>
+      <td>Supabase</td>
+      <td>일본 등 서비스 제공 리전</td>
+      <td>의견보내기 작성자, 제목, 내용, 회신연락처, 운영 통계</td>
+      <td>의견 접수 관리 및 운영 통계 저장</td>
+      <td>의견보내기 자료는 접수일로부터 1년, 운영 통계는 개인을 식별할 수 없는 형태로 보관</td>
+    </tr>
+    <tr>
+      <td>OpenAI</td>
+      <td>미국 등</td>
+      <td>사용자가 입력한 사례 내용, OCR 이미지</td>
+      <td>AI 추천 결과 생성 및 이미지 텍스트 추출</td>
+      <td>OpenAI API 정책 및 계약 조건에 따름</td>
+    </tr>
+    <tr>
+      <td>Google/Gmail SMTP</td>
+      <td>미국 등</td>
+      <td>수신 이메일 주소, 생성된 PDF 첨부파일</td>
+      <td>조사서식 PDF 이메일 발송</td>
+      <td>메일 발송 처리 과정에서 이용되며, 발송 메일함 또는 수신자 메일함에 보관될 수 있음</td>
+    </tr>
+  </table>
+  </div>
+
+  <h2>4. 보유 및 이용기간</h2>
+  <ul>
+    <li>의견보내기 접수 내용 및 회신연락처: 접수일로부터 1년</li>
+    <li>AI 추천 입력 내용, OCR 이미지, 조사서식 PDF: 서버 DB에 저장하지 않고 요청 처리 과정에서만 일시 이용</li>
+    <li>운영 통계: 개인을 식별할 수 없는 집계 정보로 보관</li>
+  </ul>
+
+  <h2>5. 파기 방법</h2>
+  <p>보유기간이 지난 개인정보는 복구할 수 없도록 삭제합니다. 전자파일은 재생할 수 없는 방법으로 삭제합니다.</p>
+
+  <h2>6. 정보주체의 권리</h2>
+  <p>이용자는 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 아래 담당부서로 요청할 수 있습니다.</p>
+
+  <h2>7. 안전성 확보조치</h2>
+  <ul>
+    <li>관리자 페이지 접근 제한</li>
+    <li>운영 로그 최소화 및 검색어·토큰·추천 결과 로그 미저장</li>
+    <li>IP 및 User-Agent 원문 미저장</li>
+    <li>외부 API 키 및 비밀번호의 환경변수 관리</li>
+  </ul>
+
+  <h2>8. 자동화된 추천에 관한 안내</h2>
+  <p>AI 추천 결과는 업무 참고용이며, 최종 판단과 안내는 담당자가 관련 지침과 현장 상황을 확인하여 결정해야 합니다.</p>
+
+  <h2>9. 개인정보 보호 담당부서</h2>
+  <p>국민건강보험공단 광주전라제주지역본부 통합돌봄부<span style="font-size:12px;">(TF)</span></p>
+
+  <a class="back" href="javascript:history.back()">돌아가기</a>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/privacy")
+def privacy():
+    return render_template_string(PRIVACY_HTML)
+
+@app.route("/board")
+def board():
+    return redirect(url_for("board_write"))
+
+@app.route("/board/write", methods=["GET", "POST"])
+def board_write():
+    if request.method == "POST":
+        writer = (request.form.get("writer", "") or "").strip()
+        title = (request.form.get("title", "") or "").strip()
+        content = (request.form.get("content", "") or "").strip()
+        org_type = (request.form.get("org_type", "") or "").strip()
+        reply_contact = (request.form.get("reply_contact", "") or "").strip()
+
+        if title and content and org_type:
+            if os.getenv("RENDER") is not None:
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/board_posts",
+                    headers=SUPABASE_HEADERS,
+                    json={
+                        "writer": writer,
+                        "title": title,
+                        "content": content,
+                        "org_type": org_type,
+                        "reply_contact": reply_contact
+                    }
+                )
+
+        return render_template_string(BOARD_SUCCESS_HTML)
+
+    return render_template_string(BOARD_WRITE_HTML)
+
+@app.route("/board/view/<int:post_id>")
+def board_view(post_id):
+    return redirect(url_for("board"))
+
+@app.route("/board/admin")
+def board_admin():
+    cleanup_old_board_posts()
+
+    posts = []
+
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&is_deleted=eq.false&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        posts = res.json() if res.ok else []
+    else:
+        posts = [
+            {
+                "id": 1,
+                "created_at": "2026-05-17T00:00:00",
+                "writer": "테스트",
+                "title": "로컬 테스트 글",
+                "content": "Render 환경에서는 Supabase에 저장됩니다."
+            }
+        ]
+
+    return render_template_string(BOARD_ADMIN_HTML, posts=posts)
 
 
+@app.route("/board/admin/view/<int:post_id>")
+def board_admin_view(post_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
 
-        filename = "safety_map_stats_" + datetime.now(KST).strftime("%Y%m%d_%H%M%S") + ".xlsx"
+    post = None
 
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/board_posts?select=*&id=eq.{post_id}&is_deleted=eq.false",
+            headers=SUPABASE_HEADERS
+        )
+        rows = res.json() if res.ok else []
+        post = rows[0] if rows else None
+    else:
+        post = {
+            "id": 1,
+            "created_at": "2026-05-17T00:00:00",
+            "writer": "테스트",
+            "title": "로컬 테스트 글",
+            "content": "Render 환경에서는 Supabase에 저장됩니다."
+        }
 
+    if not post:
+        return redirect(url_for("board_admin"))
 
-        response = send_file(
+    return render_template_string(BOARD_VIEW_HTML, post=post)
 
-            output,
+@app.route("/board/delete/<int:post_id>", methods=["POST"])
+def board_delete(post_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
 
-            as_attachment=True,
-
-            download_name=filename,
-
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
+    if os.getenv("RENDER") is not None:
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/board_posts?id=eq.{post_id}",
+            headers=SUPABASE_HEADERS,
+            json={
+                "is_deleted": True
+            }
         )
 
-
-
-        response.headers["Cache-Control"] = "no-store"
-
-        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
-
-
-
-        return response
-
-
-    except Exception as e:
-
-        return f"엑셀 생성 오류: {str(e)}", 500
-
-
-
-@app.route("/meta")
-
-def meta():
-
-    df = load_df()
-
-
-
-    provinces = sorted(df["시도"].dropna().astype(str).unique().tolist())
-
-    cities = sorted(df["시군구"].dropna().astype(str).unique().tolist())
-
-    towns = sorted(df["읍면동"].dropna().astype(str).unique().tolist())
-
-
-
-    return jsonify({
-
-        "provinces": provinces,
-
-        "cities": cities,
-
-        "towns": towns
-
-    })
-
-
-
-@app.route("/cities")
-
-def cities():
-
-
-
-    province = safe_str(request.args.get("province",""))
-
-
-
-    df = load_df()
-
-
-
-    if province:
-
-        df = df[df["시도"] == province]
-
-
-
-    cities = sorted(df["시군구"].dropna().astype(str).unique().tolist())
-
-
-
-    return jsonify({"cities":cities})
-
-
-
-
-
-@app.route("/towns")
-
-def towns():
-
-
-
-    province = safe_str(request.args.get("province",""))
-
-    city = safe_str(request.args.get("city",""))
-
-
-
-    df = load_df()
-
-
-
-    if province:
-
-        df = df[df["시도"] == province]
-
-
-
-    if city:
-
-        df = df[df["시군구"] == city]
-
-
-
-    towns = sorted(df["읍면동"].dropna().astype(str).unique().tolist())
-
-
-
-    return jsonify({"towns": towns})
-
-
-
-
-
-
-
-@app.route("/data")
-
-def data():
-
-
-
-    province = safe_str(request.args.get("province",""))
-
-    city = safe_str(request.args.get("city",""))
-
-    towns = request.args.getlist("town")
-
-    categories = request.args.getlist("category")
-
-
-
-    df = load_df()
-
-
-
-    if province:
-
-        df = df[df["시도"] == province]
-
-
-
-    if city:
-
-        df = df[df["시군구"] == city]
-
-
-
-    if towns:
-
-        df = df[df["읍면동"].isin(towns)]
-
-
-
-    if categories:
-
-        df = df[df["구분"].isin(categories)]
-
-
-
-    total_count = len(df)
-
-
-
-    # 5000개 초과 시 서버 부하 방지: 데이터 전송 없이 경고 반환
-
-    if total_count > 5000:
-
-        return jsonify({
-
-            "total": total_count,
-
-            "too_many": True,
-
-            "data": []
-
-        })
-
-
-
-    records = df.apply(row_to_dict, axis=1).tolist()
-
-
-
-    return jsonify({
-
-        "total": total_count,
-
-        "too_many": False,
-
-        "data": records
-
-    })
-
-
-
-@app.route("/data/all")
-
-def data_all():
-
-
-
-    df = load_df()
-
-
-
-    records = df.apply(row_to_dict, axis=1).tolist()
-
-
-
-    return jsonify({
-
-        "total": len(records),
-
-        "too_many": False,
-
-        "data": records
-
-    })
-
-
-
-@app.route("/sample-image")
-
-def sample_image():
-
-    category = safe_str(request.args.get("category", "위험지역"))
-
-    city = safe_str(request.args.get("city", ""))
-
-    town = safe_str(request.args.get("town", ""))
-
-
-
-    color = TYPE_COLORS.get(category, "#334155")
-
-
-
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450">
-
-    <defs>
-
-      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-
-        <stop offset="0%" stop-color="{color}"/>
-
-        <stop offset="100%" stop-color="#0f172a"/>
-
-      </linearGradient>
-
-    </defs>
-
-    <rect width="800" height="450" fill="url(#g)"/>
-
-    <rect x="30" y="30" width="740" height="390" rx="24" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)"/>
-
-    <text x="50%" y="42%" text-anchor="middle" fill="white" font-size="42" font-family="Arial" font-weight="700">{category}</text>
-
-    <text x="50%" y="54%" text-anchor="middle" fill="white" font-size="24" font-family="Arial">{city} {town}</text>
-
-    <text x="50%" y="70%" text-anchor="middle" fill="white" font-size="18" font-family="Arial">샘플 이미지</text>
-
-    </svg>"""
-
-    return Response(svg, mimetype="image/svg+xml")
-
-
-
-
-
-
-
-def open_preferred_browser(url):
-
-    time.sleep(1.5)
-
-
-
-    candidates = [
-
-        r"C:\Program Files\Naver\Naver Whale\Application\whale.exe",
-
-        r"C:\Program Files (x86)\Naver\Naver Whale\Application\whale.exe",
-
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-
-    ]
-
-
-
-    for path in candidates:
-
-        if os.path.exists(path):
-
-            try:
-
-                webbrowser.register("preferred_browser", None, webbrowser.BackgroundBrowser(path))
-
-                webbrowser.get("preferred_browser").open(url)
-
-                return
-
-            except Exception:
-
-                pass
-
-
-
-    webbrowser.open(url)
-
-
-
-
-
-
-# ================================================================
-# ===============  매식비 관리 모듈 (/meal)  =====================
-#   - 기존 지도앱 코드와 완전히 분리, /meal 하위 경로로만 동작
-#   - 저장소: Supabase REST (meal_teams / meal_members / meal_entries)
-#   - 로그인: 비밀번호 3333 (session['meal_authed'])
-# ================================================================
-import calendar as _meal_calendar
-import functools as _meal_functools
-from zoneinfo import ZoneInfo as _MealZoneInfo
-from flask import redirect as _meal_redirect
-
-MEAL_KST = _MealZoneInfo("Asia/Seoul")
-MEAL_FIXED_AMOUNT = 9000
-MEAL_MONTHLY_COUNT = 6
-MEAL_MONTHLY_CAP = MEAL_FIXED_AMOUNT * MEAL_MONTHLY_COUNT
-MEAL_PASSWORD = "3333"
-MEAL_ADMIN_PASSWORD = "qwer"   # 백업/복원 관리자 화면 비밀번호
-MEAL_BACKUP_SLOTS = 3          # 수동 저장 슬롯 개수 (1~3)
-MEAL_AUTO_SLOT = 0             # 복원 직전 자동저장 슬롯
-
-
-# ---------------------------------------------------------------- Supabase REST
-def _meal_headers():
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
-
-
-def _meal_get(path):
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return []
-    try:
-        r = requests.get(f"{SUPABASE_URL}/rest/v1/{path}",
-                         headers=_meal_headers(), timeout=10)
-        if r.status_code >= 400:
-            print("meal get err:", r.status_code, r.text)
-            return []
-        return r.json()
-    except Exception as e:
-        print("meal get exc:", e)
-        return []
-
-
-def _meal_post(table, payload):
-    h = _meal_headers()
-    h["Prefer"] = "return=representation"
-    return requests.post(f"{SUPABASE_URL}/rest/v1/{table}",
-                         headers=h, json=payload, timeout=10)
-
-
-def _meal_patch(table, filt, payload):
-    h = _meal_headers()
-    h["Prefer"] = "return=representation"
-    return requests.patch(f"{SUPABASE_URL}/rest/v1/{table}?{filt}",
-                          headers=h, json=payload, timeout=10)
-
-
-def _meal_delete(table, filt):
-    return requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?{filt}",
-                           headers=_meal_headers(), timeout=10)
-
-
-# ---------------------------------------------------------------- 백업 / 복원
-def meal_make_snapshot():
-    """현재 매식비 데이터 전체(팀/팀원/입력내역)를 하나의 딕셔너리로 묶는다."""
-    teams = _meal_get("meal_teams?select=*&order=sort_order.asc,id.asc")
-    members = _meal_get("meal_members?select=*&order=id.asc")
-    entries = _meal_get("meal_entries?select=*&order=id.asc")
-    return {
-        "version": 1,
-        "saved_at": datetime.now(MEAL_KST).isoformat(),
-        "teams": teams,
-        "members": members,
-        "entries": entries,
-        "counts": {
-            "teams": len(teams),
-            "members": len(members),
-            "entries": len(entries),
-        },
-    }
-
-
-def _meal_chunks(lst, size):
-    for i in range(0, len(lst), size):
-        yield lst[i:i + size]
-
-
-def meal_restore_snapshot(snap):
-    """스냅샷으로 현재 데이터를 통째로 교체한다.
-    id 충돌/시퀀스 문제를 피하려고, 새 id를 받아 옛 id -> 새 id로 다시 연결한다."""
-    teams = snap.get("teams") or []
-    members = snap.get("members") or []
-    entries = snap.get("entries") or []
-
-    # 1) 기존 데이터 삭제 (자식 -> 부모 순서로)
-    _meal_delete("meal_entries", "id=gt.0")
-    _meal_delete("meal_members", "id=gt.0")
-    _meal_delete("meal_teams", "id=gt.0")
-
-    # 2) 팀 복원 (옛 id -> 새 id)
-    team_map = {}
-    if teams:
-        payload = [{"name": t.get("name", ""),
-                    "sort_order": t.get("sort_order", 0)} for t in teams]
-        resp = _meal_post("meal_teams", payload)
-        if resp.status_code >= 400:
-            raise RuntimeError("teams: " + resp.text)
-        for old, new in zip(teams, resp.json()):
-            team_map[old["id"]] = new["id"]
-
-    # 3) 팀원 복원 (옛 id -> 새 id, team_id 재매핑)
-    mem_map = {}
-    if members:
-        payload = [{"team_id": team_map.get(m.get("team_id")),
-                    "name": m.get("name", ""),
-                    "active": m.get("active", True)} for m in members]
-        resp = _meal_post("meal_members", payload)
-        if resp.status_code >= 400:
-            raise RuntimeError("members: " + resp.text)
-        for old, new in zip(members, resp.json()):
-            mem_map[old["id"]] = new["id"]
-
-    # 4) 입력내역 복원 (team_id / member_id 재매핑, 큰 데이터는 나눠 삽입)
-    if entries:
-        payload = [{"team_id": team_map.get(e.get("team_id")),
-                    "member_id": mem_map.get(e.get("member_id")),
-                    "d": e.get("d"),
-                    "amount": e.get("amount", MEAL_FIXED_AMOUNT),
-                    "restaurant": e.get("restaurant") or "",
-                    "approver": e.get("approver") or "",
-                    "created_at": e.get("created_at")} for e in entries]
-        payload = [p for p in payload
-                   if p["team_id"] and p["member_id"] and p["d"]]
-        for chunk in _meal_chunks(payload, 400):
-            resp = _meal_post("meal_entries", chunk)
-            if resp.status_code >= 400:
-                raise RuntimeError("entries: " + resp.text)
-
-
-def meal_save_backup(slot, label, snap):
-    """slot 자리에 백업을 저장(기존 것 있으면 교체)."""
-    _meal_delete("meal_backups", f"slot=eq.{slot}")
-    return _meal_post("meal_backups", {
-        "slot": slot,
-        "label": (label or "").strip()[:60],
-        "created_at": datetime.now(MEAL_KST).isoformat(),
-        "payload": snap,
-    })
-
-
-def meal_backup_list():
-    rows = _meal_get("meal_backups?select=slot,label,created_at,payload&order=slot.asc")
-    by_slot = {}
-    for r in rows:
-        c = (r.get("payload") or {}).get("counts") or {}
-        by_slot[r["slot"]] = {
-            "slot": r["slot"],
-            "label": r.get("label") or "",
-            "created_at": r.get("created_at") or "",
-            "teams": c.get("teams", 0),
-            "members": c.get("members", 0),
-            "entries": c.get("entries", 0),
-        }
-    return by_slot
-
-
-# ---------------------------------------------------------------- helpers
-def meal_today_kst():
-    return datetime.now(MEAL_KST).date()
-
-
-def meal_parse_ym(ym):
-    t = meal_today_kst()
-    if ym:
+    return redirect(url_for("board_admin"))
+
+# =========================
+# 공지사항 관리 (관리자 전용)
+# =========================
+NOTICE_ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공지사항 관리</title>
+<style>
+body{ margin:0; background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; }
+.container{ max-width:640px; margin:0 auto; padding:24px 16px 40px 16px; }
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px; }
+.home-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  height:34px;
+  padding:0 15px;
+  border-radius:8px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  color:#6b7280;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:600;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08);
+  transition:all .15s;
+}
+h2{ margin:0 0 16px 0; font-size:20px; }
+.card{ background:#fff; border-radius:16px; padding:18px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06); }
+.card .meta{ font-size:11px; color:#9ca3af; margin-bottom:4px; }
+.card .title{ font-size:15px; font-weight:700; margin-bottom:4px; }
+.card .content{ font-size:13px; color:#4b5563; line-height:1.6; white-space:pre-line; word-break:keep-all; }
+.status{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:6px; font-weight:600; margin-top:6px; }
+.status-active{ background:#dcfce7; color:#166534; }
+.status-inactive{ background:#f3f4f6; color:#6b7280; }
+.btn-row{ display:flex; gap:6px; margin-top:10px; }
+.btn-sm{ height:30px; padding:0 12px; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+.btn-del{ background:#fee2e2; color:#991b1b; }
+.btn-toggle{ background:#e0e7ff; color:#3730a3; }
+.btn-edit{ background:#dbeafe; color:#1e40af; }
+.btn-save{ background:#2563eb; color:#fff; }
+.btn-cancel{ background:#f3f4f6; color:#6b7280; }
+.edit-area{ margin-top:10px; }
+.edit-area label{ display:block; margin-top:10px; font-size:13px; font-weight:700; }
+.edit-area input,.edit-area textarea{ width:100%; box-sizing:border-box; margin-top:5px; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font-size:14px; font-family:inherit; }
+.edit-area textarea{ min-height:100px; resize:vertical; line-height:1.6; }
+.write-card{ background:#fff; border-radius:16px; padding:22px; box-shadow:0 10px 26px rgba(15,23,42,0.10); margin-bottom:20px; }
+.write-card h3{ margin:0 0 14px 0; font-size:16px; font-weight:800; }
+.write-card label{ display:block; margin-top:10px; font-size:13px; font-weight:700; }
+.write-card input,.write-card textarea{ width:100%; box-sizing:border-box; margin-top:5px; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font-size:14px; font-family:inherit; }
+.write-card textarea{ min-height:100px; resize:vertical; line-height:1.6; }
+.write-card button{ margin-top:14px; width:100%; height:42px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+.empty{ background:#fff; border-radius:16px; padding:22px; color:#9ca3af; text-align:center; font-size:13px; }
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <a href="/stats" class="home-button">통계로</a>
+  </div>
+  <h2>공지사항 관리</h2>
+  <div class="write-card">
+    <h3>새 공지 작성</h3>
+    <form method="post" action="/notice/admin/write">
+      <label>제목</label>
+      <input type="text" name="title" placeholder="공지 제목" required>
+      <label>내용</label>
+      <textarea name="content" placeholder="공지 내용을 입력하세요" required></textarea>
+      <button type="submit">등록하기</button>
+    </form>
+  </div>
+  {% if notices %}
+    {% for n in notices %}
+    <div class="card">
+      <div class="meta">{{ n.created_datetime }}</div>
+
+      <div class="view-area" id="view-{{ n.id }}">
+        <div class="title">{{ n.title }}</div>
+        <div class="content">{{ n.content }}</div>
+        <div class="btn-row">
+          <button type="button" class="btn-sm btn-edit" onclick="toggleEdit({{ n.id }})">수정</button>
+          <form method="post" action="/notice/admin/delete/{{ n.id }}" onsubmit="return confirm('삭제할까요?');">
+            <button type="submit" class="btn-sm btn-del">삭제</button>
+          </form>
+        </div>
+      </div>
+
+      <form class="edit-area" id="edit-{{ n.id }}" method="post" action="/notice/admin/edit/{{ n.id }}" style="display:none;">
+        <label>제목</label>
+        <input type="text" name="title" value="{{ n.title }}" required>
+        <label>내용</label>
+        <textarea name="content" required>{{ n.content }}</textarea>
+        <div class="btn-row">
+          <button type="submit" class="btn-sm btn-save">저장</button>
+          <button type="button" class="btn-sm btn-cancel" onclick="toggleEdit({{ n.id }})">취소</button>
+        </div>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">등록된 공지가 없습니다.</div>
+  {% endif %}
+</div>
+<script>
+function toggleEdit(id){
+  var v = document.getElementById('view-' + id);
+  var e = document.getElementById('edit-' + id);
+  if(!v || !e) return;
+  var editing = (e.style.display === 'block');
+  v.style.display = editing ? 'block' : 'none';
+  e.style.display = editing ? 'none' : 'block';
+}
+</script>
+</body>
+</html>
+"""
+
+@app.route("/notice/admin")
+def notice_admin():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    notices = []
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/notices?select=*&order=created_at.desc",
+            headers=SUPABASE_HEADERS
+        )
+        if res.ok:
+            notices = res.json()
+    else:
+        notices = [{"id":1,"title":"테스트 공지","content":"로컬 테스트","created_at":"2026-06-04T00:00:00","is_active":True}]
+    notices = clean_notices_for_template(notices)
+    return render_template_string(NOTICE_ADMIN_HTML, notices=notices)
+
+@app.route("/notice/admin/write", methods=["POST"])
+def notice_admin_write():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    title = (request.form.get("title","") or "").strip()
+    content = (request.form.get("content","") or "").strip()
+    if title and content and os.getenv("RENDER") is not None:
         try:
-            y, m = ym.split("-")
-            y, m = int(y), int(m)
-            if 1 <= m <= 12:
-                return y, m
+            now = datetime.datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+            res = requests.post(
+                f"{SUPABASE_URL}/rest/v1/notices",
+                headers=SUPABASE_HEADERS,
+                json={"title": title, "content": content, "is_active": True, "created_at": now}
+            )
+            if not res.ok:
+                app.logger.error("notice insert failed: %s %s", res.status_code, res.text)
+        except Exception as e:
+            app.logger.exception(e)
+    return redirect(url_for("notice_admin"))
+
+@app.route("/notice/admin/toggle/<int:notice_id>", methods=["POST"])
+def notice_admin_toggle(notice_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    if os.getenv("RENDER") is not None:
+        res = requests.get(
+            f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}&select=is_active",
+            headers=SUPABASE_HEADERS
+        )
+        if res.ok and res.json():
+            current = res.json()[0].get("is_active", True)
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
+                headers=SUPABASE_HEADERS,
+                json={"is_active": not current}
+            )
+    return redirect(url_for("notice_admin"))
+
+@app.route("/notice/admin/delete/<int:notice_id>", methods=["POST"])
+def notice_admin_delete(notice_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    if os.getenv("RENDER") is not None:
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
+            headers=SUPABASE_HEADERS
+        )
+    return redirect(url_for("notice_admin"))
+
+
+@app.route("/notice/admin/edit/<int:notice_id>", methods=["POST"])
+def notice_admin_edit(notice_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    title = (request.form.get("title","") or "").strip()
+    content = (request.form.get("content","") or "").strip()
+    if title and content and os.getenv("RENDER") is not None:
+        try:
+            res = requests.patch(
+                f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
+                headers=SUPABASE_HEADERS,
+                json={"title": title, "content": content}
+            )
+            if not res.ok:
+                app.logger.error("notice edit failed: %s %s", res.status_code, res.text)
+        except Exception as e:
+            app.logger.exception(e)
+    return redirect(url_for("notice_admin"))
+
+
+@app.route("/guide")
+def guide():
+    return redirect("/static/guide.pdf")
+
+@app.route("/pv/guide", methods=["GET", "POST"])
+def pv_guide():
+    # 사용설명서 모달(openGuide)에서 호출 → 페이지뷰로 적재
+    if os.getenv("RENDER") is not None and (session.get("logged_in") or session.get("is_admin")):
+        try:
+            _pv_threading.Thread(target=_pv_insert, args=("/manual",), daemon=True).start()
         except Exception:
             pass
-    return t.year, t.month
+    return ("", 204)
+_GWANGJU_GU_RE = re.compile(r"^(광주)?(동구|서구|남구|북구|광산구)")
 
 
-def meal_ym_str(y, m):
-    return f"{y:04d}-{m:02d}"
+def to_map_search_address(addr: str) -> str:
+    """지도(구글맵) 검색용 주소 변환.
+    2026-07-01 전남광주통합특별시 출범 직후라 구글/카카오맵이 아직 새 행정구역명을
+    인식하지 못해, 지도 검색을 보낼 때만 옛 행정구역명(광주광역시/전라남도)으로
+    바꿔서 보낸다. 화면에 표시되는 기관주소 텍스트 자체는 건드리지 않는다."""
+    addr = str(addr or "").strip()
+    prefix = "전남광주통합특별시"
+
+    if not addr.startswith(prefix):
+        return addr
+
+    rest = addr[len(prefix):].strip()
+    old_sido = "광주광역시" if _GWANGJU_GU_RE.match(rest) else "전라남도"
+
+    return f"{old_sido} {rest}".strip()
 
 
-def meal_shift_month(y, m, delta):
-    idx = y * 12 + (m - 1) + delta
-    return idx // 12, idx % 12 + 1
-
-
-def meal_status_of(count):
-    if count == 0:
-        return "none"
-    if count >= MEAL_MONTHLY_COUNT:
-        return "full"
-    return "ok"
-
-
-def meal_ensure_teams():
-    """팀이 하나도 없으면 기본 5팀 시드(통합돌봄팀 맨 위)."""
-    teams = _meal_get("meal_teams?select=*&order=sort_order.asc,id.asc")
-    if teams:
-        return teams
-    seed = [
-        {"name": "통합돌봄팀(TF)", "sort_order": 0},
-        {"name": "요양운영1팀", "sort_order": 1},
-        {"name": "요양운영2팀", "sort_order": 2},
-        {"name": "요양운영3팀", "sort_order": 3},
-        {"name": "요양운영4팀", "sort_order": 4},
-    ]
-    try:
-        _meal_post("meal_teams", seed)
-    except Exception as e:
-        print("meal seed err:", e)
-    return _meal_get("meal_teams?select=*&order=sort_order.asc,id.asc")
-
-
-# ---------------------------------------------------------------- login guard
-def meal_login_required(fn):
-    @_meal_functools.wraps(fn)
-    def _wrap(*a, **k):
-        if not session.get("meal_authed"):
-            if request.path.startswith("/meal/api/"):
-                return jsonify(ok=False, error="로그인이 필요해요."), 401
-            return _meal_redirect("/meal/login")
-        return fn(*a, **k)
-    return _wrap
-
-
-def meal_admin_required(fn):
-    @_meal_functools.wraps(fn)
-    def _wrap(*a, **k):
-        if not session.get("meal_admin_authed"):
-            if request.path.startswith("/meal/api/"):
-                return jsonify(ok=False, error="관리자 인증이 필요해요."), 401
-            return _meal_redirect("/meal/admin/login")
-        return fn(*a, **k)
-    return _wrap
-
-
-# ---------------------------------------------------------------- routes
-@app.route("/meal/login")
-def meal_login_page():
-    if session.get("meal_authed"):
-        return _meal_redirect("/meal")
-    return render_template_string(MEAL_LOGIN_HTML)
-
-
-@app.route("/meal/api/login", methods=["POST"])
-def meal_do_login():
-    data = request.get_json(force=True)
-    pw = (data.get("password") or "").strip()
-    if pw == MEAL_PASSWORD:
-        session["meal_authed"] = True
-        return jsonify(ok=True)
-    return jsonify(ok=False, error="비밀번호가 올바르지 않아요."), 401
-
-
-@app.route("/meal/logout")
-def meal_logout():
-    session.pop("meal_authed", None)
-    return _meal_redirect("/meal/login")
-
-
-# ---------------------------------------------------------------- 관리자(백업)
-@app.route("/meal/admin/login")
-def meal_admin_login_page():
-    if session.get("meal_admin_authed"):
-        return _meal_redirect("/meal/admin")
-    return render_template_string(MEAL_ADMIN_LOGIN_HTML)
-
-
-@app.route("/meal/api/admin/login", methods=["POST"])
-def meal_admin_do_login():
-    data = request.get_json(force=True)
-    pw = (data.get("password") or "").strip()
-    if pw == MEAL_ADMIN_PASSWORD:
-        session["meal_admin_authed"] = True
-        return jsonify(ok=True)
-    return jsonify(ok=False, error="비밀번호가 올바르지 않아요."), 401
-
-
-@app.route("/meal/admin/logout")
-def meal_admin_logout():
-    session.pop("meal_admin_authed", None)
-    return _meal_redirect("/meal/login")
-
-
-@app.route("/meal/admin")
-@meal_admin_required
-def meal_admin_page():
-    backups = meal_backup_list()
-    now = meal_make_snapshot()["counts"]
-    return render_template_string(
-        MEAL_ADMIN_HTML,
-        slots=list(range(1, MEAL_BACKUP_SLOTS + 1)),
-        backups=backups,
-        auto=backups.get(MEAL_AUTO_SLOT),
-        auto_slot=MEAL_AUTO_SLOT,
-        now=now,
-    )
-
-
-@app.route("/meal/api/admin/save", methods=["POST"])
-@meal_admin_required
-def meal_admin_save():
-    data = request.get_json(force=True)
-    try:
-        slot = int(data.get("slot"))
-    except Exception:
-        return jsonify(ok=False, error="슬롯이 올바르지 않아요."), 400
-    if not (1 <= slot <= MEAL_BACKUP_SLOTS):
-        return jsonify(ok=False, error="슬롯이 올바르지 않아요."), 400
-    label = data.get("label") or ""
-    snap = meal_make_snapshot()
-    resp = meal_save_backup(slot, label, snap)
-    if resp.status_code >= 400:
-        return jsonify(ok=False, error="저장 중 오류가 발생했어요."), 500
-    return jsonify(ok=True, counts=snap["counts"])
-
-
-@app.route("/meal/api/admin/load", methods=["POST"])
-@meal_admin_required
-def meal_admin_load():
-    data = request.get_json(force=True)
-    try:
-        slot = int(data.get("slot"))
-    except Exception:
-        return jsonify(ok=False, error="슬롯이 올바르지 않아요."), 400
-    rows = _meal_get(f"meal_backups?slot=eq.{slot}&select=payload")
-    if not rows:
-        return jsonify(ok=False, error="해당 슬롯에 백업이 없어요."), 404
-    snap = rows[0].get("payload") or {}
-    # 복원 전에 현재 상태를 자동저장본(slot 0)으로 보관 → 실수 복원 되돌리기용
-    try:
-        cur = meal_make_snapshot()
-        meal_save_backup(MEAL_AUTO_SLOT, "복원 직전 자동저장", cur)
-    except Exception as e:
-        print("meal auto-backup err:", e)
-    try:
-        meal_restore_snapshot(snap)
-    except Exception as e:
-        print("meal restore err:", e)
-        return jsonify(ok=False, error="복원 중 오류가 발생했어요."), 500
-    return jsonify(ok=True)
-
-
-@app.route("/meal/api/admin/delete", methods=["POST"])
-@meal_admin_required
-def meal_admin_delete():
-    data = request.get_json(force=True)
-    try:
-        slot = int(data.get("slot"))
-    except Exception:
-        return jsonify(ok=False, error="슬롯이 올바르지 않아요."), 400
-    _meal_delete("meal_backups", f"slot=eq.{slot}")
-    return jsonify(ok=True)
-
-
-@app.route("/meal/admin/download/<int:slot>")
-@meal_admin_required
-def meal_admin_download(slot):
-    rows = _meal_get(f"meal_backups?slot=eq.{slot}&select=payload,created_at")
-    if not rows:
-        return _meal_redirect("/meal/admin")
-    snap = rows[0].get("payload") or {}
-    raw = json.dumps(snap, ensure_ascii=False, indent=2)
-    stamp = (rows[0].get("created_at") or meal_today_kst().isoformat())[:10]
-    fname = f"meal_backup_slot{slot}_{stamp}.json"
-    return Response(
-        raw, mimetype="application/json; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={fname}"})
-
-
-@app.route("/meal/api/admin/restore-file", methods=["POST"])
-@meal_admin_required
-def meal_admin_restore_file():
-    data = request.get_json(force=True)
-    snap = data.get("snapshot")
-    if not isinstance(snap, dict) or "entries" not in snap:
-        return jsonify(ok=False, error="백업 파일 형식이 올바르지 않아요."), 400
-    try:
-        cur = meal_make_snapshot()
-        meal_save_backup(MEAL_AUTO_SLOT, "파일복원 직전 자동저장", cur)
-    except Exception as e:
-        print("meal auto-backup err:", e)
-    try:
-        meal_restore_snapshot(snap)
-    except Exception as e:
-        print("meal file restore err:", e)
-        return jsonify(ok=False, error="복원 중 오류가 발생했어요."), 500
-    return jsonify(ok=True)
-
-
-@app.route("/meal")
-@meal_login_required
-def meal_home():
-    teams = meal_ensure_teams()
-    return render_template_string(MEAL_HOME_HTML, teams=teams,
-                                  monthly_count=MEAL_MONTHLY_COUNT,
-                                  cap=MEAL_MONTHLY_CAP, amount=MEAL_FIXED_AMOUNT)
-
-
-@app.route("/meal/team/<int:team_id>")
-@meal_login_required
-def meal_team_page(team_id):
-    ym = request.args.get("ym")
-    year, month = meal_parse_ym(ym)
-
-    trows = _meal_get(f"meal_teams?id=eq.{team_id}&select=*")
-    if not trows:
-        return _meal_redirect("/meal")
-    team = trows[0]
-
-    members_all = _meal_get(f"meal_members?team_id=eq.{team_id}&select=*&order=id.asc")
-    members = [m for m in members_all if m.get("active", True) is not False]
-    prefix = meal_ym_str(year, month)
-    rows = _meal_get(
-        f"meal_entries?team_id=eq.{team_id}&d=like.{prefix}*"
-        f"&select=*&order=d.asc,id.asc")
-
-    member_name = {m["id"]: m["name"] for m in members_all}
-
-    by_date = {}
-    for r in rows:
-        by_date.setdefault(r["d"], []).append({
-            "id": r["id"],
-            "member_id": r["member_id"],
-            "name": member_name.get(r["member_id"], "?"),
-            "restaurant": r.get("restaurant") or "",
-            "approver": r.get("approver") or "",
+# =========================
+# 상세 API (팝업에서 사용)
+# =========================
+@app.route("/detail/<int:idx>")
+def detail(idx):
+    if idx < 0 or idx >= len(df):
+        return jsonify({
+            "프로그램명칭": "데이터가 변경되었습니다",
+            "서비스제공기관명": "다시 검색해주세요",
+            "기관연락처": "",
+            "기관주소": "",
+            "기타": ""
         })
 
-    per_member_days = {m["id"]: [] for m in members}
-    for r in rows:
-        per_member_days.setdefault(r["member_id"], [])
-        per_member_days[r["member_id"]].append(r["d"])
+    r = df.iloc[idx]
 
-    # 삭제(비활성)된 팀원이라도 이번 달 기록이 있으면 집계에 그대로 표시
-    entry_mids = {r["member_id"] for r in rows}
-    active_ids = {m["id"] for m in members}
-    summary_members = list(members) + [
-        m for m in members_all
-        if m["id"] not in active_ids and m["id"] in entry_mids]
+    program_name = str(r.get("프로그램명(사업명)", "")).strip()
+    org_name = str(r.get("서비스제공기관명", "")).strip()
 
-    summaries = []
-    team_total = 0
-    full_people = 0
-    for m in summary_members:
-        cnt = len(per_member_days.get(m["id"], []))
-        st = meal_status_of(cnt)
-        if st == "full":
-            full_people += 1
-        team_total += cnt * MEAL_FIXED_AMOUNT
-        summaries.append({"id": m["id"], "name": m["name"],
-                          "count": cnt, "total": cnt * MEAL_FIXED_AMOUNT,
-                          "status": st})
+    service_price = str(r.get("서비스단가", "")).strip()
+    service_content = str(r.get("주요내용", "")).strip()
+    service_target = str(r.get("지원대상", "")).strip()
 
-    rest_map = {}
-    for r in rows:
-        key = (r.get("restaurant") or "").strip() or "미지정"
-        if key not in rest_map:
-            rest_map[key] = {"name": key, "days": set(), "total": 0}
-        rest_map[key]["days"].add(r["d"])
-        rest_map[key]["total"] += r.get("amount") or MEAL_FIXED_AMOUNT
-    rest_summaries = sorted(
-        [{"name": v["name"], "count": len(v["days"]), "total": v["total"]}
-         for v in rest_map.values()],
-        key=lambda x: x["total"], reverse=True)
+    return jsonify({
+        "프로그램명칭": program_name,
+        "서비스제공기관명": org_name,
+        "기관연락처": str(r.get("기관연락처", "")),
+        "기관주소": str(r.get("기관주소", "")),
+        "기관주소_지도용": to_map_search_address(r.get("기관주소", "")),
+        "기타": "",
+        "서비스단가": service_price,
+        "주요내용": service_content,
+        "대상": service_target,
+    })
 
-    cal = _meal_calendar.Calendar(firstweekday=6)
-    today = meal_today_kst()
-    weeks = []
-    for week in cal.monthdatescalendar(year, month):
-        wk = []
-        for dt in week:
-            ds = dt.strftime("%Y-%m-%d")
-            wk.append({
-                "day": dt.day,
-                "date_str": ds,
-                "in_month": dt.month == month,
-                "is_today": dt == today,
-                "entries": by_date.get(ds, []),
+
+@app.route("/combo", methods=["GET","POST"])
+def combo():
+    source = request.form if request.method == "POST" else request.args
+
+    sido = normalize_sido((source.get("sido", "") or "").strip())
+    sigungu = (source.get("sigungu", "") or "").strip()
+    main_category = (source.get("main_category", "") or "").strip()
+    manager = (source.get("manager", "") or "").strip()
+    middle_category = (source.get("middle_category", "") or "").strip()
+    program_kw = (source.get("program_kw", "") or "").strip()
+    org_kw = (source.get("org_kw", "") or "").strip()
+    action = (source.get("action", "") or "").strip()
+
+    results = {}
+    sorted_managers_by_region = {}
+    count = 0
+    show_results = (action == "search")
+
+    sigungu_options = []
+
+    if sido and sido in SIGUNGU_MAP:
+        sigungu_options = SIGUNGU_MAP[sido]
+
+    middle_category_options = []
+    if main_category and "대분류" in df.columns and "중분류" in df.columns:
+        temp = df[
+            df["대분류"].fillna("").astype(str).str.strip() == main_category
+        ]
+        middle_category_options = sorted(
+            set(
+                temp["중분류"].fillna("").astype(str).str.strip()
+            ),
+            key=lambda x: (x == "기타", x)
+        )
+        middle_category_options = [v for v in middle_category_options if v]
+
+    if show_results:
+        filtered = df.copy()
+
+        if sido and "시도" in filtered.columns:
+            filtered = filtered[
+                filtered["시도"].fillna("").astype(str).apply(normalize_sido) == sido
+            ]
+
+        if sigungu and "시군구" in filtered.columns:
+            filtered = filtered[
+                filtered["시군구"].fillna("").astype(str).apply(normalize_sigungu) == sigungu
+            ]
+
+        if main_category and "대분류" in filtered.columns:
+            filtered = filtered[
+                filtered["대분류"].fillna("").astype(str).str.strip() == main_category
+            ]
+
+        if middle_category and "중분류" in filtered.columns:
+            filtered = filtered[
+                filtered["중분류"].fillna("").astype(str).str.strip() == middle_category
+            ]
+
+        if manager and "관리주체" in filtered.columns:
+            filtered = filtered[
+                filtered["관리주체"].fillna("").astype(str).str.strip() == manager
+            ]
+
+        if program_kw and "프로그램명(사업명)" in filtered.columns:
+            filtered = filtered[
+                filtered["프로그램명(사업명)"]
+                .fillna("")
+                .astype(str)
+                .str.contains(program_kw, case=False, na=False)
+            ]
+
+        if org_kw and "서비스제공기관명" in filtered.columns:
+            filtered = filtered[
+                filtered["서비스제공기관명"]
+                .fillna("")
+                .astype(str)
+                .str.contains(org_kw, case=False, na=False)
+            ]
+
+        
+        for _, row in filtered.reset_index().iterrows():
+            row_sido = normalize_sido(str(row.get("시도", "")).strip())
+            row_sigungu = normalize_sigungu(str(row.get("시군구", "")).strip())
+            manager_key = str(row.get("관리주체", "")).strip() or "기타"
+
+            if row_sido and row_sigungu:
+                region_key = f"{row_sido}({row_sigungu})"
+            elif row_sido:
+                region_key = row_sido
+            elif row_sigungu:
+                region_key = row_sigungu
+            else:
+                region_key = "기타"
+
+            results.setdefault(region_key, {})
+            results[region_key].setdefault(manager_key, [])
+            results[region_key][manager_key].append({
+                "index": int(row["index"]),
+                "label": f"{row.get('프로그램명(사업명)','')} ({row.get('서비스제공기관명','')})"
             })
-        weeks.append(wk)
 
-    member_info = {}
-    for m in members:
-        days = sorted(per_member_days.get(m["id"], []))
-        member_info[m["id"]] = {"name": m["name"], "days": days,
-                                "count": len(days)}
+        sorted_managers_by_region = {}
+        for rk, mgrs in results.items():
+            sorted_managers_by_region[rk] = sorted(
+                mgrs.keys(),
+                key=lambda x: (x != "공단", x)
+            )
 
-    py, pm = meal_shift_month(year, month, -1)
-    ny, nm = meal_shift_month(year, month, 1)
+        
+        count = sum(
+            len(items)
+            for manager_groups in results.values()
+            for items in manager_groups.values()
+        )
 
-    # 이 팀이 지금까지(전체 기간) 사용한 식당 목록 → 식당 선택 콤보박스용
-    rest_rows = _meal_get(
-        f"meal_entries?team_id=eq.{team_id}&select=restaurant")
-    seen, restaurant_list = set(), []
-    for r in rest_rows:
-        nm_r = (r.get("restaurant") or "").strip()
-        if nm_r and nm_r not in seen:
-            seen.add(nm_r)
-            restaurant_list.append(nm_r)
-    restaurant_list.sort()
+        # 검색 로그 적재 — 일자별 지역 클릭수 집계용 (IP 미수집, 지역/검색구분만)
+        if os.getenv("RENDER"):
+            _pv_threading.Thread(
+                target=_region_log_insert,
+                args=(sido, sigungu, "combo"),
+                daemon=True
+            ).start()
 
     return render_template_string(
-        MEAL_TEAM_HTML,
-        team=team, members=members, weeks=weeks, summaries=summaries,
-        rest_summaries=rest_summaries,
-        year=year, month=month,
-        prev_ym=meal_ym_str(py, pm), next_ym=meal_ym_str(ny, nm),
-        team_total=team_total, full_people=full_people,
-        amount=MEAL_FIXED_AMOUNT, monthly_count=MEAL_MONTHLY_COUNT,
-        cap=MEAL_MONTHLY_CAP,
-        member_info_json=json.dumps(member_info, ensure_ascii=False),
-        restaurant_list=restaurant_list,
-        weekdays=["일", "월", "화", "수", "목", "금", "토"],
+        COMBO_HTML,
+        sido=sido,
+        sigungu=sigungu,
+        main_category=main_category,
+        middle_category=middle_category,
+        manager=manager,
+        program_kw=program_kw,
+        org_kw=org_kw,
+        sido_options=SIDO_OPTIONS,
+        sigungu_options=sigungu_options,
+        main_category_options=MAIN_CATEGORY_OPTIONS,
+        middle_category_options=middle_category_options,
+        manager_options=MANAGER_OPTIONS,
+        results=results,
+        sorted_managers_by_region=sorted_managers_by_region,
+        count=count,
+        show_results=show_results
     )
 
+# =========================
+# ① 선택형 검색
+# =========================
+COMBO_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 서비스 기관 찾기</title>
+<style>
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+.page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
 
-@app.route("/meal/api/entry", methods=["POST"])
-@meal_login_required
-def meal_add_entry():
-    data = request.get_json(force=True)
-    team_id = int(data.get("team_id", 0))
-    member_ids = data.get("member_ids") or []
-    d = (data.get("date") or "").strip()
-    restaurant = (data.get("restaurant") or "").strip()
-    approver = (data.get("approver") or "").strip()
+/* ── 상단 바 ── */
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
+.bottom-action-bar{ margin-top:20px; margin-bottom:0; }
+.home-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; text-decoration:none; font-size:13px; font-weight:600; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
+.home-btn:hover{ background:#f3f4f6; color:#374151; }
+.btn-group{ display:flex; gap:10px; }
+.reset-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
+.reset-btn:hover{ background:#f3f4f6; color:#374151; }
 
-    try:
-        member_ids = [int(x) for x in member_ids]
-    except Exception:
-        member_ids = []
+/* ── 폼 카드 ── */
+.form-card{ background:#fff; border-radius:16px; padding:28px 24px; box-shadow:0 10px 26px rgba(15,23,42,0.10); overflow-x:auto; }
+.form-title{ text-align:left; font-size:18px; font-weight:900; margin-bottom:20px; letter-spacing:-0.3px; border:none; border-left:5px solid #5b7ee5; padding:6px 0 6px 14px; color:#2d3a6e; }
+.section-header{ background:#5b7ee5; color:#fff; font-size:13px; font-weight:700; padding:6px 10px; border-radius:4px; margin:18px 0 8px 0; }
+.section-header:first-of-type{ margin-top:0; }
 
-    if not (team_id and member_ids and d):
-        return jsonify(ok=False, error="팀원과 날짜를 선택해 주세요."), 400
-    if not restaurant:
-        return jsonify(ok=False, error="식당명을 입력해 주세요."), 400
-
-    members = _meal_get(f"meal_members?team_id=eq.{team_id}&select=id,name")
-    name_of = {m["id"]: m["name"] for m in members}
-    month_prefix = d[:7]
-    now_iso = datetime.now(MEAL_KST).isoformat()
-
-    added, skipped = [], []
-    to_insert = []
-    for mid in member_ids:
-        ex = _meal_get(
-            f"meal_entries?member_id=eq.{mid}&d=like.{month_prefix}*&select=d")
-        used_days = {r["d"] for r in ex}
-        nm = name_of.get(mid, str(mid))
-        if d in used_days:
-            skipped.append(f"{nm}(이미 입력)")
-            continue
-        if len(used_days) >= MEAL_MONTHLY_COUNT:
-            skipped.append(f"{nm}(한도초과)")
-            continue
-        to_insert.append({
-            "team_id": team_id, "member_id": mid, "d": d,
-            "amount": MEAL_FIXED_AMOUNT, "restaurant": restaurant,
-            "approver": approver, "created_at": now_iso,
-        })
-        added.append(nm)
-
-    if to_insert:
-        resp = _meal_post("meal_entries", to_insert)
-        if resp.status_code >= 400:
-            return jsonify(ok=False, error="저장 중 오류가 발생했어요."), 500
-
-    if not added:
-        return jsonify(ok=False,
-                       error="추가된 인원이 없어요. " + ", ".join(skipped)), 400
-    return jsonify(ok=True, added=added, skipped=skipped)
-
-
-@app.route("/meal/api/entry/delete", methods=["POST"])
-@meal_login_required
-def meal_delete_entry():
-    data = request.get_json(force=True)
-    entry_id = int(data.get("entry_id", 0))
-    _meal_delete("meal_entries", f"id=eq.{entry_id}")
-    return jsonify(ok=True)
-
-
-@app.route("/meal/api/entry/delete-many", methods=["POST"])
-@meal_login_required
-def meal_delete_entries():
-    data = request.get_json(force=True)
-    ids = data.get("entry_ids") or []
-    try:
-        ids = [int(x) for x in ids]
-    except Exception:
-        ids = []
-    if ids:
-        idlist = ",".join(str(i) for i in ids)
-        _meal_delete("meal_entries", f"id=in.({idlist})")
-    return jsonify(ok=True)
-
-
-@app.route("/meal/api/member/add", methods=["POST"])
-@meal_login_required
-def meal_add_member():
-    data = request.get_json(force=True)
-    team_id = int(data.get("team_id", 0))
-    name = (data.get("name") or "").strip()
-    if not (team_id and name):
-        return jsonify(ok=False, error="이름을 입력해 주세요."), 400
-    resp = _meal_post("meal_members", {"team_id": team_id, "name": name})
-    if resp.status_code >= 400:
-        return jsonify(ok=False, error="추가 중 오류가 발생했어요."), 500
-    return jsonify(ok=True)
-
-
-@app.route("/meal/api/member/delete", methods=["POST"])
-@meal_login_required
-def meal_delete_member():
-    data = request.get_json(force=True)
-    member_id = int(data.get("member_id", 0))
-    # 기존 입력 기록은 그대로 두고, 명단에서만 숨김 처리(소프트 삭제)
-    _meal_patch("meal_members", f"id=eq.{member_id}", {"active": False})
-    return jsonify(ok=True)
-
-
-@app.route("/meal/api/member/delete-many", methods=["POST"])
-@meal_login_required
-def meal_delete_members():
-    data = request.get_json(force=True)
-    ids = data.get("member_ids") or []
-    try:
-        ids = [int(x) for x in ids]
-    except Exception:
-        ids = []
-    if ids:
-        idlist = ",".join(str(i) for i in ids)
-        _meal_patch("meal_members", f"id=in.({idlist})", {"active": False})
-    return jsonify(ok=True)
-
-
-@app.route("/meal/api/team/rename", methods=["POST"])
-@meal_login_required
-def meal_rename_team():
-    data = request.get_json(force=True)
-    team_id = int(data.get("team_id", 0))
-    name = (data.get("name") or "").strip()
-    if not (team_id and name):
-        return jsonify(ok=False, error="팀 이름을 입력해 주세요."), 400
-    resp = _meal_patch("meal_teams", f"id=eq.{team_id}", {"name": name})
-    if resp.status_code >= 400:
-        return jsonify(ok=False, error="변경 중 오류가 발생했어요."), 500
-    return jsonify(ok=True)
-
-
-# ---------------------------------------------------------------- templates
-MEAL_BASE_CSS = """
-:root{
-  --bg:#eef1f7; --bg2:#e6ebf5;
-  --surface:#ffffff; --surface-2:#f7f9fd;
-  --primary:#4f6ef0; --primary-d:#3f5bdc; --primary-dd:#2f47b8;
-  --accent:#6366f1;
-  --ink:#1b2436; --ink-soft:#3a455c; --muted:#7b8499; --line:#e6eaf2;
-  --soft:#eef1fb; --soft-2:#f1f4fb;
-  --ok:#10a37f; --ok-soft:#e6f6f0; --full:#e2555a; --full-soft:#fdeceec0;
-  --strip:linear-gradient(180deg,#5b7bf5,#3f5bdc);
-  --shadow-sm:0 1px 2px rgba(27,36,54,.05),0 2px 8px rgba(27,36,54,.05);
-  --shadow-md:0 4px 14px rgba(27,36,54,.08),0 1px 3px rgba(27,36,54,.05);
-  --shadow-lg:0 18px 50px rgba(27,36,54,.22);
-  --r:16px;
+/* ── 폼 입력 ── */
+label.field-label{ display:block; margin-top:12px; font-size:13px; font-weight:700; color:#374151; margin-bottom:4px; }
+label.field-label:first-of-type{ margin-top:8px; }
+.field-select, .field-input{
+  width:100%; padding:10px 12px; border-radius:8px; border:1px solid #d1d5db; font-size:14px; font-family:inherit; background:#fff; color:#111827; outline:none; box-sizing:border-box;
 }
-*{box-sizing:border-box}
-body{margin:0;color:var(--ink);
-  background:
-    radial-gradient(1200px 420px at 50% -120px,#f4f6fc 0%,rgba(244,246,252,0) 70%),
-    linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
-  background-attachment:fixed;min-height:100svh;
-  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
-  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;
-  letter-spacing:-.2px;}
-a{color:inherit;text-decoration:none}
-.wrap{max-width:760px;margin:0 auto;padding:18px 15px 80px;}
-.topbar{display:flex;align-items:center;gap:10px;padding:4px 2px 18px;}
-.topbar h1{font-size:21px;margin:0;font-weight:800;letter-spacing:-.6px;flex:1;}
-.back{font-size:22px;line-height:1;color:var(--primary-d);padding:6px 10px;margin-left:-6px;
-  background:rgba(255,255,255,.7);border-radius:11px;box-shadow:var(--shadow-sm);font-weight:700;}
-.back:active{transform:scale(.94);}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
-  box-shadow:var(--shadow-sm);padding:16px;margin-bottom:14px;
-  position:relative;overflow:hidden;}
-.card.strip{padding-left:19px;}
-.card.strip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;
-  background:var(--strip);}
-.muted{color:var(--muted);font-size:13px;}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;
-  background:linear-gradient(180deg,var(--primary),var(--primary-d));color:#fff;font-weight:700;
-  border-radius:13px;padding:12px 16px;font-size:15px;cursor:pointer;letter-spacing:-.2px;
-  box-shadow:0 3px 0 var(--primary-dd),0 6px 14px rgba(79,110,240,.30);
-  transition:transform .06s,box-shadow .06s,filter .15s;}
-.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--primary-dd),0 3px 8px rgba(79,110,240,.25);filter:brightness(.97);}
-.btn:disabled{background:#c4cad6;box-shadow:0 3px 0 #aab2c2;cursor:not-allowed;filter:none;}
-.btn.ghost{background:var(--soft);color:var(--primary-dd);box-shadow:0 3px 0 #d3dcf6;}
-.btn.ghost:active{box-shadow:0 1px 0 #d3dcf6;}
-.del{background:var(--full-soft);color:var(--full);border:none;border-radius:9px;
-  padding:6px 11px;font-size:13px;cursor:pointer;font-weight:700;transition:transform .06s;}
-.del:active{transform:scale(.95);}
-.pill{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;
-  background:var(--soft);color:var(--primary-dd);}
+.field-select:focus, .field-input:focus{ border-color:#5b7ee5; box-shadow:0 0 0 2px rgba(75,110,220,0.15); }
+.section-desc{ font-size:12px; color:#6b7280; margin-bottom:6px; line-height:1.5; }
 
-/* ── 로딩 오버레이 (클릭 반응 표시) ── */
-.mloader{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;
-  background:rgba(20,27,45,.40);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
-  animation:mfade .15s ease;}
-.mloader.on{display:flex;}
-@keyframes mfade{from{opacity:0}to{opacity:1}}
-.mloader-card{background:#fff;border-radius:18px;padding:22px 28px;display:flex;flex-direction:column;
-  align-items:center;gap:13px;box-shadow:var(--shadow-lg);min-width:130px;}
-.mloader-spin{width:36px;height:36px;border-radius:50%;
-  border:3.5px solid var(--soft);border-top-color:var(--primary);animation:mspin .7s linear infinite;}
-@keyframes mspin{to{transform:rotate(360deg)}}
-.mloader-txt{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:-.2px;}
-"""
+/* ── 검색 버튼 ── */
+.submit-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(75,110,220,0.25); transition:all .15s; }
+.submit-btn:hover{ background:#4a6cd4; transform:translateY(-1px); }
 
-# 모든 매식비 화면에서 재사용하는 로딩 오버레이 (markup + 제어 스크립트)
-MEAL_LOADER_HTML = """
-<div class=mloader id=mloader><div class=mloader-card>
-  <div class=mloader-spin></div><div class=mloader-txt id=mloaderTxt>처리 중…</div>
-</div></div>
-<script>
-window.mealLoading=function(show,txt){
-  var el=document.getElementById('mloader');if(!el)return;
-  if(txt){var t=document.getElementById('mloaderTxt');if(t)t.textContent=txt;}
-  el.classList.toggle('on',show!==false);
-};
-window.addEventListener('pageshow',function(){
-  var el=document.getElementById('mloader');if(el)el.classList.remove('on');
-});
-</script>
-"""
+/* ── 결과 영역 ── */
+.result-card{ margin-top:18px; background:#fff; border-radius:16px; padding:22px 20px; box-shadow:0 10px 26px rgba(15,23,42,0.10); }
+.result-card h3{ margin:18px 0 8px 0; font-size:16px; font-weight:800; color:#111827; }
+.result-card h3:first-child{ margin-top:0; }
+.result-count{ font-size:14px; font-weight:700; margin-bottom:12px; }
 
-MEAL_LOGIN_HTML = """<!doctype html><html lang=ko><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>매식비 관리 · 로그인</title><style>""" + MEAL_BASE_CSS + """
-.login-wrap{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:20px;}
-.login-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;
-  box-shadow:var(--shadow-lg);padding:34px 26px 26px;width:100%;max-width:362px;text-align:center;
-  transform:translateY(-3vh);}
-.login-logo{width:62px;height:62px;border-radius:18px;
-  background:linear-gradient(135deg,#5b7bf5,#2f47b8);
-  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
-  color:#fff;font-size:28px;box-shadow:0 8px 20px rgba(79,110,240,.40);}
-.login-card h1{font-size:21px;margin:0 0 5px;font-weight:800;letter-spacing:-.5px;}
-.login-card p{font-size:13px;color:var(--muted);margin:0 0 22px;}
-.login-card input{width:100%;font:inherit;font-size:19px;text-align:center;letter-spacing:7px;
-  border:1.5px solid var(--line);border-radius:13px;padding:14px;margin-bottom:12px;background:var(--surface-2);
-  transition:border-color .15s,box-shadow .15s;}
-.login-card input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,110,240,.18);background:#fff;}
-.login-card .btn{width:100%;}
-.login-err{color:var(--full);font-size:13px;font-weight:600;margin-bottom:10px;min-height:18px;}
-.admin-link{margin-top:20px;font-size:12.5px;color:var(--muted);}
-.admin-link a{color:var(--primary-d);font-weight:700;border-bottom:1px dashed rgba(79,110,240,.5);padding-bottom:1px;}
-</style></head><body>
-<div class=login-wrap>
-  <div class=login-card>
-    <div class=login-logo>&#127869;</div>
-    <h1>매식비 관리</h1>
-    <p>비밀번호를 입력해 주세요.</p>
-    <div class=login-err id=err></div>
-    <input id=pw type=password inputmode=numeric placeholder="****"
-           onkeydown="if(event.key=='Enter')doLogin()" autofocus>
-    <button class=btn onclick=doLogin()>로그인</button>
-    <div class=admin-link><a href="/meal/admin/login">백업 · 복원 (관리자)</a></div>
-  </div>
-</div>
-<script>
-async function doLogin(){
-  const pw = document.getElementById('pw').value;
-  const r = await fetch('/meal/api/login',{method:'POST',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-  const res = await r.json();
-  if(res.ok){location.href='/meal';}
-  else{
-    document.getElementById('err').textContent = res.error||'로그인 실패';
-    document.getElementById('pw').value='';
-    document.getElementById('pw').focus();
-  }
+.combo-warning{ margin:10px 0 14px 0; padding:12px 16px; border-radius:10px; background:#eef2ff; border:1px solid #c7d2fe; color:#3b5cc0; font-size:13px; line-height:1.65; display:flex; align-items:flex-start; gap:8px; }
+
+.manager-badge{ display:inline-block; padding:4px 12px; border-radius:999px; background:#e0e7ff; color:#3b5cc0; font-size:12px; font-weight:900; letter-spacing:0.3px; margin:14px 0 8px 0; }
+.manager-badge[data-type="공단"]{ background:#fce7f3; color:#be185d; }
+
+.item{ display:flex; align-items:flex-start; gap:6px; padding:7px 0; cursor:pointer; line-height:1.6; color:#111827; font-size:13px; }
+.item:hover{ color:#5b7ee5; }
+.item-bullet{ flex:0 0 auto; }
+.item-text{ flex:1; min-width:0; white-space:normal; word-break:keep-all; overflow-wrap:break-word; }
+
+/* ── 모달 ── */
+.modal-overlay{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:999; }
+.modal-box{ background:white; margin:0 auto; padding:20px; width:90%; max-width:520px; border-radius:14px; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; top:8%; overscroll-behavior:contain; }
+
+/* PC 화면에서는 팝업을 더 크게 (지도 등이 시원하게 보이도록) */
+@media (min-width:768px){
+  .modal-box{ max-width:760px; padding:24px 28px; }
+  /* 기관 상세 지도 iframe 도 PC 에서 세로로 더 크게 */
+  #m_map{ height:260px !important; }
 }
-</script>
-</body></html>"""
+.modal-box h3{ margin-top:0; margin-bottom:12px; font-size:16px; }
+.modal-box p{ margin:0 0 10px 0; line-height:1.6; font-size:13px; }
+.m-acc-row{ display:flex; gap:6px; margin:2px 0 0; }
+.m-acc-btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:4px; min-width:0; padding:9px 6px; border:1px solid #e3e7ef; border-radius:8px; background:#f7f8fb; color:#333; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
+.m-acc-btn:hover{ background:#eef1f6; }
+.m-acc-btn.open{ background:#eef2ff; border-color:#c7d4f5; color:#4a6cd4; }
+.m-acc-ico{ flex:none; transition:transform .15s; color:#9aa1b0; }
+.m-acc-btn.open .m-acc-ico{ transform:rotate(180deg); color:#5b7ee5; }
+.m-acc-body{ display:none; margin-top:8px; padding:9px 12px; border:1px solid #e3e7ef; border-radius:8px; background:#fafbfc; font-size:13px; line-height:1.6; color:#333; word-break:keep-all; }
+.modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+.modal-btn:hover{ background:#4a6cd4; }
 
-MEAL_ADMIN_LOGIN_HTML = """<!doctype html><html lang=ko><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>매식비 · 백업 관리자</title><style>""" + MEAL_BASE_CSS + """
-.login-wrap{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:20px;}
-.login-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;
-  box-shadow:var(--shadow-lg);padding:34px 26px 26px;width:100%;max-width:362px;text-align:center;
-  transform:translateY(-3vh);}
-.login-logo{width:62px;height:62px;border-radius:18px;
-  background:linear-gradient(135deg,#2f3b57,#111a2e);
-  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
-  color:#fff;font-size:26px;box-shadow:0 8px 20px rgba(17,26,46,.35);}
-.login-card h1{font-size:20px;margin:0 0 5px;font-weight:800;letter-spacing:-.5px;}
-.login-card p{font-size:13px;color:var(--muted);margin:0 0 22px;}
-.login-card input{width:100%;font:inherit;font-size:18px;text-align:center;letter-spacing:5px;
-  border:1.5px solid var(--line);border-radius:13px;padding:14px;margin-bottom:12px;background:var(--surface-2);
-  transition:border-color .15s,box-shadow .15s;}
-.login-card input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,110,240,.18);background:#fff;}
-.login-card .btn{width:100%;}
-.login-err{color:var(--full);font-size:13px;font-weight:600;margin-bottom:10px;min-height:18px;}
-.admin-link{margin-top:20px;font-size:12.5px;color:var(--muted);}
-.admin-link a{color:var(--primary-d);font-weight:700;}
-</style></head><body>
-<div class=login-wrap>
-  <div class=login-card>
-    <div class=login-logo>&#128274;</div>
-    <h1>백업 · 복원</h1>
-    <p>관리자 비밀번호를 입력해 주세요.</p>
-    <div class=login-err id=err></div>
-    <input id=pw type=password placeholder="비밀번호"
-           onkeydown="if(event.key=='Enter')doLogin()" autofocus>
-    <button class=btn onclick=doLogin()>들어가기</button>
-    <div class=admin-link><a href="/meal/login">‹ 일반 로그인으로</a></div>
-  </div>
-</div>
-<script>
-async function doLogin(){
-  const pw = document.getElementById('pw').value;
-  const r = await fetch('/meal/api/admin/login',{method:'POST',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-  const res = await r.json();
-  if(res.ok){location.href='/meal/admin';}
-  else{
-    document.getElementById('err').textContent = res.error||'로그인 실패';
-    document.getElementById('pw').value='';
-    document.getElementById('pw').focus();
-  }
+/* ── 카피라이트 ── */
+.copyright{ text-align:right; margin-top:22px; margin-bottom:6px; padding:0 12px; }
+.copyright-line{ width:44px; height:2px; margin:0 0 12px auto; border-radius:999px; background:linear-gradient(135deg,#a5b4fc,#5b7ee5); opacity:0.9; }
+.copyright-main{ font-size:12.5px; color:#9ca3af; line-height:1.5; font-weight:500; word-break:keep-all; letter-spacing:0.2px; }
+.copyright-sub{ margin-top:4px; font-size:15px; color:#374151; font-weight:600; letter-spacing:-0.2px; }
+.copyright-sub span{ color:#5b7ee5; font-weight:800; }
+
+@media (min-width:768px){
+  #tel_link{ display:none !important; }
 }
-</script>
-</body></html>"""
 
-MEAL_HOME_HTML = """<!doctype html><html lang=ko><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>매식비 관리</title><style>""" + MEAL_BASE_CSS + """
-.hero{position:relative;overflow:hidden;border-radius:18px;padding:14px 16px;margin:14px 0 20px;
-  background:linear-gradient(135deg,#7e93f3 0%,#6478ea 100%);
-  box-shadow:0 8px 22px rgba(100,120,234,.22);}
-.hero::before{content:"";position:absolute;width:150px;height:150px;border-radius:50%;
-  right:-46px;top:-60px;background:rgba(255,255,255,.14);}
-.hero::after{content:"";position:absolute;width:100px;height:100px;border-radius:50%;
-  right:26px;bottom:-54px;background:rgba(255,255,255,.09);}
-.hero-row{position:relative;z-index:1;display:flex;align-items:center;gap:12px;}
-.hero-logo{width:42px;height:42px;border-radius:13px;flex:0 0 auto;
-  background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:22px;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.30);}
-.hero-tt{flex:1;min-width:0;}
-.hero-tt h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.5px;color:#fff;}
-.hero .logout{background:rgba(255,255,255,.20);border:1px solid rgba(255,255,255,.32);color:#fff;
-  box-shadow:none;flex:0 0 auto;}
-.hero .logout:active{transform:scale(.95);background:rgba(255,255,255,.32);}
-
-.lead-card{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);
-  border-radius:var(--r);padding:13px 15px 13px 18px;box-shadow:var(--shadow-sm);margin-bottom:16px;}
-.lead-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--strip);}
-.lead{font-size:13.5px;color:var(--ink-soft);line-height:1.65;margin:0;word-break:keep-all;}
-.lead b{color:var(--primary-dd);font-weight:800;}
-
-.sec-title{font-size:14px;font-weight:800;margin:20px 2px 12px;letter-spacing:-.3px;color:var(--ink-soft);
-  display:flex;align-items:center;gap:7px;}
-.sec-title .dot{width:7px;height:7px;border-radius:50%;background:var(--primary);
-  box-shadow:0 0 0 3px rgba(79,110,240,.18);}
-
-.team-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px 10px;}
-.team-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
-  background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:13px 12px;
-  box-shadow:var(--shadow-sm);position:relative;overflow:hidden;text-align:center;
-  transition:transform .14s ease,box-shadow .2s ease,border-color .2s ease;}
-.team-btn .ava{width:40px;height:40px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;
-  justify-content:center;font-size:20px;color:#fff;
-  background:linear-gradient(135deg,#5b7bf5,#3f5bdc);box-shadow:0 5px 12px rgba(79,110,240,.30);}
-.team-btn.tf .ava{background:linear-gradient(135deg,#ef8585,#dd6b6b);box-shadow:0 5px 12px rgba(221,107,107,.30);}
-.team-btn .nm{font-size:15px;font-weight:800;letter-spacing:-.4px;color:var(--ink);word-break:keep-all;}
-.team-btn .chev{display:none;}
-/* 통합돌봄팀(TF) = 맨 아래 한 줄 전체폭, 가운데 정렬 카드 */
-.team-btn.tf{grid-column:1 / -1;order:1;flex-direction:row;justify-content:center;gap:12px;
-  padding:22px 16px;text-align:center;}
-.team-btn.tf .nm{font-size:18px;}
-@media (hover:hover) and (pointer:fine){
-  .team-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:rgba(79,110,240,.35);}
+/* ── 인쇄 ── */
+@media print{
+  body{ background:white; }
+  .top-bar{ display:none !important; }
+  .page-wrap{ padding:0; }
+  .form-card,.result-card{ box-shadow:none; border-radius:0; padding:10px; }
 }
-.team-btn:active{transform:scale(.98);box-shadow:0 1px 4px rgba(27,36,54,.06);}
-.logout{font-size:13px;color:var(--muted);background:rgba(255,255,255,.7);border:1px solid var(--line);
-  border-radius:10px;padding:7px 13px;cursor:pointer;font-weight:600;box-shadow:var(--shadow-sm);}
-.logout:active{transform:scale(.95);}
-</style></head><body><div class=wrap>
-<div class=hero>
-  <div class=hero-row>
-    <div class=hero-logo>&#127869;</div>
-    <div class=hero-tt>
-      <h1>매식비 관리</h1>
-    </div>
-    <button class=logout onclick="location.href='/meal/logout'">로그아웃</button>
-  </div>
-</div>
-<div class=lead-card><p class=lead>팀을 고른 뒤 달력에서 <b>날짜·팀원을 선택</b>하고 식당·결재자를 입력하면 1인 {{ "{:,}".format(amount) }}원씩 기록돼요. 한 사람당 한 달 <b>{{monthly_count}}회({{ "{:,}".format(cap) }}원)</b>까지만 가능해요.</p></div>
-<div class=sec-title><span class=dot></span>팀 선택</div>
-<div class=team-grid>
-{% for t in teams %}
-  <a class="team-btn{% if '통합돌봄' in t.name %} tf{% endif %}" href="/meal/team/{{t.id}}"
-     onclick="mealLoading(true,'불러오는 중…')">
-    <span class=ava>&#127869;</span>
-    <span class=nm>{{t.name}}</span>
-    <span class=chev>›</span>
-  </a>
-{% endfor %}
-</div>
-</div>""" + MEAL_LOADER_HTML + """</body></html>"""
 
-MEAL_ADMIN_HTML = """<!doctype html><html lang=ko><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>매식비 · 백업 관리</title><style>""" + MEAL_BASE_CSS + """
-.note-card{background:linear-gradient(180deg,#fff,var(--surface-2));border:1px solid var(--line);
-  border-radius:var(--r);padding:15px 17px;box-shadow:var(--shadow-sm);margin-bottom:16px;
-  font-size:13.5px;color:var(--ink-soft);line-height:1.65;word-break:keep-all;}
-.note-card b{color:var(--primary-dd);}
-.cur{display:flex;gap:8px;margin-top:11px;}
-.cur .c{flex:1;background:#fff;border:1px solid var(--line);border-radius:11px;padding:9px 10px;text-align:center;}
-.cur .c .n{font-size:18px;font-weight:800;}
-.cur .c .l{font-size:11px;color:var(--muted);margin-top:1px;}
-.sec-title{font-size:15px;font-weight:800;margin:22px 2px 11px;display:flex;align-items:center;gap:7px;}
-.slot{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:14px 15px;
-  margin-bottom:11px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;}
-.slot.filled{padding-left:18px;}
-.slot.filled::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--strip);}
-.slot.empty{border-style:dashed;background:var(--surface-2);}
-.slot .head{display:flex;align-items:center;gap:9px;margin-bottom:3px;}
-.slot .sn{font-size:12px;font-weight:800;color:#fff;background:var(--primary-d);
-  border-radius:8px;width:26px;height:22px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
-.slot .lb{font-weight:800;font-size:15px;flex:1;min-width:0;letter-spacing:-.3px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.slot .meta{font-size:12px;color:var(--muted);margin:1px 0 0 35px;}
-.slot .meta .dot{margin:0 5px;opacity:.5;}
-.slot .actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px;}
-.sbtn{border:none;border-radius:10px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;
-  letter-spacing:-.2px;transition:transform .06s,filter .12s;}
-.sbtn:active{transform:translateY(1px);}
-.sbtn.save{background:linear-gradient(180deg,#8ba0f6,#7186ef);color:#fff;box-shadow:0 2px 0 #5b72e3;}
-.sbtn.load{background:var(--ok-soft);color:var(--ok);}
-.sbtn.dl{background:var(--soft);color:var(--primary-dd);}
-.sbtn.rm{background:var(--full-soft);color:var(--full);}
-.sbtn.full{flex:1;}
-.auto-card{background:#fff7ed;border:1px solid #fed7aa;border-radius:15px;padding:14px 15px;margin-bottom:8px;
-  box-shadow:var(--shadow-sm);}
-.auto-card .ttl{font-weight:800;font-size:14px;color:#b45309;display:flex;align-items:center;gap:6px;}
-.auto-card .meta{font-size:12px;color:#a16207;margin:3px 0 0;}
-.auto-card .actions{display:flex;gap:7px;margin-top:11px;}
-.auto-card .sbtn.load{background:#fff1e0;color:#b45309;}
-.auto-card .sbtn.dl{background:#fff1e0;color:#b45309;}
-.file-card{background:var(--surface);border:1px dashed var(--line);border-radius:15px;padding:15px;
-  box-shadow:var(--shadow-sm);}
-.file-card p{font-size:13px;color:var(--ink-soft);margin:0 0 11px;line-height:1.6;}
-.file-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.file-row input[type=file]{font-size:13px;flex:1;min-width:0;}
-.logout{font-size:13px;color:var(--muted);background:rgba(255,255,255,.7);border:1px solid var(--line);
-  border-radius:10px;padding:7px 13px;cursor:pointer;font-weight:600;box-shadow:var(--shadow-sm);}
-</style></head><body><div class=wrap>
-<div class=topbar>
-  <a class=back href="/meal/login">‹</a>
-  <h1>백업 · 복원</h1>
-  <button class=logout onclick="location.href='/meal/admin/logout'">나가기</button>
-</div>
+/* ── 모바일 ── */
+@media (max-width:600px){
+  .page-wrap{ padding:10px 6px 60px 6px; }
+  .form-card{ padding:14px 10px; }
+  .result-card{ padding:14px 10px; }
+  .form-title{ font-size:14px; padding:4px 0 4px 12px; }
+  .top-bar{ flex-wrap:wrap; gap:6px; }
+  .home-btn,.reset-btn{ height:30px; font-size:11.5px; padding:0 10px; }
+  .section-header{ font-size:11.5px; padding:5px 8px; }
+  .field-select,.field-input{ height:42px; font-size:14px; }
+  .combo-warning{ font-size:12px; line-height:1.6; padding:10px 12px; }
+  .copyright{ margin-top:18px; margin-bottom:4px; padding:0 8px; }
+  .copyright-line{ margin-bottom:10px; }
+  .copyright-main{ font-size:11.5px; line-height:1.45; }
+  .copyright-sub{ margin-top:3px; font-size:13px; }
+}
 
-<div class=note-card>
-  매식비 기록을 슬롯에 <b>통째로 저장(백업)</b>해 두고, 필요할 때 <b>그 시점으로 되돌릴(복원)</b> 수 있어요.
-  슬롯은 최대 <b>{{ slots|length }}개</b>까지 쓸 수 있고, 각 백업은 JSON 파일로 <b>내려받아 보관</b>할 수도 있습니다.
-  <span style="color:var(--full);font-weight:700">복원하면 현재 데이터가 그 백업으로 교체</span>되지만,
-  복원 직전 상태는 자동으로 한 번 저장되니 안심하세요.
-  <div class=cur>
-    <div class=c><div class=n>{{now.teams}}</div><div class=l>팀</div></div>
-    <div class=c><div class=n>{{now.members}}</div><div class=l>팀원</div></div>
-    <div class=c><div class=n>{{now.entries}}</div><div class=l>입력내역</div></div>
-  </div>
-</div>
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
 
-{% if auto %}
-<div class=auto-card>
-  <div class=ttl>&#9888;&#65039; 복원 직전 자동저장본</div>
-  <div class=meta>{{auto.created_at[:16].replace('T',' ')}} · 팀 {{auto.teams}} · 팀원 {{auto.members}} · 내역 {{auto.entries}}</div>
-  <div class=actions>
-    <button class="sbtn load" onclick="admLoad({{auto_slot}},'복원 직전 자동저장본')">이 상태로 되돌리기</button>
-    <a class="sbtn dl" href="/meal/admin/download/{{auto_slot}}">다운로드</a>
-  </div>
-</div>
-{% endif %}
-
-<div class=sec-title>&#128190; 저장 슬롯</div>
-{% for s in slots %}
-  {% set b = backups.get(s) %}
-  {% if b %}
-  <div class="slot filled">
-    <div class=head>
-      <span class=sn>{{s}}</span>
-      <span class=lb>{{ b.label if b.label else '백업 ' ~ s }}</span>
-    </div>
-    <div class=meta>{{b.created_at[:16].replace('T',' ')}}<span class=dot>·</span>팀 {{b.teams}}<span class=dot>·</span>팀원 {{b.members}}<span class=dot>·</span>내역 {{b.entries}}</div>
-    <div class=actions>
-      <button class="sbtn save" onclick="admSave({{s}})">덮어쓰기</button>
-      <button class="sbtn load" data-label="{{ b.label|e if b.label else '백업 ' ~ s }}" onclick="admLoad({{s}}, this.dataset.label)">복원</button>
-      <a class="sbtn dl" href="/meal/admin/download/{{s}}">다운로드</a>
-      <button class="sbtn rm" onclick="admDelete({{s}})">삭제</button>
+  <div class="top-bar">
+    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <div class="btn-group">
+      <button type="button" class="reset-btn" onclick="resetDescPage()">&#8635; 다시 입력</button>
     </div>
   </div>
-  {% else %}
-  <div class="slot empty">
-    <div class=head>
-      <span class=sn>{{s}}</span>
-      <span class=lb style="color:var(--muted);font-weight:600">비어 있음</span>
+
+
+  <div class="form-card">
+    <div class="form-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>통합돌봄 서비스 기관 찾기</span>
+      <button type="button" onclick="openComboInfo()" style="width:28px;height:28px;border-radius:50%;border:none;background:#93c5fd;color:#1e40af;font-size:15px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(37,99,235,0.3);flex-shrink:0;margin-right:4px;" aria-label="안내">!</button>
     </div>
-    <div class=actions>
-      <button class="sbtn save full" onclick="admSave({{s}})">여기에 현재 데이터 저장</button>
-    </div>
-  </div>
-  {% endif %}
-{% endfor %}
 
-<div class=sec-title>&#128193; 파일에서 복원</div>
-<div class=file-card>
-  <p>내려받아 둔 백업 JSON 파일로도 복원할 수 있어요. (복원 전 현재 상태는 자동 저장됩니다.)</p>
-  <div class=file-row>
-    <input type=file id=restoreFile accept="application/json,.json">
-    <button class="btn" onclick="admRestoreFile()">파일로 복원</button>
-  </div>
-</div>
+    <form method="post">
+    <input type="hidden" name="action" id="comboAction" value="">
 
-</div>""" + MEAL_LOADER_HTML + """
-<script>
-async function admApi(url, body){
-  const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
-  return r.json();
-}
-async function admSave(slot){
-  const label = prompt('이 백업에 붙일 이름 (선택):', '');
-  if(label===null) return;
-  mealLoading(true,'저장 중…');
-  const res = await admApi('/meal/api/admin/save',{slot:slot,label:label});
-  if(res.ok){ location.reload(); }
-  else{ mealLoading(false); alert(res.error||'저장 실패'); }
-}
-async function admLoad(slot,label){
-  label = label || ('백업 '+slot);
-  if(!confirm("'"+label+"' 백업으로 복원할까요?\\n\\n지금의 모든 매식비 데이터가 이 백업 시점으로 교체됩니다.\\n(복원 직전 상태는 자동저장본으로 보관돼요.)")) return;
-  mealLoading(true,'복원 중…');
-  const res = await admApi('/meal/api/admin/load',{slot:slot});
-  if(res.ok){ mealLoading(false); alert('복원이 완료됐어요.'); location.reload(); }
-  else{ mealLoading(false); alert(res.error||'복원 실패'); }
-}
-async function admDelete(slot){
-  if(!confirm('이 슬롯의 백업을 삭제할까요?')) return;
-  mealLoading(true,'삭제 중…');
-  const res = await admApi('/meal/api/admin/delete',{slot:slot});
-  if(res.ok){ location.reload(); }
-  else{ mealLoading(false); alert(res.error||'삭제 실패'); }
-}
-async function admRestoreFile(){
-  const f = document.getElementById('restoreFile').files[0];
-  if(!f){ alert('백업 파일을 선택해 주세요.'); return; }
-  let snap;
-  try{ snap = JSON.parse(await f.text()); }
-  catch(e){ alert('JSON 파일을 읽을 수 없어요.'); return; }
-  if(!snap || !snap.entries){ alert('매식비 백업 파일이 아닌 것 같아요.'); return; }
-  const c = snap.counts || {};
-  if(!confirm('이 파일로 복원할까요?\\n\\n팀 '+(c.teams||'?')+' · 팀원 '+(c.members||'?')+' · 내역 '+(c.entries||'?')+'\\n현재 데이터가 모두 교체됩니다.')) return;
-  mealLoading(true,'복원 중…');
-  const res = await admApi('/meal/api/admin/restore-file',{snapshot:snap});
-  if(res.ok){ mealLoading(false); alert('복원이 완료됐어요.'); location.href='/meal'; }
-  else{ mealLoading(false); alert(res.error||'복원 실패'); }
-}
-</script>
-</body></html>"""
+    <div id="cgt-region">
+    <div class="section-header">&#9632; 지역 조건</div>
+    <div class="section-desc">시도와 시군구를 선택하여 지역 기준으로 검색합니다.</div>
 
-MEAL_TEAM_HTML = """<!doctype html><html lang=ko><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>{{team.name}} · 매식비</title><style>""" + MEAL_BASE_CSS + """
-.monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;
-  background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:var(--shadow-sm);}
-.monthbar .m{font-size:17px;font-weight:800;letter-spacing:-.4px;}
-.navb{font-size:18px;color:var(--primary-dd);background:var(--soft);border:none;border-radius:10px;
-  padding:8px 16px;cursor:pointer;font-weight:700;transition:transform .06s,filter .12s;}
-.navb:active{transform:scale(.92);filter:brightness(.96);}
-.teamtotal{display:flex;gap:10px;margin-bottom:14px;}
-.tot{flex:1;background:linear-gradient(180deg,#fff,var(--surface-2));border:1px solid var(--line);
-  border-radius:14px;padding:13px 15px;box-shadow:var(--shadow-sm);}
-.tot.hl{background:linear-gradient(135deg,var(--primary),var(--primary-dd));border-color:transparent;}
-.tot.hl .lab,.tot.hl .val{color:#fff;}
-.tot .lab{font-size:12px;color:var(--muted);font-weight:600;}
-.tot .val{font-size:20px;font-weight:800;margin-top:3px;letter-spacing:-.5px;}
-.cal{width:100%;border-collapse:separate;border-spacing:4px;table-layout:fixed;}
-.cal th{font-size:11.5px;color:var(--muted);font-weight:700;padding:4px 0 7px;}
-.cal th.sun{color:var(--full);} .cal th.sat{color:#3b6fe0;}
-.cal td{vertical-align:top;height:74px;border:1px solid var(--line);padding:4px;cursor:pointer;
-  background:var(--surface);transition:background .12s,transform .06s,box-shadow .12s;border-radius:10px;}
-.cal td:active{background:var(--soft);transform:scale(.96);}
-.cal td.has{box-shadow:inset 0 0 0 1.5px rgba(79,110,240,.25);}
-.cal td.out{background:transparent;border-color:transparent;color:#c2c8d2;cursor:default;}
-.cal td .dn{font-size:12px;font-weight:700;color:var(--ink-soft);}
-.cal td .cell{display:flex;flex-direction:column;align-items:flex-start;gap:5px;height:100%;}
-.cal td.today{background:#fff7ed;border-color:#fcd29a;box-shadow:inset 0 0 0 1.5px rgba(245,158,11,.45);}
-.cal td.today .dn{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#fff;border-radius:50%;
-  width:21px;height:21px;display:inline-flex;align-items:center;justify-content:center;
-  box-shadow:0 2px 6px rgba(245,158,11,.5);}
-.chip{font-size:11px;line-height:1.25;background:linear-gradient(135deg,#5b7bf5,#3f5bdc);color:#fff;
-  border-radius:7px;padding:3px 7px;margin:0;display:inline-flex;align-items:center;gap:2px;
-  white-space:nowrap;font-weight:700;box-shadow:0 1px 3px rgba(79,110,240,.3);}
-.sec-title{font-size:15px;font-weight:800;margin:22px 2px 11px;letter-spacing:-.3px;}
-.sumrow{display:flex;flex-direction:column;gap:9px;padding:13px 4px;border-bottom:1px solid var(--line);}
-.sumrow:last-child{border-bottom:none;}
-.sumtop{display:flex;align-items:center;gap:10px;}
-.sumrow .nm{font-weight:700;flex:1;min-width:0;letter-spacing:-.3px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.bar{width:100%;height:10px;background:#eaeef6;border-radius:6px;overflow:hidden;}
-.bar > i{display:block;height:100%;background:linear-gradient(90deg,#13b88f,var(--ok));
-  border-radius:6px;transition:width .3s;}
-.sumrow.full .bar > i{background:linear-gradient(90deg,#ef6a6f,var(--full));}
-.cntpill{font-size:12px;font-weight:800;min-width:34px;text-align:right;}
-.cntpill.full{color:var(--full);}
-.amt{font-size:12px;color:var(--muted);text-align:right;font-weight:600;flex:0 0 auto;}
-.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;}
-.badge.full{background:var(--full-soft);color:var(--full);}
-.badgeslot{flex:0 0 auto;width:42px;display:flex;justify-content:flex-end;}
-.empty{color:var(--muted);font-size:13px;padding:14px 4px;}
-.restrow{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--line);}
-.restrow:last-child{border-bottom:none;}
-.restrow .rn{flex:1;font-weight:700;}
-.restrow .rc{font-size:12px;color:var(--muted);min-width:44px;text-align:right;font-weight:600;}
-.restrow .ra{font-size:13px;font-weight:700;min-width:84px;text-align:right;}
-.acc-head{display:flex;align-items:center;justify-content:space-between;
-  width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;
-  padding:14px 16px;cursor:pointer;font-size:15px;font-weight:800;
-  box-shadow:var(--shadow-sm);}
-.acc-head .ico{color:var(--primary);font-size:13px;transition:transform .2s;}
-.acc-wrap.open .acc-head{border-radius:14px 14px 0 0;}
-.acc-wrap.open .acc-head .ico{transform:rotate(180deg);}
-.acc-body{display:none;background:var(--surface);border:1px solid var(--line);border-top:none;
-  border-radius:0 0 14px 14px;padding:6px 15px 14px;box-shadow:var(--shadow-sm);}
-.acc-wrap.open .acc-body{display:block;}
-.memrow{display:flex;align-items:center;gap:8px;padding:10px 2px;border-bottom:1px solid var(--line);}
-.memrow:last-child{border-bottom:none;}
-.memrow .nm{flex:1;font-weight:600;}
-.memrow .memchk{width:18px;height:18px;margin:0;flex:0 0 auto;accent-color:var(--primary);}
-.memtools{display:flex;gap:8px;margin-bottom:8px;}
-.selbtn,.selcancel{background:var(--soft);border:none;color:var(--primary-dd);font-size:13px;
-  font-weight:600;padding:7px 12px;border-radius:9px;cursor:pointer;}
-.seldel{background:var(--full-soft);border:none;color:var(--full);font-size:13px;font-weight:700;
-  padding:7px 12px;border-radius:9px;cursor:pointer;}
-.addmem{display:flex;gap:8px;margin-top:12px;align-items:stretch;}
-.addmem input{flex:1 1 auto;min-width:0;}
-.addmem .btn{flex:0 0 auto;white-space:nowrap;padding:11px 16px;}
-input,select{font:inherit;border:1.5px solid var(--line);border-radius:11px;padding:12px;background:var(--surface-2);
-  transition:border-color .15s,box-shadow .15s;color:var(--ink);}
-input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,110,240,.16);background:#fff;}
-select{appearance:none;-webkit-appearance:none;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%237b8499' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");
-  background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer;}
-.editname{background:var(--soft);border:none;color:var(--primary-dd);font-size:13px;
-  cursor:pointer;padding:7px 11px;border-radius:9px;font-weight:600;}
-.editname:active{transform:scale(.95);}
-.mask{position:fixed;inset:0;background:rgba(20,27,45,.5);display:none;backdrop-filter:blur(2px);
-  -webkit-backdrop-filter:blur(2px);
-  align-items:center;justify-content:center;z-index:50;padding:18px;overscroll-behavior:contain;}
-.mask.on{display:flex;}
-.modal{background:#fff;width:100%;max-width:440px;border-radius:22px;padding:22px 19px;
-  max-height:88vh;overflow-y:auto;animation:pop .18s cubic-bezier(.2,.8,.3,1);box-shadow:var(--shadow-lg);}
-@keyframes pop{from{transform:scale(.94) translateY(8px);opacity:0}to{transform:none;opacity:1}}
-.modal h3{margin:0 0 4px;font-size:18px;font-weight:800;letter-spacing:-.4px;}
-.modal .hint{font-size:13px;color:var(--muted);margin:0 0 14px;}
-.dayentries{margin:0 0 6px;}
-.de{display:flex;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);}
-.de .nm{font-weight:700;min-width:54px;}
-.de .meta{flex:1;min-width:0;font-size:12px;color:var(--muted);line-height:1.4;
-  white-space:normal;word-break:break-all;}
-.de .am{color:var(--muted);font-size:13px;white-space:nowrap;}
-.de .entrychk{width:18px;height:18px;margin:0;flex:0 0 auto;accent-color:var(--primary);margin-top:1px;}
-.detools{display:flex;justify-content:flex-end;gap:8px;margin:8px 0 2px;}
-.flabel{font-size:13px;font-weight:700;margin:14px 0 6px;display:block;color:var(--ink-soft);}
-.memberchecks{display:flex;flex-direction:column;max-height:220px;overflow-y:auto;overflow-x:hidden;
-  border:1.5px solid var(--line);border-radius:12px;background:var(--surface-2);}
-.mcheck{width:100%;display:grid;grid-template-columns:22px 1fr auto auto;align-items:center;gap:10px;
-  padding:12px;cursor:pointer;border-bottom:1px solid var(--line);}
-.mcheck:last-child{border-bottom:none;}
-.mcheck:active{background:var(--soft);}
-.mcheck input{width:18px;height:18px;margin:0;accent-color:var(--primary);}
-.mcheck .mname{min-width:0;font-weight:600;color:var(--ink);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;}
-.mcheck .mcount{font-size:12px;color:var(--muted);white-space:nowrap;}
-.mcheck .mtag{font-size:11px;color:var(--full);font-weight:700;white-space:nowrap;}
-.mcheck.disabled{opacity:.5;}
-.addform input,.addform select{width:100%;}
-.note{font-size:13px;border-radius:11px;padding:11px 13px;display:none;margin-top:10px;font-weight:600;}
-.note.on{display:block;}
-.note.warn{color:var(--full);background:var(--full-soft);}
-.note.ok{color:#15663f;background:var(--ok-soft);}
-.modalbtns{display:flex;gap:8px;margin-top:16px;}
-.modalbtns .btn{flex:1;}
-.cancelbtn{background:var(--soft);color:var(--primary-dd);box-shadow:0 3px 0 #d3dcf6;}
-.cancelbtn:active{box-shadow:0 1px 0 #d3dcf6;}
-</style></head><body><div class=wrap>
-
-<div class=topbar>
-  <a class=back href="/meal">‹</a>
-  <h1 id=teamTitle>{{team.name}}</h1>
-  <button class=editname onclick="renameTeam()">이름수정</button>
-</div>
-
-<div class=monthbar>
-  <a class=navb href="/meal/team/{{team.id}}?ym={{prev_ym}}" onclick="mealLoading(true,'불러오는 중…')">‹</a>
-  <span class=m>{{year}}년 {{month}}월</span>
-  <a class=navb href="/meal/team/{{team.id}}?ym={{next_ym}}" onclick="mealLoading(true,'불러오는 중…')">›</a>
-</div>
-
-<div class=teamtotal>
-  <div class="tot hl"><div class=lab>이번 달 총 사용</div><div class=val>{{ "{:,}".format(team_total) }}원</div></div>
-  <div class=tot><div class=lab>한도 마감 인원</div><div class=val>{{full_people}}명</div></div>
-</div>
-
-<div class=card style="padding:8px">
-<table class=cal>
-  <tr>{% for w in weekdays %}<th class="{% if loop.index0==0 %}sun{% elif loop.index0==6 %}sat{% endif %}">{{w}}</th>{% endfor %}</tr>
-  {% for week in weeks %}
-  <tr>
-    {% for c in week %}
-      {% if c.in_month %}
-      <td class="{% if c.is_today %}today {% endif %}{% if c.entries %}has{% endif %}" onclick="openDay('{{c.date_str}}')">
-        <div class=cell>
-          <span class=dn>{{c.day}}</span>
-          {% if c.entries %}<span class=chip>{{c.entries|length}}명</span>{% endif %}
-        </div>
-      </td>
-      {% else %}
-      <td class=out><span class=dn>{{c.day}}</span></td>
+    <label class="field-label">시도</label>
+    <select name="sido" class="field-select" onchange="handleSidoChange(this.form)">
+      <option value="">전체</option>
+      {% if sido and sido not in sido_options %}
+      <option value="{{sido}}" selected>{{sido}}</option>
       {% endif %}
-    {% endfor %}
-  </tr>
-  {% endfor %}
-</table>
-</div>
+      {% for s in sido_options %}
+      <option value="{{s}}" {% if s==sido %}selected{% endif %}>{{s}}</option>
+      {% endfor %}
+    </select>
 
-<div class=sec-title>팀원별 집계 ({{month}}월)</div>
-<div class="card strip">
-{% if summaries %}
-  {% for s in summaries %}
-  <div class="sumrow {{s.status}}">
-    <div class=sumtop>
-      <span class=nm>{{s.name}}</span>
-      <span class="cntpill {{s.status}}">{{s.count}}/{{monthly_count}}</span>
-      <span class=amt>{{ "{:,}".format(s.total) }}원</span>
-      <span class=badgeslot>{% if s.status=='full' %}<span class="badge full">마감</span>{% endif %}</span>
+    <label class="field-label">시군구</label>
+    <select name="sigungu" class="field-select">
+      <option value="">전체</option>
+      {% for g in sigungu_options %}
+      <option value="{{g}}" {% if g==sigungu %}selected{% endif %}>{{g}}</option>
+      {% endfor %}
+    </select>
     </div>
-    <span class=bar><i style="width:{{ (s.count*100//monthly_count) if s.count<monthly_count else 100 }}%"></i></span>
-  </div>
-  {% endfor %}
-{% else %}
-  <div class=empty>아직 등록된 팀원이 없어요. 아래 팀원 관리에서 추가해 주세요.</div>
-{% endif %}
-</div>
 
-<div class=sec-title>식당별 집계 ({{month}}월)</div>
-<div class="card strip">
-{% if rest_summaries %}
-  {% for r in rest_summaries %}
-  <div class=restrow>
-    <span class=rn>{{r.name}}</span>
-    <span class=rc>{{r.count}}건</span>
-    <span class=ra>{{ "{:,}".format(r.total) }}원</span>
-  </div>
-  {% endfor %}
-{% else %}
-  <div class=empty>아직 입력 내역이 없어요.</div>
-{% endif %}
-</div>
+    <div id="cgt-detail">
+    <div class="section-header" style="margin-top:22px;">&#9632; 상세 조건</div>
+    <div class="section-desc">대분류와 중분류(선택형), 프로그램과 기관명(서술형)으로 검색합니다.</div>
 
-<div class=sec-title>팀원 관리</div>
-<div class=acc-wrap id=memAcc>
-  <div class=acc-head onclick="document.getElementById('memAcc').classList.toggle('open')">
-    <span>팀원 {{members|length}}명</span>
-    <span class=ico>▼</span>
-  </div>
-  <div class=acc-body>
-    <div class=memtools>
-      <button class=selbtn id=selToggle onclick="toggleSelMode()">선택 삭제</button>
-      <button class=seldel id=selDelBtn onclick="delSelected()" style="display:none">선택한 0명 삭제</button>
-      <button class=selcancel id=selCancelBtn onclick="toggleSelMode()" style="display:none">취소</button>
+    <label class="field-label">대분류</label>
+    <select name="main_category" class="field-select" onchange="handleMainCategoryChange(this.form)">
+      <option value="">전체</option>
+      {% if main_category and main_category not in main_category_options %}
+      <option value="{{main_category}}" selected>{{main_category}}</option>
+      {% endif %}
+      {% for c in main_category_options %}
+      <option value="{{c}}" {% if c==main_category %}selected{% endif %}>{{c}}</option>
+      {% endfor %}
+    </select>
+
+    <label class="field-label">중분류</label>
+    <select name="middle_category" class="field-select">
+      <option value="">전체</option>
+      {% if middle_category and middle_category not in middle_category_options %}
+      <option value="{{middle_category}}" selected>{{middle_category}}</option>
+      {% endif %}
+      {% for c in middle_category_options %}
+      <option value="{{c}}" {% if c==middle_category %}selected{% endif %}>{{c}}</option>
+      {% endfor %}
+    </select>
+
+    <label class="field-label">관리주체</label>
+    <select name="manager" class="field-select">
+      <option value="">전체</option>
+      {% for m in manager_options %}
+      <option value="{{m}}" {% if m==manager %}selected{% endif %}>{{m}}</option>
+      {% endfor %}
+    </select>
+
+    <label class="field-label">프로그램</label>
+    <input type="text" name="program_kw" class="field-input" value="{{program_kw}}" placeholder="프로그램명 포함 검색">
+
+    <label class="field-label">기관명</label>
+    <input type="text" name="org_kw" class="field-input" value="{{org_kw}}" placeholder="기관명 포함 검색">
     </div>
-    {% for m in members %}
-    <div class=memrow>
-      <input type=checkbox class=memchk value="{{m.id}}" data-name="{{m.name}}" onchange="updateSelCount()" style="display:none">
-      <span class=nm>{{m.name}}</span>
-      <button class="del rowdel" onclick="delMember({{m.id}},'{{m.name}}')">삭제</button>
-    </div>
-    {% endfor %}
-    <div class=addmem>
-      <input id=newMember placeholder="새 팀원 이름" onkeydown="if(event.key=='Enter')addMember()">
-      <button class="btn" onclick="addMember()">추가</button>
-    </div>
+
+    <button type="submit" class="submit-btn" onclick="return setSearchAction()">검색하기</button>
+
+    </form>
   </div>
-</div>
 
-<div class=mask id=mask>
-  <div class=modal>
-    <h3 id=modalDate></h3>
-    <p class=hint>팀원을 고르고 식당·결재자를 입력하면 1인 {{ "{:,}".format(amount) }}원이 기록돼요.</p>
-    <div class=dayentries id=dayEntries></div>
-    <div class=addform>
-      <label class=flabel>팀원 선택 (여러 명 가능)</label>
-      <div class=memberchecks id=memberChecks></div>
+  {% if show_results %}
+  <div class="result-card" id="desc-result">
 
-      <label class=flabel>식당</label>
-      <select id=restaurantSel onchange="onRestaurantChange()">
-        <option value="">선택하세요</option>
-        {% for rname in restaurant_list %}<option value="{{rname}}">{{rname}}</option>{% endfor %}
-        <option value="__other__">그 외 (직접 입력)</option>
-      </select>
-      <input id=restaurantOther placeholder="식당명 직접 입력" style="display:none;margin-top:8px;">
+    <p class="result-count">총 {{count}}건이 조회되었습니다.</p>
 
-      <label class=flabel>결재자</label>
-      <select id=approverSel onchange="onApproverChange()">
-        <option value="">선택 안 함</option>
-        {% for m in members %}<option value="{{m.name}}">{{m.name}}</option>{% endfor %}
-        <option value="__other__">그 외 (직접 입력)</option>
-      </select>
-      <input id=approverOther placeholder="결재자 이름" style="display:none;margin-top:8px;">
-
-      <div class=note id=noteBox></div>
-      <div class=modalbtns>
-        <button class="btn" id=addBtn onclick="saveEntry()">추가하기</button>
-        <button class="btn cancelbtn" onclick="closeDay()">취소</button>
+    <div class="combo-warning">
+      <span style="flex:0 0 auto;">&#9888;&#65039;</span>
+      <div style="flex:1; word-break:keep-all;">
+        서비스 제공기관 정보는 현재 운영 중인 기관이며,
+        실제 정보와 차이가 있을 수 있으니 정확한 사항은 해당 기관에 직접 확인하시기 바랍니다.
       </div>
     </div>
+
+    {% if count == 0 %}
+    <p style="color:#6b7280;">조건에 맞는 서비스가 없습니다.</p>
+    {% endif %}
+
+    {% for region, manager_groups in results.items() %}
+    <h3>&#128205; {{region}}</h3>
+
+    {% for manager_name in sorted_managers_by_region[region] %}
+    {% set items = manager_groups[manager_name] %}
+
+    <div class="manager-badge" data-type="{{manager_name}}">{{manager_name}}</div>
+
+    {% for r in items %}
+    <div class="item" onclick="openDetail({{r['index']}})">
+      <span class="item-bullet">-</span>
+      <span class="item-text">{{r['label']}}</span>
+    </div>
+    {% endfor %}
+
+    {% endfor %}
+    {% endfor %}
+
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- 기관찾기 안내 모달 -->
+<div id="comboInfoModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:400px;background:#fff;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;" onclick="event.stopPropagation()">
+    <div style="padding:20px 22px 10px 22px;border-bottom:1px solid #f3f4f6;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:28px;height:28px;border-radius:50%;background:#eff6ff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#2563eb;">!</span>
+        <span style="font-size:16px;font-weight:800;color:#111827;">서비스 자원 안내</span>
+      </div>
+    </div>
+    <div style="padding:18px 22px;font-size:13.5px;line-height:1.75;color:#374151;word-break:keep-all;">
+      본 서비스 자원 데이터는 <b>지자체 현행화 자료</b> 및 <b>통합돌봄 전용누리집의 서비스 메뉴판</b>을 기준으로 제작되었습니다.<br><br>
+      조회 시기에 따라 <b>실제 운영 기관과 차이</b>가 있을 수 있으므로, 정확한 서비스 운영 여부는 해당 기관에 직접 확인하시기 바랍니다.
+    </div>
+    <div style="padding:10px 22px 20px 22px;">
+      <button type="button" onclick="closeComboInfo()" style="width:100%;height:42px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 상세 모달 -->
+<div id="modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 id="m_title"></h3>
+    <p style="margin:0 0 10px 0; line-height:1.6;">
+      <b>기관명:</b> <span id="m_org" style="white-space:normal; word-break:keep-all;"></span>
+    </p>
+    <p>
+      <b>기관 연락처:</b> <span id="m_tel"></span>
+      <a id="tel_link" style="display:none; font-size:20px; margin-left:8px; text-decoration:none;">&#128222;</a>
+    </p>
+    <p><b>기관주소:</b> <span id="m_addr"></span></p>
+    <div class="m-acc-row">
+      <button type="button" id="m_target_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_target_row','m_target_wrap')"><span>대상</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button type="button" id="m_content_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_content_row','m_content_wrap')"><span>주요내용</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button type="button" id="m_price_row" class="m-acc-btn" style="display:none;" onclick="toggleAcc('m_price_row','m_price_wrap')"><span>서비스단가</span><svg class="m-acc-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div class="m-acc-body" id="m_target_wrap"><span id="m_target"></span></div>
+    <div class="m-acc-body" id="m_content_wrap"><span id="m_content"></span></div>
+    <div class="m-acc-body" id="m_price_wrap"><span id="m_price"></span></div>
+    <iframe id="m_map" width="100%" height="170" style="border:0;margin-top:10px;display:none;border-radius:8px;"></iframe>
+    <button onclick="closeModal()" class="modal-btn">닫기</button>
   </div>
 </div>
 
 <script>
-const TEAM_ID = {{team.id}};
-const AMOUNT = {{amount}};
-const MONTHLY_COUNT = {{monthly_count}};
-const MONTHLY_CAP = {{cap}};
-const MEMBER_INFO = {{ member_info_json | safe }};
-const DAY_ENTRIES = {
-{% for week in weeks %}{% for c in week %}{% if c.in_month and c.entries %}"{{c.date_str}}":[{% for e in c.entries %}{id:{{e.id}},mid:{{e.member_id}},name:"{{e.name}}",rest:"{{e.restaurant}}",appr:"{{e.approver}}"},{% endfor %}],{% endif %}{% endfor %}{% endfor %}
-};
-const HAS_MEMBERS = {{ 'true' if members else 'false' }};
-let curDate = null;
+function openDetail(idx){
+  fetch("/detail/" + idx)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById("m_title").innerText = d["프로그램명칭"] || "";
+      document.getElementById("m_org").innerText = d["서비스제공기관명"] || "";
+      document.getElementById("m_tel").innerText = d["기관연락처"] || "";
+      document.getElementById("m_addr").innerText = d["기관주소"] || "";
+      const priceRow = document.getElementById("m_price_row");
+      const contentRow = document.getElementById("m_content_row");
+      const targetRow = document.getElementById("m_target_row");
 
-function fmt(n){return n.toLocaleString('ko-KR');}
-async function api(url, body){
-  const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  return r.json();
+      const price = d["서비스단가"] || "";
+      const content = d["주요내용"] || "";
+      const target = d["대상"] || "";
+
+      document.getElementById("m_price").innerText = price;
+      document.getElementById("m_content").innerText = content;
+      document.getElementById("m_target").innerText = target;
+
+      priceRow.style.display = price ? "flex" : "none";
+      contentRow.style.display = content ? "flex" : "none";
+      targetRow.style.display = target ? "flex" : "none";
+
+      const addr = (d["기관주소_지도용"] || d["기관주소"] || "").trim();
+      const mapFrame = document.getElementById("m_map");
+
+      if(addr){
+        mapFrame.src =
+          "https://www.google.com/maps?q=" + encodeURIComponent(addr) + "&output=embed";
+        mapFrame.style.display = "block";
+      } else {
+        mapFrame.src = "";
+        mapFrame.style.display = "none";
+      }
+
+      const telLink = document.getElementById("tel_link");
+      const tel = d["기관연락처"] || "";
+
+      if(tel){
+        const cleanNumber = tel.replace(/[^0-9]/g, "");
+        if(cleanNumber){
+          telLink.href = "tel:" + cleanNumber;
+          telLink.style.display = "inline";
+        } else {
+          telLink.style.display = "none";
+        }
+      } else {
+        telLink.style.display = "none";
+      }
+
+      document.getElementById("modal").style.display = "block";
+      document.body.style.overflow = "hidden";
+      resetAccAll();
+    });
 }
 
-function openDay(ds){
-  if(!HAS_MEMBERS){alert('먼저 팀원을 추가해 주세요.');return;}
-  curDate = ds;
-  document.getElementById('modalDate').textContent = ds.replace(/-/g,'.');
-  entrySelMode=false;
-  renderDayEntries();
-  renderMemberChecks();
-  document.getElementById('restaurantSel').value='';
-  document.getElementById('restaurantOther').value='';
-  document.getElementById('restaurantOther').style.display='none';
-  document.getElementById('approverSel').value='';
-  document.getElementById('approverOther').value='';
-  document.getElementById('approverOther').style.display='none';
-  document.getElementById('noteBox').className='note';
-  document.getElementById('mask').classList.add('on');
-  document.body.style.overflow='hidden';
-}
-function closeDay(){document.getElementById('mask').classList.remove('on');document.body.style.overflow='';}
-document.getElementById('mask').addEventListener('click',e=>{if(e.target.id==='mask')closeDay();});
+var ACC_PAIRS = [["m_target_row","m_target_wrap"],["m_content_row","m_content_wrap"],["m_price_row","m_price_wrap"]];
 
-let entrySelMode=false;
-function renderDayEntries(){
-  const box = document.getElementById('dayEntries');
-  const list = DAY_ENTRIES[curDate] || [];
-  if(!list.length){entrySelMode=false;box.innerHTML='<div class=muted style="padding:4px 0 6px">이 날 입력 내역이 없어요.</div>';return;}
-  const rows = list.map(e=>{
-    let meta = [];
-    if(e.rest) meta.push(e.rest);
-    if(e.appr) meta.push('결재 '+e.appr);
-    return `<div class=de>`+
-      `<input type=checkbox class=entrychk value="${e.id}" onchange="updateEntrySelCount()" style="display:${entrySelMode?'block':'none'}">`+
-      `<span class=nm>${e.name}</span>`+
-      `<span class=meta>${meta.join(' · ')}</span>`+
-      `<span class=am>${fmt(AMOUNT)}원</span>`+
-      `<button class="del entrydel" onclick="delEntry(${e.id})" style="display:${entrySelMode?'none':''}">삭제</button></div>`;
-  }).join('');
-  let tools = '';
-  if(list.length >= 2){
-    tools = `<div class=detools>`+(entrySelMode
-      ? `<button class=seldel id=entrySelDelBtn onclick="delSelectedEntries()">선택한 0건 삭제</button>`+
-        `<button class=selcancel onclick="toggleEntrySelMode()">취소</button>`
-      : `<button class=selbtn onclick="toggleEntrySelMode()">선택 삭제</button>`)+`</div>`;
+function resetAccAll(){
+  ACC_PAIRS.forEach(function(pair){
+    var btn = document.getElementById(pair[0]);
+    var body = document.getElementById(pair[1]);
+    if(btn) btn.classList.remove("open");
+    if(body) body.style.display = "none";
+  });
+}
+
+function toggleAcc(btnId, bodyId){
+  var btn = document.getElementById(btnId);
+  var body = document.getElementById(bodyId);
+  if(!btn || !body) return;
+  var willOpen = body.style.display !== "block";
+  resetAccAll();
+  if(willOpen){
+    body.style.display = "block";
+    btn.classList.add("open");
   }
-  box.innerHTML = rows + tools;
-}
-function toggleEntrySelMode(){entrySelMode=!entrySelMode;renderDayEntries();}
-function updateEntrySelCount(){
-  const n=document.querySelectorAll('#dayEntries .entrychk:checked').length;
-  const b=document.getElementById('entrySelDelBtn');
-  if(b)b.textContent='선택한 '+n+'건 삭제';
-}
-async function delSelectedEntries(){
-  const checked=Array.from(document.querySelectorAll('#dayEntries .entrychk:checked'));
-  if(!checked.length){alert('삭제할 항목을 선택해 주세요.');return;}
-  if(!confirm(`선택한 ${checked.length}건을 삭제할까요?`))return;
-  mealLoading(true,'삭제 중…');
-  const ids=checked.map(c=>parseInt(c.value,10));
-  const res=await api('/meal/api/entry/delete-many',{entry_ids:ids});
-  if(res.ok)location.reload(); else {mealLoading(false);alert(res.error||'삭제 실패');}
 }
 
-function renderMemberChecks(){
-  const box = document.getElementById('memberChecks');
-  let html='';
-  for(const mid in MEMBER_INFO){
-    const info = MEMBER_INFO[mid];
-    if(info.days.includes(curDate)) continue; // 그 날 이미 입력한 사람은 숨김(위 내역에 표시됨)
-    const full = info.count >= MONTHLY_COUNT;
-    const tag = full ? '<span class=mtag>한도초과</span>' : '';
-    html += `<label class="mcheck ${full?'disabled':''}">`+
-      `<input type=checkbox value="${mid}" ${full?'disabled':''}>`+
-      `<span class=mname>${info.name}</span>`+
-      `<span class=mcount>${info.count}/${MONTHLY_COUNT}</span>`+
-      `${tag}</label>`;
+function closeModal(){
+  document.getElementById("modal").style.display = "none";
+  document.body.style.overflow = "";
+}
+
+function handleSidoChange(form){
+  form.sigungu.value = "";
+  document.getElementById("comboAction").value = "change_sido";
+  form.submit();
+}
+
+function handleMainCategoryChange(form){
+  form.middle_category.value = "";
+  document.getElementById("comboAction").value = "change_main_category";
+  form.submit();
+}
+
+function setSearchAction(){
+  var f = document.querySelector('form');
+  var sido = f.sido.value;
+  var sigungu = f.sigungu.value;
+  var main_cat = f.main_category.value;
+  var mid_cat = f.middle_category.value;
+  var mgr = f.manager.value;
+  var prog = f.program_kw.value.trim();
+  var org = f.org_kw.value.trim();
+  if(!sido && !sigungu && !main_cat && !mid_cat && !mgr && !prog && !org){
+    showComboValidationAlert();
+    return false;
   }
-  if(!html) html='<div class=muted style="padding:14px;text-align:center;font-size:13px">오늘 추가할 수 있는 팀원이 없어요.</div>';
-  box.innerHTML = html;
+  document.getElementById("comboAction").value = "search";
+  return true;
 }
 
-function onApproverChange(){
-  const sel = document.getElementById('approverSel');
-  const other = document.getElementById('approverOther');
-  if(sel.value==='__other__'){other.style.display='block';other.focus();}
-  else{other.style.display='none';}
-}
-function onRestaurantChange(){
-  const sel = document.getElementById('restaurantSel');
-  const other = document.getElementById('restaurantOther');
-  if(sel.value==='__other__'){other.style.display='block';other.focus();}
-  else{other.style.display='none';}
+function showComboValidationAlert(){
+  var existing = document.getElementById('comboValidationModal');
+  if(existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'comboValidationModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  var box = document.createElement('div');
+  box.style.cssText = 'width:100%;max-width:360px;background:#fff;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;text-align:center;';
+  box.innerHTML =
+    '<div style="padding:28px 24px 12px 24px;">' +
+      '<div style="font-size:36px;margin-bottom:10px;">&#9888;&#65039;</div>' +
+      '<div style="font-size:16px;font-weight:800;color:#111827;margin-bottom:8px;">검색 조건을 입력해주세요</div>' +
+      '<div style="font-size:13px;color:#6b7280;line-height:1.6;">최소 하나 이상의 조건을 선택하거나<br>입력한 후 검색해주세요.</div>' +
+    '</div>' +
+    '<div style="padding:16px 24px 22px 24px;">' +
+      '<button type="button" id="comboValidCloseBtn" style="width:100%;height:42px;border:none;border-radius:10px;background:#5b7ee5;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">확인</button>' +
+    '</div>';
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  document.getElementById('comboValidCloseBtn').addEventListener('click', function(){ overlay.remove(); });
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) overlay.remove(); });
 }
 
-async function saveEntry(){
-  const checks = document.querySelectorAll('#memberChecks input:checked');
-  const ids = Array.from(checks).map(c=>parseInt(c.value,10));
-  const note = document.getElementById('noteBox');
-  if(!ids.length){note.className='note warn on';note.textContent='팀원을 한 명 이상 선택해 주세요.';return;}
-  let rest = document.getElementById('restaurantSel').value;
-  if(rest==='__other__') rest = document.getElementById('restaurantOther').value.trim();
-  if(!rest){note.className='note warn on';note.textContent='식당을 선택하거나 직접 입력해 주세요.';return;}
-  let appr = document.getElementById('approverSel').value;
-  if(appr==='__other__') appr = document.getElementById('approverOther').value.trim();
-  if(appr==='') appr='';
+function resetDescPage(){
+  window.location.href = "/combo";
+}
 
-  mealLoading(true,'저장 중…');
-  const res = await api('/meal/api/entry',{team_id:TEAM_ID,member_ids:ids,date:curDate,
-    restaurant:rest,approver:appr});
-  if(res.ok){
-    if(res.skipped && res.skipped.length){
-      alert('추가: '+res.added.join(', ')+'\\n제외: '+res.skipped.join(', '));
+function openComboInfo(){
+  var m = document.getElementById('comboInfoModal');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeComboInfo(); };
+}
+function closeComboInfo(){
+  document.getElementById('comboInfoModal').style.display = 'none';
+}
+
+window.addEventListener("load", function(){
+  const resultBox = document.getElementById("desc-result");
+  if(resultBox){
+    setTimeout(function(){
+      resultBox.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 120);
+  }
+});
+
+/* ── 콤보 가이드 투어 ── */
+var COMBO_GUIDE_ITEMS = [
+  {
+    target: 'cgt-region',
+    title: '지역 조건 선택',
+    text: '<b>시도</b>와 <b>시군구</b>를 선택하여 지역 기준으로 검색 범위를 설정하세요.'
+  },
+  {
+    target: 'cgt-detail',
+    title: '상세 조건 입력',
+    text: '<b>대분류·중분류</b>(선택형)와 <b>프로그램·기관명</b>(서술형)으로 세부 조건을 설정하세요.'
+  }
+];
+
+function comboGuideStart() {
+  if (sessionStorage.getItem('combo_guide_done')) return;
+
+  var isMobile = window.innerWidth < 600;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+
+  window.scrollTo(0, 0);
+
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.62);';
+  document.body.appendChild(overlay);
+
+  var prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+
+  var bubbles = [];
+  var bubbleW = isMobile ? Math.min(Math.floor(vw * 0.6), 240) : 230;
+
+  /* ── 공통 헬퍼 ── */
+  function addHighlight(elId) {
+    var el = document.getElementById(elId);
+    if (!el) return null;
+    var pad = isMobile ? 4 : 6;
+    var r = el.getBoundingClientRect();
+    var hl = document.createElement('div');
+    hl.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(75,110,220,0.55);',
+      'top:'+(r.top-pad)+'px;left:'+(r.left-pad)+'px;',
+      'width:'+(r.width+pad*2)+'px;height:'+(r.height+pad*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl);
+    bubbles.push(hl);
+    return r;
+  }
+
+  function makeBubble(title, text, w) {
+    var fs      = isMobile ? '11px'   : '12px';
+    var fsTitle = isMobile ? '11.5px' : '12.5px';
+    var bpd     = isMobile ? '9px 12px 8px' : '13px 16px 12px';
+    var b = document.createElement('div');
+    b.style.cssText = [
+      'position:fixed;z-index:10000;background:#fff;border-radius:11px;',
+      'padding:'+bpd+';width:'+w+'px;',
+      'box-shadow:0 5px 20px rgba(0,0,0,0.22);',
+      'font-family:inherit;pointer-events:none;'
+    ].join('');
+    b.innerHTML =
+      '<div style="font-size:'+fsTitle+';font-weight:700;color:#3b5cc0;margin-bottom:4px;">&#128161; '+title+'</div>'+
+      '<div style="font-size:'+fs+';color:#374151;line-height:1.6;word-break:keep-all;">'+text+'</div>';
+    document.body.appendChild(b);
+    bubbles.push(b);
+    return b;
+  }
+
+  function addArrow(bubble, dir, pos) {
+    var a = document.createElement('div');
+    a.style.position = 'absolute';
+    a.style.width = '0';
+    a.style.height = '0';
+    if (dir === 'up') {
+      a.style.borderLeft = '8px solid transparent';
+      a.style.borderRight = '8px solid transparent';
+      a.style.borderBottom = '8px solid #fff';
+      a.style.top = '-8px';
+      a.style.left = pos + 'px';
+    } else if (dir === 'down') {
+      a.style.borderLeft = '8px solid transparent';
+      a.style.borderRight = '8px solid transparent';
+      a.style.borderTop = '8px solid #fff';
+      a.style.bottom = '-8px';
+      a.style.left = pos + 'px';
     }
-    location.reload();
-  }else{
-    mealLoading(false);
-    note.className='note warn on';note.textContent=res.error||'저장에 실패했어요.';
+    bubble.appendChild(a);
+  }
+
+  /* ── ① 지역 조건 ── */
+  var r1 = addHighlight('cgt-region');
+
+  /* ── ② 상세 조건 ── */
+  var r2 = addHighlight('cgt-detail');
+
+  if (isMobile) {
+    /* ===== 모바일 배치 =====
+       두 하이라이트 경계(r1.bottom ~ r2.top)의 중간 지점을 기준으로
+       지역 조건 말풍선은 중간 위에, 상세 조건 말풍선은 중간 아래에 */
+
+    if (r1 && r2) {
+      var midY = (r1.bottom + r2.top) / 2;
+
+      var b_region = makeBubble(COMBO_GUIDE_ITEMS[0].title, COMBO_GUIDE_ITEMS[0].text, bubbleW);
+      var b_detail = makeBubble(COMBO_GUIDE_ITEMS[1].title, COMBO_GUIDE_ITEMS[1].text, bubbleW);
+
+      requestAnimationFrame(function(){
+        var bh1 = b_region.offsetHeight;
+        var bh2 = b_detail.offsetHeight;
+        var spacing = 28;
+
+        var top1 = midY - spacing - bh1;
+        var top2 = midY + spacing;
+
+        if (top1 < 6) top1 = 6;
+        if (top2 + bh2 > vh - 90) top2 = vh - 90 - bh2;
+
+        var bubbleLeft = Math.max(8, (vw - bubbleW) / 2);
+
+        b_region.style.top = top1 + 'px';
+        b_region.style.left = bubbleLeft + 'px';
+        var arrowLeft1 = Math.max(10, Math.min(r1.left + r1.width/2 - bubbleLeft - 8, bubbleW - 26));
+        addArrow(b_region, 'down', arrowLeft1);
+
+        b_detail.style.top = top2 + 'px';
+        b_detail.style.left = bubbleLeft + 'px';
+        var arrowLeft2 = Math.max(10, Math.min(r2.left + r2.width/2 - bubbleLeft - 8, bubbleW - 26));
+        addArrow(b_detail, 'up', arrowLeft2);
+      });
+    }
+
+  } else {
+    /* ===== PC 배치 =====
+       동일하게 두 하이라이트 경계의 중간 기준으로 위/아래 배치 */
+
+    if (r1 && r2) {
+      var midY = (r1.bottom + r2.top) / 2;
+
+      var b_pc_region = makeBubble(COMBO_GUIDE_ITEMS[0].title, COMBO_GUIDE_ITEMS[0].text, bubbleW);
+      var b_pc_detail = makeBubble(COMBO_GUIDE_ITEMS[1].title, COMBO_GUIDE_ITEMS[1].text, bubbleW);
+
+      requestAnimationFrame(function(){
+        var bh1 = b_pc_region.offsetHeight;
+        var bh2 = b_pc_detail.offsetHeight;
+        var spacing = 30;
+
+        var top1 = midY - spacing - bh1;
+        var top2 = midY + spacing;
+
+        if (top1 < 10) top1 = 10;
+        if (top2 + bh2 > vh - 60) top2 = vh - 60 - bh2;
+
+        var targetMidX = r1.left + r1.width / 2;
+        var bubbleLeft = Math.max(10, Math.min(targetMidX - bubbleW/2, vw - bubbleW - 10));
+
+        b_pc_region.style.top = top1 + 'px';
+        b_pc_region.style.left = bubbleLeft + 'px';
+        var arrowLeft1 = Math.max(10, Math.min(targetMidX - bubbleLeft - 8, bubbleW - 26));
+        addArrow(b_pc_region, 'down', arrowLeft1);
+
+        b_pc_detail.style.top = top2 + 'px';
+        b_pc_detail.style.left = bubbleLeft + 'px';
+        var arrowLeft2 = Math.max(10, Math.min(targetMidX - bubbleLeft - 8, bubbleW - 26));
+        addArrow(b_pc_detail, 'up', arrowLeft2);
+      });
+    }
+  }
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.textContent = '확인';
+  confirmBtn.style.cssText = [
+    'position:fixed;z-index:10001;',
+    'left:50%;transform:translateX(-50%);bottom:14%;',
+    'background:#5b7ee5;color:#fff;border:none;',
+    'border-radius:10px;',
+    'padding:'+(isMobile?'10px 40px':'11px 52px')+';',
+    'font-size:'+(isMobile?'13px':'14px')+';font-weight:700;cursor:pointer;',
+    'box-shadow:0 4px 16px rgba(75,110,220,0.35);white-space:nowrap;'
+  ].join('');
+  document.body.appendChild(confirmBtn);
+  bubbles.push(confirmBtn);
+
+  function closeGuide() {
+    bubbles.forEach(function(b){ b.remove(); });
+    overlay.remove();
+    document.body.style.overflow = prevOverflow;
+    sessionStorage.setItem('combo_guide_done', '1');
+  }
+
+  confirmBtn.addEventListener('click', function(e){ e.stopPropagation(); closeGuide(); });
+  overlay.addEventListener('click', closeGuide);
+}
+
+// 가이드 투어 제거: 자동 실행하지 않음
+</script>
+
+</body>
+</html>
+"""
+
+@app.route("/ocr", methods=["POST"])
+def ocr():
+    # 개인정보가 포함된 이미지가 외부 OCR 처리로 넘어가지 않도록 사용자 확인을 서버에서도 검사
+    if request.form.get("ocr_privacy_confirmed") != "yes":
+        return jsonify({"error": "개인정보 업로드 주의사항 확인이 필요합니다."}), 400
+
+    file = request.files.get("image")
+    if not file:
+        return {"text": ""}
+
+    if not (file.mimetype or "").startswith("image/"):
+        return jsonify({"error": "이미지 파일만 업로드할 수 있습니다."}), 400
+
+    import base64
+    from openai import OpenAI
+    client = OpenAI()
+
+    img_bytes = file.read()
+    if len(img_bytes) > 8 * 1024 * 1024:
+        return jsonify({"error": "이미지 용량은 8MB 이하만 업로드할 수 있습니다."}), 400
+
+    img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+    try:
+        res = client.responses.create(
+            model="gpt-4.1-mini",
+            input=[{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "이미지의 한글 텍스트를 그대로 추출해줘. 줄바꿈 유지."},
+                    {"type": "input_image", "image_url": f"data:{file.mimetype};base64,{img_base64}"}
+                ]
+            }]
+        )
+
+        text = res.output[0].content[0].text
+
+        usage = getattr(res, "usage", None)
+
+        input_tokens = getattr(usage, "input_tokens", 0) if usage else 0
+        output_tokens = getattr(usage, "output_tokens", 0) if usage else 0
+        total_tokens = getattr(usage, "total_tokens", 0) if usage else 0
+
+        # 토큰 사용량은 관리자 통계용 DB에만 누적하고 Render 로그에는 남기지 않음
+
+        add_token_usage(input_tokens, output_tokens)
+
+        return {
+            "text": text,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens
+        }
+
+    except Exception:
+        return {"text": ""}
+
+def build_grouped_service_results(service_results):
+    grouped_service_results = []
+    group_map = {}
+    seen_sub = {}  # key -> set of 서비스내용 (소분류 중복 방지)
+
+    for item in service_results:
+        main_cat = str(item.get("대분류", "")).strip()
+        middle_cat = str(item.get("중분류", "")).strip()
+        key = main_cat + "|" + middle_cat
+
+        if key not in group_map:
+            group_id = "group_" + str(len(grouped_service_results))
+            group_map[key] = {
+                "group_id": group_id,
+                "대분류": main_cat,
+                "중분류": middle_cat,
+                "direct_need": False,
+                "items": []
+            }
+            seen_sub[key] = set()
+            grouped_service_results.append(group_map[key])
+
+        if item.get("direct_need"):
+            group_map[key]["direct_need"] = True
+
+        # 같은 소분류(서비스내용)가 이미 있으면 건너뜀 (중복 방지)
+        sub = str(item.get("서비스내용", "")).strip()
+        if sub not in seen_sub[key]:
+            seen_sub[key].add(sub)
+            group_map[key]["items"].append(item)
+
+    return grouped_service_results
+
+@app.route("/desc", methods=["GET","POST"])
+def desc():
+    query = (request.values.get("query", "") or "").strip()
+
+    results = {}
+    cond_display = None
+    count = 0
+    service_results = []
+    warning_msg = ""
+    action = (request.values.get("action", "") or "").strip()
+
+    input_sido = normalize_sido((request.values.get("sido", "") or "").strip())
+    input_sigungu = (request.values.get("sigungu", "") or "").strip()
+
+    selected_sido = session.get("desc_selected_sido", "")
+    selected_sigungu = session.get("desc_selected_sigungu", "")
+
+    if action == "reset_region":
+        session.pop("desc_selected_sido", None)
+        session.pop("desc_selected_sigungu", None)
+        return redirect(url_for("desc"))
+
+    else:
+        if action == "change_sido":
+            session["desc_selected_sido"] = input_sido
+            selected_sido = input_sido
+            session.pop("desc_selected_sigungu", None)
+            selected_sigungu = ""
+
+        elif action == "change_sigungu":
+            session["desc_selected_sigungu"] = input_sigungu
+            selected_sigungu = input_sigungu
+
+    cache_key = make_cache_key(query + "|" + selected_sido + "|" + selected_sigungu)
+    do_search = (action == "search")
+        
+    if request.method == "POST" and do_search:
+        # 개인정보(전화·주민번호·이메일) 탐지 시 GPT로 전송하지 않고 차단 + 팝업
+        if _contains_pii(query):
+            return render_template_string(
+                DESC_HTML,
+                style=BASE_STYLE,
+                query=query,
+                results=results,
+                cond_display=cond_display,
+                count=0,
+                service_results=[],
+                warning_msg="",
+                selected_sido=selected_sido,
+                selected_sigungu=selected_sigungu,
+                sido_options=SIDO_OPTIONS,
+                sigungu_options=SIGUNGU_MAP.get(selected_sido, []),
+                pii_block=True
+            )
+
+        now_time = time.time()
+        last_search_time = session.get("desc_last_search_time", 0)
+
+        if now_time - float(last_search_time or 0) < 10:
+            warning_msg = "검색 요청이 너무 빠릅니다.\n잠시 후 다시 검색해 주세요."
+
+            return render_template_string(
+                DESC_HTML,
+                style=BASE_STYLE,
+                query=query,
+                results=results,
+                cond_display=cond_display,
+                count=0,
+                service_results=[],
+                warning_msg=warning_msg,
+                selected_sido=selected_sido,
+                selected_sigungu=selected_sigungu,
+                sido_options=SIDO_OPTIONS,
+                sigungu_options=SIGUNGU_MAP.get(selected_sido, [])
+            )
+
+        session["desc_last_search_time"] = now_time
+
+        if cache_key in DESC_CACHE:
+            cached = DESC_CACHE[cache_key]
+
+            if time.time() - cached["time"] < 600:
+                service_results = cached["results"]
+                count = len(service_results)
+                warning_msg = cached["warning"]
+
+                return render_template_string(
+                    DESC_HTML,
+                    style=BASE_STYLE,
+                    query=query,
+                    results=results,
+                    cond_display=cond_display,
+                    count=count,
+                    service_results=service_results,
+                                 grouped_service_results=build_grouped_service_results(service_results),
+                    warning_msg=warning_msg,
+                    selected_sido=selected_sido,
+                    selected_sigungu=selected_sigungu,
+                    sido_options=SIDO_OPTIONS,
+                    sigungu_options=SIGUNGU_OPTIONS
+                )
+            else:
+                del DESC_CACHE[cache_key]
+
+        cond_display = []
+
+        # ======================
+        # 검색어 보강 (튜브/줄 + 복지용구 관련 표현 보정)
+        # ======================
+        query_for_ai = query
+        q_norm = query.replace(" ", "")
+
+        wound_context = any(k in q_norm for k in [
+            "상처", "상처소독", "드레싱", "욕창", "염증", "감염", "고름",
+            "진물", "봉합", "절개", "베임", "찰과상", "화상", "욕창관리"
+        ])
+
+        extra_aliases = []
+        extra_aliases += expand_query_aliases(query)
+
+        # ---- 튜브/의료처치 관련 ----
+        if any(k in q_norm for k in ["콧줄", "비위관", "위관", "경관급식", "콧줄영양", "비위관영양"]):
+            extra_aliases += ["튜브관리", "비위관", "경관영양", "위관관리"]
+
+        if any(k in q_norm for k in ["소변줄", "유치도뇨", "도뇨줄", "폴리", "foley", "배뇨줄"]):
+            extra_aliases += ["튜브관리", "유치도뇨관", "도뇨관관리", "배뇨관리"]
+
+        if any(k in q_norm for k in ["기관절개", "기관절개관", "석션", "흡인", "장루", "요루", "튜브", "루관리", "장루관리", "요루관리"]):
+            extra_aliases += ["튜브관리", "루관리", "기관절개관리", "흡인", "감염관리"]
+
+        # ---- 복지용구 관련 ----
+        if any(k in q_norm for k in ["지팡이", "워커", "보행기", "보행차", "휠체어"]):
+            extra_aliases += ["복지용구", "보행보조", "대여", "구입"]
+
+        if any(k in q_norm for k in ["배회", "길을잃", "길잃", "집을못찾", "집에못오", "실종", "위치확인", "위치추적", "gps", "인지저하", "치매"]):
+            extra_aliases += [
+                "복지용구",
+                "배회감지기",
+                "위치확인",
+                "위치추적",
+                "GPS",
+                "실종예방",
+                "안전지원",
+                "대여",
+                "구입"
+            ]
+
+        if any(k in q_norm for k in ["안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이"]):
+            extra_aliases += ["복지용구", "안전손잡이", "욕실안전", "낙상예방", "구입"]
+
+        if any(k in q_norm for k in ["미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립", "미끄럼"]):
+            extra_aliases += ["복지용구", "미끄럼방지", "욕실안전", "낙상예방", "구입"]
+
+        if any(k in q_norm for k in ["목욕의자", "샤워의자", "목욕", "샤워"]):
+            extra_aliases += ["복지용구", "목욕의자", "욕실안전", "구입"]
+
+        if any(k in q_norm for k in ["이동변기", "간이변기", "변기", "좌변기"]):
+            extra_aliases += ["복지용구", "이동변기", "배변보조", "구입"]
+
+        if any(k in q_norm for k in ["요실금팬티"]):
+            extra_aliases += ["복지용구", "요실금팬티", "구입"]
+        elif any(k in q_norm for k in ["요실금", "패드"]) and "기저귀" not in q_norm:
+            extra_aliases += ["복지용구", "요실금팬티", "구입"]
+
+        if any(k in q_norm for k in ["전동침대", "침대", "병원침대"]):
+            extra_aliases += ["복지용구", "전동침대", "대여"]
+
+        if any(k in q_norm for k in ["욕창", "욕창매트", "욕창방지", "자세변환", "체위변경"]):
+            extra_aliases += ["복지용구", "욕창예방", "자세변환", "대여"]
+
+        if any(k in q_norm for k in ["목욕차", "방문목욕", "목욕도움", "씻기기", "씻겨", "씻겨줬으면", "목욕시켜", "목욕"]):
+            extra_aliases += ["요양", "방문목욕", "장기요양", "목욕지원", "신체청결"]
+
+        if any(k in q_norm for k in ["식사", "식사도움", "식사 준비", "식사준비", "밥", "반찬", "도시락", "영양"]):
+            extra_aliases += ["가사지원", "일상생활지원", "식사도움"]
+
+        if any(k in q_norm for k in ["청소", "청소도움"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원", "청소도움"]
+
+        if any(k in q_norm for k in ["빨래", "세탁", "빨래도움"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원", "빨래도움"]
+
+        if any(k in q_norm for k in ["가사일", "집안일", "생활도움", "집에누가와서도와", "도와줬으면"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "가사지원", "일상생활지원"]
+
+        if any(k in q_norm for k in ["돌봄", "간병", "부축", "옆에서도움", "집에서돌봐", "일상생활도움"]):
+            extra_aliases += ["요양", "방문요양", "장기요양", "신체활동지원", "일상생활지원"]
+
+        if any(k in q_norm for k in ["스마트폰", "핸드폰", "휴대폰", "휴대전화", "앱", "어플", "디지털", "비대면", "온라인"]):
+            extra_aliases += ["IoT", "IOT", "사물인터넷", "스마트기기", "돌봄기기", "AI", "비대면", "응급안전", "응급안전안심서비스", "스마트돌봄", "안전확인"]
+
+        if any(k in q_norm for k in ["경사로", "문턱", "턱", "이동불편", "출입불편"]):
+            extra_aliases += ["복지용구", "경사로", "이동보조", "구입"]
+
+        if any(k in q_norm for k in ["주간보호", "주야간보호", "데이케어", "낮동안보호", "낮에맡김", "센터다님", "센터에다님", "주간센터"]):
+            extra_aliases += ["주야간보호", "신체활동지원", "인지관리", "기능회복훈련"]
+
+        # ---- 주거/구강/의사소통/응급/단기보호/치매조호 관련 ----
+        if any(k in q_norm for k in ["주거", "주택", "거주환경", "주거환경", "집수리", "노후", "곰팡이", "해충", "악취", "쓰레기"]):
+            extra_aliases += ["주거복지", "주거공간개선", "주거환경개선", "방역소독", "주거안전지원", "기타"]
+
+        if any(k in q_norm for k in ["보일러", "에어컨", "냉방", "난방", "냉난방", "단열", "창호", "설비교체", "에너지효율", "에너지효율화"]):
+            extra_aliases += ["주거복지", "주거공간개선", "기타", "집수리", "설비개선", "에너지효율화"]
+
+        if any(k in q_norm for k in ["가스레인지", "가스렌지", "가스불", "화기", "불관리", "가스차단", "화재위험"]):
+            extra_aliases += ["주거복지", "주거공간개선", "주거안전지원", "화재예방", "가스안전"]
+
+        if "치매" in q_norm and (
+            any(k in q_norm for k in ["가스레인지", "가스렌지", "가스불", "화기", "불관리", "가스차단", "화재위험", "불을켜놓", "가스잠그"])
+            or ("냄비" in q_norm and any(k in q_norm for k in ["태우", "태움", "태웠", "태워", "탄다", "태운"]))
+            or ("불" in q_norm and any(k in q_norm for k in ["깜빡", "잊어버", "잊고"]))
+        ):
+            extra_aliases += ["일상생활돌봄", "스마트돌봄", "기타", "안부확인", "응급안전", "화재감지기", "가스타이머차단기", "안전확인"]
+
+        if any(k in q_norm for k in ["구강", "구강건조", "입마름", "입이마름", "칫솔질", "양치", "잇몸", "잇몸출혈", "치아출혈", "구내염"]):
+            extra_aliases += ["구강관리", "구강위생", "칫솔질", "구강건강", "방문구강관리", "건강관리"]
+
+        if any(k in q_norm for k in ["언어장애", "말을못", "말못", "소리를내지못", "의사소통", "고개를끄덕", "고개끄덕", "몸짓으로"]):
+            extra_aliases += ["일상생활돌봄", "의사소통지원", "의사표현지원", "언어지원", "대화지원"]
+
+        if any(k in q_norm for k in ["응급서비스", "응급안전", "응급안전안심", "응급호출", "응급벨", "위급상황", "응급상황", "안전확인필요"]):
+            extra_aliases += ["일상생활돌봄", "스마트돌봄", "안부확인", "응급안전안심서비스", "응급호출", "안전확인", "기타"]
+
+        if any(k in q_norm for k in ["단기보호", "임시보호", "잠시맡", "며칠맡", "일시보호", "가족부재", "보호자부재", "돌볼가족없", "맡아줄사람없"]):
+            extra_aliases += ["요양", "단기보호", "보호", "일시보호", "가족부재", "돌봄공백"]
+
+        if "치매" in q_norm and any(k in q_norm for k in ["기저귀", "조호물품", "소변실수", "배뇨실수"]):
+            extra_aliases += ["건강관리예방", "치매전문관리", "조호물품제공", "치매조호물품", "기저귀지원"]
+
+        # ---- 상처/감염/드레싱 관련 ----
+        if wound_context:
+            extra_aliases += ["감염관리", "상처관리", "드레싱", "의료처치", "방문진료"]
+
+        extra_aliases = list(dict.fromkeys(extra_aliases))
+
+        if extra_aliases:
+            query_for_ai = query + " / 연관표현: " + ", ".join(extra_aliases)
+
+        # ======================
+        # 서비스 목록 문자열 생성
+        # ======================
+
+        service_text = ""
+
+        for idx, r in service_df.iterrows():
+            service_text += (
+                f"{idx}. "
+                f"대분류: {str(r.get('대분류','')).strip()} | "
+                f"중분류: {str(r.get('중분류','')).strip()} | "
+                f"서비스내용: {compress_text(r.get('서비스내용',''),25)} | "
+                f"서비스설명: {compress_text(r.get('서비스설명',''),77)} | "
+                f"검색어: {compress_text(r.get('검색어',''),100)}\n"
+            )
+
+        # ======================
+        # 서비스 그룹 데이터 문자열 생성
+        # ======================
+        cond_display = []
+
+        # ======================
+        # 서비스 그룹 데이터 문자열 생성
+        # ======================
+        cond_display = []
+
+        api_key = os.getenv("OPENAI_API_KEY")
+
+        if not api_key:
+            cond_display.append("OPENAI_API_KEY가 설정되어 있지 않습니다.")
+            return render_template_string(
+                DESC_HTML,
+                style=BASE_STYLE,
+                query=query,
+                results=results,
+                cond_display=cond_display,
+                count=count,
+                service_results=service_results,
+                          grouped_service_results=build_grouped_service_results(service_results),
+                warning_msg=warning_msg,
+                selected_sido=selected_sido,
+                selected_sigungu=selected_sigungu,
+                sido_options=SIDO_OPTIONS,
+                sigungu_options=SIGUNGU_OPTIONS
+            )
+
+        client = OpenAI(api_key=api_key)
+
+        prompt = f"""
+너는 통합돌봄 서비스 추천 전문가다.
+
+[돌봄 사례 판단]
+입력에 '돌봄 연결 단서'가 하나라도 있으면 추천을 진행한다.
+(어르신·환자 같은 대상자 명칭이 적혀 있지 않아도 된다)
+돌봄 연결 단서:
+- 질환·건강상태·후유증·통증·투병 등 건강 단서
+- 식사·이동·위생·주거·안전·정서 영역의 어려움이나 도움 필요
+- 스마트폰·앱·디지털기기 등 IoT·스마트돌봄으로 연결되는 단서
+단, "잘 한다/잘 탄다" 같은 능력·긍정 표현 자체는 단서로 보지 않는다.
+(디지털기기 활용은 예외 — IoT 적합 신호로 본다)
+명시적으로 적혀 있지 않아도 위 단서로부터 잠재적 돌봄 욕구를 합리적으로 추론하여 관련 서비스를 제시한다.
+돌봄 연결 단서가 전혀 없는 입력이나 정치·연예·스포츠·날씨·잡담·정보나열은 {{"results": []}} 로 반환한다.
+
+[추천 방식]
+- 서비스 목록의 '서비스설명'과 '검색어'를 적극 참고한다
+- 정확한 행정용어를 쓰지 않아도 의미가 비슷하면 연결한다 (예: "씻는 것 도와줬으면" → 방문목욕, "가사일 도와줬으면" → 방문요양)
+- 의료·요양 맥락만 있으면 방역·환경소독 서비스 제외 (집 위생·악취·해충 언급 시 포함)
+- 배회·길을 잃음·귀가 어려움 → 배회감지기, 위치확인 복지용구, 인지안전지원 연결
+
+[추천사유 작성]
+- 사례에 실제로 적힌 내용만 근거로 쓴다 (없는 내용 추측 금지)
+- "사례의 어려움 → 서비스가 필요한 이유" 흐름으로 간결하게 작성
+
+[판단 원칙]
+1. 사례의 핵심 욕구(건강/이동/식사/위생/정서/주거/안전/돌봄부담)를 먼저 정리한다
+2. 서비스설명·검색어와 의미적으로 맞는 서비스를 찾는다
+3. 연관 서비스도 함께 포함하고, 관련성 있으면 충분히 제시한다
+4. 직접 욕구 서비스 외에도 사례에 언급된 건강상태·질환·불편에 해당하는 서비스도 반드시 함께 추천한다
+   (예: '관절염으로 힘들어하며 집수리 욕구가 있음' → 집수리 관련 + 관절염 관련 재활·이동지원·방문보건도 포함)
+5. 특히 아래 표현은 적극 반영한다.
+   - "집으로 와주길 원함", "누가 와주는", "방문해주는", "집으로 오는", "와서 ~해주는" 등 사람이 가정을 방문하여 돌봄을 제공하는 표현 → 방문요양·방문목욕·방문보건·방문진료 등 방문형 서비스를 우선 추천한다. 이때 함께 언급된 욕구(예: 건강관리)에 맞는 방문형을 선택한다.
+     · 매우 중요: 이런 "사람이 방문하는" 표현을 주거복지(주거공간개선·주거안전지원·방역소독)로 해석하지 않는다. 주거복지는 문턱·손잡이·집수리·곰팡이·악취처럼 물리적 주거환경 문제가 직접 언급된 경우에만 검토한다.
+   - 복지용구 추천 시 아래 품목 목록 기준으로 반드시 대여/구입을 구분한다 (없는 품목명 절대 사용 금지):
+     · 대여 품목: 수동휠체어, 전동침대, 수동침대, 이동욕조, 목욕리프트, 배회감지기(GPS형·메트형)
+     · 구입 또는 대여 품목: 욕창예방매트리스, 경사로(실외), 경사로(실내), 이승보조기기, 대화형정서지원기기
+     · 구입 품목: 이동변기, 목욕의자, 성인용보행기, 안전손잡이, 미끄럼방지용품, 간이변기, 지팡이, 욕창예방방석, 자세변환용구, 요실금팬티, 구강청정기(마우스피스형), 기저귀센서, 배회감지기(태그형), 고관절보호대, 낙상알림시스템
+   - 복지용구 서비스 선택 기준 (매우 중요):
+     · 필요한 품목이 대여 품목만 해당 → "복지용구 대여"만 추천
+     · 필요한 품목이 구입 품목만 해당 → "복지용구 구입"만 추천
+     · 필요한 품목이 "구입 또는 대여" 품목이거나 대여·구입 둘 다 해당 → 둘 다 추천
+     · 품목이 명확하지 않은 일반적 보조기구 필요 표현 → 둘 다 추천
+   - "지팡이", "워커", "보행기", "보행차" → 복지용구 구입(지팡이, 성인용보행기)만 추천, 대여 품목 추천 금지
+   - "휠체어" → 복지용구 대여(수동휠체어)만 추천, 구입 품목 추천 금지
+   - "안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이" → 복지용구 구입(안전손잡이) 적극 고려
+   - "도구가 필요함", "보조도구 필요", "이동 도구 필요", "집에서 활용가능한 도구", "활용가능한 도구" → 지팡이·보행기 등 구입 품목 우선 검토, 휠체어 언급 없으면 복지용구 대여 추천 금지
+   - "미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립", "미끄럼" → 복지용구 구입(미끄럼방지용품) 적극 고려
+   - "목욕의자", "샤워의자" → 복지용구 구입(목욕의자) 고려
+   - 방문목욕 소분류 판단 기준 (매우 중요):
+     · "차량", "목욕차", "차가 와서" 등 차량 방문 표현 → 반드시 "차량내 목욕"만 선택
+     · "집에서", "가정에서", "가정내" 등 가정 방문 표현 → 반드시 "가정내 목욕"만 선택
+     · 그 외 일반 목욕 표현("목욕이 필요", "목욕 도움" 등) → "차량내 목욕"과 "가정내 목욕" 둘 다 선택
+   - "이동변기", "간이변기" → 복지용구 구입(이동변기, 간이변기) 고려
+   - "요실금팬티"가 직접 언급된 경우만 복지용구 구입(요실금팬티)을 검토한다
+   - "요실금", "패드"는 기저귀와 구분하여 판단하고, 기저귀가 함께 언급되면 요실금팬티로 대체하지 않는다
+   - "치매 + 소변실수/기저귀/조호물품" 맥락이면 건강관리예방-치매전문관리-조호물품제공을 우선 검토한다
+   - "전동침대", "침대", "병원침대" → 복지용구 대여(전동침대, 수동침대) 우선 고려
+   - "욕창", "욕창매트", "욕창방지" → 복지용구 구입 또는 대여(욕창예방매트리스, 욕창예방방석) 및 의료처치 함께 고려
+   - "자세변환", "체위변경" → 복지용구 구입(자세변환용구) 고려
+   - "경사로", "문턱", "턱" → 복지용구 구입 또는 대여(경사로) 고려
+   - "배회", "길을 잃", "실종", "위치확인", "GPS" → 복지용구 대여(배회감지기 GPS형·메트형) 또는 구입(배회감지기 태그형) 고려
+   - "낙상", "넘어짐" → 복지용구 구입(고관절보호대, 낙상알림시스템, 미끄럼방지용품) 고려
+   - "콧줄", "비위관", "위관", "경관급식", "소변줄", "도뇨줄", "유치도뇨", "장루", "요루", "기관절개", "석션", "흡인", "복막투석" → 방문진료의 의료처치(욕창, 루, 튜브관리 등)를 적극 우선 고려
+   - 의료처치(욕창, 루, 튜브관리 등)가 적합하면 감염관리도 함께 검토한다
+   - 매우 중요: 서비스내용의 "소독"은 기본적으로 집안/주거환경 관련 소독으로 본다
+   - "상처 소독", "드레싱", "욕창 소독", "감염", "염증", "고름", "진물"처럼 의료적 맥락의 소독은 서비스내용 "소독"으로 연결하지 말고, 반드시 "감염관리" 또는 "의료처치(욕창, 루, 튜브관리 등)" 쪽으로 판단한다
+   - 반대로 집 청소, 방역, 주거 위생, 해충, 집안 환경개선 맥락이면 서비스내용 "소독"을 검토한다
+   - 집이 지저분함, 악취, 곰팡이, 해충, 쓰레기, 노후주택 등 주거환경 문제 → 주거복지-주거공간개선-방역소독 또는 기타를 우선 검토한다
+   - 보일러 교체, 에어컨 설치, 냉난방, 단열, 집수리, 주거 설비 교체 → 주거복지-주거공간개선-기타를 우선 검토한다
+   - 화재·가스 안전 문제 판단 기준:
+     · 가스레인지, 화기관리, 불을 켜놓음, 가스차단, 화재위험 등 화재·가스 안전 문제 → 주거복지-주거공간개선-주거안전지원(문턱제거, 안전손잡이 설치 등)을 우선 검토한다 (가스타이머차단기 등 설치도 이 서비스 범위에 포함된다)
+     · 치매·인지저하로 인해 가스불을 켜놓고 잊어버리거나 냄비를 태우는 등 인지 문제가 원인인 경우, 안부·안전 상태를 확인해줄 "일상생활돌봄-스마트돌봄-안부확인"도 함께 추천한다
+   - 구강건조, 칫솔질 시 출혈, 잇몸출혈, 양치 어려움 → 구강관리 관련 서비스를 우선 검토한다
+   - 언어장애, 말을 하지 못함, 고개 끄덕임·몸짓으로만 의사표현 → 일상생활돌봄-의사소통지원 우선 검토
+   - 응급서비스, 응급호출, 위급상황 대응, 응급안전안심서비스 필요 → 일상생활돌봄-스마트돌봄-안부확인 또는 같은 중분류의 기타 우선 검토
+   - 치매 또는 돌봄 필요 대상자가 있으나 가족·보호자 부재로 일시적으로 맡아줄 곳이 필요함 → 단기보호 우선 검토
+   - 몸 씻기, 비누칠, 샤워, 신체청결을 혼자 깨끗하게 수행하지 못하거나 부분도움이 필요함 → 방문목욕 또는 목욕지원 관련 서비스를 우선 검토한다
+   - "무릎통증", "통증", "거동불편", "움직이기 어려움" → 재활, 기능회복, 방문보건, 이동지원 계열 고려 (단, 약 복용 언급만으로는 이 규칙 적용 금지 — 신체 불편이 명확히 언급된 경우에만 적용)
+   - "요통", "허리가 자주 아픔", "허리 통증", "허리 불편" → 통증관리, 재활, 기능회복, 방문보건 계열을 우선 검토한다
+   - "외로움", "말벗 필요", "혼자 지냄", "고립", "독거", "가족 왕래 없음", "보호자 부재" → 정서지원, 안부확인, 돌봄연계를 우선 검토한다
+   - "주간보호", "주야간보호", "센터 다님", "낮에 센터", "데이케어" → 주야간보호(신체활동지원, 인지관리, 기능회복훈련 등) 계열을 우선 검토한다
+   - 표현이 다르더라도 의미가 비슷하면 대표 욕구로 묶어서 판단한다
+   - "다리가 저림", "다리 저림", "발 저림", "손발 저림", "찌릿함", "감각이상" → 신경증상, 통증, 재활, 기능회복, 방문보건, 이동지원 계열을 우선 검토한다
+   - "오줌을 지림", "소변을 지림", "소변 실수", "배뇨 실수", "요실금" → 배뇨관리, 위생지원, 패드 등 복지용구, 방문보건 계열을 우선 검토한다
+   - "변을 지림", "대변 실수", "배변 실수", "배변 불편" → 배변관리, 위생지원, 복지용구, 방문보건 계열을 우선 검토한다
+   - "자주 넘어진다", "휘청거린다", "낙상이 걱정된다", "균형이 불안하다" → 낙상예방, 안전지원, 보행보조 복지용구, 이동지원 계열을 우선 검토한다
+   - "기억을 잘 못한다", "자꾸 깜빡한다", "약을 자주 잊는다" → 인지지원, 복약관리, 안부확인, 돌봄연계를 우선 검토한다
+   - "약 챙기기 어렵다", "복약 관리 어렵다", "약을 많이 먹는다", "약이 많다", "다약제" → 복약관리, 방문보건 계열만 검토한다 (이동지원·재활 포함 금지)
+   - "병원 가기 어렵다", "병원 동행이 필요하다", "통원이 어렵다" → 병원동행, 이동지원, 방문보건 계열을 우선 검토한다
+   - "반찬을 못함", "식사 준비 어려움", "자주 배고파함", "잘 못 먹음", "차려 먹기 어렵다", "챙겨 먹기 어렵다" → 식사지원, 반찬지원, 영양지원 계열을 추천 대상으로 검토한다
+   - "잘 못 씹음", "씹기 어려움", "씹지 못함", "저작곤란", "삼키기 어려움", "연하곤란", "틀니가 안 맞음", "치아가 없어 못 먹음" 등 씹기·삼킴 문제 → "잘 못 먹음"과 동일하게 식사지원, 반찬지원(죽·갈아먹는 형태 포함), 영양지원 계열을 반드시 추천 대상으로 검토한다
+   - 스마트폰·앱·디지털기기 언급 → IoT, 스마트돌봄, 응급안전안심서비스, AI 돌봄기기 검토
+   - 입력에 "치매", "인지저하", "기억력 저하", "배회", "인지기능", "알츠하이머" 등이 직접 언급되지 않으면 치매 관련 서비스는 추천하지 않는다
+   - 방문구강관리(대분류 건강관리예방) 추천 기준 (매우 중요):
+     · 입력에 "구강", "양치", "칫솔질", "잇몸", "치아", "입냄새", "구취", "입마름", "구강건조", "구내염", "입안", "치주" 등 구강·치아 관련 단서가 직접 언급된 경우에만 방문구강관리를 추천한다
+     · 위 구강·치아 단서가 전혀 없으면 방문구강관리는 추천하지 않는다. 특히 "뇌출혈", "거동 불편", "외출 곤란", "치과 방문 어려움" 같은 일반 질환·이동제약 표현만 있는 경우 절대 추천하지 않는다
+     · 방문구강관리 서비스의 검색어/설명에 "거동 불편", "치과 방문 어려움"이 포함되어 있더라도 그것은 매칭 근거가 아니다. 사용자 입력에 실제 구강·치아 문제가 있을 때만 연결한다
+6. 결과는 너무 적게 내지 말고, 관련성이 있으면 충분히 제시한다
+7. 우선순위가 높은 순서대로 정렬한다
+8. 최대 30개까지 추천한다
+9. 동일 유형 서비스는 중복 추천하지 말고 균형 있게 포함한다
+
+[direct_need 판정]
+direct_need=true 조건: 수급자·보호자가 특정 서비스나 도움을 직접 원하거나 필요로 한다고 표현한 경우
+- 해당 표현: '원함', '희망함', '받고 싶어함', '원한다고 함', '희망한다고 함', '지원 희망', '욕구가 있음', '욕구가 있는', '욕구 있음', '~욕구', '원하고 있음', '희망하고 있음', '바라고 있음', '필요함', '필요하다', '필요로 함', '필요로 한다', '~가 필요한', '~이 필요한'
+- 예: '외출 욕구가 있는 어르신' → 외출 관련 서비스 전체 direct_need=true
+- 예: '휠체어가 필요한 어르신' → 복지용구 관련 서비스 direct_need=true
+- 예: '식사도움이 필요하고 외출 욕구가 있는' → 식사 관련과 외출 관련 모두 true
+- 희망/필요 표현은 바로 앞에 연결된 대상에만 적용
+- 욕구 표현이 연결된 대상이 중분류 자체인 경우(예: "방문요양이 필요함", "주야간보호를 원함") → 그 중분류 안의 모든 소분류를 true로 표시한다
+- 욕구 표현이 연결된 대상이 특정 소분류인 경우(예: "정서 지원이 필요함", "식사 도움을 원함") → 그 소분류만 true, 같은 중분류의 다른 소분류는 false
+  (예: '외출욕구가 있음' → 이동지원 중분류의 기타·외출동행·차량지원 전부 true)
+  (예: '방문요양이 필요함' → 방문요양 중분류의 모든 소분류 true)
+  (예: '목욕을 원함' → 방문목욕 중분류의 모든 소분류 true)
+  (예: '정서 지원이 필요함' → 정서지원 소분류만 true, 방문요양의 다른 소분류는 false)
+  (예: '식사도움을 희망' → 식사 관련 소분류만 true, 같은 중분류의 인지관리 등은 false)
+- 직접 욕구/필요 표현이 특정 영역(식사, 외출, 목욕 등)에 해당하면 해당 영역의 관련 서비스만 true로 표시한다
+
+direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
+- 식사·영양 관련 상태 표현: "반찬을 못함", "식사 준비 어려움", "자주 배고파함", "허기짐", "굶는 편", "잘 못 먹음", "영양이 부족해 보임", "차려 먹기 어렵다", "챙겨 먹기 어렵다", "기운이 없다", "체중이 준다"
+- 환경·건강·위생·낙상·영양 문제를 조사자 또는 시스템이 필요하다고 판단한 경우
+- 벌레·주거 문제 등으로 방역소독이 추천되더라도 사용자가 직접 원한다고 표현하지 않은 경우
+
+설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
+
+출력 형식:
+{{
+  "results": [
+    {{
+      "index": 12,
+      "선택이유": "무릎통증으로 이동이 어렵다고 하였으므로 이동지원 서비스를 검토할 수 있음",
+      "direct_need": false
+    }}
+  ]
+}}
+
+서비스 목록:
+{service_text}
+
+사용자 사례:
+{query_for_ai}
+"""
+        try:
+            res = client.responses.create(
+                model="gpt-4.1-mini",
+                input=prompt,
+                temperature=0,
+                timeout=90
+            )
+
+            if hasattr(res, "usage"):
+                try:
+                    # 토큰 수는 관리자 통계용 DB에만 저장하고 Render 로그에는 출력하지 않음
+                    add_token_usage(res.usage.input_tokens, res.usage.output_tokens)
+                except Exception:
+                    pass
+
+            text = res.output_text
+            try:
+                parsed = json.loads(text)
+            except:
+                match = re.search(r'\{.*\}', text, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group())
+                else:
+                    parsed = {"results": []}
+
+            raw_results = parsed.get("results", [])[:50]
+
+            final_results = []
+
+            for r in raw_results:
+                idx = int(r.get("index", -1))
+
+                if 0 <= idx < len(service_df):
+                    row = service_df.iloc[idx]
+
+                    final_results.append({
+                        "대분류": row.get("대분류", ""),
+                        "중분류": row.get("중분류", ""),
+                        "서비스내용": row.get("서비스내용", ""),
+                        "선택이유": r.get("선택이유", ""),
+                        "direct_need": bool(r.get("direct_need", False)),
+                        "_ai_picked": True
+                    })
+
+            # direct_need 기준: AI가 판단한 값 그대로 사용
+            for item in final_results:
+                if infer_direct_need_from_query(query, item):
+                    item["direct_need"] = True
+
+            # 선택이유에서 실제 존재하지 않는 복지용구 품목명 제거
+            INVALID_WELFARE_TERMS = ["욕실안전", "보행보조", "배변보조", "이동보조", "욕창예방", "위생지원"]
+            for item in final_results:
+                reason = str(item.get("선택이유", ""))
+                for term in INVALID_WELFARE_TERMS:
+                    reason = reason.replace(term + ", ", "").replace(", " + term, "").replace(term, "")
+                item["선택이유"] = reason
+
+            # 방문구강관리 하드 가드: 입력에 구강·치아 단서가 없으면 강제 제거 (GPT 오추천 차단)
+            ORAL_CLUES = ["구강", "입안", "입속", "칫솔질", "양치", "잇몸", "치아", "치주",
+                          "입냄새", "구취", "백태", "구내염", "입마름", "구강건조", "틀니"]
+            _q_oral = query.replace(" ", "")
+            if not any(c in _q_oral for c in ORAL_CLUES):
+                final_results = [it for it in final_results
+                                 if "구강" not in str(it.get("중분류", ""))]
+
+            final_results.sort(
+                key=lambda x: (
+                    0 if x.get("direct_need") else 1,
+                    str(x.get("대분류", "")).strip(),
+                    1 if str(x.get("중분류", "")).strip() == "기타" else 0,
+                    str(x.get("중분류", "")).strip(),
+                    0 if x.get("_ai_picked") else 1,
+                    str(x.get("서비스내용", "")).strip()
+                )
+            )
+
+            # 검색 로그 적재 — 일자별 지역 클릭수 집계용 (IP 미수집, 지역/검색구분만)
+            if os.getenv("RENDER"):
+                _pv_threading.Thread(
+                    target=_region_log_insert,
+                    args=(selected_sido, selected_sigungu, "desc"),
+                    daemon=True
+                ).start()
+
+            # ======================
+            # [후처리] 난청/청각 문제 → 의사소통지원 강제 포함
+            # ======================
+            q_norm_hearing = query.replace(" ", "").lower()
+            has_hearing_comm_need = any(k in q_norm_hearing for k in [
+                "난청", "청각장애", "귀가어두움", "귀가어두워",
+                "소리를못알아듣", "소리를알아듣지못",
+                "말소리를못알아듣", "말소리를알아듣지못",
+                "듣지못함", "잘못들음", "잘안들림", "소리가안들림",
+                "대화어려움", "의사소통어려움"
+            ])
+
+            if has_hearing_comm_need:
+                existing_keys = set(
+                    (str(item.get("대분류", "")).strip(),
+                     str(item.get("중분류", "")).strip(),
+                     str(item.get("서비스내용", "")).strip())
+                    for item in final_results
+                )
+
+                for _, srow in service_df.iterrows():
+                    s_main = str(srow.get("대분류", "")).strip()
+                    s_mid  = str(srow.get("중분류", "")).strip()
+                    s_sub  = str(srow.get("서비스내용", "")).strip()
+
+                    if s_main == "일상생활돌봄" and s_mid == "의사소통지원":
+                        if (s_main, s_mid, s_sub) not in existing_keys:
+                            final_results.append({
+                                "대분류": s_main,
+                                "중분류": s_mid,
+                                "서비스내용": s_sub,
+                                "선택이유": "난청으로 소리를 알아듣기 어려워 의사소통지원 서비스 검토가 필요함",
+                                "direct_need": any(w in q_norm_hearing for w in ["필요함", "필요하다", "필요로함", "원함", "희망함"]),
+                                "_ai_picked": False
+                            })
+                            existing_keys.add((s_main, s_mid, s_sub))
+
+            # ======================
+            # [후처리] 몸씻기/비누칠/부분도움 → 방문요양-신체활동지원 강제 포함 및 정서지원 오탐 제거
+            # ======================
+            q_norm_bodycare = query.replace(" ", "")
+            has_bodycare_need = (
+                any(k in q_norm_bodycare for k in ["몸씻", "씻", "비누칠", "비누질", "샤워", "신체청결"])
+                and any(k in q_norm_bodycare for k in ["도움", "부분도움", "필요", "못함", "수행하지못", "어려움"])
+            )
+
+            if has_bodycare_need:
+                final_results = [
+                    item for item in final_results
+                    if not (
+                        str(item.get("대분류", "")).strip() == "요양"
+                        and str(item.get("중분류", "")).strip() == "방문요양"
+                        and str(item.get("서비스내용", "")).strip() == "정서지원"
+                    )
+                ]
+
+                existing_keys = set(
+                    (str(item.get("대분류", "")).strip(),
+                     str(item.get("중분류", "")).strip(),
+                     str(item.get("서비스내용", "")).strip())
+                    for item in final_results
+                )
+
+                for _, srow in service_df.iterrows():
+                    s_main = str(srow.get("대분류", "")).strip()
+                    s_mid  = str(srow.get("중분류", "")).strip()
+                    s_sub  = str(srow.get("서비스내용", "")).strip()
+
+                    if s_main == "요양" and s_mid == "방문요양" and s_sub == "신체활동지원":
+                        if (s_main, s_mid, s_sub) not in existing_keys:
+                            final_results.append({
+                                "대분류": s_main,
+                                "중분류": s_mid,
+                                "서비스내용": s_sub,
+                                "선택이유": "혼자서는 몸 씻기와 비누칠을 깨끗하게 수행하기 어려워 신체활동지원 검토가 필요함",
+                                "direct_need": True,
+                                "_ai_picked": False
+                            })
+                            existing_keys.add((s_main, s_mid, s_sub))
+
+            # ======================
+            # [규칙 1] 기초사정 자동 포함
+            # 같은 중분류 안에 다른 소분류가 이미 검색된 경우,
+            # "기초사정"이 service_df에 존재하면 무조건 함께 포함
+            # ======================
+            existing_keys = set(
+                (str(item.get("대분류", "")).strip(),
+                 str(item.get("중분류", "")).strip(),
+                 str(item.get("서비스내용", "")).strip())
+                for item in final_results
+            )
+            middle_cats_in_results = set(k[1] for k in existing_keys)
+
+            for _, srow in service_df.iterrows():
+                s_main = str(srow.get("대분류", "")).strip()
+                s_mid  = str(srow.get("중분류", "")).strip()
+                s_sub  = str(srow.get("서비스내용", "")).strip()
+                if s_sub == "기초사정" and s_mid in middle_cats_in_results:
+                    if (s_main, s_mid, s_sub) not in existing_keys:
+                        final_results.append({
+                            "대분류": s_main,
+                            "중분류": s_mid,
+                            "서비스내용": s_sub,
+                            "선택이유": f"{s_mid} 서비스 제공 전 기초사정을 통해 대상자의 상태와 필요를 파악하는 것이 필요함",
+                            "direct_need": False,
+                            "_ai_picked": False
+                        })
+                        existing_keys.add((s_main, s_mid, s_sub))
+
+            # ======================
+            # [규칙 1-2] 목욕 도움/지원 필요 맥락이 있을 때만 방문목욕 소분류 강제 포함
+            # 단순히 목욕 단어가 나오는 것만으로는 강제 추가하지 않는다.
+            # "혼자 목욕 가능", "스스로 씻기 가능" 같은 자립 표현이 있으면 제외한다.
+            # ======================
+            q_norm_bath_pre = query.replace(" ", "").lower()
+
+            # 목욕 도움/지원이 필요한 맥락 키워드
+            bath_need_keywords = [
+                "목욕도움", "목욕지원", "목욕희망", "목욕원함", "방문목욕",
+                "씻겨", "씻기도움", "씻기지원", "목욕케어", "목욕서비스",
+                "샤워도움", "샤워지원", "목욕어려움", "목욕힘듦", "목욕불가",
+                "목욕못함", "목욕스스로어렵", "혼자씻기어렵", "혼자목욕어렵",
+                "목욕필요", "목욕욕구", "목욕바람",
+                "몸씻", "몸씻기", "씻을때", "씻을때도움", "몸을씻",
+                "비누칠", "비누질", "등씻기", "머리감기", "샤워",
+                "부분도움", "깨끗하게수행하지못", "신체청결", "청결유지어려움",
+            ]
+            # 목욕 자립 표현 (이런 표현이 있으면 방문목욕 강제 추가 안 함)
+            bath_independent_keywords = [
+                "혼자목욕가능", "혼자씻기가능", "혼자씻을수있", "스스로목욕가능",
+                "목욕혼자가능", "씻기혼자가능", "혼자목욕함", "혼자씻음",
+                "목욕스스로가능", "목욕독립적", "목욕도혼자가능",
+            ]
+            has_bath_keyword = any(k in q_norm_bath_pre for k in bath_need_keywords)
+            if any(k in q_norm_bath_pre for k in ["몸씻", "씻을때", "비누칠", "비누질", "샤워", "신체청결"]) and any(k in q_norm_bath_pre for k in ["도움", "부분도움", "못함", "어려움", "필요"]):
+                has_bath_keyword = True
+            # 자립 표현이 명시적으로 있으면 강제 추가 취소
+            if any(k in q_norm_bath_pre for k in bath_independent_keywords):
+                has_bath_keyword = False
+            if has_bath_keyword:
+                is_car_bath_pre = any(k in q_norm_bath_pre for k in [
+                    "차량목욕", "목욕차", "차가와서", "차로목욕",
+                    "차량으로목욕", "차가오는", "차량이와서", "차량"
+                ])
+                is_home_bath_pre = any(k in q_norm_bath_pre for k in [
+                    "집에서목욕", "가정에서목욕", "가정내목욕",
+                    "집에서씻", "가정방문목욕", "집에서하는목욕", "가정에서", "집에서"
+                ])
+                # 희망욕구 여부 — 목욕 관련 표현 근처에 희망/요청 표현이 함께 있을 때만 직접욕구로 인정
+                # 예: "목욕 도움을 원함", "방문목욕 희망", "씻겨주기를 바람" → True
+                # 예: "혼자 목욕 가능", "거의 매일 목욕함" → False (방문목욕 서비스를 요청한 게 아님)
+                bath_direct_patterns = [
+                    "목욕도움", "목욕지원", "목욕희망", "목욕원함", "목욕원한다",
+                    "목욕받고싶", "목욕욕구", "목욕바람", "목욕필요",
+                    "방문목욕희망", "방문목욕원함", "방문목욕필요",
+                    "씻겨주기희망", "씻겨주기원함", "씻겨주기바람",
+                    "씻기도움희망", "씻기도움원함", "씻기필요", "씻을때도움필요",
+                    "몸씻기필요", "비누칠도움", "부분도움필요", "신체청결필요",
+                    "목욕서비스희망", "목욕서비스원함",
+                ]
+                is_bath_direct = (
+                    any(p in q_norm_bath_pre for p in bath_direct_patterns)
+                    or any(w in q_norm_bath_pre for w in ["필요함", "필요하다", "도움이필요", "도움필요", "원함", "희망함"])
+                )
+
+                # 기존에 AI가 추가한 방문목욕 소분류를 전부 제거하고 새로 통제
+                final_results = [
+                    item for item in final_results
+                    if not (str(item.get("대분류","")).strip() == "요양"
+                            and str(item.get("중분류","")).strip() == "방문목욕")
+                ]
+                existing_keys = set(
+                    (str(item.get("대분류","")).strip(),
+                     str(item.get("중분류","")).strip(),
+                     str(item.get("서비스내용","")).strip())
+                    for item in final_results
+                )
+
+                for _, srow in service_df.iterrows():
+                    s_main = str(srow.get("대분류", "")).strip()
+                    s_mid  = str(srow.get("중분류", "")).strip()
+                    s_sub  = str(srow.get("서비스내용", "")).strip()
+                    if s_main != "요양" or s_mid != "방문목욕":
+                        continue
+                    if is_car_bath_pre and not is_home_bath_pre:
+                        if "차량" not in s_sub:
+                            continue
+                    # 그 외(가정 명시 또는 일반 목욕): 둘 다 포함
+                    if (s_main, s_mid, s_sub) not in existing_keys:
+                        final_results.append({
+                            "대분류": s_main,
+                            "중분류": s_mid,
+                            "서비스내용": s_sub,
+                            "선택이유": f"방문목욕 서비스 제공 시 {s_sub}을 통해 대상자의 목욕 지원이 필요함",
+                            "direct_need": is_bath_direct,
+                            "_ai_picked": False
+                        })
+                        existing_keys.add((s_main, s_mid, s_sub))
+
+            # ======================
+            # [규칙 2] 요양 대분류 → 해당 중분류 소분류 전체 포함
+            # 검색 결과에 "요양" 대분류가 있으면,
+            # 그 중분류의 모든 소분류를 service_df에서 자동 추가
+            # 단, "방문목욕" 중분류는 쿼리 문맥에 따라 구분
+            # ======================
+            lt_middles_in_results = set(
+                str(item.get("중분류", "")).strip()
+                for item in final_results
+                if str(item.get("대분류", "")).strip() == "요양"
+            )
+
+            if lt_middles_in_results:
+                q_norm_bath = query.replace(" ", "").lower()
+
+                for _, srow in service_df.iterrows():
+                    s_main = str(srow.get("대분류", "")).strip()
+                    s_mid  = str(srow.get("중분류", "")).strip()
+                    s_sub  = str(srow.get("서비스내용", "")).strip()
+
+                    if s_main != "요양":
+                        continue
+                    if s_mid not in lt_middles_in_results:
+                        continue
+
+                    # 방문목욕은 규칙1-2에서 이미 처리 → 여기선 제외
+                    if s_mid == "방문목욕":
+                        continue
+
+                    if (s_main, s_mid, s_sub) not in existing_keys:
+                        final_results.append({
+                            "대분류": s_main,
+                            "중분류": s_mid,
+                            "서비스내용": s_sub,
+                            "선택이유": f"{s_mid} 서비스를 이용하는 경우 {s_sub}도 함께 검토할 수 있음",
+                            "direct_need": False,
+                            "_ai_picked": False
+                        })
+                        existing_keys.add((s_main, s_mid, s_sub))
+
+            # 직접 욕구 재보정 — 후처리로 추가된 항목까지 포함
+            for item in final_results:
+                if infer_direct_need_from_query(query, item):
+                    item["direct_need"] = True
+
+            # 추가 후 다시 정렬
+            final_results.sort(
+                key=lambda x: (
+                    0 if x.get("direct_need") else 1,
+                    str(x.get("대분류", "")).strip(),
+                    1 if str(x.get("중분류", "")).strip() == "기타" else 0,
+                    str(x.get("중분류", "")).strip(),
+                    0 if x.get("_ai_picked") else 1,
+                    str(x.get("서비스내용", "")).strip()
+                )
+            )
+
+            if wound_context:
+                wound_filtered = []
+
+                for item in final_results:
+                    service_name = str(item.get("서비스내용", "")).strip()
+
+                    if service_name == "소독":
+                        continue
+
+                    wound_filtered.append(item)
+
+                final_results = wound_filtered
+
+            has_medical_tube = any(
+                str(item.get("대분류", "")).strip() == "보건의료" and
+                str(item.get("중분류", "")).strip() == "방문진료" and
+                str(item.get("서비스내용", "")).strip() == "의료처치(욕창, 루, 튜브관리 등)"
+                for item in final_results
+            )
+
+            has_infection = any(
+                str(item.get("대분류", "")).strip() == "보건의료" and
+                str(item.get("중분류", "")).strip() == "방문진료" and
+                str(item.get("서비스내용", "")).strip() == "감염관리"
+                for item in final_results
+            )
+
+            if has_medical_tube and not has_infection:
+                final_results.append({
+                    "대분류": "보건의료",
+                    "중분류": "방문진료",
+                    "서비스내용": "감염관리",
+                    "선택이유": "의료처치(욕창, 루, 튜브관리 등)가 필요한 경우 감염관리도 함께 검토가 필요함",
+                    "_ai_picked": False
+                })
+
+            # ======================
+            # ======================
+            # [후처리] 목욕 키워드만 있을 때 주거환경개선 제외
+            # ======================
+            if has_bath_keyword:
+                final_results = [
+                    item for item in final_results
+                    if str(item.get("중분류", "")).strip() != "주거환경개선"
+                ]
+
+            # 복지용구 대여/구입 후처리
+            # 쿼리에 휠체어·침대·욕조 등 대여 품목 명시 없으면 복지용구 대여 제거
+            # ======================
+            q_norm_welfare = query.replace(" ", "").lower()
+            rental_keywords = [
+                "휠체어", "전동침대", "수동침대", "침대", "이동욕조", "목욕리프트",
+                "배회감지기", "욕창예방매트리스", "경사로", "이승보조기기", "대화형정서지원기기"
+            ]
+            has_rental_keyword = any(k in q_norm_welfare for k in rental_keywords)
+
+            if not has_rental_keyword:
+                final_results = [
+                    item for item in final_results
+                    if not (
+                        str(item.get("대분류","")).strip() == "요양" and
+                        str(item.get("중분류","")).strip() == "복지용구" and
+                        str(item.get("서비스내용","")).strip() == "복지용구 대여"
+                    )
+                ]
+
+            # ======================
+            # [후처리] 치매+기저귀/조호물품 맥락에서는 요실금팬티 복지용구 오탐 제거
+            # ======================
+            if "치매" in q_norm_welfare and any(k in q_norm_welfare for k in ["기저귀", "조호물품", "소변실수", "배뇨실수"]):
+                final_results = [
+                    item for item in final_results
+                    if not (
+                        str(item.get("대분류", "")).strip() == "요양" and
+                        str(item.get("중분류", "")).strip() == "복지용구" and
+                        "요실금팬티" in str(item.get("서비스내용", ""))
+                    )
+                ]
+
+            # ======================
+            # [후처리] "기관" 글자 오탐 방지 — 방문진료·방문간호 제거
+            # 검색어에 "기관"이 포함되어 있지만 실제 의료처치 키워드가 없을 때
+            # AI가 "기관절개" 맥락으로 오해하여 방문진료·방문간호를 추천하는 것을 제거
+            # ======================
+            real_medical_keywords = [
+                "기관절개", "기관절개관", "석션", "흡인", "콧줄", "비위관", "위관",
+                "경관급식", "소변줄", "도뇨줄", "유치도뇨", "장루", "요루", "복막투석",
+                "욕창", "상처", "드레싱", "감염", "의료처치", "튜브"
+            ]
+            q_norm_medical = query.replace(" ", "")
+            has_real_medical = any(k in q_norm_medical for k in real_medical_keywords)
+
+            # ======================
+            # [후처리] 화기·가스 안전 맥락에서는 방역소독 오탐 제거
+            # - 화기관리/가스불/가스차단/화재위험은 주거안전지원으로 봄
+            # - 해충·악취·곰팡이·쓰레기 등 주거위생 문제가 함께 있을 때만 방역소독 허용
+            # ======================
+            q_norm_fire = query.replace(" ", "")
+
+            fire_safety_keywords = [
+                "가스레인지", "가스렌지", "가스불", "화기", "불관리",
+                "가스차단", "화재위험", "불을켜놓", "불을안끄", "불끄는걸잊"
+            ]
+
+            hygiene_keywords = [
+                "방역", "소독", "해충", "벌레", "바퀴", "악취",
+                "곰팡이", "쓰레기", "집이지저분", "청소", "위생"
+            ]
+
+            has_fire_safety = any(k in q_norm_fire for k in fire_safety_keywords)
+            has_hygiene_issue = any(k in q_norm_fire for k in hygiene_keywords)
+
+            if has_fire_safety and not has_hygiene_issue:
+                final_results = [
+                    item for item in final_results
+                    if not (
+                        "방역" in str(item.get("서비스내용", "")).strip()
+                        or "소독" in str(item.get("서비스내용", "")).strip()
+                        or "방역" in str(item.get("중분류", "")).strip()
+                        or "소독" in str(item.get("중분류", "")).strip()
+                    )
+                ]
+
+            if "기관" in q_norm_medical and not has_real_medical:
+                final_results = [
+                    item for item in final_results
+                    if not (
+                        str(item.get("중분류", "")).strip() in ("방문진료", "방문간호")
+                    )
+                ]
+
+            filtered_results = final_results
+
+
+            if selected_sido or selected_sigungu:
+                region_df = df.copy()
+
+                sido_col = find_col("시도", "시도명", "광역시도")
+                sigungu_col = find_col("시군구")
+                main_col = find_col("대분류")
+                middle_col = find_col("중분류")
+
+                if selected_sido:
+                    if sido_col:
+                        region_df = region_df[
+                            region_df[sido_col].fillna("").astype(str).apply(normalize_sido) == selected_sido
+                        ]
+                    elif sigungu_col and selected_sido in SIGUNGU_MAP:
+                        region_df = region_df[
+                            region_df[sigungu_col].fillna("").astype(str).apply(normalize_sigungu).isin(SIGUNGU_MAP[selected_sido])
+                        ]
+                    else:
+                        region_df = region_df.iloc[0:0]
+
+                if selected_sigungu and sigungu_col:
+                    region_df = region_df[
+                        region_df[sigungu_col].fillna("").astype(str).apply(normalize_sigungu) == selected_sigungu
+                    ]
+
+                region_keys = set(
+                    (region_df[main_col].fillna("").astype(str).str.strip() if main_col else pd.Series(dtype=str)) + "|" +
+                    (region_df[middle_col].fillna("").astype(str).str.strip() if middle_col else pd.Series(dtype=str))
+                )
+
+                filtered_results = [
+                    item for item in filtered_results
+                    if (
+                        str(item.get("대분류", "")).strip() + "|" +
+                        str(item.get("중분류", "")).strip()
+                    ) in region_keys
+                ]
+            service_results = filtered_results
+            # _ai_picked는 정렬용 내부 플래그이므로 결과에서 제거
+            for item in service_results:
+                item.pop("_ai_picked", None)
+
+
+        except Exception as e:
+            app.logger.exception(e)
+            return render_template_string(ERROR_500_HTML), 500
+
+
+        count = len(service_results)
+
+        if count == 0:
+            warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활환경, 돌봄 필요 상황 등을 조금 더 구체적으로 입력해 주세요."
+
+        elif count >= 15:
+            warning_msg = "15개 이상의 서비스가 검색되었습니다.\n복합적인 서비스 연계가 필요한 대상일 수 있습니다."
+            if not service_results:
+                warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 구체적으로 입력해 주세요."
+                count = 0
+
+        DESC_CACHE[cache_key] = {
+            "results": service_results,
+            "warning": warning_msg,
+            "time": time.time()
+        }
+        trim_desc_cache()
+
+    sigungu_options = SIGUNGU_OPTIONS
+
+    if selected_sido and selected_sido in SIGUNGU_MAP:
+        sigungu_options = SIGUNGU_MAP[selected_sido]
+    else:
+        sigungu_options = []
+
+    return render_template_string(
+        DESC_HTML,
+        style=BASE_STYLE,
+        query=query,
+        results=results,
+        cond_display=cond_display,
+        count=count,
+        service_results=service_results,
+             grouped_service_results=build_grouped_service_results(service_results),
+        warning_msg=warning_msg,
+        selected_sido=selected_sido,
+        selected_sigungu=selected_sigungu,
+        sido_options=SIDO_OPTIONS,
+        sigungu_options=sigungu_options
+    )
+
+# =========================
+# ② 서술형 검색 (GPT 기반) + 팝업/지도 포함
+# =========================
+DESC_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사례별 AI 추천 서비스 찾기</title>
+
+<style>
+
+.item{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  padding:8px 0;
+  cursor:pointer;
+  line-height:1.6;
+}
+
+.item-bullet{
+  flex:0 0 auto;
+}
+
+.item-text{
+  flex:1;
+  min-width:0;
+  white-space:normal;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+.mobile-br{
+  display:none;
+}
+
+@media (max-width:480px){
+  .mobile-br{
+    display:inline;
   }
 }
-async function delEntry(id){
-  if(!confirm('이 입력을 삭제할까요?'))return;
-  mealLoading(true,'삭제 중…');
-  const res = await api('/meal/api/entry/delete',{entry_id:id});
-  if(res.ok)location.reload(); else mealLoading(false);
+
+*{
+  box-sizing: border-box;
 }
-async function addMember(){
-  const inp = document.getElementById('newMember');
-  const name = inp.value.trim();
-  if(!name){inp.focus();return;}
-  mealLoading(true,'추가 중…');
-  const res = await api('/meal/api/member/add',{team_id:TEAM_ID,name:name});
-  if(res.ok)location.reload(); else {mealLoading(false);alert(res.error||'추가 실패');}
+
+.loading-ci{
+  width:132px;
+  margin-top:28px;
+  opacity:0.82;
+  display:block;
 }
-async function delMember(id,name){
-  if(!confirm(`'${name}' 팀원을 명단에서 삭제할까요?\n\n지금까지 입력한 식비 기록은 그대로 남고,\n팀원 선택 명단에서만 빠집니다.`))return;
-  mealLoading(true,'삭제 중…');
-  const res = await api('/meal/api/member/delete',{member_id:id});
-  if(res.ok)location.reload(); else mealLoading(false);
+
+.top-bar{
+  margin-bottom:35px;
 }
-let selMode=false;
-function toggleSelMode(){
-  selMode=!selMode;
-  document.querySelectorAll('.memchk').forEach(c=>{c.style.display=selMode?'block':'none';if(!selMode)c.checked=false;});
-  document.querySelectorAll('.rowdel').forEach(b=>{b.style.display=selMode?'none':'';});
-  document.getElementById('selToggle').style.display=selMode?'none':'';
-  document.getElementById('selDelBtn').style.display=selMode?'':'none';
-  document.getElementById('selCancelBtn').style.display=selMode?'':'none';
-  updateSelCount();
+
+.desc-top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:28px;
 }
-function updateSelCount(){
-  const n=document.querySelectorAll('.memchk:checked').length;
-  document.getElementById('selDelBtn').textContent='선택한 '+n+'명 삭제';
+
+.desc-top-bar .home-button,
+.desc-top-bar .reset-button{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  width:auto !important;
+  height:34px !important;
+  margin:0 !important;
+  padding:0 15px !important;
+
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  border-radius:8px !important;
+  color:#6b7280 !important;
+  backdrop-filter:none;
+
+  font-size:13px !important;
+  font-weight:600 !important;
+  line-height:1 !important;
+  text-decoration:none !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+
+  cursor:pointer;
+  transition:all .15s;
 }
-async function delSelected(){
-  const checked=Array.from(document.querySelectorAll('.memchk:checked'));
-  if(!checked.length){alert('삭제할 팀원을 선택해 주세요.');return;}
-  const names=checked.map(c=>c.dataset.name).join(', ');
-  if(!confirm(`선택한 ${checked.length}명(${names})을 명단에서 삭제할까요?\n\n입력한 식비 기록은 그대로 남고, 팀원 명단에서만 빠집니다.`))return;
-  mealLoading(true,'삭제 중…');
-  const ids=checked.map(c=>parseInt(c.value,10));
-  const res=await api('/meal/api/member/delete-many',{member_ids:ids});
-  if(res.ok)location.reload(); else {mealLoading(false);alert(res.error||'삭제 실패');}
+
+.desc-top-bar .home-button:hover,
+.desc-top-bar .reset-button:hover{
+  background:#f3f4f6 !important;
+  color:#374151 !important;
 }
-async function renameTeam(){
-  const name = prompt('팀 이름', document.getElementById('teamTitle').textContent);
-  if(!name||!name.trim())return;
-  mealLoading(true,'변경 중…');
-  const res = await api('/meal/api/team/rename',{team_id:TEAM_ID,name:name.trim()});
-  if(res.ok)location.reload(); else {mealLoading(false);alert(res.error||'변경 실패');}
+
+.desc-title-row{
+  width:100%;
+  max-width:680px;
+  margin:0 auto 18px auto;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
 }
+
+.desc-title-row h2{
+  grid-column:2;
+  margin:0;
+}
+
+.desc-title-row .service-table-icon-btn{
+  grid-column:3;
+  justify-self:end;
+  position:relative;
+  top:24px;
+  right:10px;
+  z-index:10000;
+}
+
+.service-table-icon-btn{
+  width:auto !important;
+  height:26px !important;
+  padding:0 8px !important;
+  border-radius:999px;
+  border:1px solid #e5e7eb;
+  background:#ffffff;
+  color:#6b7280;
+  font-size:11.5px;
+  font-weight:600;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  box-shadow:none;
+}
+
+.service-table-icon-btn em{
+  font-style:normal;
+  font-size:11.5px;
+}
+
+.service-table-icon-btn:hover{
+  background:#f9fafb;
+  color:#374151;
+}
+
+.service-table-modal{
+  display:none;
+  position:fixed !important;
+  inset:0 !important;
+  z-index:99999 !important;
+  background:rgba(15,23,42,0.58) !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:18px !important;
+}
+
+.service-table-box{
+  width:100%;
+  max-width:820px;
+  max-height:86vh;
+  background:#ffffff;
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 18px 50px rgba(0,0,0,0.28);
+  display:flex;
+  flex-direction:column;
+}
+
+.service-table-header{
+  height:48px;
+  padding:0 16px;
+  background:#f8fafc;
+  border-bottom:1px solid #e5e7eb;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size:15px;
+  font-weight:800;
+  color:#111827;
+}
+
+.service-table-close{
+  width:34px !important;
+  height:34px !important;
+  padding:0 !important;
+  border:none !important;
+  border-radius:999px !important;
+  background:transparent !important;
+  color:#374151 !important;
+  font-size:22px !important;
+  font-weight:800 !important;
+  line-height:1 !important;
+  box-shadow:none !important;
+  cursor:pointer;
+}
+
+.service-table-body{
+  padding:14px;
+  overflow:auto;
+}
+
+.service-table-body img{
+  width:100%;
+  display:block;
+  border-radius:12px;
+  margin-bottom:14px;
+  border:1px solid #e5e7eb;
+}
+
+.service-table-body img:last-child{
+  margin-bottom:0;
+}
+
+@media (max-width:480px){
+  .service-table-box{
+    max-height:88vh;
+    border-radius:14px;
+  }
+
+  .service-table-header{
+    height:44px;
+    font-size:14px;
+  }
+}
+
+@media (max-width:480px){
+  .desc-title-row{
+    gap:6px;
+    margin-bottom:14px;
+  }
+
+  .service-table-icon-btn{
+    width:28px;
+    height:28px;
+    font-size:13px;
+  }
+}
+@media (max-width:480px){
+  .desc-top-bar{
+    gap:8px;
+    margin-bottom:20px;
+  }
+
+  .desc-top-bar .home-button,
+  .desc-top-bar .reset-button{
+    height:30px !important;
+    padding:0 10px !important;
+    font-size:11.5px !important;
+  }
+}
+
+.home-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  width:auto;
+  height:34px;
+  margin-top:0;
+  padding:0 15px;
+  border-radius:8px;
+  background:#5b7ee5;
+  color:#fff;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:500;
+  border:none;
+  cursor:pointer;
+  transition:all .15s;
+  flex:0 0 auto;
+}
+
+.reset-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  width:auto;
+  height:34px;
+  margin-top:0;
+  padding:0 15px;
+  border-radius:8px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  color:#6b7280;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:600;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08);
+  cursor:pointer;
+  transition:all .15s;
+  flex:0 0 auto;
+}
+
+.desc-top-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+
+.reset-button:hover{
+  background:#f3f4f6;
+  color:#374151;
+}
+
+@media (max-width:480px){
+  .home-button,
+  .reset-button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:auto;
+    height:30px;
+    margin-top:0;
+    padding:0 10px;
+    font-size:11.5px;
+    line-height:1;
+    flex:0 0 auto;
+  }
+}
+
+
+.home-button:hover{
+  background:#f3f4f6;
+  color:#374151;
+}
+
+
+body{
+  margin:0;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+}
+
+.container{
+  max-width:720px;
+  margin:auto;
+  padding:30px 20px;
+}
+
+/* 홈버튼 */
+.home{
+  display:inline-block;
+  margin-bottom:20px;
+  text-decoration:none;
+  color:#2563eb;
+  font-size:14px;
+}
+
+/* 제목 */
+.title{
+  text-align:center;
+  margin-bottom:0;
+  padding-bottom:14px;
+}
+
+.title h2{
+  margin:0;
+  font-size:24px;
+}
+
+.title-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap:8px;
+}
+
+.title-row h2{
+  margin:0;
+  line-height:1.2;
+  white-space:nowrap;
+  word-break:keep-all;
+  flex:0 0 auto;
+}
+
+.tip-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  min-width:52px;
+  height:30px;
+  padding:0 12px;
+  margin-top:-1px;
+  border:1px solid #dbeafe;
+  border-radius:999px;
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  color:#2563eb;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:0.3px;
+  line-height:1;
+  cursor:pointer;
+  box-shadow:0 4px 12px rgba(37,99,235,0.14);
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
+.tip-btn:hover{
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(37,99,235,0.34);
+}
+
+.tip-btn:active{
+  transform:translateY(0);
+}
+
+.tip-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.48);
+  z-index:9999;
+  padding:20px;
+  align-items:center;
+  justify-content:center;
+}
+
+.tip-modal.show{
+  display:flex;
+}
+
+.tip-modal-box{
+  width:100%;
+  max-width:620px;
+  max-height:85vh;
+  background:#ffffff;
+  border-radius:22px;
+  box-shadow:0 20px 50px rgba(15,23,42,0.22);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  animation:tipFadeUp 0.18s ease;
+}
+
+.tip-modal-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:18px 20px 14px 20px;
+  border-bottom:1px solid #eef2f7;
+  flex:0 0 auto;
+}
+
+.tip-modal-title{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  font-size:17px;
+  font-weight:800;
+  color:#111827;
+}
+
+.tip-modal-title span{
+  display:inline-block;
+  line-height:1.2;
+}
+
+.tip-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  min-width:52px;
+  height:30px;
+  padding:0 12px;
+  border:1px solid #dbeafe;
+  border-radius:999px;
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  color:#2563eb;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:0.3px;
+  line-height:1;
+  box-shadow:0 4px 12px rgba(37,99,235,0.14);
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
+.tip-close{
+  width:40px;
+  height:40px;
+  border:none;
+  border-radius:999px;
+  background:#f3f4f6;
+  color:#64748b;
+  font-size:24px;
+  line-height:1;
+  cursor:pointer;
+  flex:0 0 auto;
+}
+
+.tip-modal-body{
+  margin-top:18px;
+  padding:16px 18px;
+  border-radius:14px;
+  background:#f1f5f9;
+  border:1px solid #dbeafe;
+}
+
+.tip-notice{
+  margin:18px 0 0 0;              /* 위 박스랑 간격 맞춤 */
+  padding:16px 18px;              /* 내부 여백 통일 */
+  border-radius:16px;             /* 위 박스랑 비슷하게 */
+  background:#f8fbff;
+  border:1px solid #dbeafe;
+  color:#1f2937;
+  font-size:14px;
+  line-height:1.7;
+  word-break:keep-all;
+  overflow-wrap:break-word;       /* 줄바꿈 자연스럽게 */
+}
+.tip-notice p{
+  margin:0;
+  padding-left:1.1em;
+  text-indent:-1.4em;
+}
+
+.tip-example-title{
+  margin:0 0 10px 0;
+  font-size:14px;
+  font-weight:800;
+  color:#2563eb;
+}
+
+.tip-example-box{
+  background:#f9fafb;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:16px;
+}
+
+.tip-example-text{
+  font-size:14px;
+  line-height:1.78;
+  color:#374151;
+  word-break:keep-all;
+}
+
+.tip-row{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin:0 0 8px 0;
+}
+
+.tip-num{
+  width:22px;
+  flex:0 0 22px;
+  text-align:right;
+  font-weight:700;
+  color:#374151;
+}
+
+.tip-text{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.tip-heading{
+  margin:10px 0 6px 0;
+  font-weight:700;
+  color:#374151;
+}
+
+.tip-bullet{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin:0 0 6px 18px;
+}
+
+.tip-dash{
+  width:10px;
+  flex:0 0 10px;
+}
+
+.tip-bullet-text{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.tip-subblock{
+  margin:2px 0 6px 18px;
+  font-weight:700;
+  color:#4b5563;
+}
+
+
+.tip-modal-foot{
+  padding:14px 20px 20px 20px;
+  border-top:1px solid #eef2f7;
+  background:#ffffff;
+  flex:0 0 auto;
+}
+
+.tip-confirm{
+  display:block;
+  width:100%;
+  height:46px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#ffffff;
+  font-size:15px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+}
+
+@keyframes tipFadeUp{
+  from{
+    opacity:0;
+    transform:translateY(14px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+@media (max-width:480px){
+  .title-row{
+    gap:8px;
+  }
+
+  .title h2{
+    font-size:21px;
+  }
+
+  .title-row h2{
+    white-space:nowrap;
+  }
+
+.tip-btn{
+  min-width:54px;
+  height:30px;
+  padding:0 12px;
+  margin-top:-3px;
+  font-size:11px;
+  border:1px solid #dbeafe;
+  box-shadow:0 4px 12px rgba(37,99,235,0.14);
+}
+
+
+  .tip-modal{
+    padding:14px;
+  }
+
+  .tip-modal-box{
+    max-height:88vh;
+    border-radius:18px;
+  }
+
+  .tip-modal-head{
+    padding:16px 16px 12px 16px;
+  }
+
+  .tip-modal-title{
+    gap:10px;
+    font-size:16px;
+  }
+
+  .tip-modal-body{
+    padding:16px 16px 16px 16px;
+  }
+
+  .tip-modal-foot{
+    padding:12px 16px 16px 16px;
+  }
+
+  .tip-notice{
+    font-size:13px;
+    line-height:1.72;
+  }
+
+  .tip-example-text{
+    font-size:12.5px;
+    line-height:1.72;
+  }
+
+  .tip-num{
+    width:20px;
+    flex:0 0 20px;
+  }
+
+.tip-bullet{
+  margin:0 0 6px 18px;
+}
+
+.tip-subblock{
+  margin:2px 0 6px 18px;
+}
+
+.tip-confirm{
+  height:44px;
+  font-size:14px;
+}
+}
+
+
+
+/* 검색 카드 */
+.search-box{
+  background:white;
+  padding:24px 18px;
+  border-radius:20px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* 텍스트 입력 */
+#queryInput{
+  width:100%;
+  height:150px;
+  padding:14px 58px 14px 14px;
+
+  border-radius:12px;
+  border:1px solid #cbd5e1;
+
+  background:#ffffff;
+
+  font-size:15px;
+  line-height:1.7;
+
+  box-shadow:none;
+  resize:none;
+}
+
+#queryInput:focus{
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+}
+
+#queryInput:hover{
+  border-color:#94a3b8;
+}
+
+@media (max-width:768px){
+
+  #queryInput{
+    height:140px;
+  }
+}
+
+textarea:focus{
+  outline:none;
+  border-color:#2563eb;
+}
+
+.warning-box{
+  margin:18px 0 16px 0;
+  padding:14px 20px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.7;
+
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+.warning-icon{
+  flex:0 0 auto;
+  line-height:1.7;
+}
+
+.warning-text{
+  flex:1;
+  min-width:0;
+  white-space:pre-line;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+@media (max-width:480px){
+  .warning-box{
+    font-size:13px;
+    line-height:1.65;
+    padding:13px 14px;
+  }
+
+  .warning-icon{
+    line-height:1.65;
+  }
+
+  .warning-text{
+    line-height:1.65;
+  }
+}
+
+/* 👇 여기다 붙여 */
+#voiceBtn,
+#imgBtn{
+  display:none !important;
+}
+
+@media (max-width:768px){
+  #voiceBtn,
+  #imgBtn{
+    position:absolute !important;
+    right:12px !important;
+    width:42px !important;
+    height:42px !important;
+    min-width:42px !important;
+    max-width:42px !important;
+    margin:0 !important;
+    padding:0 !important;
+    border-radius:50% !important;
+    border:none !important;
+    background:rgba(37,99,235,0.92) !important;
+    color:white !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15) !important;
+    cursor:pointer !important;
+    z-index:30 !important;
+    line-height:1 !important;
+  }
+
+  #voiceBtn{
+    top:20px !important;
+  }
+
+  #imgBtn{
+    top:80px !important;
+  }
+}
+
+#imgBtn{
+  display:none;
+}
+
+@media (max-width:768px){
+  #imgBtn{
+    position:absolute;
+    right:12px;
+    top:90px;
+    width:42px;
+    height:42px;
+    margin:0;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:50%;
+    border:none;
+    background:rgba(37,99,235,0.92);
+    color:white;
+    font-size:18px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15);
+    cursor:pointer;
+    z-index:10;
+  }
+}
+
+/* 버튼 */
+button{
+  width:100%;
+  height:48px;
+  margin-top:12px;
+  border:none;
+  border-radius:10px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+button:hover{
+  opacity:0.9;
+}
+
+/* 설명 */
+.notice{
+  text-align:center;
+  margin-top:14px;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+
+/* 결과 카드 */
+.result{
+  margin-top:24px;
+}
+
+.result-card{
+  background:white;
+  padding:18px;
+  border-radius:14px;
+  margin-bottom:12px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+
+.result-card b{
+  font-size:15px;
+}
+
+.reason{
+  margin-top:6px;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+
+/* 로딩 */
+.loading-step-bar{
+  display:flex;
+  justify-content:center;
+  gap:6px;
+  margin:16px auto 0 auto;
+  width:150px;
+}
+
+.loading-step{
+  flex:1;
+  height:6px;
+  border-radius:999px;
+  background:#e5e7eb;
+  transition:background 0.3s ease, transform 0.3s ease;
+}
+
+.loading-step.active{
+  background:#2563eb;
+  transform:scaleY(1.15);
+}
+
+.loading{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  align-items:center;
+  justify-content:center;
+  z-index:99999;
+}
+
+.loading-box{
+  background:white;
+  width:86%;
+  max-width:320px;
+  padding:34px 24px 26px 24px;
+  border-radius:20px;
+  text-align:center;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+.spinner{
+  border:5px solid #eee;
+  border-top:5px solid #2563eb;
+  border-radius:50%;
+  width:42px;
+  height:42px;
+  margin:auto;
+  animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+  0%{transform:rotate(0deg)}
+  100%{transform:rotate(360deg)}
+}
+
+@media (min-width:769px){
+  #voiceBtn{
+    display:none !important;
+  }
+}
+
+.voice-inline{
+  display:none;
+  margin-top:14px;
+  padding:16px 18px;
+  border-radius:18px;
+  background:#f8fbff;
+  border:1px solid #dbeafe;
+  box-shadow:0 10px 24px rgba(37,99,235,0.08);
+  animation:voiceInlineShow 0.22s ease;
+}
+
+@keyframes voiceInlineShow{
+  from{
+    opacity:0;
+    transform:translateY(6px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+.voice-inline-box{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.voice-wave-wrap{
+  position:relative;
+  width:92px;
+  height:42px;
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.voice-wave{
+  height:34px;
+  display:flex;
+  align-items:flex-end;
+  gap:4px;
+}
+
+.voice-bar{
+  width:5px;
+  border-radius:999px;
+  background:linear-gradient(180deg,#93c5fd 0%, #60a5fa 50%, #2563eb 100%);
+  animation:voiceWave 1s ease-in-out infinite;
+  transform-origin:center bottom;
+}
+
+.voice-bar:nth-child(1){ height:12px; animation-delay:0s; }
+.voice-bar:nth-child(2){ height:20px; animation-delay:0.12s; }
+.voice-bar:nth-child(3){ height:30px; animation-delay:0.24s; }
+.voice-bar:nth-child(4){ height:22px; animation-delay:0.36s; }
+.voice-bar:nth-child(5){ height:14px; animation-delay:0.48s; }
+
+@keyframes voiceWave{
+  0%,100%{
+    transform:scaleY(0.55);
+    opacity:0.45;
+  }
+  50%{
+    transform:scaleY(1.08);
+    opacity:1;
+  }
+}
+
+.voice-inline-text{
+  min-width:0;
+}
+
+.voice-inline-title{
+  font-size:14px;
+  font-weight:700;
+  color:#1e3a8a;
+  margin-bottom:2px;
+}
+
+.voice-inline-subtitle{
+  font-size:12px;
+  color:#64748b;
+  line-height:1.45;
+}
+
+@media (max-width:480px){
+  .voice-inline{
+    margin-top:12px;
+    padding:14px 14px;
+    border-radius:16px;
+  }
+
+  .voice-inline-box{
+    gap:12px;
+  }
+
+  .voice-wave-wrap{
+    width:80px;
+    height:38px;
+  }
+
+  .voice-wave{
+    height:30px;
+    gap:3px;
+  }
+
+  .voice-bar{
+    width:4px;
+  }
+
+  .voice-inline-title{
+    font-size:13px;
+  }
+
+  .voice-inline-subtitle{
+    font-size:11px;
+  }
+}
+
+@media (min-width:769px){
+  #queryInput::placeholder{
+    white-space:nowrap;
+    color:#6b7280;
+    line-height:1.65;
+  }
+}
+
+@media (max-width:768px){
+  #queryInput::placeholder{
+    white-space:pre-wrap;
+    color:#6b7280;
+    line-height:1.7;
+  }
+}
+
+.ai-model-wrap{
+  margin-top:8px;
+  margin-bottom:28px;
+  width:100%;
+  display:flex;
+  justify-content:center;
+}
+
+.ai-model-badge{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  margin:0 auto;
+  background:transparent;
+  border:none;
+  box-shadow:none;
+}
+
+.ai-model-top{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  margin:0 auto;
+  font-size:9px;
+  font-weight:400;
+  color:#94a3b8;
+  line-height:1;
+  text-align:center;
+}
+
+.ai-model-icon{
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:#94a3b8;
+  box-shadow:none;
+  flex:0 0 auto;
+}
+
+.ai-engine-text{
+  font-size:10px !important;
+  font-weight:400 !important;
+  color:#94a3b8 !important;
+  letter-spacing:0;
+  line-height:1;
+  text-align:center;
+}
+
+.ai-logo{
+  width:13px;
+  height:13px;
+  object-fit:contain;
+}
+
+.ai-model-top{
+  gap:3px;
+}
+
+/* ===== 사례기반 지역선택 박스 ===== */
+
+.desc-warning{
+  margin:0 0 16px 0;
+  padding:14px 16px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.65;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+
+.desc-warning-icon{
+  flex:0 0 auto;
+  font-size:15px;
+  line-height:1.4;
+  margin-top:1px;
+}
+
+.desc-warning-text{
+  flex:1;
+  white-space:pre-line;
+  word-break:keep-all;
+}
+
+@media (max-width:480px){
+  .desc-warning{
+    margin:0 0 14px 0;
+    padding:13px 14px;
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  .desc-warning-icon{
+    font-size:14px;
+    margin-top:1px;
+  }
+}
+
+.desc-warning{
+  margin:12px 0 0 0;
+  padding:14px 16px;
+  border-radius:12px;
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+  font-size:14px;
+  line-height:1.65;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+
+.desc-warning-icon{
+  flex:0 0 auto;
+  font-size:15px;
+  line-height:1.4;
+  margin-top:1px;
+}
+
+.desc-warning-text{
+  flex:1;
+  white-space:pre-line;
+  word-break:keep-all;
+}
+
+@media (max-width:480px){
+  .desc-warning{
+    margin:12px 0 0 0;
+    padding:13px 14px;
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  .desc-warning-icon{
+    font-size:14px;
+    margin-top:1px;
+  }
+}
+
+.privacy-warning{
+  position:relative;
+  margin:30px 0 0 0;
+  padding:26px 18px 16px;
+  border-radius:12px;
+  background:#fff1f2;
+  border:1px solid #fb7185;
+  color:#9f1239;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.65;
+  text-align:left;
+}
+
+.privacy-warning .siren-icon{
+  position:absolute;
+  top:-18px;
+  left:50%;
+  transform:translateX(-50%);
+  width:40px;
+  height:40px;
+  flex:none;
+  margin:0;
+  background:#fff;
+  border:1px solid #fb7185;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 1px 4px rgba(159,18,57,0.12);
+}
+
+.privacy-warning .siren-svg{
+  width:22px;
+  height:23px;
+}
+
+.privacy-warning-text{
+  display:block;
+  width:100%;
+  text-align:left;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+.privacy-warning-text p{
+  margin:0;
+  padding-left:0;
+  text-indent:0;
+}
+
+.privacy-warning-text .pw-sub{
+  display:inline;
+}
+
+@media (max-width:480px){
+  .privacy-warning-text .pw-sub{
+    display:block;
+    margin-top:6px;
+  }
+}
+
+@media (min-width:481px){
+  .privacy-warning{
+    padding:28px 28px 18px;
+  }
+}
+
+@media (max-width:480px){
+  .privacy-warning{
+    margin:28px 0 0 0;
+    padding:24px 14px 14px;
+    font-size:13px;
+  }
+}
+.siren-icon{
+  width:54px;
+  height:56px;
+  flex:0 0 54px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:0;
+}
+
+.siren-svg{
+  width:54px;
+  height:56px;
+  display:block;
+}
+@media (max-width:480px){
+  .siren-icon{
+    width:48px;
+    height:50px;
+    flex-basis:48px;
+  }
+
+  .siren-svg{
+    width:48px;
+    height:50px;
+  }
+}
+
+.ray-left{
+  left:0;
+  top:9px;
+  transform:rotate(45deg);
+}
+
+.ray-right{
+  right:0;
+  top:9px;
+  transform:rotate(-45deg);
+}
+
+.ray-top{
+  left:24px;
+  top:0;
+  width:5px;
+  height:20px;
+}
+
+@keyframes sirenBlink{
+  0%, 100%{
+    background:#ef4444;
+  }
+  50%{
+    background:#dc2626;
+  }
+}
+
+@media (max-width:480px){
+  .siren-icon{
+    width:48px;
+    height:43px;
+    flex-basis:48px;
+  }
+
+  .siren-light{
+    left:12px;
+    top:11px;
+    width:24px;
+    height:25px;
+    border-width:4px;
+  }
+
+  .siren-base{
+    left:4px;
+    bottom:3px;
+    width:40px;
+    height:14px;
+    border-width:4px;
+  }
+
+  .siren-ray{
+    width:17px;
+    height:5px;
+  }
+
+  .ray-left{
+    left:0;
+    top:8px;
+  }
+
+  .ray-right{
+    right:0;
+    top:8px;
+  }
+
+  .ray-top{
+    left:22px;
+    top:0;
+    width:5px;
+    height:17px;
+  }
+}
+
+.desc-region-box{
+  margin-bottom:18px;
+  padding:14px 14px 12px 14px;
+  border-radius:16px;
+  background:#eef4ff;
+  border:1px solid #c7d7ff;
+}
+
+.desc-region-title{
+  font-size:16px;
+  font-weight:800;
+  color:#111827;
+  margin-bottom:10px;
+}
+
+.desc-region-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.desc-region-item{
+  display:flex;
+  flex-direction:column;
+}
+
+.desc-region-item label{
+  margin:0 0 6px 0;
+  font-size:13px;
+  font-weight:700;
+  color:#374151;
+  line-height:1.2;
+}
+
+.desc-region-item select{
+  width:100%;
+  height:40px;
+  margin:0;
+  padding:0 10px;
+  border-radius:10px;
+  border:1px solid #cbd5e1;
+  font-size:14px;
+  background:#ffffff;
+  box-sizing:border-box;
+}
+
+@media (max-width:480px){
+  .desc-region-box{
+    padding:14px 12px 12px 12px;
+    border-radius:16px;
+  }
+
+  .desc-region-row{
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    align-items:start;
+  }
+
+  .desc-region-title{
+    margin-bottom:10px;
+    font-size:15px;
+  }
+
+  .desc-region-item label{
+    margin:0 0 5px 0;
+    font-size:12px;
+    line-height:1.2;
+  }
+
+  .desc-region-item select{
+    width:100%;
+    height:40px;
+    margin:0;
+    padding:0 10px;
+    font-size:13px;
+  }
+}
+
+
+.direct-need-box{
+  margin:14px 0 18px 0;
+  padding:14px;
+
+  background:#eef4ff;
+
+  border:2px solid #5b8ff9;
+
+  border-radius:16px;
+}
+
+.direct-need-title{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+
+  height:32px;
+  padding:0 14px 0 10px;
+
+  border-radius:999px;
+
+  background:#ffffff;
+  border:1px solid #93c5fd;
+
+  color:#2563eb;
+
+  font-size:12px;
+  font-weight:800;
+  line-height:1;
+  margin-bottom:16px;
+}
+
+
+.direct-need-tooltip-wrap{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+}
+.direct-need-tooltip-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#93c5fd;
+  color:#1e40af;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+  flex-shrink:0;
+  user-select:none;
+  border:none;
+  padding:0;
+  margin:0;
+  line-height:1;
+  font-family:inherit;
+  -webkit-appearance:none;
+  appearance:none;
+}
+.direct-need-tooltip-box{
+  display:none;
+  position:absolute;
+  left:24px;
+  top:50%;
+  transform:translateY(-50%);
+  background:#1e3a8a;
+  color:#fff;
+  font-size:12px;
+  font-weight:500;
+  line-height:1.55;
+  padding:8px 12px;
+  border-radius:8px;
+  width:max-content;
+  max-width:min(360px, calc(100vw - 64px));
+  white-space:normal;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+  z-index:999;
+  box-shadow:0 4px 14px rgba(0,0,0,0.18);
+  pointer-events:none;
+}
+.direct-need-tooltip-wrap:hover .direct-need-tooltip-box{
+  display:block;
+}
+
+@media (max-width:480px){
+  .direct-need-box{
+    position:relative;
+  }
+
+  .direct-need-tooltip-wrap{
+    position:static;
+  }
+
+  .direct-need-tooltip-box{
+    left:12px;
+    right:12px;
+    top:56px;
+    transform:none;
+    width:auto;
+    max-width:none;
+    box-sizing:border-box;
+    text-align:left;
+    z-index:5000;
+  }
+}
+.cute-star{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:17px;
+  height:17px;
+  margin-right:0px;
+  color:#f59e0b;
+  font-size:15px;
+  font-weight:900;
+  line-height:1;
+  text-shadow:0 1px 2px rgba(180,83,9,0.25);
+  transform:rotate(-8deg);
+}
+
+.mini-cute-star{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  height:auto;
+  margin-right:4px;
+  color:#f59e0b;
+  font-size:12px;
+  font-weight:900;
+  line-height:1;
+  text-shadow:0 1px 2px rgba(180,83,9,0.25);
+  vertical-align:0;
+  transform:rotate(-8deg);
+}
+
+.direct-need-card{
+  border:1px solid #bfdbfe !important;
+  background:#ffffff !important;
+  margin-bottom:14px !important;
+}
+
+.direct-need-card:last-child{
+  margin-bottom:0 !important;
+}
+
+.grouped-result-card{
+  background:#ffffff !important;
+  border:0.5px solid #e5e7eb !important;
+  border-radius:16px !important;
+  padding:0 !important;
+  box-shadow:none !important;
+  overflow:hidden;
+  transition:none !important;
+}
+
+.grouped-result-card:hover{
+  border:0.5px solid #e5e7eb !important;
+  box-shadow:none !important;
+}
+
+.direct-need-card{
+  border:1px solid #85B7EB !important;
+}
+
+.group-card-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:11px 14px 10px;
+  gap:10px;
+  border-bottom:0.5px solid #f1f5f9;
+}
+
+.group-title-area{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.group-title-meta{
+  font-size:10px;
+  color:#9ca3af;
+  letter-spacing:0.3px;
+}
+
+.group-title-grid{
+  display:flex;
+  align-items:flex-start;
+  gap:4px;
+  flex-wrap:wrap;
+}
+
+.group-title-col{
+  min-width:0;
+}
+
+.group-title-label{
+  display:none;
+}
+
+.group-title-value{
+  font-size:15px;
+  font-weight:700;
+  color:#111827;
+  line-height:1.35;
+  letter-spacing:-0.3px;
+  white-space:normal;
+  overflow:visible;
+  text-overflow:clip;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+.group-title-value.main-val{
+  font-size:12px;
+  font-weight:400;
+  color:#6b7280;
+}
+
+.group-title-arrow{
+  font-size:12px;
+  font-weight:400;
+  color:#d1d5db;
+  line-height:1;
+  flex-shrink:0;
+}
+
+.group-search-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:28px;
+  padding:0 10px;
+  border:0.5px solid #d1d5db;
+  border-radius:999px;
+  background:#f9fafb;
+  color:#6b7280;
+  font-size:12px;
+  font-weight:500;
+  text-decoration:none;
+  white-space:nowrap;
+  flex-shrink:0;
+  cursor:pointer;
+}
+
+.sub-service-section{
+  padding:10px 14px 12px;
+}
+
+.sub-service-label{
+  font-size:10px;
+  font-weight:500;
+  color:#9ca3af;
+  letter-spacing:0.4px;
+  text-transform:uppercase;
+  margin-bottom:7px;
+}
+
+.sub-service-tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-bottom:10px;
+}
+
+.sub-service-tab{
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  width:auto !important;
+  height:auto !important;
+  margin-top:0 !important;
+  min-height:30px;
+  padding:4px 12px;
+  border-radius:999px;
+  border:0.5px solid #e5e7eb;
+  background:#f9fafb;
+  font-size:13px;
+  color:#6b7280;
+  cursor:pointer;
+  white-space:normal;
+  word-break:keep-all;
+  line-height:1.4;
+}
+
+.sub-service-tab.active{
+  background:#185FA5;
+  border-color:#185FA5;
+  color:#ffffff;
+}
+
+.sub-service-tab.direct{
+  background:#ffffff;
+  border:1.5px solid #EF9F27;
+  color:#633806;
+  font-weight:500;
+}
+
+.wish-star-sm{
+  width:11px;
+  height:11px;
+  flex-shrink:0;
+}
+
+.reason-box{
+  background:#f9fafb;
+  padding:10px 12px;
+  border-left:2.5px solid #378ADD;
+  border-radius:0 8px 8px 0;
+}
+
+.reason-title{
+  font-size:11px;
+  font-weight:500;
+  color:#9ca3af;
+  margin-bottom:4px;
+  letter-spacing:0.3px;
+  text-transform:uppercase;
+}
+
+.reason-text{
+  font-size:13px;
+  color:#374151;
+  line-height:1.6;
+  word-break:keep-all;
+}
+
+
+@media (max-width:480px){
+  .group-card-top{
+    flex-direction:row;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:6px;
+    padding:10px 10px 6px !important;
+  }
+
+  .group-title-area{
+    flex:1 1 auto;
+    width:auto;
+    min-width:0;
+  }
+
+  .group-title-grid{
+    gap:3px;
+    align-items:flex-start;
+  }
+
+  .group-title-value{
+    font-size:14px;
+    font-weight:750;
+    line-height:1.35;
+  }
+
+  .group-title-value.main-val{
+    font-size:11px;
+    line-height:1.35;
+  }
+
+  .group-title-arrow{
+    font-size:11px;
+    line-height:1.35;
+  }
+
+  .group-search-btn{
+    align-self:flex-start;
+    height:24px;
+    min-height:24px;
+    padding:0 8px;
+    font-size:11px;
+    margin-top:2px;
+    flex-shrink:0;
+  }
+
+  .sub-service-section{
+    padding:6px 10px 10px !important;
+  }
+
+  .sub-service-label{
+    margin-bottom:5px;
+  }
+
+  .sub-service-tabs{
+    gap:5px;
+    margin-bottom:8px;
+  }
+
+  .sub-service-tab{
+    font-size:12.5px !important;
+    padding:6px 10px !important;
+    min-height:28px;
+  }
+
+  .direct-need-box{
+    margin:14px 0 18px 0;
+    padding:14px;
+    background:#eef4ff;
+    border:2px solid #5b8ff9;
+    border-radius:16px;
+  }
+
+  .direct-need-title{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    height:32px;
+    padding:0 14px 0 10px;
+    border-radius:999px;
+    background:#ffffff;
+    border:1px solid #93c5fd;
+    color:#2563eb;
+    font-size:12px;
+    font-weight:800;
+    line-height:1;
+    margin-bottom:16px;
+  }
+
+  .cute-star{
+    width:auto;
+    height:auto;
+    margin-right:0;
+    font-size:11px;
+  }
+}
+
+
+/* ===== 개인정보 입력 주의 팝업 ===== */
+#privacyModal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.48);
+  z-index:10010;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  overscroll-behavior:contain;
+  touch-action:none;
+}
+
+body.privacy-modal-open{
+  overflow:hidden !important;
+  position:fixed !important;
+  width:100% !important;
+}
+
+#privacyBox{
+  width:100%;
+  max-width:390px;
+  background:#ffffff;
+  border-radius:24px;
+  padding:30px 24px 24px 24px;
+  text-align:center;
+  box-shadow:0 20px 50px rgba(0,0,0,0.22);
+}
+
+.privacy-icon{
+  width:46px;
+  height:46px;
+  margin:0 auto 14px auto;
+  border-radius:50%;
+  background:#fee2e2;
+  color:#dc2626;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:28px;
+  font-weight:900;
+}
+
+.privacy-icon.siren-icon{
+  background:#ffffff;
+  border-radius:0;
+  width:56px;
+  height:62px;
+  margin:0 auto 4px auto;
+}
+
+.privacy-icon.siren-icon .siren-svg{
+  width:56px;
+  height:62px;
+  display:block;
+}
+
+.privacy-title{
+  font-size:22px;
+  font-weight:900;
+  color:#111827;
+  margin-bottom:8px;
+}
+
+.privacy-subtitle{
+  font-size:14px;
+  color:#6b7280;
+  line-height:1.55;
+  margin-bottom:18px;
+  word-break:keep-all;
+}
+
+.privacy-text{
+  font-size:14px;
+  line-height:1.7;
+  color:#374151;
+  word-break:keep-all;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:16px 15px;
+  margin-bottom:14px;
+}
+
+.privacy-text b{
+  color:#dc2626;
+}
+
+.privacy-notice{
+  margin:8px 0 12px 0;
+  color:#6b7280;
+  font-size:12px;
+  line-height:1.45;
+  word-break:keep-all;
+}
+
+.privacy-check{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin:12px 0 18px 0;
+  font-size:13px;
+  color:#4b5563;
+  cursor:pointer;
+}
+
+.privacy-check input{
+  width:16px;
+  height:16px;
+  margin:0;
+}
+
+.privacy-confirm{
+  width:100%;
+  height:48px;
+  border:none;
+  border-radius:14px;
+  background:#2563eb;
+  color:#ffffff;
+  font-size:15px;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(37,99,235,0.22);
+}
+
+.privacy-agree-note{
+  margin:14px 0 0 0;
+  font-size:12.5px;
+  color:#4b5563;
+  line-height:1.6;
+  text-align:center;
+  word-break:keep-all;
+}
+
+.privacy-btns{
+  display:flex;
+  gap:10px;
+}
+
+.privacy-btns button{
+  flex:1;
+  width:auto;
+}
+
+.privacy-disagree{
+  height:48px;
+  border:1px solid #d1d5db;
+  border-radius:14px;
+  background:#ffffff;
+  color:#6b7280;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+@media (max-width:480px){
+  #privacyBox{
+    max-width:360px;
+    padding:28px 22px 22px 22px;
+    border-radius:22px;
+  }
+
+  .privacy-title{
+    font-size:21px;
+  }
+
+  .privacy-text,
+  .privacy-subtitle{
+    font-size:13px;
+  }
+}
+
+@media (max-width:480px){
+
+  .desc-title-row{
+    width:100%;
+    max-width:380px;
+    grid-template-columns:1fr;
+    justify-items:center;
+    row-gap:8px;
+    margin-bottom:4px;
+  }
+
+  .desc-title-row h2{
+    grid-column:1;
+    margin-bottom:0;
+  }
+
+  .desc-title-row .service-table-icon-btn{
+    grid-column:1;
+    justify-self:end;
+    margin-right:5px;
+    margin-bottom:-8px;
+    top:auto;
+    right:auto;
+    transform:translateX(-2px);
+    white-space:nowrap;
+    width:auto !important;
+  }
+
+}
+/* ===== 일반욕구 카드 색상 분리 ===== */
+
+.normal-need-card{
+  border:1.5px solid #94a3b8 !important;
+}
+
+.normal-need-card:hover{
+  border:1.5px solid #94a3b8 !important;
+  box-shadow:none !important;
+}
+
+.normal-need-card .group-search-btn{
+  border-color:#cbd5e1 !important;
+  color:#475569 !important;
+}
+
+.normal-need-card .group-search-btn:hover{
+  background:#f1f5f9 !important;
+  border-color:#94a3b8 !important;
+  color:#334155 !important;
+}
+
+.normal-need-card .sub-service-tab{
+  border-color:#cbd5e1 !important;
+  background:#ffffff !important;
+  color:#475569 !important;
+}
+
+.normal-need-card .sub-service-tab:hover{
+  background:#f1f5f9 !important;
+  border-color:#94a3b8 !important;
+  color:#334155 !important;
+}
+
+.normal-need-card .sub-service-tab.active{
+  background:#64748b !important;
+  border-color:#64748b !important;
+  color:#ffffff !important;
+}
+
+.normal-need-card .reason-box{
+  border-left:2.5px solid #94a3b8 !important;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+
+<body>
+
+<!-- ===== 개인정보 입력 주의 팝업 ===== -->
+<div id="privacyModal" onwheel="event.preventDefault()" ontouchmove="event.preventDefault()">
+  <div id="privacyBox">
+
+    <div class="privacy-icon siren-icon">
+  <svg class="siren-svg" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg">
+    <line x1="48" y1="6" x2="48" y2="20" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+    <line x1="17" y1="22" x2="28" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+    <line x1="79" y1="22" x2="68" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+
+    <path d="M28 80V62C28 48 36.8 39 48 39C59.2 39 68 48 68 62V80Z"
+          fill="#ef4444"
+          stroke="#111827"
+          stroke-width="6"
+          stroke-linejoin="round"/>
+
+    <path d="M39 42C45 44 51 56 52 80H28V62C28 52 32.5 45 39 42Z"
+          fill="rgba(255,255,255,0.18)"/>
+
+    <rect x="18" y="76" width="60" height="20" rx="10"
+          fill="#e5e7eb"
+          stroke="#111827"
+          stroke-width="6"/>
+  </svg>
+</div>
+
+    <div class="privacy-title">개인정보 유출 주의</div>
+
+<div class="privacy-subtitle">
+  ※ 개인정보 입력에 따른 책임은 사용자에게 있습니다.
+</div>
+
+<div class="privacy-text">
+  <b>이름, 주민등록번호, 연락처, 상세주소</b> 등<br>
+  개인정보 입력 시 주의해 주세요.<br>
+  건강, 환경 등 돌봄필요 상황만 입력해 주세요.
+</div>
+
+    <div class="privacy-agree-note">
+      위 주의사항을 확인했으며, 개인정보·민감정보를 입력하지 않고 이용하는 데 동의합니다.
+    </div>
+
+    <label class="privacy-check">
+      <input type="checkbox" id="hidePrivacyToday">
+      오늘 하루 보지 않기
+    </label>
+
+    <div class="privacy-btns">
+      <button type="button" class="privacy-confirm" onclick="closePrivacyModal()">
+        동의하고 시작
+      </button>
+      <button type="button" class="privacy-disagree" onclick="declinePrivacyModal()">
+        동의 안 함
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<div class="container">
+
+<div class="top-bar desc-top-bar">
+  <a href="/home" class="home-button">⌂ 홈으로</a>
+  <button type="button" class="reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
+</div>
+
+<div class="title">
+  <div class="title-row">
+    <div class="desc-title-row">
+  <h2>사례별 AI 추천 서비스 찾기</h2>
+  <button type="button" class="service-table-icon-btn" onclick="openServiceTableModal()" title="서비스 분류표">
+  <span>📋</span>
+  <em> 분류표</em>
+</button>
+</div>
+  </div>
+</div>
+
+<div id="serviceTableModal" class="service-table-modal" onclick="closeServiceTableModalByBg(event)">
+  <div class="service-table-box">
+    <div class="service-table-header">
+      <span>서비스 분류표</span>
+      <button type="button" class="service-table-close" onclick="closeServiceTableModal()">×</button>
+    </div>
+
+    <div class="service-table-body">
+      <img src="/static/service_table_1.png" alt="서비스 분류표 1">
+      <img src="/static/service_table_2.png" alt="서비스 분류표 2">
+    </div>
+  </div>
+</div>
+
+<div class="search-box">
+
+<form method="post" id="searchForm">
+<input type="hidden" name="action" id="descAction" value="">
+
+<div class="desc-region-box">
+
+  <div class="desc-region-title">지역 설정</div>
+  
+  <div class="desc-region-row">
+
+    <div class="desc-region-item">
+      <label>시도</label>
+      <select name="sido" onchange="handleDescSidoChange(this.form)">
+        <option value="">전체</option>
+        {% for s in sido_options %}
+        <option value="{{s}}" {% if s==selected_sido %}selected{% endif %}>{{s}}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="desc-region-item">
+      <label>시군구</label>
+      <select name="sigungu" onchange="handleDescSigunguChange(this.form)">
+        <option value="">전체</option>
+        {% for g in sigungu_options %}
+        <option value="{{g}}" {% if g==selected_sigungu %}selected{% endif %}>{{g}}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+  </div>
+
+</div>
+
+<div style="position:relative;">
+
+<div class="textarea-wrap">
+
+<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
+
+
+<button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
+style="
+position:absolute;
+right:12px;
+top:12px;
+width:42px;
+height:42px;
+display:flex;
+align-items:center;
+justify-content:center;
+border-radius:50%;
+border:none;
+background:rgba(37,99,235,0.92);
+backdrop-filter:blur(6px);
+box-shadow:0 4px 12px rgba(0,0,0,0.15);
+cursor:pointer;
+z-index:10;
+transition:0.2s;
+">
+
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 24 24">
+  <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a1 1 0 0 0-2 0 3 3 0 0 1-6 0 1 1 0 0 0-2 0 5 5 0 0 0 4 4.9V19H8a1 1 0 0 0 0 2h8a1 1 0 0 0 0-2h-3v-3.1A5 5 0 0 0 17 11z"/>
+</svg>
+
+</button>
+
+<input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none;">
+
+<button type="button" onclick="openImage()" id="imgBtn">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 24 24">
+    <path d="M20 5h-3.2l-1.6-2H8.8L7.2 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 13c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm0-8.2c-1.8 0-3.2 1.4-3.2 3.2s1.4 3.2 3.2 3.2 3.2-1.4 3.2-3.2-1.4-3.2-3.2-3.2z"/>
+  </svg>
+</button>
+</div>
+
+<div class="voice-inline" id="voiceOverlay">
+  <div class="voice-inline-box">
+    <div class="voice-wave-wrap">
+      <div class="voice-wave">
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+        <span class="voice-bar"></span>
+      </div>
+    </div>
+
+    <div class="voice-inline-text">
+      <div class="voice-inline-title">음성 듣는 중</div>
+      <div class="voice-inline-subtitle">말씀하시면 자동으로 입력됩니다.</div>
+    </div>
+  </div>
+</div>
+
+<button type="submit" id="descSubmitBtn" onclick="setDescSearchAction()">AI 검색</button>
+
+</form>
+</div>
+
+<div id="searchResultSection">
+{% if warning_msg %}
+<div class="warning-box">
+  <span class="warning-icon">⚠️</span>
+  <span class="warning-text">{{ warning_msg }}</span>
+</div>
+{% endif %}
+{% if service_results %}
+
+<div class="result" id="resultArea">
+
+<h3>{{count}}건의 추천 서비스</h3>
+
+{% set ns = namespace(direct_box_open=false) %}
+
+{% for group in grouped_service_results|default([]) %}
+
+{% if not group.direct_need and ns.direct_box_open %}
+</div>
+{% set ns.direct_box_open = false %}
+{% endif %}
+
+{% if group.direct_need and not ns.direct_box_open %}
+<div class="direct-need-box">
+  <div style="display:flex;align-items:center;gap:7px;margin-bottom:16px;">
+    <div class="direct-need-title" style="margin-bottom:0;">
+      <svg style="width:17px;height:17px;flex-shrink:0;vertical-align:-3px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
+      </svg>
+      <span>주요욕구</span>
+    </div>
+    <div class="direct-need-tooltip-wrap">
+      <button type="button" class="direct-need-tooltip-icon" aria-label="안내" onclick="var e=event;e.stopPropagation();var b=this.parentElement.querySelector('.direct-need-tooltip-box');if(!b)return;var vis=(b.style.display==='block');document.querySelectorAll('.direct-need-tooltip-box').forEach(function(x){x.style.display='none';});b.style.display=vis?'none':'block';">?</button>
+      <div class="direct-need-tooltip-box">대상자·보호자의 희망욕구와 조사자 판단 필요 서비스가 모두 포함되었습니다.</div>
+    </div>
+  </div>
+{% set ns.direct_box_open = true %}
+{% endif %}
+
+<div class="result-card grouped-result-card {% if group.direct_need %}direct-need-card{% else %}normal-need-card{% endif %}">
+
+  <div class="group-card-top">
+    <div class="group-title-area">
+      <div class="group-title-meta">대분류 · 중분류</div>
+      <div class="group-title-grid">
+        <div class="group-title-col">
+          <div class="group-title-value main-val">{{group["대분류"]}}</div>
+        </div>
+        <div class="group-title-arrow">›</div>
+        <div class="group-title-col">
+          <div class="group-title-value">{{group["중분류"]}}</div>
+        </div>
+      </div>
+    </div>
+
+    <a
+  href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{group['대분류']|urlencode}}&middle_category={{group['중분류']|urlencode}}&from_desc=1"
+  class="group-search-btn"
+  onclick="return openComboGuideModal(this.href)"
+>
+  기관검색
+</a>
+  </div>
+
+  <div class="sub-service-section">
+    <div class="sub-service-label">소분류</div>
+
+    <div class="sub-service-tabs">
+    {% for item in group["items"] %}
+    <button
+      type="button"
+      class="sub-service-tab {% if loop.first %}active{% endif %} {% if item.direct_need %}direct{% endif %}"
+      onclick="showReason(this, 'reason-{{group['group_id']}}-{{loop.index0}}')"
+    >
+      {% if item.direct_need %}
+      <svg class="wish-star-sm" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
+      </svg>
+      {% endif %}
+      {{item["서비스내용"]}}
+    </button>
+    {% endfor %}
+    </div>
+
+    <div class="reason-box-wrap">
+    {% for item in group["items"] %}
+    <div
+      id="reason-{{group['group_id']}}-{{loop.index0}}"
+      class="reason-box"
+      style="{% if not loop.first %}display:none;{% endif %}"
+    >
+      <div class="reason-title">추천 이유</div>
+      <div class="reason-text">{{item["선택이유"]}}</div>
+    </div>
+    {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+{% endfor %}
+
+{% if ns.direct_box_open %}
+</div>
+{% endif %}
+
+<div style="margin-top:18px;padding:12px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;font-size:12.5px;line-height:1.6;color:#64748b;text-align:center;">
+  본 추천 결과는 AI 기반 참고 자료이며, 최종 판단과 책임은 담당자의 전문적 판단에 따릅니다.
+</div>
+</div>
+
+{% endif %}
+
+
+
+<div id="comboGuideModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:420px;background:#ffffff;border-radius:20px;box-shadow:0 20px 50px rgba(15,23,42,0.22);overflow:hidden;">
+    
+    <div style="padding:18px 20px 12px 20px;border-bottom:1px solid #eef2f7;">
+      <div style="font-size:17px;font-weight:800;color:#111827;">기관검색 안내</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px;">사례기반 검색 결과 연동</div>
+    </div>
+
+    <div style="padding:18px 20px 8px 20px;font-size:14px;line-height:1.7;color:#374151;word-break:keep-all;">
+      기관검색은 <b>대분류와 중분류만</b> 반영됩니다.<br>
+      소분류 등 세부 서비스 필요 시 <b>프로그램명</b>을 입력해 주세요.
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 20px 20px 20px;">
+      <button type="button" onclick="moveComboGuideModal()" style="height:42px;padding:0 16px;border:none;border-radius:10px;background:#2563eb;color:#ffffff;font-size:14px;font-weight:700;cursor:pointer;">
+        확인
+      </button>
+      <button type="button" onclick="closeComboGuideModal()" style="height:42px;padding:0 16px;border:none;border-radius:10px;background:#e5e7eb;color:#374151;font-size:14px;font-weight:700;cursor:pointer;">
+        취소
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<div class="loading" id="loading">
+
+
+  <div class="loading-box">
+
+    <div class="spinner"></div>
+
+<p id="loadingText" style="margin:14px 0 0 0;font-weight:700;font-size:15px;line-height:1.35;text-align:center;">
+  AI가 사례를 분석 중입니다
+</p>
+
+<p id="loadingSubText" style="margin:8px 0 0 0;font-size:13px;line-height:1.5;color:#6b7280;text-align:center;word-break:keep-all;">
+  어르신의 건강상태와 생활불편을 확인하고 있습니다.
+</p>
+
+<div class="loading-step-bar">
+  <div class="loading-step active"></div>
+  <div class="loading-step"></div>
+  <div class="loading-step"></div>
+  <div class="loading-step"></div>
+</div>
+
+<img src="/static/ci.png" class="loading-ci">
+  </div>
+
+</div>
+
+<script>
+const searchForm = document.getElementById("searchForm");
+const loading = document.getElementById("loading");
+const queryInput = document.getElementById("queryInput");
+const voiceBtn = document.getElementById("voiceBtn");
+const descSubmitBtn = document.getElementById("descSubmitBtn");
+
+const loadingText = document.getElementById("loadingText");
+const loadingSubText = document.getElementById("loadingSubText");
+const loadingSteps = document.querySelectorAll(".loading-step");
+
+const loadingMessages = [
+  ["AI가 사례를 분석 중입니다", "어르신의 건강상태와 생활불편을 확인하고 있습니다."],
+  ["욕구를 분류하고 있습니다", "식사, 이동, 건강, 정서 등 돌봄 필요 상황을 살펴보고 있습니다."],
+  ["서비스 목록과 비교 중입니다", "입력한 사례와 관련 있는 통합돌봄 서비스를 찾고 있습니다."],
+  ["추천 결과를 정리하고 있습니다", "대분류, 중분류, 서비스내용, 추천이유를 정리하고 있습니다."]
+];
+
+let loadingMessageIndex = 0;
+let loadingMessageTimer = null;
+
+function startLoadingMessages(){
+  loadingMessageIndex = 0;
+
+  if(loadingText && loadingSubText){
+    loadingText.innerText = loadingMessages[0][0];
+    loadingSubText.innerText = loadingMessages[0][1];
+  }
+
+  loadingSteps.forEach(function(step, idx){
+    if(idx === 0){
+      step.classList.add("active");
+    }else{
+      step.classList.remove("active");
+    }
+  });
+
+  loadingMessageTimer = setInterval(function(){
+    loadingMessageIndex++;
+
+    if(loadingMessageIndex >= loadingMessages.length){
+      loadingMessageIndex = loadingMessages.length - 1;
+      clearInterval(loadingMessageTimer);
+    }
+
+    if(loadingText && loadingSubText){
+      loadingText.innerText = loadingMessages[loadingMessageIndex][0];
+      loadingSubText.innerText = loadingMessages[loadingMessageIndex][1];
+    }
+    loadingSteps.forEach(function(step, idx){
+      if(idx <= loadingMessageIndex){
+        step.classList.add("active");
+      }else{
+        step.classList.remove("active");
+      }
+    });
+
+  }, 4500);
+}
+
+const originalIcon = voiceBtn ? voiceBtn.innerHTML : "";
+let recognition = null;
+let isRecording = false;
+
+function handleDescSidoChange(form){
+  document.getElementById("descAction").value = "change_sido";
+  form.submit();
+}
+
+function handleDescSigunguChange(form){
+  document.getElementById("descAction").value = "change_sigungu";
+  form.submit();
+}
+
+window.addEventListener("load", function(){
+  const resultBox = document.getElementById("resultArea");
+  const warningBox = document.querySelector("#searchResultSection .warning-box");
+
+  if (resultBox) {
+    setTimeout(function(){
+      resultBox.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 250);
+    return;
+  }
+
+  if (warningBox) {
+    setTimeout(function(){
+      warningBox.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 250);
+  }
+});
+
+
+let serviceTableHistoryOpen = false;
+
+function openServiceTableModal(){
+  const modal = document.getElementById("serviceTableModal");
+  if(modal){
+    modal.style.display = "flex";
+  }
+
+  if(!serviceTableHistoryOpen){
+    history.pushState({ modal: "serviceTable" }, "", location.href);
+    serviceTableHistoryOpen = true;
+  }
+}
+
+function closeServiceTableModal(){
+  const modal = document.getElementById("serviceTableModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+
+  serviceTableHistoryOpen = false;
+}
+
+function closeServiceTableModalByBg(e){
+  if(e.target.id === "serviceTableModal"){
+    closeServiceTableModal();
+  }
+}
+
+window.addEventListener("popstate", function(e){
+  const modal = document.getElementById("serviceTableModal");
+
+  if(modal && modal.style.display === "flex"){
+    modal.style.display = "none";
+    serviceTableHistoryOpen = false;
+    history.pushState({ page: "desc" }, "", location.href);
+    return;
+  }
+});
+
+function setDescSearchAction(){
+  document.getElementById("descAction").value = "search";
+}
+
+
+function playBeep(type="start"){
+  try{
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if(!AudioContextClass) return;
+
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.value = (type === "start") ? 880 : 660;
+
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.7, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  }catch(e){
+    console.log("beep error:", e);
+  }
+}
+
+let comboGuideTargetHref = "";
+
+function openComboGuideModal(href){
+  comboGuideTargetHref = href || "";
+
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "flex";
+  }
+
+  return false;
+}
+
+function closeComboGuideModal(){
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+}
+
+function moveComboGuideModal(){
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+
+  if(comboGuideTargetHref){
+    window.location.href = comboGuideTargetHref;
+  }
+}
+
+function showReason(btn, targetId){
+  const card = btn.closest(".result-card");
+  if(!card) return;
+
+  const tabs = card.querySelectorAll(".sub-service-tab");
+  const reasons = card.querySelectorAll(".reason-box");
+
+  tabs.forEach(function(tab){
+    tab.classList.remove("active");
+  });
+
+  reasons.forEach(function(reason){
+    reason.style.display = "none";
+  });
+
+  btn.classList.add("active");
+
+  const target = document.getElementById(targetId);
+  if(target){
+    target.style.display = "block";
+  }
+}
+
+
+window.addEventListener("pageshow", function(){
+  const modal = document.getElementById("comboGuideModal");
+  if(modal){
+    modal.style.display = "none";
+  }
+});
+
+function setVoiceButtonRecording(active){
+  if(!voiceBtn) return;
+
+  if(active){
+    voiceBtn.style.background = "rgba(220,38,38,0.92)";
+    voiceBtn.style.transform = "scale(0.96)";
+    voiceBtn.innerHTML = "■";
+  }else{
+    voiceBtn.style.background = "rgba(37,99,235,0.92)";
+    voiceBtn.style.transform = "scale(1)";
+    voiceBtn.innerHTML = originalIcon;
+  }
+}
+
+function finishVoiceUI(){
+  isRecording = false;
+  setVoiceButtonRecording(false);
+  playBeep("end");
+
+  const overlay = document.getElementById("voiceOverlay");
+  if(overlay){
+    overlay.style.display = "none";
+  }
+}
+
+function submitVoiceText(transcript){
+  if(!transcript) {
+    finishVoiceUI();
+    return;
+  }
+
+  queryInput.value = transcript;
+
+  finishVoiceUI();
+
+  if(loading){
+    loading.style.display = "flex";
+  }
+
+  startLoadingMessages();
+
+  document.getElementById("descAction").value = "search";
+  searchForm.submit();
+}
+
+window.__careNaviVoiceResult = function(text){
+  submitVoiceText(text);
+};
+
+window.__careNaviVoiceEnd = function(){
+  finishVoiceUI();
+};
+
+function startVoiceInput(event){
+  if(event) event.preventDefault();
+
+  const isCareNaviApp = navigator.userAgent.indexOf("CareNaviApp") !== -1;
+
+  if(isCareNaviApp && window.AndroidVoice){
+    if(isRecording){
+      if(window.AndroidVoice.stopVoiceSearch){
+        window.AndroidVoice.stopVoiceSearch();
+      }
+      finishVoiceUI();
+      return;
+    }
+
+    isRecording = true;
+    setVoiceButtonRecording(true);
+    playBeep("start");
+
+    const overlay = document.getElementById("voiceOverlay");
+    if(overlay){
+      overlay.style.display = "block";
+    }
+
+    window.AndroidVoice.startVoiceSearch();
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SpeechRecognition){
+    alert("이 브라우저는 음성인식을 지원하지 않습니다.");
+    return;
+  }
+
+  if(isRecording && recognition){
+    recognition.stop();
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = "ko-KR";
+
+  recognition.onstart = function(){
+    isRecording = true;
+    setVoiceButtonRecording(true);
+    playBeep("start");
+
+    const overlay = document.getElementById("voiceOverlay");
+    if(overlay){
+      overlay.style.display = "block";
+    }
+  };
+
+  recognition.onresult = function(e){
+    const transcript = e.results[0][0].transcript;
+    submitVoiceText(transcript);
+  };
+
+  recognition.onend = function(){
+    finishVoiceUI();
+  };
+
+  recognition.start();
+}
+
+function openImage(){
+  document.getElementById("imgInput").click();
+}
+
+document.getElementById("imgInput").addEventListener("change", async function(){
+  const file = this.files[0];
+  if(!file) return;
+
+
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("ocr_privacy_confirmed", "yes");
+
+  if(loading){
+    loading.style.display = "flex";
+  }
+
+  if(loadingText){
+    loadingText.innerText = "사진 속 글자를 분석하고 있습니다";
+  }
+
+  if(loadingSubText){
+    loadingSubText.innerText = "촬영한 이미지에서 사례 내용을 추출하는 중입니다.";
+  }
+
+  loadingSteps.forEach(function(step){
+    step.classList.remove("active");
+  });
+
+  try{
+    const res = await fetch("/ocr", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    const ocrText = (data.text || "").trim();
+
+    if(!ocrText){
+      if(loading){
+        loading.style.display = "none";
+      }
+
+      alert("사진에서 글자를 인식하지 못했습니다. 다시 촬영해 주세요.");
+      return;
+    }
+
+    queryInput.value = ocrText;
+
+    startLoadingMessages();
+
+    document.getElementById("descAction").value = "search";
+    searchForm.submit();
+
+  }catch(e){
+    if(loading){
+      loading.style.display = "none";
+    }
+
+    alert("이미지 인식 실패");
+  }
+});
+
+if(searchForm){
+  searchForm.addEventListener("submit", function(e){
+    var qv = (document.getElementById("queryInput") || {}).value || "";
+    if(window.__hasPII && window.__hasPII(qv)){
+      if(e && e.preventDefault){ e.preventDefault(); }
+      if(typeof openPiiModal === "function"){ openPiiModal(); }
+      return false;
+    }
+    if(descSubmitBtn){
+      descSubmitBtn.disabled = true;
+      descSubmitBtn.innerText = "검색 중...";
+      descSubmitBtn.style.opacity = "0.7";
+      descSubmitBtn.style.cursor = "not-allowed";
+    }
+
+    if(loading){
+      loading.style.display = "flex";
+      startLoadingMessages();
+    }
+  });
+}
+
+function resetDescPage(){
+  window.location.href = "/desc?action=reset_region";
+}
+
+window.addEventListener("load", function(){
+  const hasResults =
+    {{ 'true' if service_results else 'false' }} ||
+    {{ 'true' if warning_msg else 'false' }};
+
+  if (hasResults) {
+    history.replaceState({ page: "desc-root" }, "", "/desc");
+    history.pushState({ page: "desc-result" }, "", "/desc");
+  }
+});
+
+window.addEventListener("popstate", function(e){
+  if (e.state && e.state.page === "desc-root") {
+    window.location.replace("/desc");
+  }
+});
+
+function getPrivacyTodayKey(){
+  const d = new Date();
+  return "privacy_hide_" + d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate();
+}
+
+let privacyScrollY = 0;
+
+function lockPrivacyScroll(){
+  privacyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.style.top = "-" + privacyScrollY + "px";
+  document.body.classList.add("privacy-modal-open");
+}
+
+function unlockPrivacyScroll(){
+  document.body.classList.remove("privacy-modal-open");
+  document.body.style.top = "";
+  window.scrollTo(0, privacyScrollY || 0);
+}
+
+function showPrivacyModal(){
+  const modal = document.getElementById("privacyModal");
+  if(!modal) return;
+  modal.style.display = "flex";
+  lockPrivacyScroll();
+}
+
+function closePrivacyModal(){
+  const modal = document.getElementById("privacyModal");
+  const check = document.getElementById("hidePrivacyToday");
+
+  if(check && check.checked){
+    localStorage.setItem(getPrivacyTodayKey(), "Y");
+  }
+
+  // 확인 눌렀으면 이 세션 동안 /desc 내부 재로드 시 다시 안 뜨게
+  try{ sessionStorage.setItem("desc_privacy_shown", "Y"); }catch(e){}
+
+  if(modal){
+    modal.style.display = "none";
+  }
+  unlockPrivacyScroll();
+}
+
+function closePrivacyModalByBg(e){
+  // 박스 바깥(어두운 배경) 클릭 시에만 닫기
+  if(e.target && e.target.id === "privacyModal"){
+    closePrivacyModal();
+  }
+}
+
+function declinePrivacyModal(){
+  // 미동의: 사례별 AI 추천을 이용하지 않고 메인페이지로 이동
+  try{ sessionStorage.removeItem("desc_privacy_shown"); }catch(e){}
+  unlockPrivacyScroll();
+  window.location.href = "/home";
+}
+
+window.addEventListener("load", function(){
+  const modal = document.getElementById("privacyModal");
+  if(!modal) return;
+
+  // /desc 밖에서 새로 진입한 경우(홈 등) → desc_privacy_shown 초기화
+  const ref = document.referrer;
+  const comingFromDesc = ref && ref.indexOf("/desc") !== -1;
+  if(!comingFromDesc){
+    try{ sessionStorage.removeItem("desc_privacy_shown"); }catch(e){}
+  }
+
+  // 오늘 안 보기 체크했으면 무조건 숨김
+  if(localStorage.getItem(getPrivacyTodayKey()) === "Y"){
+    modal.style.display = "none";
+    return;
+  }
+
+  // 이 세션에서 이미 확인 눌렀고, /desc 내부 이동이면 숨김
+  try{
+    if(sessionStorage.getItem("desc_privacy_shown") === "Y"){
+      modal.style.display = "none";
+      return;
+    }
+  }catch(e){}
+
+  showPrivacyModal();
+});
+
 </script>
-""" + MEAL_LOADER_HTML + """
-</div></body></html>"""
-# ================================================================
-# ===============  매식비 관리 모듈 끝  ==========================
-# ================================================================
+
+  <div class="tip-notice">
+    <p>※ 입력한 사례와 유사한 <b class="highlight">통합돌봄 서비스를 최대 30가지</b> 추천합니다.(최대 2,000자)</p>
+    <p>※ <b class="highlight">AI 기반 추천 서비스</b>로, 같은 사례라도 추천 결과가 달라질 수 있습니다.</p>
+    <p>※ <b class="highlight">지역 설정 시</b> 해당 지역 자원의 서비스 분류를, 미설정 시 전체 분류를 추천합니다.</p>
+
+    <div class="privacy-warning">
+      <span class="privacy-warning-icon siren-icon" aria-hidden="true">
+        <svg class="siren-svg" viewBox="0 0 96 110" xmlns="http://www.w3.org/2000/svg">
+          <line x1="48" y1="6" x2="48" y2="20" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+          <line x1="17" y1="22" x2="28" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+          <line x1="79" y1="22" x2="68" y2="33" stroke="#111827" stroke-width="7" stroke-linecap="round"/>
+
+          <path d="M28 80V62C28 48 36.8 39 48 39C59.2 39 68 48 68 62V80Z"
+                fill="#ef4444"
+                stroke="#111827"
+                stroke-width="6"
+                stroke-linejoin="round"/>
+
+          <path d="M39 42C45 44 51 56 52 80H28V62C28 52 32.5 45 39 42Z"
+                fill="rgba(255,255,255,0.18)"/>
+
+          <rect x="18" y="76" width="60" height="20" rx="10"
+                fill="#e5e7eb"
+                stroke="#111827"
+                stroke-width="6"/>
+        </svg>
+      </span>
+
+      <div class="privacy-warning-text">
+        <p class="pw-main">성명·주민번호·연락처·주소 등 개인정보는 입력하지 마시고 사진 촬영 시 개인정보를 가려주세요. <span class="pw-sub">입력·업로드의 책임은 사용자에게 있습니다.</span></p>
+      </div>
+    </div>
+
+<!-- ===== 개인정보 입력 차단 팝업 ===== -->
+<div id="piiModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closePiiModal()">
+  <div style="width:100%;max-width:360px;background:#fff;border-radius:18px;padding:26px 22px;text-align:center;box-shadow:0 20px 50px rgba(15,23,42,0.25);">
+    <div style="font-size:38px;line-height:1;margin-bottom:12px;">🔒</div>
+    <div style="font-size:18px;font-weight:800;color:#111827;margin-bottom:10px;">개인정보가 감지되었습니다</div>
+    <div style="font-size:14px;color:#4b5563;line-height:1.65;">전화번호 · 주민등록번호 · 이메일 등<br>개인정보가 포함되어 <b>검색이 차단</b>되었습니다.<br>해당 정보를 지우고 다시 검색해 주세요.</div>
+    <button type="button" onclick="closePiiModal()" style="margin-top:20px;width:100%;padding:13px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">확인</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var PII = [
+    /[\\w.+-]+@[\\w-]+\\.[\\w.-]+/,
+    /\\d{6}\\s*-\\s*\\d{7}/,
+    /01[016789][-\\s.]?\\d{3,4}[-\\s.]?\\d{4}/,
+    /\\d{2,3}[-\\s.]\\d{3,4}[-\\s.]\\d{4}/
+  ];
+  window.__hasPII = function(t){
+    if(!t) return false;
+    for(var i=0;i<PII.length;i++){ if(PII[i].test(t)) return true; }
+    return false;
+  };
+  window.openPiiModal = function(){
+    var m = document.getElementById("piiModal");
+    if(m){ m.style.display = "flex"; }
+  };
+  window.closePiiModal = function(){
+    var m = document.getElementById("piiModal");
+    if(m){ m.style.display = "none"; }
+  };
+})();
+{% if pii_block|default(false) %}
+window.addEventListener("DOMContentLoaded", function(){ if(window.openPiiModal) window.openPiiModal(); });
+{% endif %}
+</script>
+
+</body>
+</html>
+"""
+
+def normalize_query_text(text: str) -> str:
+    text = str(text or "")
+    text = text.strip().lower()
+    text = re.sub(r"\s+", "", text)
+    return text
 
 
+SYNONYM_GROUPS = {
+    "pain_back": {
+        "keywords": [
+            "요통", "허리통증", "허리아픔", "허리아프", "허리불편",
+            "허리쑤심", "허리가아픔", "허리가자주아픔"
+        ],
+        "aliases": [
+            "허리통증", "허리아픔", "근골격통증", "통증",
+            "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "pain_knee": {
+        "keywords": [
+            "무릎통증", "무릎아픔", "무릎이아픔", "관절통증", "관절아픔"
+        ],
+        "aliases": [
+            "무릎통증", "관절통증", "통증",
+            "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "pain_shoulder_arm": {
+        "keywords": [
+            "어깨통증", "어깨아픔", "팔통증", "팔아픔", "손목통증",
+            "손목아픔", "팔저림", "손저림"
+        ],
+        "aliases": [
+            "상지통증", "근골격통증", "감각이상",
+            "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "neuro_numbness": {
+        "keywords": [
+            "저리", "저림", "저린", "찌릿", "찌릿함", "화끈거림",
+            "감각이상", "감각저하", "감각둔함", "감각무딤",
+            "다리저림", "다리가저림", "다리가저린", "종아리저림",
+            "발저림", "발바닥저림", "허벅지저림", "엉덩이저림",
+            "손저림", "손발저림"
+        ],
+        "aliases": [
+            "저림", "감각이상", "신경증상", "말초신경", "통증",
+            "이동불편", "보행불편", "재활", "기능회복", "방문보건"
+        ]
+    },
+
+    "mobility": {
+        "keywords": [
+            "거동불편", "보행불편", "걷기힘듦", "걷기힘들",
+            "움직이기힘듦", "움직이기힘들", "이동불편",
+            "다리가불편", "허리가불편", "무릎이불편",
+            "일어나기힘들", "앉았다일어나기힘들", "계단오르기힘들"
+        ],
+        "aliases": [
+            "이동지원", "보행지원", "재활", "기능회복", "복지용구"
+        ]
+    },
+
+    "fall_safety": {
+        "keywords": [
+            "낙상", "넘어짐", "자주넘어짐", "비틀거림", "휘청거림",
+            "균형이안맞", "균형불안", "넘어질까걱정", "낙상걱정"
+        ],
+        "aliases": [
+            "낙상예방", "안전지원", "보행보조", "복지용구",
+            "방문보건", "이동지원"
+        ]
+    },
+
+    "meal_support": {
+        "keywords": [
+            "도시락", "도시락필요", "식사배달", "밥배달", "배달식",
+            "식사도움", "식사지원", "반찬", "반찬지원", "끼니",
+            "식사를못함", "밥을못함", "차려먹기힘들", "챙겨먹기힘들"
+        ],
+        "aliases": [
+            "식사지원", "반찬지원", "영양지원", "도시락",
+            "식사배달", "방문형지원"
+        ]
+    },
+
+    "nutrition_loss": {
+        "keywords": [
+            "배고프", "배가고프", "허기", "허기짐", "굶", "굶고",
+            "못먹", "못먹음", "입맛없", "식욕없", "식욕부진",
+            "못씹", "씹기힘들", "씹지못", "저작곤란", "연하곤란", "삼키기힘들", "틀니", "이가없",
+            "영양부족", "영양불량", "체중감소", "기운없음"
+        ],
+        "aliases": [
+            "영양지원", "식사지원", "반찬지원", "방문형지원", "건강관리"
+        ]
+    },
+
+    "emotional_support": {
+        "keywords": [
+            "외로움", "외롭", "고립", "말벗", "우울", "혼자지냄",
+            "혼자있음", "고독", "불안", "적적함", "심심함",
+            "독거", "독거중", "혼자거주", "혼자삶", "혼자생활",
+            "왕래하는가족없", "가족왕래없", "가족없음", "보호자없음",
+            "가족부재", "연락하는사람없", "찾아오는사람없"
+        ],
+        "aliases": [
+            "정서지원", "안부확인", "말벗", "돌봄연계", "사회적고립", "고독사예방"
+        ]
+    },
+
+    "social_relation": {
+        "keywords": [
+            "잘어울리지못", "어울리지못", "대인관계", "관계어려움",
+            "사람만나기싫", "사회활동어려움", "밖에안나감", "외출안함"
+        ],
+        "aliases": [
+            "정서지원", "사회참여지원", "안부확인", "돌봄연계"
+        ]
+    },
+
+    "hygiene": {
+        "keywords": [
+            "목욕힘듦", "목욕힘들", "씻기힘듦", "씻기힘들",
+            "청소힘듦", "청소힘들", "세탁힘듦", "세탁힘들",
+            "위생관리어려움"
+        ],
+        "aliases": [
+            "위생지원", "목욕지원", "청소지원", "세탁지원", "생활지원"
+        ]
+    },
+
+    "urinary_incontinence": {
+        "keywords": [
+            "요실금", "실금", "소변실수", "배뇨실수", "오줌실수",
+            "오줌지림", "오줌을지림", "오줌을지린", "소변지림",
+            "소변을지림", "소변을지린", "지린다", "지림",
+            "쉬를지림", "쉬실수", "소변이샘", "소변이새",
+            "오줌이샘", "오줌이새"
+        ],
+        "aliases": [
+            "요실금", "배뇨장애", "배뇨관리", "위생지원",
+            "패드", "복지용구", "방문보건"
+        ]
+    },
+
+    "urinary_difficulty": {
+        "keywords": [
+            "소변보기힘듦", "소변보기힘들", "배뇨곤란", "오줌이안나옴",
+            "잔뇨감", "소변불편", "화장실을자주감", "빈뇨", "야간뇨"
+        ],
+        "aliases": [
+            "배뇨관리", "방문보건", "건강관리", "위생지원"
+        ]
+    },
+
+    "bowel_difficulty": {
+        "keywords": [
+            "변실수", "대변실수", "변을지림", "변지림", "변비",
+            "설사", "배변힘듦", "배변불편", "화장실실수"
+        ],
+        "aliases": [
+            "배변관리", "위생지원", "복지용구", "방문보건"
+        ]
+    },
+
+    "tube_care": {
+        "keywords": [
+            "콧줄", "비위관", "위관", "경관급식", "콧줄영양",
+            "비위관영양", "소변줄", "유치도뇨", "도뇨줄",
+            "장루", "요루", "기관절개", "석션", "흡인", "튜브"
+        ],
+        "aliases": [
+            "튜브관리", "의료처치", "감염관리", "방문진료", "방문보건"
+        ]
+    },
+
+    "wound_infection": {
+        "keywords": [
+            "상처", "상처소독", "드레싱", "욕창", "염증", "감염",
+            "고름", "진물", "봉합", "절개", "찰과상", "화상"
+        ],
+        "aliases": [
+            "감염관리", "상처관리", "드레싱", "의료처치", "방문진료"
+        ]
+    },
+
+    "cognitive_dementia": {
+        "keywords": [
+            "치매", "깜빡", "기억못", "기억력저하", "인지저하",
+            "헷갈려", "길을잃", "약을까먹", "약을잊"
+        ],
+        "aliases": [
+            "인지지원", "복약관리", "안부확인", "돌봄연계", "방문보건"
+        ]
+    },
+
+    "medication_hospital": {
+        "keywords": [
+            "약챙기기힘들", "복약어려움", "병원가기힘들", "병원동행",
+            "통원어려움", "진료받기힘들"
+        ],
+        "aliases": [
+            "복약관리", "병원동행", "이동지원", "방문보건", "건강관리"
+        ]
+    },
+
+    "oral_care": {
+        "keywords": [
+            "구강", "구강건조", "입마름", "입이마름", "칫솔질",
+            "양치", "잇몸", "잇몸출혈", "출혈", "피가남",
+            "치아출혈", "구내염", "입안통증", "구강관리",
+            "입안", "입안관리", "입안위생", "입속", "입속관리", "입속위생",
+            "입안이지저분", "입속이지저분", "입안청결", "입속청결",
+            "입냄새", "구취", "혀", "백태"
+        ],
+        "aliases": [
+            "구강관리", "구강위생", "칫솔질", "구강건강", "방문구강관리", "건강관리"
+        ]
+    },
+
+    "housing_environment": {
+        "keywords": [
+            "집이지저분", "집이더러", "쓰레기", "악취", "냄새", "곰팡이",
+            "해충", "벌레", "바퀴벌레", "쥐", "방역", "소독",
+            "집노후", "노후주택", "주거환경", "주거공간", "환경개선"
+        ],
+        "aliases": [
+            "주거복지", "주거공간개선", "방역소독", "주거환경개선", "환경개선"
+        ]
+    },
+
+    "housing_facility": {
+        "keywords": [
+            "보일러", "보일러교체", "에어컨", "에어컨설치", "냉방",
+            "난방", "난방비", "냉난방", "단열", "창호", "수리",
+            "집수리", "설비교체", "전기시설", "수도시설", "가스시설",
+            "에너지효율", "에너지효율화"
+        ],
+        "aliases": [
+            "주거복지", "주거공간개선", "기타", "집수리", "설비개선", "에너지효율화"
+        ]
+    },
+
+    "housing_fire_safety": {
+        "keywords": [
+            "가스레인지", "가스렌지", "가스불", "화기", "불관리",
+            "불을켜놓", "가스잠그", "가스차단", "화재위험",
+            "인덕션", "전기레인지", "안전점검"
+        ],
+        "aliases": [
+            "주거복지", "주거공간개선", "주거안전지원", "화재예방", "가스안전"
+        ]
+    },
+
+    "communication_support": {
+        "keywords": [
+            "언어장애", "말을못", "말못", "소리를내지못",
+            "의사소통어려움", "의사소통불가", "고개를끄덕",
+            "고개끄덕", "표정으로", "몸짓으로", "수어", "대화어려움",
+            "난청", "청각장애", "귀가어두움", "귀가어두워",
+            "소리를못알아듣", "소리를알아듣지못",
+            "말소리를못알아듣", "말소리를알아듣지못",
+            "듣지못함", "잘못들음", "잘안들림", "소리가안들림"
+        ],
+        "aliases": [
+            "일상생활돌봄", "의사소통지원", "의사표현지원", "언어지원", "대화지원"
+        ]
+    },
+
+    "emergency_safety": {
+        "keywords": [
+            "응급서비스", "응급서비스필요", "응급안전", "응급안전안심",
+            "응급안전안심서비스", "응급호출", "응급벨", "위급상황",
+            "쓰러졌을때", "119연계", "응급상황", "안전확인필요"
+        ],
+        "aliases": [
+            "일상생활돌봄", "스마트돌봄", "안부확인", "응급안전안심서비스",
+            "응급호출", "안전확인", "기타"
+        ]
+    },
+
+    "short_term_care": {
+        "keywords": [
+            "단기보호", "임시보호", "잠시맡", "며칠맡", "일시보호",
+            "가족부재", "보호자부재", "돌볼가족없", "맡아줄사람없",
+            "가족이없어돌봄", "치매가족부재", "보호자가없어"
+        ],
+        "aliases": [
+            "요양", "단기보호", "보호", "일시보호", "가족부재", "돌봄공백"
+        ]
+    },
+
+    "dementia_care_supplies": {
+        "keywords": [
+            "치매기저귀", "치매로소변실수", "치매로배뇨실수",
+            "기저귀", "기저귀지원", "기저귀사용량", "조호물품",
+            "소변실수잦아기저귀", "치매소변실수"
+        ],
+        "aliases": [
+            "건강관리예방", "치매전문관리", "조호물품제공", "치매조호물품", "기저귀지원"
+        ]
+    },
+
+    "welfare_aid": {
+        "keywords": [
+            "지팡이", "워커", "보행기", "보행차", "휠체어",
+            "도구", "보조도구", "보조기구", "도구필요", "보조필요",
+            "안전손잡이", "손잡이", "욕실손잡이", "화장실손잡이",
+            "미끄럼방지", "미끄럼방지매트", "욕실매트", "논슬립",
+            "목욕의자", "샤워의자", "이동변기", "간이변기",
+            "요실금팬티", "패드", "전동침대", "병원침대",
+            "욕창매트", "욕창방지", "자세변환", "체위변경",
+            "경사로", "문턱", "턱",
+            "배회감지기", "배회", "길잃음", "길 잃", "길을 잃",
+            "길을 잃어버림", "집을 못 찾", "집에 못 오",
+            "실종", "위치확인", "위치 확인", "위치추적", "GPS", "gps"
+        ],
+        "aliases": [
+            "복지용구", "구입", "대여", "안전지원", "이동보조"
+        ]
+    }
+}
+
+
+def expand_query_aliases(query: str):
+    q_norm = normalize_query_text(query)
+    aliases = []
+
+    for group in SYNONYM_GROUPS.values():
+        if any(keyword in q_norm for keyword in group["keywords"]):
+            aliases.extend(group["aliases"])
+
+    if "아프" in q_norm or "통증" in q_norm or "쑤시" in q_norm or "결리" in q_norm:
+        aliases.extend(["통증", "방문보건", "재활", "기능회복"])
+
+    if "저리" in q_norm or "저림" in q_norm or "찌릿" in q_norm:
+        aliases.extend(["저림", "감각이상", "신경증상", "방문보건", "재활", "기능회복", "이동불편"])
+
+    if "다리" in q_norm and ("저리" in q_norm or "저림" in q_norm):
+        aliases.extend(["다리저림", "보행불편", "이동지원", "재활", "기능회복"])
+
+    if "손" in q_norm and ("저리" in q_norm or "저림" in q_norm):
+        aliases.extend(["손저림", "감각이상", "신경증상", "방문보건"])
+
+    if (
+        "지리" in q_norm or "지림" in q_norm or "실금" in q_norm
+        or "소변실수" in q_norm or "오줌실수" in q_norm
+        or "오줌" in q_norm or "소변" in q_norm or "배뇨" in q_norm
+    ):
+        aliases.extend([
+            "요실금", "배뇨장애", "배뇨관리", "위생지원", "방문보건"
+        ])
+        if "기저귀" not in q_norm:
+            aliases.extend(["요실금팬티", "복지용구"])
+
+    if "변" in q_norm and ("실수" in q_norm or "지리" in q_norm or "지림" in q_norm):
+        aliases.extend(["배변관리", "위생지원", "복지용구", "방문보건"])
+
+    if "혼자" in q_norm or "외롭" in q_norm or "고립" in q_norm or "말벗" in q_norm or "독거" in q_norm or "가족왕래없" in q_norm or "가족부재" in q_norm or "보호자없" in q_norm:
+        aliases.extend(["정서지원", "안부확인", "돌봄연계", "사회적고립", "고독사예방"])
+
+    if "밥" in q_norm or "식사" in q_norm or "반찬" in q_norm or "도시락" in q_norm:
+        aliases.extend(["식사지원", "반찬지원", "영양지원"])
+
+    if "낙상" in q_norm or "넘어" in q_norm or "휘청" in q_norm:
+        aliases.extend(["낙상예방", "안전지원", "이동지원", "복지용구"])
+
+    if "약" in q_norm or "병원" in q_norm or "복약" in q_norm:
+        aliases.extend(["복약관리", "병원동행", "방문보건", "건강관리"])
+
+    if "배고프" in q_norm or "배고파" in q_norm or "허기" in q_norm or "허기지" in q_norm or "굶" in q_norm or "못먹" in q_norm or "식욕없" in q_norm or "못씹" in q_norm or "씹기" in q_norm or "씹지" in q_norm or "씹는" in q_norm or "저작" in q_norm or "연하" in q_norm or "삼키" in q_norm or "삼킬" in q_norm or "틀니" in q_norm or "이가없" in q_norm or "치아" in q_norm:
+        aliases.extend([
+            "영양지원", "식사지원", "반찬지원",
+            "도시락", "식사배달", "방문형지원", "건강관리"
+        ])
+
+    if "도구" in q_norm or "보조도구" in q_norm or "보조기구" in q_norm:
+        aliases.extend([
+            "복지용구", "보행보조", "지팡이", "워커",
+            "보행기", "휠체어", "안전손잡이",
+            "이동지원", "낙상예방"
+        ])
+
+    if any(k in q_norm for k in ["주거", "주택", "거주환경", "주거환경", "집수리", "노후", "곰팡이", "해충", "악취", "쓰레기"]):
+        aliases.extend(["주거복지", "주거공간개선", "주거환경개선", "방역소독", "주거안전지원", "기타"])
+
+    if any(k in q_norm for k in ["보일러", "에어컨", "냉방", "난방", "냉난방", "단열", "창호", "설비교체", "에너지효율", "에너지효율화"]):
+        aliases.extend(["주거복지", "주거공간개선", "기타", "집수리", "설비개선", "에너지효율화"])
+
+    if any(k in q_norm for k in ["가스레인지", "가스렌지", "가스불", "화기", "불관리", "가스차단", "화재위험"]):
+        aliases.extend(["주거복지", "주거공간개선", "주거안전지원", "화재예방", "가스안전"])
+
+    if "치매" in q_norm and (
+        any(k in q_norm for k in ["가스레인지", "가스렌지", "가스불", "화기", "불관리", "가스차단", "화재위험", "불을켜놓", "가스잠그"])
+        or ("냄비" in q_norm and any(k in q_norm for k in ["태우", "태움", "태웠", "태워", "탄다", "태운"]))
+        or ("불" in q_norm and any(k in q_norm for k in ["깜빡", "잊어버", "잊고"]))
+    ):
+        aliases.extend(["일상생활돌봄", "스마트돌봄", "기타", "안부확인", "응급안전", "화재감지기", "가스타이머차단기", "안전확인"])
+
+    if any(k in q_norm for k in ["구강", "구강건조", "입마름", "입이마름", "칫솔질", "양치", "잇몸", "잇몸출혈", "치아출혈", "구내염"]):
+        aliases.extend(["구강관리", "구강위생", "칫솔질", "구강건강", "방문구강관리", "건강관리"])
+
+    if any(k in q_norm for k in ["언어장애", "말을못", "말못", "소리를내지못", "의사소통", "고개를끄덕", "고개끄덕", "몸짓으로"]):
+        aliases.extend(["일상생활돌봄", "의사소통지원", "의사표현지원", "언어지원", "대화지원"])
+
+    if any(k in q_norm for k in ["응급서비스", "응급안전", "응급안전안심", "응급호출", "응급벨", "위급상황", "응급상황", "안전확인필요"]):
+        aliases.extend(["일상생활돌봄", "스마트돌봄", "안부확인", "응급안전안심서비스", "응급호출", "안전확인", "기타"])
+
+    if any(k in q_norm for k in ["단기보호", "임시보호", "잠시맡", "며칠맡", "일시보호", "가족부재", "보호자부재", "돌볼가족없", "맡아줄사람없"]):
+        aliases.extend(["요양", "단기보호", "보호", "일시보호", "가족부재", "돌봄공백"])
+
+    if "치매" in q_norm and any(k in q_norm for k in ["기저귀", "조호물품", "소변실수", "배뇨실수"]):
+        aliases.extend(["건강관리예방", "치매전문관리", "조호물품제공", "치매조호물품", "기저귀지원"])
+
+    if any(k in q_norm for k in ["몸씻", "씻을때", "비누칠", "비누질", "샤워", "신체청결"]) and any(k in q_norm for k in ["도움", "부분도움", "못함", "어려움", "필요"]):
+        aliases.extend(["요양", "방문목욕", "목욕지원", "신체청결"])
+
+    return list(dict.fromkeys(aliases))
+
+
+def infer_direct_need_from_query(query, item):
+    q = str(query or "").replace(" ", "")
+    need_words = ["필요함", "필요하다", "필요로함", "필요로한다", "원함", "희망함", "받고싶", "도움이필요", "도움필요"]
+    if not any(w in q for w in need_words):
+        return False
+
+    mid = str(item.get("중분류", "")).strip()
+
+    if mid == "방문목욕" and any(k in q for k in ["목욕", "씻", "샤워", "비누칠", "비누질", "신체청결", "몸씻", "부분도움"]):
+        return True
+
+    if mid == "주거공간개선" and any(k in q for k in ["주거", "집", "보일러", "에어컨", "방역", "소독", "가스", "화기", "노후", "곰팡이", "해충", "악취"]):
+        return True
+
+    if mid == "의사소통지원" and any(k in q for k in ["의사소통", "언어장애", "말을못", "말못", "고개", "몸짓", "난청", "청각장애", "소리를알아듣지못", "소리를못알아듣", "듣지못함", "잘안들림"]):
+        return True
+
+    if mid == "스마트돌봄" and any(k in q for k in ["응급", "안부", "안전확인"]):
+        return True
+
+    if mid == "단기보호" and any(k in q for k in ["단기보호", "임시보호", "잠시맡", "며칠맡", "가족부재", "보호자부재", "맡아줄사람없"]):
+        return True
+
+    if mid == "치매전문관리" and any(k in q for k in ["기저귀", "조호물품", "소변실수", "배뇨실수"]):
+        return True
+
+    if "구강" in mid and any(k in q for k in ["구강", "입안", "입속", "칫솔질", "양치", "잇몸", "치아", "입냄새", "구취", "백태"]):
+        return True
+
+    return False
+
+def normalize_sigungu(text: str) -> str:
+    if not text:
+        return ""
+    t = str(text).strip()
+    mapping = {"나주":"나주시", "목포":"목포시", "영암":"영암군"}
+    if t in mapping:
+        return mapping[t]
+    return t
+
+def normalize_health(text: str) -> str:
+    if not text:
+        return ""
+
+    t = str(text).strip()
+
+    # 공백 제거
+    t = t.replace(" ", "")
+
+    # 불필요 단어 제거
+    t = t.replace("어르신", "")
+    t = t.replace("노인", "")
+    t = t.replace("고령자", "")
+
+    # 거동불편 변형 통합
+    if "거동" in t and "불편" in t:
+        return "거동불편"
+
+    return t
+
+def is_irrelevant_query(query: str) -> bool:
+    q = str(query or "").strip()
+    q_norm = q.replace(" ", "").lower()
+
+    if not q_norm:
+        return True
+
+    # 너무 짧은 입력
+    if len(q_norm) <= 1:
+        return True
+
+    # 완전히 무관한 짧은 입력들
+    short_block_words = [
+        "트럼프", "윤석열", "이재명", "정치", "대통령",
+        "주식", "코인", "비트코인", "나스닥", "s&p",
+        "축구", "야구", "농구", "연예인", "아이돌",
+        "영화", "드라마", "날씨", "로또", "게임"
+    ]
+
+    if q_norm in short_block_words:
+        return True
+
+    # 케어네비 관련 기본 키워드
+    care_keywords = [
+        "어르신", "노인", "고령", "돌봄", "통합돌봄", "복지", "복지용구",
+        "장기요양", "요양", "건강", "질환", "통증", "병원", "의료", "간호",
+        "간병", "치매", "약", "복약", "식사", "영양", "반찬", "목욕", "위생",
+        "청소", "세탁", "이동", "거동", "보행", "낙상", "배뇨", "배변",
+        "욕창", "상처", "감염", "튜브", "비위관", "콧줄", "도뇨", "소변줄",
+        "외로움", "고립", "말벗", "독거", "보호자", "가족", "주거", "안전",
+        "방문", "재활", "장애", "지원", "서비스", "구강", "칫솔질", "양치",
+        "언어장애", "의사소통", "응급", "단기보호", "기저귀", "조호물품",
+        "보일러", "에어컨", "가스레인지", "화기"
+    ]
+
+    # 의미상 돌봄/생활불편/정서지원으로 볼 수 있는 표현
+    meaning_keywords = [
+        "잘어울리지못", "어울리지못", "대인관계", "관계어려움",
+        "혼자지냄", "혼자있음", "혼자생활", "외출안", "밖에안나감",
+        "고립", "고독", "우울", "불안", "외롭", "말상대", "말벗",
+        "난청", "청각장애", "귀가어두움", "귀가어두워",
+        "소리를못알아듣", "소리를알아듣지못", "말소리를못알아듣", "말소리를알아듣지못",
+        "듣지못함", "잘못들음", "잘안들림", "소리가안들림", "의사소통어려움", "대화어려움",
+        "입안", "입속", "입안관리", "입속관리", "구강관리",
+        "도구필요", "보조도구", "보조기구", "지팡이필요",
+        "보행기필요", "휠체어필요",
+
+        "밥못", "식사못", "반찬못", "끼니", "먹기힘들", "챙겨먹기힘들",
+        "배고프", "배고파", "배가고프", "배가고파", "허기", "허기짐", "허기지", "굶", "굶고", "못먹", "못먹음",
+        "못씹", "씹기힘들", "씹지못", "씹는것", "저작", "연하곤란", "삼키기힘들", "삼키기어렵", "틀니", "이가없", "치아",
+        "입맛없", "식욕없", "식욕부진", "영양부족", "영양불량",
+        "도시락", "도시락필요", "식사배달", "밥배달", "배달식", "배달도시락",
+        "반찬지원", "식사지원", "영양지원",
+
+        "씻기힘들", "목욕힘들", "청소힘들", "세탁힘들",
+        "걷기힘들", "움직이기힘들", "거동불편", "보행불편",
+        "이동불편", "허리불편", "무릎불편",
+        "넘어질까", "낙상걱정", "화장실힘들", "배변힘들", "배뇨힘들",
+        "병원가기힘들", "병원동행", "약챙기기힘들",
+
+        "아프", "통증", "쑤시", "결리", "저리", "불편", "불편함",
+        "허리아프", "무릎아프", "어깨아프", "다리아프", "손목아프",
+        "허리통증", "무릎통증", "어깨통증", "다리통증", "관절통증",
+        "요통", "허리아픔", "허리가아픔", "허리가자주아픔", "허리쑤심",
+
+        "다리저림", "다리가저림", "발저림", "손저림", "손발저림",
+        "찌릿", "감각이상", "감각저하",
+
+        "요실금", "실금", "소변실수", "배뇨실수", "오줌실수",
+        "오줌지림", "소변지림", "지린다", "지림", "쉬를지림",
+        "소변이샘", "소변이새", "오줌이샘", "오줌이새",
+
+        "변실수", "대변실수", "변지림", "변을지림", "배변불편",
+
+        "낙상", "넘어짐", "자주넘어짐", "휘청거림", "비틀거림",
+        "균형불안", "낙상걱정",
+
+        "깜빡", "기억못", "기억력저하", "인지저하", "헷갈림",
+
+        "약챙기기힘들", "복약어려움", "병원가기힘들", "병원동행",
+        "통원어려움",
+
+        "차려먹기힘들", "챙겨먹기힘들", "체중감소", "기운없음",
+
+        "소변줄", "콧줄", "비위관", "도뇨줄", "장루", "요루",
+
+        "못함", "하지못함", "수행하지못함", "알아듣지못함",
+        "듣지못함", "말하지못함", "소리내지못함",
+        "도움필요", "부분도움", "전적인도움", "혼자못함",
+        "구강건조", "입마름", "칫솔질", "잇몸출혈",
+        "독거", "왕래하는가족없", "가족왕래없", "보호자없음",
+        "응급서비스", "응급호출", "위급상황",
+        "보일러교체", "에어컨설치", "가스레인지", "화기관리",
+        "단기보호", "임시보호", "기저귀", "조호물품",
+    ]
+
+
+    if any(k in q_norm for k in ["못함", "하지못함", "도움필요", "부분도움"]) and any(
+        c in q_norm for c in ["식사", "목욕", "씻", "이동", "청소", "세탁", "소변", "배변", "의사소통", "듣", "말", "구강", "칫솔질"]
+    ):
+        return False
+
+    # 질병/치료/후유증 문맥 표현
+    disease_context_keywords = [
+        "진단", "진단받", "앓고", "앓음", "병력", "후유증",
+        "수술후", "수술 후", "입원후", "입원 후",
+        "치료중", "치료 중", "재활필요", "재활 필요",
+        "투석", "마비", "편마비", "통원", "복약",
+        "약복용", "약 복용", "지병", "기저질환", "후유장애",
+        "있다고함", "있다고 함", "라고함", "라고 함"
+    ]
+
+    # 자주 나오는 대표 질환명만 최소한으로
+    disease_keywords = [
+        "뇌출혈", "뇌경색", "중풍", "치매", "파킨슨",
+        "당뇨", "고혈압", "암", "골절", "관절염",
+        "심부전", "심근경색", "폐렴", "신부전", "투석",
+        "편마비", "사지마비"
+    ]
+
+    # 1. 기본 케어 키워드가 있으면 통과
+    if any(word in q_norm for word in care_keywords):
+        return False
+
+    # 2. 의미상 돌봄 관련 표현이면 통과
+    if any(word in q_norm for word in meaning_keywords):
+        return False
+
+    # 3. 질병/치료 문맥 표현이 있으면 통과
+    if any(word in q for word in disease_context_keywords):
+        return False
+
+    # 4. 대표 질환명이 있으면 통과
+    if any(word in q_norm for word in disease_keywords):
+        return False
+
+    # 완전히 무관해 보이는 일반 질문 패턴
+    irrelevant_patterns = [
+        r"^트럼프[\?\!\.\~]*$",
+        r"^날씨[\?\!\.\~]*$",
+        r"^주식[\?\!\.\~]*$",
+        r"^로또[\?\!\.\~]*$",
+        r"^안녕[\?\!\.\~]*$",
+        r"^뭐야[\?\!\.\~]*$",
+        r"^누구야[\?\!\.\~]*$",
+        r"^오늘뭐하냐[\?\!\.\~]*$",
+        r"^뭐함[\?\!\.\~]*$",
+        r"^심심하다[\?\!\.\~]*$"
+    ]
+
+    for pattern in irrelevant_patterns:
+        if re.match(pattern, q_norm):
+            return True
+
+    # 위 조건들에 안 걸리면 기본적으로 무관 질문으로 처리
+    return True
+
+
+def make_no_result_response(query, results, cond_display, count, service_results, found_sido, found_sigungu):
+    warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 구체적으로 입력해 주세요."
+
+    return render_template_string(
+        DESC_HTML,
+        style=BASE_STYLE,
+        query=query,
+        results=results,
+        cond_display=cond_display,
+        count=count,
+        service_results=service_results,
+             grouped_service_results=build_grouped_service_results(service_results),
+        warning_msg=warning_msg,
+        found_sido=found_sido,
+        found_sigungu=found_sigungu,
+        sido_options=SIDO_OPTIONS
+    )
+
+
+def extract_region_from_query(query: str):
+    q = str(query or "").strip()
+    q = q.replace(" ", "")
+
+    found_sido = ""
+    found_sigungu = ""
+
+    sido_alias_map = {
+        "전남광주통합특별시": "전남광주통합특별시",
+        "전라남도": "전남광주통합특별시",
+        "전남": "전남광주통합특별시",
+        "광주광역시": "전남광주통합특별시",
+        "광주": "전남광주통합특별시",
+        "전라북도": "전라북도",
+        "전북": "전라북도",
+        "제주특별자치도": "제주특별자치도",
+        "제주도": "제주특별자치도",
+        "제주": "제주특별자치도"
+    }
+
+    sigungu_alias_map = {
+        "목포시": ("전남광주통합특별시", "목포시"),
+        "목포": ("전남광주통합특별시", "목포시"),
+        "여수시": ("전남광주통합특별시", "여수시"),
+        "여수": ("전남광주통합특별시", "여수시"),
+        "순천시": ("전남광주통합특별시", "순천시"),
+        "순천": ("전남광주통합특별시", "순천시"),
+        "나주시": ("전남광주통합특별시", "나주시"),
+        "나주": ("전남광주통합특별시", "나주시"),
+        "광양시": ("전남광주통합특별시", "광양시"),
+        "광양": ("전남광주통합특별시", "광양시"),
+        "담양군": ("전남광주통합특별시", "담양군"),
+        "담양": ("전남광주통합특별시", "담양군"),
+        "곡성군": ("전남광주통합특별시", "곡성군"),
+        "곡성": ("전남광주통합특별시", "곡성군"),
+        "구례군": ("전남광주통합특별시", "구례군"),
+        "구례": ("전남광주통합특별시", "구례군"),
+        "고흥군": ("전남광주통합특별시", "고흥군"),
+        "고흥": ("전남광주통합특별시", "고흥군"),
+        "보성군": ("전남광주통합특별시", "보성군"),
+        "보성": ("전남광주통합특별시", "보성군"),
+        "화순군": ("전남광주통합특별시", "화순군"),
+        "화순": ("전남광주통합특별시", "화순군"),
+        "장흥군": ("전남광주통합특별시", "장흥군"),
+        "장흥": ("전남광주통합특별시", "장흥군"),
+        "강진군": ("전남광주통합특별시", "강진군"),
+        "강진": ("전남광주통합특별시", "강진군"),
+        "해남군": ("전남광주통합특별시", "해남군"),
+        "해남": ("전남광주통합특별시", "해남군"),
+        "영암군": ("전남광주통합특별시", "영암군"),
+        "영암": ("전남광주통합특별시", "영암군"),
+        "무안군": ("전남광주통합특별시", "무안군"),
+        "무안": ("전남광주통합특별시", "무안군"),
+        "함평군": ("전남광주통합특별시", "함평군"),
+        "함평": ("전남광주통합특별시", "함평군"),
+        "영광군": ("전남광주통합특별시", "영광군"),
+        "영광": ("전남광주통합특별시", "영광군"),
+        "장성군": ("전남광주통합특별시", "장성군"),
+        "장성": ("전남광주통합특별시", "장성군"),
+        "완도군": ("전남광주통합특별시", "완도군"),
+        "완도": ("전남광주통합특별시", "완도군"),
+        "진도군": ("전남광주통합특별시", "진도군"),
+        "진도": ("전남광주통합특별시", "진도군"),
+        "신안군": ("전남광주통합특별시", "신안군"),
+        "신안": ("전남광주통합특별시", "신안군"),
+
+        "전주시": ("전라북도", "전주시"),
+        "전주": ("전라북도", "전주시"),
+        "군산시": ("전라북도", "군산시"),
+        "군산": ("전라북도", "군산시"),
+        "익산시": ("전라북도", "익산시"),
+        "익산": ("전라북도", "익산시"),
+        "정읍시": ("전라북도", "정읍시"),
+        "정읍": ("전라북도", "정읍시"),
+        "남원시": ("전라북도", "남원시"),
+        "남원": ("전라북도", "남원시"),
+        "김제시": ("전라북도", "김제시"),
+        "완산구": ("전라북도", "전주시 완산구"),
+        "덕진구": ("전라북도", "전주시 덕진구"),
+        "김제": ("전라북도", "김제시"),
+        "완주군": ("전라북도", "완주군"),
+        "완주": ("전라북도", "완주군"),
+        "진안군": ("전라북도", "진안군"),
+        "진안": ("전라북도", "진안군"),
+        "무주군": ("전라북도", "무주군"),
+        "무주": ("전라북도", "무주군"),
+        "장수군": ("전라북도", "장수군"),
+        "장수": ("전라북도", "장수군"),
+        "임실군": ("전라북도", "임실군"),
+        "임실": ("전라북도", "임실군"),
+        "순창군": ("전라북도", "순창군"),
+        "순창": ("전라북도", "순창군"),
+        "고창군": ("전라북도", "고창군"),
+        "고창": ("전라북도", "고창군"),
+        "부안군": ("전라북도", "부안군"),
+        "부안": ("전라북도", "부안군"),
+
+        "동구": ("전남광주통합특별시", "동구"),
+        "서구": ("전남광주통합특별시", "서구"),
+        "남구": ("전남광주통합특별시", "남구"),
+        "북구": ("전남광주통합특별시", "북구"),
+        "광산구": ("전남광주통합특별시", "광산구"),
+        "광산": ("전남광주통합특별시", "광산구"),
+        "광주동구": ("전남광주통합특별시", "동구"),
+        "광주서구": ("전남광주통합특별시", "서구"),
+        "광주남구": ("전남광주통합특별시", "남구"),
+        "광주북구": ("전남광주통합특별시", "북구"),
+        "광주광역시동구": ("전남광주통합특별시", "동구"),
+        "광주광역시서구": ("전남광주통합특별시", "서구"),
+        "광주광역시남구": ("전남광주통합특별시", "남구"),
+        "광주광역시북구": ("전남광주통합특별시", "북구"),
+
+        "제주시": ("제주특별자치도", "제주시"),
+        "제주시청": ("제주특별자치도", "제주시"),
+        "제주": ("제주특별자치도", "제주시"),
+        "서귀포시": ("제주특별자치도", "서귀포시"),
+        "서귀포": ("제주특별자치도", "서귀포시")
+    }
+
+
+    for alias in sorted(sido_alias_map.keys(), key=len, reverse=True):
+        if alias in q:
+            found_sido = sido_alias_map[alias]
+            break
+
+    for alias in sorted(sigungu_alias_map.keys(), key=len, reverse=True):
+        if alias in q:
+            found_sido = sigungu_alias_map[alias][0]
+            found_sigungu = sigungu_alias_map[alias][1]
+            break
+
+    return found_sido, found_sigungu
+
+
+# =========================
+# ③ 사전조사 (UI 유지)
+# =========================
+CARE_QUESTIONS = [
+    ["의자나 소파에서 걸터앉은 상태에서 무릎을 짚고 일어설 수 있습니까?",
+     "도움 없이 혼자서 수행 가능", "보조도구(지팡이 등)를 잡고 수행 가능", "타인이 도와줘야 수행 가능"],
+    ["집안에서 6걸음을 이동할 수 있습니까?",
+     "도움 없이 혼자서 수행 가능", "보조도구(지팡이 등)를 잡고 수행 가능", "타인이 도와줘야 수행 가능"],
+    ["등을 제외한 몸 전체를 씻을 수 있습니까?",
+     "도움 없이 혼자서 수행 가능", "필요 도구를 준비해 주면 수행 가능", "타인이 도와줘야 수행 가능"],
+    ["상의를 입고 단추를 잠글 수 있습니까?",
+     "도움 없이 혼자서 수행 가능", "상의를 준비해 주면 수행 가능", "타인이 도와줘야 수행 가능"],
+    ["하의를 입고 지퍼를 올릴 수 있습니까?",
+     "도움 없이 혼자서 수행 가능", "하의를 준비해 주면 수행 가능", "타인이 도와줘야 수행 가능"],
+    ["소변실수를 하지 않고 화장실에 갈 수 있습니까?",
+     "요실금 없음", "주 1회 정도 실금함", "주 2회 이상 실금함"],
+    ["화장실에서 변기에 앉아 용변을 볼 수 있습니까?",
+     "도움 없이 혼자서 수행 가능", "보조도구(지팡이 등)를 잡고 수행 가능", "타인이 도와줘야 수행 가능"]
+]
+
+
+CARE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합돌봄 사전조사</title>
+<style>
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+.page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
+
+/* ── 상단 바 ── */
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
+.home-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; text-decoration:none; font-size:13px; font-weight:600; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
+.home-btn:hover{ background:#f3f4f6; color:#374151; }
+.btn-group{ display:flex; gap:10px; }
+.reset-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
+.reset-btn:hover{ background:#f3f4f6; color:#374151; }
+
+/* ── 폼 카드 ── */
+.form-card{ background:#fff; border-radius:16px; padding:28px 24px; box-shadow:0 10px 26px rgba(15,23,42,0.10); overflow-x:auto; }
+.form-title{ text-align:left; font-size:18px; font-weight:900; margin-bottom:20px; letter-spacing:-0.3px; border:none; border-left:5px solid #5b7ee5; padding:6px 0 6px 14px; color:#2d3a6e; }
+.section-header{ background:#5b7ee5; color:#fff; font-size:13px; font-weight:700; padding:6px 10px; border-radius:4px; margin:18px 0 8px 0; }
+.section-header:first-of-type{ margin-top:0; }
+
+/* ── 치매 박스 ── */
+.dementia-box{ background:linear-gradient(135deg,#eef2ff,#e0e7ff); padding:16px 18px; border-radius:12px; margin-bottom:16px; border:1px solid #c7d2fe; }
+.dementia-box b{ font-size:13.5px; display:block; margin-bottom:10px; }
+.dementia-options{ display:flex; width:100%; align-items:center; justify-content:space-between; gap:0; }
+.dementia-options label{ flex:1; display:flex; justify-content:center; align-items:center; gap:6px; white-space:nowrap; margin:0; font-size:13px; cursor:pointer; }
+.dementia-options input[type=radio]{ width:auto !important; margin:0; flex:0 0 auto; transform:scale(1.1); border:revert; padding:revert; border-radius:revert; }
+
+/* ── 질문 박스 ── */
+.question-box{ background:#f8fafc; padding:18px; border-radius:12px; margin-bottom:10px; border:1px solid #e5e7eb; transition:0.18s ease; }
+.question-box.active{ border:2px solid #5b7ee5; background:#eef2ff; box-shadow:0 6px 18px rgba(75,110,220,0.12); }
+.question-title{ display:block; font-size:13.5px; line-height:1.6; word-break:keep-all; overflow-wrap:break-word; padding-left:22px; text-indent:-22px; }
+.options{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+.options label{ display:flex; align-items:center; gap:8px; cursor:pointer; line-height:1.5; font-size:12.5px; }
+.options input[type=radio]{ width:auto !important; flex:0 0 auto; transform:scale(1.05); border:revert; padding:revert; border-radius:revert; }
+
+/* ── 검사 버튼 ── */
+.submit-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(75,110,220,0.25); transition:all .15s; }
+.submit-btn:hover{ background:#4a6cd4; transform:translateY(-1px); }
+
+/* ── 점수 배너 ── */
+.score-banner{ position:fixed; top:100px; right:80px; z-index:998; width:132px; padding:14px 12px; border-radius:22px; background:rgba(255,255,255,0.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(191,219,254,0.95); box-shadow:0 18px 38px rgba(75,110,220,0.18); text-align:center; transition:all 0.2s ease; }
+.score-banner.disabled{ opacity:0.62; transform:scale(0.98); }
+.score-badge{ width:72px; height:72px; margin:0 auto 10px auto; border-radius:50%; background:linear-gradient(135deg,#5b7ee5,#a5b4fc); display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; box-shadow:0 10px 22px rgba(75,110,220,0.28); }
+.score-badge-label{ font-size:10px; opacity:0.92; line-height:1; margin-bottom:4px; }
+.score-value{ font-size:28px; font-weight:800; line-height:1; }
+.score-meta{ display:none; }
+.score-progress-wrap{ width:100%; height:8px; background:#eef2ff; border-radius:999px; overflow:hidden; margin-bottom:3px; }
+.score-progress-bar{ height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg,#a5b4fc,#5b7ee5); transition:width 0.22s ease; }
+.score-status{ font-size:11px; color:#2d3a6e; line-height:1.45; word-break:keep-all; min-height:34px; font-weight:600; }
+.score-chip{ margin-top:8px; display:inline-block; padding:5px 8px; border-radius:999px; font-size:10px; font-weight:700; background:#eef2ff; color:#5b7ee5; }
+
+/* 상태별 색감 */
+.score-banner.state-low .score-badge{ background:linear-gradient(135deg,#22c55e,#4ade80); box-shadow:0 10px 22px rgba(34,197,94,0.24); }
+.score-banner.state-low .score-progress-bar{ background:linear-gradient(90deg,#86efac,#22c55e); }
+.score-banner.state-low .score-status{ color:#166534; }
+.score-banner.state-low .score-chip{ background:#f0fdf4; color:#16a34a; }
+
+.score-banner.state-mid .score-badge{ background:linear-gradient(135deg,#f59e0b,#fbbf24); box-shadow:0 10px 22px rgba(245,158,11,0.24); }
+.score-banner.state-mid .score-progress-bar{ background:linear-gradient(90deg,#fde68a,#f59e0b); }
+.score-banner.state-mid .score-status{ color:#92400e; }
+.score-banner.state-mid .score-chip{ background:#fffbeb; color:#d97706; }
+
+.score-banner.state-high .score-badge{ background:linear-gradient(135deg,#ef4444,#f87171); box-shadow:0 10px 22px rgba(239,68,68,0.24); }
+.score-banner.state-high .score-progress-bar{ background:linear-gradient(90deg,#fca5a5,#ef4444); }
+.score-banner.state-high .score-status{ color:#991b1b; }
+.score-banner.state-high .score-chip{ background:#fef2f2; color:#dc2626; }
+
+.score-banner.state-dementia .score-badge{ background:linear-gradient(135deg,#7c3aed,#a78bfa); box-shadow:0 10px 22px rgba(124,58,237,0.24); }
+.score-banner.state-dementia .score-progress-bar{ background:linear-gradient(90deg,#c4b5fd,#7c3aed); width:100% !important; }
+.score-banner.state-dementia .score-status{ color:#5b21b6; }
+.score-banner.state-dementia .score-chip{ background:#f5f3ff; color:#7c3aed; }
+
+/* ── 결과 안내 박스 ── */
+.guide-box{ margin-top:16px; padding:14px 18px; border-radius:12px; background:#fff7ed; border:1px solid #fdba74; color:#9a3412; font-size:13px; line-height:1.7; display:flex; align-items:flex-start; gap:8px; }
+
+/* ── 모달 ── */
+.modal-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; padding-top:6vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+.modal-box{ background:white; margin:0 auto; position:absolute; top:8%; left:0; right:0; padding:18px 22px 22px 22px; width:92%; max-width:460px; border-radius:14px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.15); }
+.modal-result-area{ background:#eef2ff; border-radius:10px; padding:14px; margin-bottom:18px; }
+.modal-result-area p{ font-size:18px; line-height:1.6; margin:0; }
+.modal-criteria{ text-align:left; font-size:13px; line-height:1.6; color:#444; background:#fafafa; padding:14px; border-radius:8px; }
+.modal-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+.modal-btn:hover{ background:#4a6cd4; }
+
+/* ── 인쇄 ── */
+@media print{
+  body{ background:white; }
+  .top-bar,.score-banner{ display:none !important; }
+  .page-wrap{ padding:0; }
+  .form-card{ box-shadow:none; border-radius:0; padding:10px; }
+}
+
+/* ── 모바일 ── */
+@media (max-width:600px){
+  .page-wrap{ padding:10px 6px 60px 6px; }
+  .form-card{ padding:14px 10px; }
+  .form-title{ font-size:14px; padding:4px 0 4px 12px; }
+  .top-bar{ flex-wrap:wrap; gap:6px; justify-content:flex-start; }
+  .btn-group{ margin-left:0; }
+  .home-btn,.reset-btn{ height:30px; font-size:11.5px; padding:0 10px; }
+  .section-header{ font-size:11.5px; padding:5px 8px; }
+  .question-title{ font-size:12.5px; line-height:1.55; padding-left:18px; text-indent:-18px; }
+  .options label{ font-size:11.5px; }
+  .dementia-box{ padding:12px 14px; }
+  .dementia-box b{ font-size:12.5px; }
+  .dementia-options label{ font-size:12px; }
+
+  .score-banner{ position:fixed; top:10px; right:10px; width:85px; padding:8px 6px; border-radius:16px; z-index:10; }
+  .score-badge{ width:44px; height:44px; }
+  .score-value{ font-size:18px; }
+  .score-meta{ font-size:9px; }
+  .score-status{ font-size:10px; line-height:1.2; min-height:20px; }
+  .score-chip{ font-size:10px; padding:3px 6px; }
+
+  .modal-overlay{ padding-top:0 !important; }
+  .modal-box{ top:2% !important; }
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+
+<body>
+<div class="page-wrap">
+
+  <div class="top-bar">
+    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <div class="btn-group">
+      <button type="button" id="gt-reset" class="reset-btn" onclick="resetCarePage()">&#8635; 다시 입력</button>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="form-title">통합돌봄 사전조사</div>
+
+    <div id="scoreBanner" class="score-banner disabled">
+      <div class="score-badge">
+        <div class="score-badge-label">점수</div>
+        <div id="scoreValue" class="score-value">0</div>
+      </div>
+      <div class="score-meta">응답 <span id="answeredCount">0</span>/7 · 최대 14점</div>
+      <div class="score-progress-wrap">
+        <div id="scoreProgressBar" class="score-progress-bar"></div>
+      </div>
+      <div id="scoreStatus" class="score-status">치매 여부를 먼저 선택하세요</div>
+      <div id="scoreChip" class="score-chip">사전 확인 필요</div>
+    </div>
+
+    <form id="careForm">
+
+      <div id="gt-dementia">
+      <div class="section-header">&#9632; 치매 관련 약 복용 여부</div>
+      <div class="dementia-box">
+        <b>치매 관련 약을 복용 중이십니까?</b>
+        <div class="dementia-options">
+          <label><input type="radio" name="dementia" value="y"> 예</label>
+          <label><input type="radio" name="dementia" value="n"> 아니오</label>
+        </div>
+      </div>
+      </div>
+
+      <div id="gt-adl" class="section-header">&#9632; 일상생활 수행능력(ADL) 조사</div>
+      <div id="adlSection">
+        {% for i,q in questions %}
+        <div class="question-box">
+          <b class="question-title">{{i+1}}) {{q[0]}}</b>
+          <div class="options">
+            <label><input type="radio" name="q{{i}}" value="0"> {{q[1]}} (0점)</label>
+            <label><input type="radio" name="q{{i}}" value="1"> {{q[2]}} (1점)</label>
+            <label><input type="radio" name="q{{i}}" value="2"> {{q[3]}} (2점)</label>
+          </div>
+        </div>
+        {% endfor %}
+
+        <button type="submit" class="submit-btn">검사하기</button>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+
+<!-- 결과 모달 -->
+<div id="resultModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 id="modalTitle" style="margin-top:0;margin-bottom:12px;">사전조사 결과 안내</h3>
+    <div class="modal-result-area">
+      <p id="r_text"></p>
+    </div>
+    <div class="modal-criteria">
+      <b>통합돌봄 지원 기준</b><br><br>
+      ① 치매약 복약 중인 경우<br>
+      → 일상생활 수행능력과 관계없이 통합돌봄 지원 대상<br><br>
+      ② 일상생활수행능력(ADL) 점수 기준<br>
+      • 0~1점 : 지자체 사업 안내 후 종결<br>
+      • 2~3점 : 지자체 자체조사 후 지원 검토<br>
+      • 4점 이상 : 통합판정조사 대상<br><br>
+      <span style="font-size:11px;color:#666;">
+        ※ 본 결과는 통합돌봄 서비스 안내를 위한 참고용 사전조사입니다.<br>
+        최종 지원 여부는 지자체 및 공단의 추가 조사 후 결정됩니다.
+      </span>
+    </div>
+    <button onclick="closeModal()" class="modal-btn">확인</button>
+  </div>
+</div>
+
+<script>
+function showGuide(messageHtml){
+  document.getElementById("modalTitle").innerText = "안내";
+  document.getElementById("r_text").innerHTML = messageHtml;
+  document.getElementById("resultModal").style.display = "block";
+}
+
+function showResult(title, messageText){
+  document.getElementById("modalTitle").innerText = title;
+  document.getElementById("r_text").innerText = messageText;
+  document.getElementById("resultModal").style.display = "block";
+}
+
+function closeModal(){
+  document.getElementById("resultModal").style.display = "none";
+}
+
+function getCurrentScore(){
+  let score = 0;
+  for(let i=0; i<7; i++){
+    const checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){ score += Number(checked.value); }
+  }
+  return score;
+}
+
+function getAnsweredCount(){
+  let count = 0;
+  for(let i=0; i<7; i++){
+    const checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){ count += 1; }
+  }
+  return count;
+}
+
+function getBannerState(score, dementiaValue){
+  if(!dementiaValue) return "disabled";
+  if(dementiaValue === "y") return "state-dementia";
+  if(score <= 1) return "state-low";
+  else if(score <= 3) return "state-mid";
+  else return "state-high";
+}
+
+function getScoreStatusText(score, dementiaValue){
+  if(!dementiaValue) return "치매 여부를 먼저 선택하세요";
+  if(dementiaValue === "y") return "치매약 복용으로 별도 조사 없이 대상입니다";
+  if(score <= 1) return "지자체 사업 안내 후 종결 구간입니다";
+  else if(score <= 3) return "지자체 자체조사 대상 구간입니다";
+  else return "통합판정조사 대상 구간입니다";
+}
+
+function getChipText(score, dementiaValue){
+  if(!dementiaValue) return "사전 확인 필요";
+  if(dementiaValue === "y") return "치매약 복용";
+  if(score <= 1) return "0~1점";
+  else if(score <= 3) return "2~3점";
+  else return "4점 이상";
+}
+
+function resetCarePage(){
+  try{ sessionStorage.removeItem("care_form_state"); }catch(e){}
+  window.location.href = "/care";
+}
+
+function updateScoreBanner(){
+  const banner = document.getElementById("scoreBanner");
+  const scoreValue = document.getElementById("scoreValue");
+  const answeredCount = document.getElementById("answeredCount");
+  const scoreStatus = document.getElementById("scoreStatus");
+  const scoreChip = document.getElementById("scoreChip");
+  const scoreProgressBar = document.getElementById("scoreProgressBar");
+  const dementia = document.querySelector('input[name="dementia"]:checked');
+
+  const score = getCurrentScore();
+  const answered = getAnsweredCount();
+  const dementiaValue = dementia ? dementia.value : "";
+
+  scoreValue.innerText = score;
+  answeredCount.innerText = answered;
+  scoreStatus.innerText = getScoreStatusText(score, dementiaValue);
+  scoreChip.innerText = getChipText(score, dementiaValue);
+
+  let progress = Math.min((score / 14) * 100, 100);
+  if(dementiaValue === "y") progress = 100;
+  scoreProgressBar.style.width = progress + "%";
+
+  banner.classList.remove("disabled","state-low","state-mid","state-high","state-dementia");
+  const nextState = getBannerState(score, dementiaValue);
+  if(nextState === "disabled") banner.classList.add("disabled");
+  else banner.classList.add(nextState);
+}
+
+/* ── 상태 저장/복원 ── */
+var CARE_STORAGE_KEY = "care_form_state";
+
+function saveCareState(){
+  var state = {};
+  var dementia = document.querySelector('input[name="dementia"]:checked');
+  state.dementia = dementia ? dementia.value : null;
+  state.adl = {};
+  for(var i=0;i<7;i++){
+    var r = document.querySelector('input[name="q'+i+'"]:checked');
+    state.adl[i] = r ? r.value : null;
+  }
+  try{ sessionStorage.setItem(CARE_STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+function restoreCareState(){
+  var raw;
+  try{ raw = sessionStorage.getItem(CARE_STORAGE_KEY); }catch(e){}
+  if(!raw) return;
+  var state;
+  try{ state = JSON.parse(raw); }catch(e){ return; }
+
+  if(state.dementia){
+    var dr = document.querySelector('input[name="dementia"][value="'+state.dementia+'"]');
+    if(dr){
+      dr.checked = true;
+      if(state.dementia === "y"){
+        document.getElementById("adlSection").style.opacity = "0.4";
+      }
+    }
+  }
+
+  for(var i=0;i<7;i++){
+    if(state.adl && state.adl[i]){
+      var ar = document.querySelector('input[name="q'+i+'"][value="'+state.adl[i]+'"]');
+      if(ar){
+        ar.checked = true;
+        var box = ar.closest(".question-box");
+        if(box) box.classList.add("active");
+      }
+    }
+  }
+
+  updateScoreBanner();
+}
+
+/* 1) 치매 선택 안 했는데 ADL 누르면 차단 */
+document.querySelectorAll('#adlSection .options input[type="radio"]').forEach(radio => {
+  radio.addEventListener("change", function(){
+    const dementia = document.querySelector('input[name="dementia"]:checked');
+
+    if(!dementia){
+      this.checked = false;
+      showGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를<br> 선택해주세요.");
+      updateScoreBanner();
+      return;
+    }
+
+    const box = this.closest(".question-box");
+    if(box) box.classList.add("active");
+
+    updateScoreBanner();
+    saveCareState();
+  });
+});
+
+/* 2) 치매 선택 처리 */
+document.querySelectorAll('input[name="dementia"]').forEach(radio => {
+  radio.addEventListener("change", function(){
+    if(this.value === "y"){
+      document.getElementById("adlSection").style.opacity = "0.4";
+      showGuide("치매약을 복약 중인 경우 일상생활 수행능력과 관계없이 <b>통합돌봄 대상</b>입니다.");
+    }else{
+      document.getElementById("adlSection").style.opacity = "1";
+    }
+
+    updateScoreBanner();
+    saveCareState();
+  });
+});
+
+/* 3) 검사하기 클릭 시 */
+document.getElementById("careForm").onsubmit = async function(e){
+  e.preventDefault();
+
+  const dementia = document.querySelector('input[name="dementia"]:checked');
+
+  if(!dementia){
+    showGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를 선택해주세요.");
+    return;
+  }
+
+  if(dementia.value === "y") return;
+
+  for(let i=0; i<7; i++){
+    const checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(!checked){
+      showGuide((i+1) + "번 문항을 선택해주세요.");
+      return;
+    }
+  }
+
+  const formData = new FormData(this);
+
+  const res = await fetch("/care_check",{
+    method:"POST",
+    body:formData
+  });
+
+  const data = await res.json();
+
+  updateScoreBanner();
+  showResult("사전조사 결과 안내", data.result + "\\n총점: " + data.score);
+};
+
+/* 페이지 로드 시 상태 복원 */
+restoreCareState();
+updateScoreBanner();
+
+/* ── 사전조사 가이드 (한 화면에 전체 표시) ── */
+function careGuideStart() {
+  if (sessionStorage.getItem('cg_done')) return;
+
+  var isMobile = window.innerWidth < 600;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+
+  window.scrollTo(0, 0);
+
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.62);';
+  document.body.appendChild(overlay);
+
+  var prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+
+  var bubbles = [];
+
+  /* ── 공통 헬퍼: 하이라이트 ── */
+  function addHighlight(elId) {
+    var el = document.getElementById(elId);
+    if (!el) return null;
+    var pad = isMobile ? 4 : 6;
+    var r = el.getBoundingClientRect();
+    var hl = document.createElement('div');
+    hl.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(75,110,220,0.55);',
+      'top:'+(r.top-pad)+'px;left:'+(r.left-pad)+'px;',
+      'width:'+(r.width+pad*2)+'px;height:'+(r.height+pad*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl);
+    bubbles.push(hl);
+    return r;
+  }
+
+  /* ── 공통 헬퍼: 말풍선 만들기 ── */
+  function makeBubble(title, text, w) {
+    var fs      = isMobile ? '10.5px' : '12px';
+    var fsTitle = isMobile ? '11px'   : '12.5px';
+    var bpd     = isMobile ? '8px 10px 7px' : '13px 16px 12px';
+    var b = document.createElement('div');
+    b.style.cssText = [
+      'position:fixed;z-index:10000;background:#fff;border-radius:11px;',
+      'padding:'+bpd+';width:'+w+'px;',
+      'box-shadow:0 5px 20px rgba(0,0,0,0.22);',
+      'font-family:inherit;pointer-events:none;'
+    ].join('');
+    b.innerHTML =
+      '<div style="font-size:'+fsTitle+';font-weight:700;color:#3b5cc0;margin-bottom:4px;">&#128161; '+title+'</div>'+
+      '<div style="font-size:'+fs+';color:#374151;line-height:1.55;word-break:keep-all;">'+text+'</div>';
+    document.body.appendChild(b);
+    bubbles.push(b);
+    return b;
+  }
+
+  /* ── 공통 헬퍼: 화살표 ── */
+  function addArrow(bubble, dir, posFromEdge) {
+    var arrow = document.createElement('div');
+    arrow.style.position = 'absolute';
+    arrow.style.width = '0';
+    arrow.style.height = '0';
+    if (dir === 'left') {
+      /* 화살표가 말풍선 왼쪽에서 왼쪽으로 뾰족 → 왼쪽의 타겟을 가리킴 */
+      arrow.style.borderTop = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid transparent';
+      arrow.style.borderRight = '8px solid #fff';
+      arrow.style.left = '-8px';
+      arrow.style.top = posFromEdge + 'px';
+    } else if (dir === 'right') {
+      /* 화살표가 말풍선 오른쪽에서 오른쪽으로 뾰족 → 오른쪽의 타겟을 가리킴 */
+      arrow.style.borderTop = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid transparent';
+      arrow.style.borderLeft = '8px solid #fff';
+      arrow.style.right = '-8px';
+      arrow.style.top = posFromEdge + 'px';
+    } else if (dir === 'up') {
+      /* 화살표가 말풍선 위에서 위로 뾰족 → 위의 타겟을 가리킴 */
+      arrow.style.borderLeft = '8px solid transparent';
+      arrow.style.borderRight = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid #fff';
+      arrow.style.top = '-8px';
+      arrow.style.left = posFromEdge + 'px';
+    } else if (dir === 'down') {
+      arrow.style.borderLeft = '8px solid transparent';
+      arrow.style.borderRight = '8px solid transparent';
+      arrow.style.borderTop = '8px solid #fff';
+      arrow.style.bottom = '-8px';
+      arrow.style.left = posFromEdge + 'px';
+    }
+    bubble.appendChild(arrow);
+  }
+
+  /* ========================================
+     ① 치매약 복약 여부 — 말풍선을 타겟의 오른쪽 반에 배치, 꼬리는 왼쪽 옆면
+     ======================================== */
+  var r1 = addHighlight('gt-dementia');
+  if (r1) {
+    var bw1 = isMobile ? Math.min(Math.floor(vw * 0.48), 195) : 230;
+    var b1 = makeBubble('치매약 복약 여부', '치매약을 복약하고 있는지 여부를 <b>먼저 체크</b>해 주세요.', bw1);
+    requestAnimationFrame(function(){
+      var bh1 = b1.offsetHeight;
+      /* 가로: 타겟 오른쪽 절반 영역에 배치 (화면 안에 들어오게 clamp) */
+      var bubbleLeft = Math.min(r1.left + r1.width * 0.55, vw - bw1 - 6);
+      bubbleLeft = Math.max(6, bubbleLeft);
+      /* 세로: 타겟 세로 중앙 */
+      var bubbleTop = Math.max(6, r1.top + r1.height/2 - bh1/2);
+      if (bubbleTop + bh1 > vh - 60) bubbleTop = vh - 60 - bh1;
+      b1.style.top = bubbleTop + 'px';
+      b1.style.left = bubbleLeft + 'px';
+      /* 꼬리: 왼쪽 옆면 → 타겟 왼쪽 부분을 가리킴 */
+      var arrowTop = Math.max(8, Math.min(r1.top + r1.height/2 - bubbleTop - 8, bh1 - 24));
+      addArrow(b1, 'left', arrowTop);
+    });
+  }
+
+  /* ========================================
+     ② ADL 조사 — 섹션헤더 + 1~2번 문항까지 큰 하이라이트
+     ======================================== */
+  var adlHeader = document.getElementById('gt-adl');
+  var adlQuestions = document.querySelectorAll('#adlSection .question-box');
+  var r2 = null;
+  if (adlHeader && adlQuestions.length >= 3) {
+    var rH = adlHeader.getBoundingClientRect();
+    var rQ2 = adlQuestions[2].getBoundingClientRect(); /* 3번 문항 */
+    /* 헤더 top ~ 3번 문항 bottom 을 합친 영역 */
+    var pad2 = isMobile ? 4 : 6;
+    var unionTop = Math.min(rH.top, rQ2.top);
+    var unionBottom = Math.max(rH.bottom, rQ2.bottom);
+    var unionLeft = Math.min(rH.left, rQ2.left);
+    var unionRight = Math.max(rH.right, rQ2.right);
+    r2 = { top: unionTop, bottom: unionBottom, left: unionLeft, right: unionRight,
+           width: unionRight - unionLeft, height: unionBottom - unionTop };
+    var hl2 = document.createElement('div');
+    hl2.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(75,110,220,0.55);',
+      'top:'+(r2.top-pad2)+'px;left:'+(r2.left-pad2)+'px;',
+      'width:'+(r2.width+pad2*2)+'px;height:'+(r2.height+pad2*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl2);
+    bubbles.push(hl2);
+  }
+  if (r2) {
+    var bw2 = isMobile ? Math.min(Math.floor(vw * 0.48), 195) : 230;
+    var b2 = makeBubble('ADL 조사', '일상생활 수행능력(ADL) 항목에서 <b>해당하는 항목을 눌러</b> 주세요.', bw2);
+    requestAnimationFrame(function(){
+      var bh2 = b2.offsetHeight;
+      /* 가로: 타겟 왼쪽 절반 영역에 배치 */
+      var bubbleLeft = Math.max(6, r2.left + r2.width * 0.45 - bw2);
+      /* 세로: 타겟 세로 중앙 */
+      var bubbleTop = isMobile
+              ? Math.max(6, r2.top + 100)
+              : Math.max(6, r2.top + r2.height/2 - bh2/2);
+      if (bubbleTop + bh2 > vh - 60) bubbleTop = vh - 60 - bh2;
+      b2.style.top = bubbleTop + 'px';
+      b2.style.left = bubbleLeft + 'px';
+      /* 꼬리: 오른쪽 옆면 → 타겟 오른쪽 부분을 가리킴 */
+      var arrowTop = Math.max(8, Math.min(r2.top + r2.height/2 - bubbleTop - 8, bh2 - 24));
+      addArrow(b2, 'right', arrowTop);
+    });
+  }
+
+  /* ========================================
+     ③ 다시 입력 — 말풍선을 타겟 아래에
+     ======================================== */
+  var r3 = addHighlight('gt-reset');
+  if (r3) {
+    var bw3 = isMobile ? Math.min(Math.floor(vw * 0.48), 190) : 220;
+    var b3 = makeBubble('다시 입력', '체크를 초기화하고 싶을 경우 이 버튼을 눌러주세요.', bw3);
+    requestAnimationFrame(function(){
+      var bh3 = b3.offsetHeight;
+      var bubbleTop = r3.bottom + 18;
+      if (bubbleTop + bh3 > vh - 60) bubbleTop = r3.top - bh3 - 18;
+      var bubbleLeft = Math.max(4, Math.min(r3.left + r3.width/2 - bw3/2, vw - bw3 - 4));
+      b3.style.top = bubbleTop + 'px';
+      b3.style.left = bubbleLeft + 'px';
+      var arrowLeft = Math.max(10, Math.min(r3.left + r3.width/2 - bubbleLeft - 8, bw3 - 26));
+      if (bubbleTop > r3.bottom) {
+        addArrow(b3, 'up', arrowLeft);
+      } else {
+        addArrow(b3, 'down', arrowLeft);
+      }
+    });
+  }
+
+  /* 확인 버튼 */
+  var confirmBtn = document.createElement('button');
+  confirmBtn.textContent = '확인';
+  confirmBtn.style.cssText = [
+    'position:fixed;z-index:10001;',
+    'left:50%;transform:translateX(-50%);bottom:18%;',
+    'background:#4a6cd4;color:#fff;border:none;',
+    'border-radius:10px;',
+    'padding:'+(isMobile?'10px 40px':'11px 52px')+';',
+    'font-size:'+(isMobile?'13px':'14px')+';font-weight:700;cursor:pointer;',
+    'box-shadow:0 4px 16px rgba(75,110,220,0.35);white-space:nowrap;'
+  ].join('');
+  document.body.appendChild(confirmBtn);
+  bubbles.push(confirmBtn);
+
+  function closeGuide() {
+    bubbles.forEach(function(b){ b.remove(); });
+    overlay.remove();
+    document.body.style.overflow = prevOverflow;
+    sessionStorage.setItem('cg_done', '1');
+  }
+
+  confirmBtn.addEventListener('click', function(e){ e.stopPropagation(); closeGuide(); });
+  overlay.addEventListener('click', closeGuide);
+}
+
+// 가이드 투어 제거: 자동 실행하지 않음
+</script>
+
+</body>
+</html>
+"""
+
+@app.route("/care")
+def care():
+    return render_template_string(
+        CARE_HTML,
+        questions=list(enumerate(CARE_QUESTIONS))
+    )
+
+@app.route("/care_check", methods=["POST"])
+def care_check():
+    score = 0
+    dementia = request.form.get("dementia", "n")
+
+    for i in range(7):
+        val = request.form.get(f"q{i}")
+        if val is None or val == "":
+            val = 0
+        score += int(val)
+
+    if dementia == "y":
+        return jsonify({"result":"통합돌봄 지원 대상 (치매약 복용)","score":"검사 제외"})
+
+    if score <= 1:
+        result = "지원 대상 아님"
+    elif score <= 3:
+        result = "지자체 자체조사 대상"
+    else:
+        result = "통합판정조사 대상"
+
+    return jsonify({"result":result,"score":score})
+
+
+NHIS25_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>건강보험 25시</title>
+<style>{{style}}
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+
+<style>
+.ai-engine-text{
+  font-size:14px !important;   /* 🔥 핵심: 확 줄임 */
+  font-weight:500 !important;
+  color:#6b7280 !important;    /* 🔥 회색톤 */
+  letter-spacing:0.2px;
+}
+
+.app-box{
+  background:white;
+  padding:22px;
+  border-radius:14px;
+  text-align:center;
+  margin-top:20px;
+  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+}
+
+.desc{
+  font-size:15px;
+  line-height:1.7;
+  color:#374151;
+  margin-bottom:18px;
+}
+
+.notice{
+  margin-top:14px;
+  font-size:13px;
+  color:#6b7280;
+  line-height:1.6;
+}
+
+.btn{
+  display:block;
+  width:100%;
+  padding:14px;
+  margin-top:10px;
+  border:none;
+  border-radius:10px;
+  text-decoration:none;
+  font-weight:600;
+  font-size:15px;
+  cursor:pointer;
+  box-sizing:border-box;
+}
+
+.primary-btn{
+  background:#4a6cd4;
+  color:white;
+}
+
+.hidden{
+  display:none;
+}
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="top-bar">
+  <a href="/home" class="home-button">⌂ 홈으로</a>
+</div>
+
+<h2>건강보험 25시</h2>
+
+<div class="app-box">
+
+  <div id="pcBox" class="hidden">
+    <p class="desc">
+      현재는 <b>PC 환경</b>입니다.<br>
+      건강보험 25시는 <b>모바일 앱 기반 서비스</b>입니다.<br>
+      스마트폰에서 접속하면 앱 실행 또는 설치 화면으로 이동합니다.
+    </p>
+
+    <div class="notice">
+      ※ 모바일에서 QR코드 또는 링크로 접속해 주세요.
+    </div>
+  </div>
+
+  <div id="mobileBox" class="hidden">
+    <p class="desc">
+      모바일 환경이 확인되었습니다.<br>
+      버튼을 누르면 건강보험 25시로 이동합니다.<br>
+    </p>
+
+    <button id="goBtn" class="btn primary-btn">
+      건강보험 25시 열기
+    </button>
+
+    <div class="notice">
+      ※ 앱 미설치 시 설치페이지로 이동합니다.
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+(function () {
+
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isMobile = isAndroid || isIOS;
+
+  const pcBox = document.getElementById("pcBox");
+  const mobileBox = document.getElementById("mobileBox");
+  const goBtn = document.getElementById("goBtn");
+
+  const NHIS_URL = "https://m.nhis.or.kr/index4.html?path=%2Fmg%2Fwbmmb0010%2FmainApp.do";
+
+  if (!isMobile) {
+    pcBox.classList.remove("hidden");
+    return;
+  }
+
+  mobileBox.classList.remove("hidden");
+
+  goBtn.addEventListener("click", function () {
+    window.location.href = NHIS_URL;
+  });
+
+})();
+</script>
+
+</body>
+</html>
+"""
+
+
+
+# =========================
+# 지자체 자체조사 서식
+# =========================
+SURVEY_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>지자체 조사 서식</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; font-size:13px; }
+.page-wrap{ max-width:860px; margin:0 auto; padding:20px 16px 60px 16px; min-width:0; word-break:keep-all; }
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; padding:6px 0; }
+.home-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; text-decoration:none; font-size:13px; font-weight:600; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
+.home-btn:hover{ background:#f3f4f6; color:#374151; }
+.btn-group{ display:flex; gap:10px; }
+.print-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
+.print-btn:hover{ background:#f3f4f6; color:#374151; }
+.reset-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; height:34px; padding:0 15px; border-radius:8px; background:#ffffff; border:1px solid #e5e7eb; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 6px rgba(15,23,42,0.08); transition:all .15s; }
+.reset-btn:hover{ background:#f3f4f6; color:#374151; }
+.tab-bar{ display:flex; gap:4px; border-bottom:2px solid #5b7ee5; padding-top:4px; }
+.tab-btn{ padding:9px 20px; font-size:13px; font-weight:700; border:1px solid #d1d5db; border-bottom:none; background:#eef2ff; color:#6b7280; cursor:pointer; border-radius:8px 8px 0 0; transition:all .15s; }
+.tab-btn.active{ background:#5b7ee5; color:#fff; border-color:#5b7ee5; }
+.tab-btn:hover:not(.active){ background:#e0e7ff; color:#374151; }
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; }
+.form-card{ background:#fff; border-radius:0 16px 16px 16px; padding:28px 24px; box-shadow:0 10px 26px rgba(15,23,42,0.10); overflow-x:auto; }
+.form-title{ text-align:left; font-size:18px; font-weight:900; margin-bottom:20px; letter-spacing:-0.3px; border:none; border-left:5px solid #5b7ee5; padding:6px 0 6px 14px; color:#2d3a6e; }
+.section-header{ background:#5b7ee5; color:#fff; font-size:13px; font-weight:700; padding:6px 10px; border-radius:4px; margin:18px 0 8px 0; }
+.form-table{ width:100%; border-collapse:collapse; margin-bottom:4px; }
+.form-table th,.form-table td{ border:1px solid #d1d5db; padding:7px 10px; vertical-align:middle; line-height:1.5; }
+.form-table th{ background:#f8fafc; font-weight:700; text-align:center; white-space:nowrap; min-width:72px; }
+.form-table td{ color:#374151; }
+.form-table input[type=text],.form-table input[type=date],.form-table select{ width:100%; border:none; border-bottom:1px solid #94a3b8; padding:2px 4px; font-size:13px; font-family:inherit; background:transparent; outline:none; }
+.form-table input[type=text]:focus,.form-table input[type=date]:focus{ border-bottom-color:#4a6cd4; }
+.radio-group,.check-group{ display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
+.radio-group label,.check-group label{ display:inline-flex; align-items:center; gap:3px; cursor:pointer; white-space:nowrap; font-size:12.5px; }
+.radio-group input,.check-group input{ width:auto; border:none; border-bottom:none; flex-shrink:0; }
+.etc-input{ display:inline-block; width:80px; border:none !important; border-bottom:1px solid #94a3b8 !important; padding:0 4px !important; font-size:12.5px; font-family:inherit; background:transparent; outline:none; vertical-align:middle; }
+.adl-table{ width:100%; border-collapse:collapse; margin-bottom:4px; }
+.adl-table th,.adl-table td{ border:1px solid #d1d5db; padding:6px 8px; text-align:center; font-size:12px; vertical-align:middle; }
+.adl-table th{ background:#f8fafc; font-weight:700; }
+.adl-table td:first-child{ text-align:left; }
+.form-textarea{ width:100%; border:1px solid #d1d5db; border-radius:6px; padding:8px; font-size:13px; font-family:inherit; resize:vertical; min-height:60px; outline:none; }
+.form-textarea:focus{ border-color:#4a6cd4; }
+.service-table{ width:100%; border-collapse:collapse; margin-bottom:8px; }
+.service-table th,.service-table td{ border:1px solid #d1d5db; padding:8px; text-align:center; font-size:12.5px; }
+.service-table th{ background:#f8fafc; font-weight:700; }
+.relay-note{ font-size:11px; color:#6b7280; margin-top:6px; line-height:1.6; }
+.paren-sm,.paren-sm label,.paren-sm span{ font-size:10.5px !important; }
+.opt-group{ display:inline-flex; align-items:center; flex-wrap:wrap; vertical-align:middle; max-width:100%; gap:0 3px; }
+.opt-group > label{ display:inline-flex; align-items:center; line-height:1.4; }
+.sub-paren{ font-size:10.5px; color:#374151; }
+.sub-paren label{ font-size:10.5px !important; }
+.sub-paren input[type=checkbox]{ width:12px !important; height:12px !important; flex-shrink:0; }
+.th-internet-pc{ display:block; }
+.th-internet-mo{ display:none !important; }
+@media print{
+  body{ background:white; }
+  .top-bar,.tab-bar{ display:none !important; }
+  .score-banner,.care-modal-overlay{ display:none !important; }
+  .page-wrap{ padding:0; }
+  .form-card{ box-shadow:none; border-radius:0; padding:10px; }
+  .tab-panel{ display:none !important; }
+  .tab-panel.print-target{ display:block !important; }
+  .section-header{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+/* 연령 칸 */
+.age-td{ white-space:nowrap; }
+.age-input{ display:inline-block; width:32px !important; padding:0 2px !important; border:none; border-bottom:1px solid #94a3b8; background:transparent; font-size:inherit; font-family:inherit; outline:none; vertical-align:middle; }
+@media (max-width:600px){
+  /* 성별·연령·생년월일 th 동일 폭 */
+  .th-gender, .age-th, .th-birth{ width:2.8em !important; font-size:10px !important; padding:3px 2px !important; }
+  .age-th{ letter-spacing:-0.3px; }
+  /* 성명 td 넓게, 생년월일 td 좁게 */
+  .td-name{ width:6em !important; padding:3px 2px !important; }
+  .td-birth{ width:4em !important; padding:3px 2px !important; }
+  /* 성별 td, 연령 td */
+  .td-gender{ width:4em !important; padding:3px 2px !important; font-size:10px !important; }
+  .age-td{ width:5em !important; font-size:10px !important; padding:3px 2px !important; }
+  .age-input{ width:22px !important; padding:0 1px !important; }
+}
+@media (max-width:600px){
+  .page-wrap{ padding:10px 6px 60px 6px; }
+  .form-card{ padding:12px 8px; }
+  .form-title{ font-size:14px; padding:4px 0 4px 12px; }
+  .tab-btn{ padding:7px 11px; font-size:11.5px; }
+  .form-table,.adl-table,.service-table{ table-layout:fixed; width:100%; word-break:keep-all; overflow-wrap:break-word; }
+  .form-table th{ min-width:0; font-size:11px; padding:5px 4px; white-space:normal; word-break:keep-all; overflow-wrap:anywhere; width:5em; text-align:center; }
+  .form-table td{ font-size:11px; padding:5px 4px; word-break:keep-all; }
+  .radio-group,.check-group{ gap:5px 8px; }
+  .radio-group label,.check-group label{ font-size:11px; white-space:normal; }
+  .radio-group input[type=radio],.radio-group input[type=checkbox],.check-group input[type=radio],.check-group input[type=checkbox]{ width:14px !important; height:14px !important; }
+  .wrap-below .sub-paren{ display:block; margin-top:2px; }
+  .paren-sm,.paren-sm label,.paren-sm span{ font-size:9px !important; }
+  .sub-paren{ font-size:9px; }
+  .sub-paren label{ font-size:9px !important; }
+  .sub-paren input[type=checkbox]{ width:11px !important; height:11px !important; }
+  .adl-table th,.adl-table td{ font-size:10px; padding:4px 3px; }
+  .service-table th,.service-table td{ font-size:10px; padding:4px 3px; }
+  .section-header{ font-size:11.5px; padding:5px 8px; }
+  .top-bar{
+    flex-wrap:nowrap !important;
+    gap:5px !important;
+    align-items:center !important;
+  }
+
+.btn-group{
+  display:flex !important;
+  gap:5px !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+}
+
+  .home-btn,
+  .reset-btn,
+  .print-btn{
+    height:30px !important;
+    font-size:10.5px !important;
+    padding:0 6px !important;
+    white-space:nowrap !important;
+  }
+
+  .home-btn{
+    flex:0 0 auto !important;
+  }
+
+  .btn-group .print-btn,
+.btn-group .reset-btn{
+  flex:0 0 auto !important;
+}
+  .etc-input{ width:56px !important; font-size:11px; }
+  .adl-table thead tr th:nth-child(2),.adl-table thead tr th:nth-child(3),.adl-table thead tr th:nth-child(4),.adl-table thead tr th:nth-child(6),.adl-table thead tr th:nth-child(7),.adl-table thead tr th:nth-child(8){ width:32px; word-break:break-all; }
+  .adl-table tbody tr td:nth-child(5){ text-align:left; }
+  .th-internet-pc{ display:none !important; }
+  .th-internet-mo{ display:block !important; font-size:10px; }
+  span.th-internet-mo{ display:inline !important; }
+  .th-internet{ font-size:10px !important; }
+  .th-internet-mo input[type=checkbox]{ margin:0 !important; padding:0 !important; vertical-align:middle !important; }
+  .bottom-action-bar{
+    display:flex !important;
+    justify-content:space-between !important;
+    align-items:center !important;
+    flex-wrap:nowrap !important;
+    gap:5px !important;
+    margin-top:20px !important;
+  }
+  .bottom-action-bar > .home-btn{
+    flex:0 0 auto !important;
+    margin-right:auto !important;
+  }
+  .bottom-action-bar > .btn-group,
+  .bottom-action-bar > div{
+    margin-left:auto !important;
+    display:flex !important;
+    gap:5px !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+  }
+  .relay-service-reason{
+  flex-basis:auto !important;
+  display:inline !important;
+  margin-top:0 !important;
+}
+.relay-service-input{
+  flex-basis:100% !important;
+  width:100% !important;
+  max-width:100% !important;
+  display:block !important;
+  margin-top:2px !important;
+}
+  .adl-table td span{
+    font-size:9px !important;
+  }
+
+}
+
+/* ── 사전조사 전용 스타일 ── */
+.dementia-box{ background:linear-gradient(135deg,#eef2ff,#e0e7ff); padding:16px 18px; border-radius:12px; margin-bottom:16px; border:1px solid #c7d2fe; }
+.dementia-options{ display:flex; width:100%; align-items:center; justify-content:space-between; gap:0; }
+.dementia-options label{ flex:1; display:flex; justify-content:center; align-items:center; gap:6px; white-space:nowrap; margin:0; font-size:13px; cursor:pointer; }
+.dementia-options input[type=radio]{ width:auto !important; margin:0; flex:0 0 auto; transform:scale(1.1); border:revert; padding:revert; border-radius:revert; }
+.question-box{ background:#f8fafc; padding:18px; border-radius:12px; margin-bottom:10px; border:1px solid #e5e7eb; transition:0.18s ease; }
+.question-box.active{ border:2px solid #5b7ee5; background:#eef2ff; box-shadow:0 6px 18px rgba(75,110,220,0.12); }
+.question-title{ display:block; font-size:13.5px; line-height:1.6; word-break:keep-all; overflow-wrap:break-word; padding-left:22px; text-indent:-22px; }
+.options{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+.options label{ display:flex; align-items:center; gap:8px; cursor:pointer; line-height:1.5; font-size:12.5px; }
+.options input[type=radio]{ width:auto !important; flex:0 0 auto; transform:scale(1.05); border:revert; padding:revert; border-radius:revert; }
+.guide-box{ display:flex; }
+
+/* ── 점수 배너 ── */
+.score-banner{ position:fixed; top:100px; right:80px; z-index:998; width:132px; padding:14px 12px; border-radius:22px; background:rgba(255,255,255,0.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(191,219,254,0.95); box-shadow:0 18px 38px rgba(75,110,220,0.18); text-align:center; transition:all 0.2s ease; }
+.score-banner.disabled{ opacity:0.62; transform:scale(0.98); }
+.score-banner.hidden-banner{ display:none !important; }
+.score-badge{ width:72px; height:72px; margin:0 auto 10px auto; border-radius:50%; background:linear-gradient(135deg,#5b7ee5,#a5b4fc); display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; box-shadow:0 10px 22px rgba(75,110,220,0.28); }
+.score-badge-label{ font-size:10px; opacity:0.92; line-height:1; margin-bottom:4px; }
+.score-value-text{ font-size:28px; font-weight:800; line-height:1; }
+.score-meta{ display:none; }
+.score-progress-wrap{ width:100%; height:8px; background:#eef2ff; border-radius:999px; overflow:hidden; margin-bottom:3px; }
+.score-progress-bar{ height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg,#a5b4fc,#5b7ee5); transition:width 0.22s ease; }
+.score-status{ font-size:11px; color:#2d3a6e; line-height:1.45; word-break:keep-all; min-height:34px; font-weight:600; }
+.score-chip{ margin-top:8px; display:inline-block; padding:5px 8px; border-radius:999px; font-size:10px; font-weight:700; background:#eef2ff; color:#5b7ee5; }
+
+.score-banner.state-low .score-badge{ background:linear-gradient(135deg,#22c55e,#4ade80); box-shadow:0 10px 22px rgba(34,197,94,0.24); }
+.score-banner.state-low .score-progress-bar{ background:linear-gradient(90deg,#86efac,#22c55e); }
+.score-banner.state-low .score-status{ color:#166534; }
+.score-banner.state-low .score-chip{ background:#f0fdf4; color:#16a34a; }
+
+.score-banner.state-mid .score-badge{ background:linear-gradient(135deg,#f59e0b,#fbbf24); box-shadow:0 10px 22px rgba(245,158,11,0.24); }
+.score-banner.state-mid .score-progress-bar{ background:linear-gradient(90deg,#fde68a,#f59e0b); }
+.score-banner.state-mid .score-status{ color:#92400e; }
+.score-banner.state-mid .score-chip{ background:#fffbeb; color:#d97706; }
+
+.score-banner.state-high .score-badge{ background:linear-gradient(135deg,#ef4444,#f87171); box-shadow:0 10px 22px rgba(239,68,68,0.24); }
+.score-banner.state-high .score-progress-bar{ background:linear-gradient(90deg,#fca5a5,#ef4444); }
+.score-banner.state-high .score-status{ color:#991b1b; }
+.score-banner.state-high .score-chip{ background:#fef2f2; color:#dc2626; }
+
+.score-banner.state-dementia .score-badge{ background:linear-gradient(135deg,#7c3aed,#a78bfa); box-shadow:0 10px 22px rgba(124,58,237,0.24); }
+.score-banner.state-dementia .score-progress-bar{ background:linear-gradient(90deg,#c4b5fd,#7c3aed); width:100% !important; }
+.score-banner.state-dementia .score-status{ color:#5b21b6; }
+.score-banner.state-dementia .score-chip{ background:#f5f3ff; color:#7c3aed; }
+
+/* ── 사전조사 결과 모달 ── */
+.care-modal-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; padding-top:6vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+.care-modal-box{ background:white; margin:0 auto; position:absolute; top:8%; left:0; right:0; padding:18px 22px 22px 22px; width:92%; max-width:460px; border-radius:14px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.15); }
+.care-modal-result-area{ background:#eef2ff; border-radius:10px; padding:14px; margin-bottom:18px; }
+.care-modal-result-area p{ font-size:18px; line-height:1.6; margin:0; }
+.care-modal-criteria{ text-align:left; font-size:13px; line-height:1.6; color:#444; background:#fafafa; padding:14px; border-radius:8px; }
+.care-modal-btn{ margin-top:18px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+
+@media (max-width:600px){
+  .score-banner{ position:fixed; top:80px; right:10px; width:85px; padding:8px 6px; border-radius:16px; z-index:10; }
+  .score-badge{ width:44px; height:44px; }
+  .score-value-text{ font-size:18px; }
+  .score-meta{ font-size:9px; }
+  .score-status{ font-size:10px; line-height:1.2; min-height:20px; }
+  .score-chip{ font-size:10px; padding:3px 6px; }
+  .question-title{ font-size:12.5px; line-height:1.55; padding-left:18px; text-indent:-18px; }
+  .options label{ font-size:11.5px; }
+  .dementia-box{ padding:12px 14px; }
+  .dementia-options label{ font-size:12px; }
+  .care-modal-overlay{ padding-top:0 !important; }
+  .care-modal-box{ top:2% !important; }
+}
+
+/* ── 개인정보 비활성화 스타일 ── */
+.personal-disabled{
+  background:#f3f4f6 !important;
+  color:#9ca3af !important;
+  cursor:not-allowed;
+  position:relative;
+}
+.personal-disabled input,
+.personal-disabled select{
+  background:#f3f4f6 !important;
+  color:#9ca3af !important;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+.personal-disabled label{
+  color:#9ca3af !important;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="top-bar" id="gt-topbar">
+    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <div class="btn-group">
+      <button type="button" class="print-btn" id="gt-email" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
+      <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력 / pdf 저장</button>
+      <button type="button" class="reset-btn" id="gt-reset" onclick="resetForm()">&#8635; 다시 입력</button>
+    </div>
+  </div>
+
+  <div class="tab-bar" id="gt-tabs">
+    <button class="tab-btn active" onclick="switchTab('care')" id="tab-care">사전조사</button>
+    <button class="tab-btn" onclick="switchTab('self')" id="tab-self">자체조사</button>
+    <button class="tab-btn" onclick="switchTab('relay')" id="tab-relay">연계조사</button>
+  </div>
+
+  <div class="form-card">
+
+    <!-- ══ 탭0: 사전조사 ══ -->
+    <div class="tab-panel active" id="panel-care">
+      <div class="form-title">통합돌봄 사전조사</div>
+
+      <div id="scoreBanner" class="score-banner disabled">
+        <div class="score-badge">
+          <div class="score-badge-label">점수</div>
+          <div id="scoreValue" class="score-value">0</div>
+        </div>
+        <div class="score-meta">응답 <span id="answeredCount">0</span>/7 · 최대 14점</div>
+        <div class="score-progress-wrap">
+          <div id="scoreProgressBar" class="score-progress-bar"></div>
+        </div>
+        <div id="scoreStatus" class="score-status">치매 여부를 먼저 선택하세요</div>
+        <div id="scoreChip" class="score-chip">사전 확인 필요</div>
+      </div>
+
+      <form id="careForm">
+        <div id="gt-dementia">
+        <div class="section-header">&#9632; 치매 관련 약 복용 여부</div>
+        <div class="dementia-box">
+          <b style="font-size:13.5px;display:block;margin-bottom:10px;">치매 관련 약을 복용 중이십니까?</b>
+          <div class="dementia-options">
+            <label><input type="radio" name="dementia" value="y"> 예</label>
+            <label><input type="radio" name="dementia" value="n"> 아니오</label>
+          </div>
+        </div>
+        </div>
+
+        <div id="gt-adl" class="section-header">&#9632; 일상생활 수행능력(ADL) 조사</div>
+        <div id="adlSection">
+          {% for i,q in questions %}
+          <div class="question-box">
+            <b class="question-title">{{i+1}}) {{q[0]}}</b>
+            <div class="options">
+              <label><input type="radio" name="q{{i}}" value="0"> {{q[1]}} (0점)</label>
+              <label><input type="radio" name="q{{i}}" value="1"> {{q[2]}} (1점)</label>
+              <label><input type="radio" name="q{{i}}" value="2"> {{q[3]}} (2점)</label>
+            </div>
+          </div>
+          {% endfor %}
+
+          <button type="submit" class="submit-btn" style="margin-top:18px;width:100%;height:44px;border:none;border-radius:10px;background:#5b7ee5;color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(75,110,220,0.25);">검사하기</button>
+        </div>
+      </form>
+
+      <!-- 결과 안내 박스 영역 -->
+      <div id="careGuideBox" class="guide-box" style="display:none;margin-top:16px;padding:14px 18px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:13px;line-height:1.7;align-items:flex-start;gap:8px;"></div>
+
+    </div><!-- /panel-care -->
+
+    <!-- ══ 탭1: 자체조사 ══ -->
+    <div class="tab-panel" id="panel-self">
+      <div class="form-title" id="gt-title">지자체 자체조사 서식</div>
+      <div id="gt-section-wrap">
+      <div class="section-header" id="gt-section">&#9632; 대상자 기본사항</div>
+      <table class="form-table">
+        <tr>
+          <th>성명</th><td class="td-name personal-disabled"><input type="text" name="s_name" disabled></td>
+          <th class="th-gender">성별</th>
+          <td class="td-gender personal-disabled"><div class="radio-group"><label><input type="radio" name="s_gender" value="남" disabled> 남</label><label><input type="radio" name="s_gender" value="여" disabled> 여</label></div></td>
+          <th class="age-th">연령</th>
+          <td class="age-td personal-disabled">만<input type="text" name="s_age_d" class="age-input" disabled>&thinsp;세</td>
+          <th class="th-birth">생년<br>월일</th><td class="td-birth personal-disabled"><input type="text" name="s_birth" disabled></td>
+        </tr>
+        <tr><th>주소</th><td colspan="7" class="personal-disabled"><input type="text" name="s_address" disabled></td></tr>
+        <tr><th>실거주지</th><td colspan="7" class="personal-disabled"><input type="text" name="s_real_addr" disabled></td></tr>
+        <tr>
+          <th rowspan="2">연락처</th>
+          <td colspan="3" class="personal-disabled">자택: <input type="text" name="s_tel_home" class="etc-input" style="width:120px" disabled></td>
+          <td colspan="4" class="personal-disabled">핸드폰: <input type="text" name="s_tel_mobile" class="etc-input" style="width:120px" disabled></td>
+        </tr>
+        <tr><td colspan="7" class="personal-disabled">비상연락처: <input type="text" name="s_tel_emg" class="etc-input" style="width:150px" disabled> (관계: <input type="text" name="s_tel_rel" class="etc-input" style="width:70px" disabled>)</td></tr>
+        <tr><th>주수<br>발자</th><td colspan="7"><div class="check-group">
+          <label><input type="radio" name="s_care" value="없음"> 없음</label>
+          <label><input type="radio" name="s_care" value="배우자"> 배우자</label>
+          <label><input type="radio" name="s_care" value="자녀"> 자녀(며느리·사위 포함)</label>
+          <label><input type="radio" name="s_care" value="손자녀"> 손자녀</label>
+          <label><input type="radio" name="s_care" value="친인척"> 친인척</label>
+          <label><input type="radio" name="s_care" value="친구이웃"> 친구·이웃</label>
+          <label><input type="radio" name="s_care" value="사적간병인"> 사적 간병인</label>
+          <label><input type="radio" name="s_care" value="공적서비스"> 공적서비스 돌봄제공자(요양보호사 등)</label>
+          <label><input type="radio" name="s_care" value="형제자매"> 형제·자매</label>
+          <label><input type="radio" name="s_care" value="자원봉사자"> 자원봉사자</label>
+          <span style="display:inline-flex;align-items:center;"><label><input type="radio" name="s_care" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:45px">)</span>
+        </div></td></tr>
+        <tr><th>가구<br>형태</th><td colspan="7"><div class="radio-group">
+          <label><input type="radio" name="s_hh" value="독거"> 독거</label>
+          <span class="opt-group"><label><input type="radio" name="s_hh" value="비독거"> 비독거</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_hh_sub" value="부부"> 부부</label></span> <label><input type="checkbox" name="s_hh_sub" value="노부모"> 노부모</label> <label><input type="checkbox" name="s_hh_sub" value="자녀"> 자녀</label> <label><input type="checkbox" name="s_hh_sub" value="조손"> 조손</label> <label><input type="checkbox" name="s_hh_sub" value="형제자매"> 형제자매</label> <label><input type="checkbox" name="s_hh_sub" value="장애인가구"> 장애인가구</label> <label><input type="checkbox" name="s_hh_sub" value="다문화가구"> 다문화가구</label> <label><input type="checkbox" name="s_hh_sub" value="친척지인"> 친척·지인</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_hh_sub" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:55px">))</span></span></span>
+        </div></td></tr>
+        <tr><th>사회보장<br>수급권</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span class="opt-group"><label><input type="checkbox" name="s_wf2" value="국민기초"> 국민기초생활보장제도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_wf_sub" value="생계급여"> 생계급여</label></span> <label><input type="checkbox" name="s_wf_sub" value="의료급여"> 의료급여</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_wf_sub" value="주거급여"> 주거급여</label>)</span></span></span>
+            <label><input type="checkbox" name="s_wf" value="차상위"> 차상위</label>
+            <label><input type="checkbox" name="s_wf" value="일반보훈"> 일반(보훈)</label>
+            <label><input type="checkbox" name="s_wf2" value="기초연금"> 기초연금</label>
+            <label><input type="checkbox" name="s_wf2" value="일반가구"> 일반가구</label>
+          </div>
+        </div></td></tr>
+        <tr><th>대상자<br>유형</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span class="opt-group wrap-below"><label><input type="checkbox" name="s_tt" value="장기요양재가"> 장기요양 재가급여자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tg" value="1등급"> 1등급</label></span> <label><input type="checkbox" name="s_tg" value="2등급"> 2등급</label> <label><input type="checkbox" name="s_tg" value="3등급"> 3등급</label> <label><input type="checkbox" name="s_tg" value="4등급"> 4등급</label> <label><input type="checkbox" name="s_tg" value="5등급"> 5등급</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tg" value="인지등급"> 인지등급</label>)</span></span></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="s_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
+            <label><input type="checkbox" name="s_tt" value="기각각하"> 기각·각하</label>
+            <label><input type="checkbox" name="s_tt" value="등급판정신청중"> 장기요양 등급판정 신청 중</label>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span class="opt-group"><label><input type="checkbox" name="s_tt" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tc" value="일반돌봄군"> 일반돌봄군</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tc" value="중점돌봄군"> 중점돌봄군</label>)</span></span></span>
+            <span class="opt-group"><label><input type="checkbox" name="s_tt" value="퇴원예정자"> 퇴원(예정)자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_td" value="의료기관연계"> 의료기관 연계</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_td" value="지역사회발굴"> 지역사회 발굴</label>)</span></span></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span class="opt-group"><label><input type="checkbox" name="s_tt" value="장애등록"> 장애등록·정도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_tdi" value="심한장애"> 심한 장애</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_tdi" value="심하지않은장애"> 심하지 않은 장애</label>)</span></span></span>
+            <span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="s_tt" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:90px">)</span>
+            <label><input type="checkbox" name="s_tt" value="해당없음"> 해당 없음</label>
+          </div>
+        </div></td></tr>
+        <tr><th>현재 이용중인<br>서비스</th><td colspan="7"><div class="check-group" style="flex-wrap:wrap;gap:4px 8px;">
+          <label><input type="radio" name="s_cs" value="없음"> 없음</label>
+          <span class="opt-group"><label><input type="radio" name="s_cs" value="있음"> 있음</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="s_csd" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label></span> <label><input type="checkbox" name="s_csd" value="치매안심센터"> 치매안심센터</label> <label><input type="checkbox" name="s_csd" value="급식도시락반찬"> 급식 및 도시락 반찬</label> <label><input type="checkbox" name="s_csd" value="활동보조"> 활동보조</label> <label><input type="checkbox" name="s_csd" value="말벗"> 말벗</label> <label><input type="checkbox" name="s_csd" value="보건소사업"> 보건소사업</label> <label><input type="checkbox" name="s_csd" value="주거개선사업"> 주거개선사업</label> <label><input type="checkbox" name="s_csd" value="건강운동교실"> 건강운동교실</label> <label><input type="checkbox" name="s_csd" value="목욕이미용"> 목욕·이미용</label> <label><input type="checkbox" name="s_csd" value="이동지원"> 이동지원</label> <label><input type="checkbox" name="s_csd" value="노인일자리사업"> 노인일자리 사업</label> <label><input type="checkbox" name="s_csd" value="무료진료연계"> 무료진료연계</label> <label><input type="checkbox" name="s_csd" value="가사간병방문도움"> 가사간병방문도움</label> <label><input type="checkbox" name="s_csd" value="여가문화교육"> 여가, 문화, 교육</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="s_csd" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:60px">))</span></span></span>
+        </div></td></tr>
+      </table>
+
+      <div class="section-header">&#9632; 주거환경상태<br><span style="font-weight:400;font-size:11px;">(현장조사 시 조사자가 확인 / 병원조사인 경우 생략 가능)</span></div>
+      <table class="form-table">
+        <tr><th>생활방식</th><td colspan="5"><div class="radio-group">
+          <label><input type="checkbox" name="s_ls" value="단독보행"> 단독보행</label>
+          <label><input type="checkbox" name="s_ls_sub" value="클러치사용"> 클러치사용</label>
+          <label><input type="checkbox" name="s_ls_sub" value="좌식생활"> 좌식생활</label>
+          <label><input type="checkbox" name="s_ls_sub" value="휠체어사용"> 휠체어사용</label>
+          <label><input type="checkbox" name="s_ls" value="와상생활"> 와상생활</label>
+        </div></td></tr>
+        <tr>
+          <th>주거상태</th>
+          <td colspan="2"><div class="radio-group"><label><input type="radio" name="s_hs" value="노후"> 노후</label><label><input type="radio" name="s_hs" value="보통"> 보통</label><label><input type="radio" name="s_hs" value="양호"> 양호</label></div></td>
+          <th class="th-internet"><span style="display:inline;" class="th-internet-pc">인터넷가능여부<br>(스마트폰 포함)</span><span class="th-internet-mo">인터넷<br>가능여부<br>(스마트폰<br>포함)</span></th>
+          <td colspan="2"><div class="radio-group"><label><input type="radio" name="s_net" value="가능"> 가능</label><label><input type="radio" name="s_net" value="불가능"> 불가능</label></div></td>
+        </tr>
+        <tr><th>주택형태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_ht" value="단독주택"> 단독주택</label>
+          <label><input type="radio" name="s_ht" value="아파트"> 아파트</label>
+          <label><input type="radio" name="s_ht" value="연립주택"> 연립주택</label>
+          <label><input type="radio" name="s_ht" value="다가구주택"> 다가구주택</label>
+          <label><input type="radio" name="s_ht" value="비주택"> 비주택</label>
+          <span style="display:inline-flex;align-items:center;"><label><input type="radio" name="s_ht" value="기타"> 기타</label>(<input type="text" class="etc-input">)</span>
+        </div></td></tr>
+        <tr><th>주거지<br>상태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_hf" value="지하"> 지하</label>
+          <label><input type="radio" name="s_hf" value="1층"> 1층</label>
+          <label><input type="radio" name="s_hf" value="2층이상"> 2층이상</label>
+          <label style="white-space:nowrap;">(계단 <input type="checkbox" name="s_hf_stair" value="계단" style="width:auto;border:none;border-bottom:none;"> / 승강기 <input type="checkbox" name="s_hf_elev" value="승강기" style="width:auto;border:none;border-bottom:none;">)</label>
+        </div></td></tr>
+        <tr><th>난방형태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_heat" value="가스보일러"> 가스보일러</label>
+          <label><input type="radio" name="s_heat" value="연탄보일러"> 연탄보일러</label>
+          <label><input type="radio" name="s_heat" value="기름보일러"> 기름보일러</label>
+          <label><input type="radio" name="s_heat" value="아궁이"> 아궁이(연탄/장작)</label>
+          <label><input type="radio" name="s_heat" value="난방없음"> 난방없음</label>
+          <span style="display:inline-flex;align-items:center;"><label><input type="radio" name="s_heat" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:120px">)</span>
+        </div></td></tr>
+        <tr><th>화장실<br>형태</th><td colspan="5"><div class="radio-group">
+          <label><input type="radio" name="s_tlt" value="공용"> 공용</label>
+          <label><input type="radio" name="s_tlt" value="전용"> 전용</label>
+          <span style="color:#cbd5e1;">|</span>
+          <label><input type="radio" name="s_tlt2" value="수세식"> 수세식</label>
+          <label><input type="radio" name="s_tlt2" value="재래식"> 재래식</label>
+        </div></td></tr>
+        <tr>
+          <th rowspan="3">주요<br>주거환경</th>
+          <td>조명</td><td><div class="radio-group"><label><input type="radio" name="s_light" value="양호"> 양호</label><label><input type="radio" name="s_light" value="불량"> 불량</label></div></td>
+          <td><span style="display:inline;" class="th-internet-pc">문턱여부(현관, 방, 화장실)</span><span class="th-internet-mo" style="font-size:11px;">문턱여부<br><span style="font-size:10px;">(현관, 방,<br>화장실)</span></span></td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_thr" value="양호"> 양호</label><label><input type="radio" name="s_thr" value="불량"> 불량</label></div></td>
+        </tr>
+        <tr>
+          <td><span style="display:inline;" class="th-internet-pc">계단(난간위치)</span><span class="th-internet-mo" style="font-size:11px;">계단<br><span style="font-size:10px;">(난간위치)</span></span></td><td><div class="radio-group"><label><input type="radio" name="s_stair" value="양호"> 양호</label><label><input type="radio" name="s_stair" value="불량"> 불량</label></div></td>
+          <td><span style="display:inline;" class="th-internet-pc">집안의 안전손잡이</span><span class="th-internet-mo" style="font-size:11px;">집안의<br><span style="font-size:10px;">안전손잡이</span></span></td><td colspan="2"><div class="radio-group"><label><input type="radio" name="s_hdl" value="양호"> 양호</label><label><input type="radio" name="s_hdl" value="불량"> 불량</label></div></td>
+        </tr>
+      </table>
+      </div><!-- /gt-section-wrap -->
+
+      <div class="section-header">&#9632; 일상생활기능</div>
+      <table class="adl-table">
+        <thead><tr>
+          <th style="width:30%">구분</th><th>완전자립</th><th>부분도움</th><th>완전도움</th>
+          <th style="width:30%">구분</th><th>완전자립</th><th>부분도움</th><th>완전도움</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>옷 입기<br><span style="font-size:11px;color:#6b7280;">(옷 꺼내기, 단추·지퍼·벨트 채우기)</span></td>
+            <td><input type="radio" name="s_adl_dress" value="완전자립"></td><td><input type="radio" name="s_adl_dress" value="부분도움"></td><td><input type="radio" name="s_adl_dress" value="완전도움"></td>
+            <td>누웠다 일어나 방 밖으로 나가기</td>
+            <td><input type="radio" name="s_adl_move" value="완전자립"></td><td><input type="radio" name="s_adl_move" value="부분도움"></td><td><input type="radio" name="s_adl_move" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>세수, 양치질, 머리감기</td>
+            <td><input type="radio" name="s_adl_wash" value="완전자립"></td><td><input type="radio" name="s_adl_wash" value="부분도움"></td><td><input type="radio" name="s_adl_wash" value="완전도움"></td>
+            <td>화장실 출입과 대소변 후 닦고 옷 입기</td>
+            <td><input type="radio" name="s_adl_toilet" value="완전자립"></td><td><input type="radio" name="s_adl_toilet" value="부분도움"></td><td><input type="radio" name="s_adl_toilet" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>목욕 또는 샤워하기<br><span style="font-size:11px;color:#6b7280;">(욕조 드나들기, 때밀기, 샤워)</span></td>
+            <td><input type="radio" name="s_adl_bath" value="완전자립"></td><td><input type="radio" name="s_adl_bath" value="부분도움"></td><td><input type="radio" name="s_adl_bath" value="완전도움"></td>
+            <td>대소변 조절하기</td>
+            <td><input type="radio" name="s_adl_exc" value="완전자립"></td><td><input type="radio" name="s_adl_exc" value="부분도움"></td><td><input type="radio" name="s_adl_exc" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>차려 놓은 음식먹기</td>
+            <td><input type="radio" name="s_adl_eat" value="완전자립"></td><td><input type="radio" name="s_adl_eat" value="부분도움"></td><td><input type="radio" name="s_adl_eat" value="완전도움"></td>
+            <td></td><td></td><td></td><td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="section-header">&#9632; 도구적 일상생활기능</div>
+      <table class="adl-table">
+        <thead><tr>
+          <th style="width:30%">구분</th><th>완전자립</th><th>부분도움</th><th>완전도움</th>
+          <th style="width:30%">구분</th><th>완전자립</th><th>부분도움</th><th>완전도움</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>몸단장<br><span style="font-size:11px;color:#6b7280;">(빗질, 화장, 면도 등)</span></td>
+            <td><input type="radio" name="s_iadl_groom" value="완전자립"></td><td><input type="radio" name="s_iadl_groom" value="부분도움"></td><td><input type="radio" name="s_iadl_groom" value="완전도움"></td>
+            <td>금전 관리<br><span style="font-size:11px;color:#6b7280;">(용돈, 통장관리, 재산관리)</span></td>
+            <td><input type="radio" name="s_iadl_money" value="완전자립"></td><td><input type="radio" name="s_iadl_money" value="부분도움"></td><td><input type="radio" name="s_iadl_money" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>집안일<br><span style="font-size:11px;color:#6b7280;">(실내청소, 집안정돈 등)</span></td>
+            <td><input type="radio" name="s_iadl_house" value="완전자립"></td><td><input type="radio" name="s_iadl_house" value="부분도움"></td><td><input type="radio" name="s_iadl_house" value="완전도움"></td>
+            <td>근거리 외출하기<br><span style="font-size:11px;color:#6b7280;">(가까운 거리 걸어서)</span></td>
+            <td><input type="radio" name="s_iadl_out" value="완전자립"></td><td><input type="radio" name="s_iadl_out" value="부분도움"></td><td><input type="radio" name="s_iadl_out" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>식사준비<br><span style="font-size:11px;color:#6b7280;">(음식재료준비, 요리 등)</span></td>
+            <td><input type="radio" name="s_iadl_cook" value="완전자립"></td><td><input type="radio" name="s_iadl_cook" value="부분도움"></td><td><input type="radio" name="s_iadl_cook" value="완전도움"></td>
+            <td>물건 구매 결정, 돈 지불, 거스름돈 받기</td>
+            <td><input type="radio" name="s_iadl_buy" value="완전자립"></td><td><input type="radio" name="s_iadl_buy" value="부분도움"></td><td><input type="radio" name="s_iadl_buy" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>빨래<br><span style="font-size:11px;color:#6b7280;">(세탁후 널어말리기 포함)</span></td>
+            <td><input type="radio" name="s_iadl_laundry" value="완전자립"></td><td><input type="radio" name="s_iadl_laundry" value="부분도움"></td><td><input type="radio" name="s_iadl_laundry" value="완전도움"></td>
+            <td>전화 걸고 받기</td>
+            <td><input type="radio" name="s_iadl_phone" value="완전자립"></td><td><input type="radio" name="s_iadl_phone" value="부분도움"></td><td><input type="radio" name="s_iadl_phone" value="완전도움"></td>
+          </tr>
+          <tr>
+            <td>제시간에 정해진 양의 약 챙겨 먹기</td>
+            <td><input type="radio" name="s_iadl_med" value="완전자립"></td><td><input type="radio" name="s_iadl_med" value="부분도움"></td><td><input type="radio" name="s_iadl_med" value="완전도움"></td>
+            <td>교통수단 이용하기<br><span style="font-size:11px;color:#6b7280;">(대중교통, 개인 차)</span></td>
+            <td><input type="radio" name="s_iadl_transit" value="완전자립"></td><td><input type="radio" name="s_iadl_transit" value="부분도움"></td><td><input type="radio" name="s_iadl_transit" value="완전도움"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="section-header">&#9632; 식사기능</div>
+      <table class="form-table">
+        <tr><td>1) 하루에 몇 끼니를 챙겨드십니까? (간식 제외)</td><td><div class="radio-group">
+          <label><input type="radio" name="s_meal_count" value="1끼"> &#9312; 1끼</label>
+          <label><input type="radio" name="s_meal_count" value="2끼"> &#9313; 2끼</label>
+          <label><input type="radio" name="s_meal_count" value="3끼"> &#9314; 3끼</label>
+        </div></td></tr>
+        <tr><td>2) 음식 씹는 기능</td><td><div class="radio-group">
+          <label><input type="radio" name="s_chew" value="씹기어렵다"> &#9312; 씹기 어렵다</label>
+          <label><input type="radio" name="s_chew" value="부드러운음식"> &#9313; 부드러운 음식을 잘 씹는다</label>
+          <label><input type="radio" name="s_chew" value="어떤음식이든"> &#9314; 어떤 음식이든지 잘 씹는다</label>
+        </div></td></tr>
+        <tr><td>3) 음식을 삼키는 기능 <span style="font-weight:400;font-size:11px;color:#6b7280;">(연하곤란, 사례들림 등)</span></td><td><div class="radio-group">
+          <label><input type="radio" name="s_swallow" value="삼키기어렵다"> &#9312; 삼키기 어렵다</label>
+          <label><input type="radio" name="s_swallow" value="부드러운음식"> &#9313; 부드러운 음식을 잘 삼킨다</label>
+          <label><input type="radio" name="s_swallow" value="어떤음식이든"> &#9314; 어떤 음식이든지 잘 삼킨다</label>
+        </div></td></tr>
+      </table>
+
+      <div class="section-header">&#9632; 인지심리기능</div>
+      <table class="form-table">
+        <tr><td>1) 단기 기억력</td><td><div class="radio-group">
+          <label><input type="radio" name="s_mem" value="정상"> &#9312; 정상</label>
+          <label><input type="radio" name="s_mem" value="이상있음"> &#9313; 이상 있음</label>
+          <label><input type="radio" name="s_mem" value="확인불가"> &#9314; 확인 불가</label>
+        </div></td></tr>
+        <tr><td>2) 일상생활 시에 관한 의사결정을 할 수 있는 인식 기술</td><td><div class="radio-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <label><input type="radio" name="s_decision" value="합리적"> &#9312; 스스로 일관성 있고 합리적인 의사결정을 함</label>
+          <label><input type="radio" name="s_decision" value="새로운상황"> &#9313; 새로운 상황에서만 의사결정의 어려움이 있음</label>
+          <label><input type="radio" name="s_decision" value="다소손상"> &#9314; 인식기술이 다소 손상됨</label>
+          <label><input type="radio" name="s_decision" value="심하게손상"> &#9315; 인식기술이 심하게 손상됨</label>
+        </div></td></tr>
+        <tr><td colspan="2">3) 우울정도</td></tr>
+        <tr><td style="padding-left:18px;">(1) 2주 이상 거의 매일 하루 종일 슬프거나, 공허하거나 우울하게 지낸 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_dep1" value="예"> &#9312; 예</label><label><input type="radio" name="s_dep1" value="아니오"> &#9313; 아니오</label></div></td></tr>
+        <tr><td style="padding-left:18px;">(2) 2주 이상 거의 매일 하루 종일 일이나 취미 혹은 평소에 좋아하는 것들 대부분 흥미를 잃어버린 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_dep2" value="예"> &#9312; 예</label><label><input type="radio" name="s_dep2" value="아니오"> &#9313; 아니오</label></div></td></tr>
+      </table>
+
+      <div class="section-header">&#9632; 병의원 이용</div>
+      <table class="form-table">
+        <tr><td>1) 정기적으로 방문하는 병원이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_hosp1" value="예"> &#9312; 예</label><label><input type="radio" name="s_hosp1" value="아니오"> &#9313; 아니오</label></div></td></tr>
+        <tr><td>2) (최근 1년) 아프면 병원에 가지 못하고 참았던 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_hosp2" value="예" onchange="toggleHosp2sub()"> &#9312; 예(2-1번으로)</label><label><input type="radio" name="s_hosp2" value="아니오" onchange="toggleHosp2sub()"> &#9313; 아니오(3번으로)</label></div></td></tr>
+        <tr id="s_hosp2_sub"><td style="padding-left:20px;">2-1) 병원에 가지 못한 이유</td><td><div class="check-group">
+          <label><input type="checkbox" name="s_hr" value="경제적어려움"> &#9312; 경제적 어려움</label>
+          <label><input type="checkbox" name="s_hr" value="거동불편"> &#9313; 거동이 불편해서</label>
+          <label><input type="checkbox" name="s_hr" value="의료정보부족"> &#9314; 의료정보 부족</label>
+          <label><input type="checkbox" name="s_hr" value="병원예약어려움"> &#9315; 병원 예약이 어려워서</label>
+          <label><input type="checkbox" name="s_hr" value="증상가벼움"> &#9316; 증상이 가벼워서</label>
+          <span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="s_hr" value="기타"> &#9317; 기타</label>(<input type="text" class="etc-input">)</span>
+        </div></td></tr>
+        <tr><td>3) 다른 사람이 병원에서 약을 처방받아준 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_prx" value="예"> &#9312; 예</label><label><input type="radio" name="s_prx" value="아니오"> &#9313; 아니오</label></div></td></tr>
+        <tr><td>4) 기타 통증 및 불편 사항</td><td><div class="radio-group"><label><input type="radio" name="s_pain" value="없음"> &#9312; 없음</label><label><input type="radio" name="s_pain" value="다소있음"> &#9313; 다소 있음</label><label><input type="radio" name="s_pain" value="매우심함"> &#9314; 매우 심함</label></div></td></tr>
+        <tr><td>5) 병명 및 복용 중인 약 <span style="font-weight:400;font-size:11px;color:#6b7280;">(지자체 조사인 경우 생략 가능)</span></td><td>병명: <input type="text" name="s_disease" class="etc-input" style="width:180px"><span class="th-internet-mo"><br></span><span class="th-internet-pc">&nbsp;</span>복용약: <input type="text" name="s_meds" class="etc-input" style="width:180px"></td></tr>
+      </table>
+
+      <div class="section-header">&#9632; 이동지원</div>
+      <table class="form-table">
+        <tr><td>1) 누군가의 도움 없이 실외 보행에 어려움이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_mob1" value="예"> &#9312; 예</label><label><input type="radio" name="s_mob1" value="아니오"> &#9313; 아니오</label></div></td></tr>
+        <tr><td>2) 기존 이동지원서비스 수혜여부</td><td><div class="radio-group"><label><input type="radio" name="s_mob2" value="예"> &#9312; 예</label><label><input type="radio" name="s_mob2" value="아니오"> &#9313; 아니오</label></div></td></tr>
+      </table>
+
+      <div class="section-header">&#9632; 서비스 유형별 필요여부 <span style="font-weight:400;font-size:11px;">(조사자가 종합적으로 판단)</span></div>
+      <table class="service-table">
+        <thead><tr><th>보건의료</th><th><span class="th-internet-pc">건강관리·예방</span><span class="th-internet-mo">건강관리·<br>예방</span></th><th>장기요양</th><th><span class="th-internet-pc" style="white-space:nowrap;">일상생활돌봄</span><span class="th-internet-mo" style="white-space:nowrap;">일상생활<br>돌봄</span></th><th>주거복지</th><th>기타</th></tr></thead>
+        <tbody><tr>
+          <td><input type="checkbox" name="s_sn" value="보건의료"></td><td><input type="checkbox" name="s_sn" value="건강관리예방"></td>
+          <td><input type="checkbox" name="s_sn" value="장기요양"></td><td><input type="checkbox" name="s_sn" value="일상생활돌봄"></td>
+          <td><input type="checkbox" name="s_sn" value="주거복지"></td><td><input type="checkbox" name="s_sn" value="기타"></td>
+        </tr></tbody>
+      </table>
+
+      <div class="section-header">&#9632; 주요 욕구</div>
+      <table class="service-table">
+        <thead><tr><th>일상생활기능</th><th>인지심리기능</th><th>의료적욕구</th><th>주거환경</th></tr></thead>
+        <tbody><tr>
+          <td><textarea class="form-textarea" name="s_n_adl" style="min-height:50px;"></textarea></td>
+          <td><textarea class="form-textarea" name="s_n_cog" style="min-height:50px;"></textarea></td>
+          <td><textarea class="form-textarea" name="s_n_med" style="min-height:50px;"></textarea></td>
+          <td><textarea class="form-textarea" name="s_n_hsg" style="min-height:50px;"></textarea></td>
+        </tr></tbody>
+      </table>
+
+      <div class="section-header">&#9632; 종합의견</div>
+      <textarea class="form-textarea" name="s_opinion" style="min-height:80px;" placeholder="지자체 자체조사를 수행한 담당자가 대상자(보호자)의 현재 생활현황 및 필요로 하는 서비스 내용, 조사결과 대상자에게 제공되어야 할 서비스 내용(조사자 판단)을 종합적으로 기입함"></textarea>
+      <div class="top-bar bottom-action-bar">
+  <a href="/home" class="home-btn">&#8962; 홈으로</a>
+  <div class="btn-group">
+    <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
+    <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+    <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
+  </div>
+</div>
+    </div><!-- /panel-self -->
+
+    <!-- ══ 탭2: 연계조사 ══ -->
+    <div class="tab-panel" id="panel-relay">
+      <div class="form-title">통합(종합)판정조사 관련 지자체 연계조사 서식</div>
+      <div class="section-header">&#9632; 대상자 기본사항</div>
+      <table class="form-table">
+        <tr>
+          <th>성명</th><td class="td-name personal-disabled"><input type="text" name="r_name" disabled></td>
+          <th class="th-gender">성별</th>
+          <td class="td-gender personal-disabled"><div class="radio-group"><label><input type="radio" name="r_gender" value="남" disabled> 남</label><label><input type="radio" name="r_gender" value="여" disabled> 여</label></div></td>
+          <th class="age-th">연령</th>
+          <td class="age-td personal-disabled">만<input type="text" name="r_age_d" class="age-input" disabled>&thinsp;세</td>
+          <th class="th-birth">생년<br>월일</th><td class="td-birth personal-disabled"><input type="text" name="r_birth" disabled></td>
+        </tr>
+        <tr><th>주소</th><td colspan="7" class="personal-disabled"><input type="text" name="r_address" disabled></td></tr>
+        <tr><th>실거주지</th><td colspan="7" class="personal-disabled"><input type="text" name="r_real_addr" disabled></td></tr>
+        <tr>
+          <th rowspan="2">연락처</th>
+          <td colspan="3" class="personal-disabled">자택: <input type="text" name="r_tel_home" class="etc-input" style="width:120px" disabled></td>
+          <td colspan="4" class="personal-disabled">핸드폰: <input type="text" name="r_tel_mobile" class="etc-input" style="width:120px" disabled></td>
+        </tr>
+        <tr><td colspan="7" class="personal-disabled">비상연락처: <input type="text" name="r_tel_emg" class="etc-input" style="width:150px" disabled> (관계: <input type="text" name="r_tel_rel" class="etc-input" style="width:70px" disabled>)</td></tr>
+        <tr><th>주수<br>발자</th><td colspan="7"><div class="check-group">
+          <label><input type="radio" name="r_care" value="없음"> 없음</label>
+          <label><input type="radio" name="r_care" value="배우자"> 배우자</label>
+          <label><input type="radio" name="r_care" value="자녀"> 자녀(며느리·사위 포함)</label>
+          <label><input type="radio" name="r_care" value="손자녀"> 손자녀</label>
+          <label><input type="radio" name="r_care" value="친인척"> 친인척</label>
+          <label><input type="radio" name="r_care" value="친구이웃"> 친구·이웃</label>
+          <label><input type="radio" name="r_care" value="사적간병인"> 사적 간병인</label>
+          <label><input type="radio" name="r_care" value="공적서비스"> 공적서비스 돌봄제공자(요양보호사 등)</label>
+          <label><input type="radio" name="r_care" value="형제자매"> 형제·자매</label>
+          <label><input type="radio" name="r_care" value="자원봉사자"> 자원봉사자</label>
+          <span style="display:inline-flex;align-items:center;"><label><input type="radio" name="r_care" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:45px">)</span>
+        </div></td></tr>
+        <tr><th>가구<br>형태</th><td colspan="7"><div class="radio-group">
+          <label><input type="radio" name="r_hh" value="독거"> 독거</label>
+          <span class="opt-group"><label><input type="radio" name="r_hh" value="비독거"> 비독거</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_hh_sub" value="부부"> 부부</label></span> <label><input type="checkbox" name="r_hh_sub" value="노부모"> 노부모</label> <label><input type="checkbox" name="r_hh_sub" value="자녀"> 자녀</label> <label><input type="checkbox" name="r_hh_sub" value="조손"> 조손</label> <label><input type="checkbox" name="r_hh_sub" value="형제자매"> 형제자매</label> <label><input type="checkbox" name="r_hh_sub" value="장애인가구"> 장애인가구</label> <label><input type="checkbox" name="r_hh_sub" value="다문화가구"> 다문화가구</label> <label><input type="checkbox" name="r_hh_sub" value="친척지인"> 친척·지인</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_hh_sub" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:55px">))</span></span></span>
+        </div></td></tr>
+        <tr><th>사회보장<br>수급권</th><td colspan="7">
+          <div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:6px;">
+            <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+              <span class="opt-group"><label><input type="checkbox" name="r_wf2" value="국민기초"> 국민기초생활보장제도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_wf_sub" value="생계급여"> 생계급여</label></span> <label><input type="checkbox" name="r_wf_sub" value="의료급여"> 의료급여</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_wf_sub" value="주거급여"> 주거급여</label>)</span></span></span>
+              <label><input type="checkbox" name="r_wf" value="차상위"> 차상위</label>
+              <label><input type="checkbox" name="r_wf" value="일반보훈"> 일반(보훈)</label>
+              <label><input type="checkbox" name="r_wf2" value="기초연금"> 기초연금</label>
+              <label><input type="checkbox" name="r_wf2" value="일반가구"> 일반가구</label>
+            </div>
+          </div>
+          <table style="border-collapse:collapse;width:100%;table-layout:fixed;">
+            <tr><th style="border:1px solid #d1d5db;padding:5px 8px;background:#f8fafc;font-weight:600;text-align:center;white-space:nowrap;width:6.5em;">주수입원</th><td style="border:1px solid #d1d5db;padding:5px 8px;"><div class="check-group"><label><input type="checkbox" name="r_inc" value="공적연금"> 공적연금</label><label><input type="checkbox" name="r_inc" value="사적지원"> 사적지원(가족지원)</label><label><input type="checkbox" name="r_inc" value="근로수입"> 근로수입</label><span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="r_inc" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:50px">)</span></div></td></tr>
+            <tr><th style="border:1px solid #d1d5db;padding:5px 8px;background:#f8fafc;font-weight:600;text-align:center;white-space:nowrap;width:6.5em;">본인부담<br>가능여부</th><td style="border:1px solid #d1d5db;padding:5px 8px;"><div class="check-group"><label><input type="radio" name="r_copay" value="부담가능"> 부담가능</label><label><input type="radio" name="r_copay" value="일부부담가능"> 일부 부담가능</label><label><input type="radio" name="r_copay" value="부담어려움"> 부담어려움</label></div></td></tr>
+          </table>
+        </td></tr>
+        <tr><th>대상자<br>유형</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="radio" name="r_tt" value="해당없음"> 해당없음</label>
+            <span class="opt-group wrap-below"><label><input type="checkbox" name="r_tt" value="장기요양재가"> 장기요양 재가급여자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_tg" value="1등급"> 1등급</label></span> <label><input type="checkbox" name="r_tg" value="2등급"> 2등급</label> <label><input type="checkbox" name="r_tg" value="3등급"> 3등급</label> <label><input type="checkbox" name="r_tg" value="4등급"> 4등급</label> <label><input type="checkbox" name="r_tg" value="5등급"> 5등급</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_tg" value="인지등급"> 인지등급</label>)</span></span></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <label><input type="checkbox" name="r_tt" value="장기요양등급외"> 장기요양 등급외(A, B)</label>
+            <label><input type="checkbox" name="r_tt" value="기각각하"> 기각·각하</label>
+            <label><input type="checkbox" name="r_tt" value="등급판정신청중"> 장기요양 등급판정 신청 중</label>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span class="opt-group"><label><input type="checkbox" name="r_tt" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_tc" value="일반돌봄군"> 일반돌봄군</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_tc" value="중점돌봄군"> 중점돌봄군</label>)</span></span></span>
+            <span class="opt-group"><label><input type="checkbox" name="r_tt" value="퇴원예정자"> 퇴원(예정)자</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_td" value="의료기관연계"> 의료기관 연계</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_td" value="지역사회발굴"> 지역사회 발굴</label>)</span></span></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span class="opt-group"><label><input type="checkbox" name="r_tt" value="활동지원신청"> 활동지원 신청여부</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_act" value="미신청"> 미신청</label></span> <label><input type="checkbox" name="r_act" value="신청"> 신청</label> <label><input type="checkbox" name="r_act" value="수급자"> 수급자</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_act" value="등급외"> 등급외</label>)</span></span></span>
+            <span class="paren-sm" style="color:#6b7280;">* 6세 이상 65세 미만 장애인만 해당</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span class="opt-group"><label><input type="checkbox" name="r_tt" value="장애등록"> 장애등록·정도</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_tdi" value="심한장애"> 심한 장애</label></span> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_tdi" value="심하지않은장애"> 심하지 않은 장애</label>)</span></span></span>
+            <span class="opt-group wrap-below"><label><input type="checkbox" name="r_tt" value="장애유형"> 장애유형</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_dtype" value="지체"> 지체</label></span> <label><input type="checkbox" name="r_dtype" value="뇌병변"> 뇌병변</label> <label><input type="checkbox" name="r_dtype" value="시각"> 시각</label> <label><input type="checkbox" name="r_dtype" value="청각"> 청각</label> <label><input type="checkbox" name="r_dtype" value="언어"> 언어</label> <label><input type="checkbox" name="r_dtype" value="지적"> 지적</label> <label><input type="checkbox" name="r_dtype" value="자폐성"> 자폐성</label> <label><input type="checkbox" name="r_dtype" value="정신"> 정신</label> <label><input type="checkbox" name="r_dtype" value="신장"> 신장</label> <label><input type="checkbox" name="r_dtype" value="심장"> 심장</label> <label><input type="checkbox" name="r_dtype" value="호흡기"> 호흡기</label> <label><input type="checkbox" name="r_dtype" value="간"> 간</label> <label><input type="checkbox" name="r_dtype" value="안면"> 안면</label> <label><input type="checkbox" name="r_dtype" value="장루요루"> 장루·요루</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_dtype" value="뇌전증"> 뇌전증</label>)</span></span></span>
+            <span class="paren-sm" style="color:#6b7280;">* 중복시 모두 체크</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+            <span style="display:inline-flex;align-items:center;"><label><input type="checkbox" name="r_tt" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:90px">)</span>
+          </div>
+        </div></td></tr>
+        <tr><th>현재 이용중인<br>서비스</th><td colspan="7"><div class="check-group" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;">
+            <label><input type="radio" name="r_sv" value="없음"> 없음</label>
+            <span class="relay-service-reason" style="color:#6b7280;">— 필요서비스 미이용 사유 (사유확인):</span>
+            <input type="text" name="r_sv_confirm" class="etc-input relay-service-input" style="width:150px">
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;">
+            <span class="opt-group"><label><input type="radio" name="r_sv" value="있음"> 있음</label><span class="sub-paren"><span style="white-space:nowrap;">(<label><input type="checkbox" name="r_svd" value="노인맞춤돌봄"> 노인맞춤돌봄서비스</label></span> <label><input type="checkbox" name="r_svd" value="치매안심센터"> 치매안심센터</label> <label><input type="checkbox" name="r_svd" value="급식도시락반찬"> 급식 및 도시락 반찬</label> <label><input type="checkbox" name="r_svd" value="활동보조"> 활동보조</label> <label><input type="checkbox" name="r_svd" value="말벗"> 말벗</label> <label><input type="checkbox" name="r_svd" value="보건소사업"> 보건소사업</label> <label><input type="checkbox" name="r_svd" value="주거개선사업"> 주거개선사업</label> <label><input type="checkbox" name="r_svd" value="건강운동교실"> 건강운동교실</label> <label><input type="checkbox" name="r_svd" value="목욕이미용"> 목욕·이미용</label> <label><input type="checkbox" name="r_svd" value="이동지원"> 이동지원</label> <label><input type="checkbox" name="r_svd" value="노인일자리사업"> 노인일자리 사업</label> <label><input type="checkbox" name="r_svd" value="무료진료연계"> 무료진료연계</label> <label><input type="checkbox" name="r_svd" value="가사간병방문도움"> 가사간병방문도움</label> <label><input type="checkbox" name="r_svd" value="여가문화교육"> 여가, 문화, 교육</label> <span style="white-space:nowrap;"><label><input type="checkbox" name="r_svd" value="기타"> 기타</label>(<input type="text" class="etc-input" style="width:60px">))</span></span></span>
+          </div>
+        </div></td></tr>
+        <tr><th>희망<br>서비스</th><td colspan="7"><input type="text" name="r_wish" placeholder="희망하는 서비스를 기입하세요"></td></tr>
+      </table>
+
+      <div class="section-header">&#9632; 서비스 유형별 필요여부 <span style="font-weight:400;font-size:11px;">(조사자가 종합적으로 판단)</span></div>
+      <table class="service-table">
+        <thead><tr><th>보건의료</th><th><span class="th-internet-pc">건강관리·예방</span><span class="th-internet-mo">건강관리·<br>예방</span></th><th>장기요양</th><th><span class="th-internet-pc" style="white-space:nowrap;">일상생활돌봄</span><span class="th-internet-mo" style="white-space:nowrap;">일상생활<br>돌봄</span></th><th>주거복지</th><th>기타</th></tr></thead>
+        <tbody><tr>
+          <td><input type="checkbox" name="r_sn" value="보건의료"></td><td><input type="checkbox" name="r_sn" value="건강관리예방"></td>
+          <td><input type="checkbox" name="r_sn" value="장기요양"></td><td><input type="checkbox" name="r_sn" value="일상생활돌봄"></td>
+          <td><input type="checkbox" name="r_sn" value="주거복지"></td><td><input type="checkbox" name="r_sn" value="기타"></td>
+        </tr></tbody>
+      </table>
+
+      <div class="section-header">&#9632; 종합의견</div>
+      <textarea class="form-textarea" name="r_opinion" style="min-height:80px;" placeholder="조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함"></textarea>
+      <p class="relay-note" style="display:flex;gap:0.3em;align-items:flex-start;"><span style="flex-shrink:0;">&#10071;</span><span>조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함</span></p>
+      <div class="top-bar bottom-action-bar">
+        <a href="/home" class="home-btn">&#8962; 홈으로</a>
+        <div class="btn-group">
+          <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
+          <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
+          <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
+        </div>
+      </div>
+    </div><!-- /panel-relay -->
+
+  </div><!-- /form-card -->
+
+<!-- 사전조사 결과 모달 -->
+<div id="careResultModal" class="care-modal-overlay">
+  <div class="care-modal-box">
+    <h3 id="careModalTitle" style="margin-top:0;margin-bottom:12px;">사전조사 결과 안내</h3>
+    <div class="care-modal-result-area">
+      <p id="care_r_text"></p>
+    </div>
+    <div class="care-modal-criteria">
+      <b>통합돌봄 지원 기준</b><br><br>
+      ① 치매약 복약 중인 경우<br>
+      → 일상생활 수행능력과 관계없이 통합돌봄 지원 대상<br><br>
+      ② 일상생활수행능력(ADL) 점수 기준<br>
+      • 0~1점 : 지자체 사업 안내 후 종결<br>
+      • 2~3점 : 지자체 자체조사 후 지원 검토<br>
+      • 4점 이상 : 통합판정조사 대상<br><br>
+      <span style="font-size:11px;color:#666;">
+        ※ 본 결과는 통합돌봄 서비스 안내를 위한 참고용 사전조사입니다.<br>
+        최종 지원 여부는 지자체 및 공단의 추가 조사 후 결정됩니다.
+      </span>
+    </div>
+    <button onclick="closeCareModal()" class="care-modal-btn">확인</button>
+  </div>
+</div>
+
+</div><!-- /page-wrap -->
+
+<script>
+var currentTab = 'care';
+var SURVEY_STORAGE_KEY = 'survey_form_state';
+
+/* ── 개인정보 비활성 셀 클릭 시 안내 팝업 ── */
+document.addEventListener('click', function(e){
+  var cell = e.target.closest('.personal-disabled');
+  if(cell){
+    e.preventDefault();
+    e.stopPropagation();
+    showPersonalBlockAlert();
+  }
+}, true);
+
+function showPersonalBlockAlert(){
+  var existing = document.getElementById('personalBlockToast');
+  if(existing) existing.remove();
+
+  var toast = document.createElement('div');
+  toast.id = 'personalBlockToast';
+  toast.style.cssText = [
+    'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10020;',
+    'background:#fff;border-radius:14px;padding:32px 28px 24px;width:88%;max-width:340px;',
+    'box-shadow:0 12px 40px rgba(0,0,0,0.22);text-align:center;font-family:inherit;',
+    'animation:fadeInToast 0.2s ease;'
+  ].join('');
+  toast.innerHTML = [
+    '<div style="font-size:32px;margin-bottom:12px;">🔒</div>',
+    '<div style="font-size:15px;font-weight:700;color:#1f2937;line-height:1.6;margin-bottom:8px;">',
+    '개인정보 보호를 위해<br>해당 항목은 입력이 제한됩니다.</div>',
+    '<div style="font-size:12.5px;color:#6b7280;line-height:1.5;margin-bottom:20px;">',
+    '성명·연락처 등 민감정보는<br>본 시스템에서 수집하지 않습니다.</div>',
+    '<button onclick="this.parentElement.remove()" ',
+    'style="padding:9px 36px;border:none;border-radius:8px;background:#5b7ee5;color:#fff;',
+    'font-size:13px;font-weight:600;cursor:pointer;">확인</button>'
+  ].join('');
+  document.body.appendChild(toast);
+
+  /* 바깥 클릭 시 닫기 */
+  setTimeout(function(){
+    document.addEventListener('click', function handler(ev){
+      if(!toast.contains(ev.target)){
+        toast.remove();
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 100);
+}
+
+function toggleHosp2sub(){
+  var sub = document.getElementById('s_hosp2_sub');
+  if(!sub) return;
+  var sel = document.querySelector('input[name="s_hosp2"]:checked');
+  var enable = sel && sel.value === '예';
+  sub.querySelectorAll('input').forEach(function(el){ el.disabled = !enable; });
+  sub.style.opacity = enable ? '1' : '0.45';
+  if(!enable){
+    sub.querySelectorAll('input[type=checkbox]').forEach(function(el){ el.checked = false; });
+    sub.querySelectorAll('input[type=text]').forEach(function(el){ el.value = ''; });
+  }
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  /* 채점배너: 사전조사 탭에서만 표시 */
+  var banner = document.getElementById('scoreBanner');
+  if(banner){
+    if(tab === 'care'){
+      banner.classList.remove('hidden-banner');
+    } else {
+      banner.classList.add('hidden-banner');
+    }
+  }
+}
+
+/* ══════════════════════════════════
+   사전조사 로직
+   ══════════════════════════════════ */
+function showCareGuide(messageHtml){
+  document.getElementById("careModalTitle").innerText = "안내";
+  document.getElementById("care_r_text").innerHTML = messageHtml;
+  document.getElementById("careResultModal").style.display = "block";
+}
+
+function showCareResult(title, messageText){
+  document.getElementById("careModalTitle").innerText = title;
+  document.getElementById("care_r_text").innerText = messageText;
+  document.getElementById("careResultModal").style.display = "block";
+}
+
+function closeCareModal(){
+  document.getElementById("careResultModal").style.display = "none";
+}
+
+function getCurrentScore(){
+  var score = 0;
+  for(var i=0; i<7; i++){
+    var checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){ score += Number(checked.value); }
+  }
+  return score;
+}
+
+function getAnsweredCount(){
+  var count = 0;
+  for(var i=0; i<7; i++){
+    var checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(checked){ count += 1; }
+  }
+  return count;
+}
+
+function getBannerState(score, dementiaValue){
+  if(!dementiaValue) return "disabled";
+  if(dementiaValue === "y") return "state-dementia";
+  if(score <= 1) return "state-low";
+  else if(score <= 3) return "state-mid";
+  else return "state-high";
+}
+
+function getScoreStatusText(score, dementiaValue){
+  if(!dementiaValue) return "치매 여부를 먼저 선택하세요";
+  if(dementiaValue === "y") return "치매약 복용으로 별도 조사 없이 대상입니다";
+  if(score <= 1) return "지자체 사업 안내 후 종결 구간입니다";
+  else if(score <= 3) return "지자체 자체조사 대상 구간입니다";
+  else return "통합판정조사 대상 구간입니다";
+}
+
+function getChipText(score, dementiaValue){
+  if(!dementiaValue) return "사전 확인 필요";
+  if(dementiaValue === "y") return "치매약 복용";
+  if(score <= 1) return "0~1점";
+  else if(score <= 3) return "2~3점";
+  else return "4점 이상";
+}
+
+function updateScoreBanner(){
+  var banner = document.getElementById("scoreBanner");
+  var scoreValue = document.getElementById("scoreValue");
+  var answeredCount = document.getElementById("answeredCount");
+  var scoreStatus = document.getElementById("scoreStatus");
+  var scoreChip = document.getElementById("scoreChip");
+  var scoreProgressBar = document.getElementById("scoreProgressBar");
+  var dementia = document.querySelector('input[name="dementia"]:checked');
+
+  var score = getCurrentScore();
+  var answered = getAnsweredCount();
+  var dementiaValue = dementia ? dementia.value : "";
+
+  scoreValue.innerText = score;
+  answeredCount.innerText = answered;
+  scoreStatus.innerText = getScoreStatusText(score, dementiaValue);
+  scoreChip.innerText = getChipText(score, dementiaValue);
+
+  var progress = Math.min((score / 14) * 100, 100);
+  if(dementiaValue === "y") progress = 100;
+  scoreProgressBar.style.width = progress + "%";
+
+  banner.classList.remove("disabled","state-low","state-mid","state-high","state-dementia");
+  var nextState = getBannerState(score, dementiaValue);
+  if(nextState === "disabled") banner.classList.add("disabled");
+  else banner.classList.add(nextState);
+}
+
+/* 사전조사 상태 저장/복원 키 */
+var CARE_STORAGE_KEY = "care_form_state";
+
+function saveCareState(){
+  var state = {};
+  var dementia = document.querySelector('input[name="dementia"]:checked');
+  state.dementia = dementia ? dementia.value : null;
+  state.adl = {};
+  for(var i=0;i<7;i++){
+    var r = document.querySelector('input[name="q'+i+'"]:checked');
+    state.adl[i] = r ? r.value : null;
+  }
+  try{ sessionStorage.setItem(CARE_STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+function restoreCareState(){
+  var raw;
+  try{ raw = sessionStorage.getItem(CARE_STORAGE_KEY); }catch(e){}
+  if(!raw) return;
+  var state;
+  try{ state = JSON.parse(raw); }catch(e){ return; }
+
+  if(state.dementia){
+    var dr = document.querySelector('input[name="dementia"][value="'+state.dementia+'"]');
+    if(dr){
+      dr.checked = true;
+      if(state.dementia === "y"){
+        document.getElementById("adlSection").style.opacity = "0.4";
+      }
+    }
+  }
+
+  for(var i=0;i<7;i++){
+    if(state.adl && state.adl[i]){
+      var ar = document.querySelector('input[name="q'+i+'"][value="'+state.adl[i]+'"]');
+      if(ar){
+        ar.checked = true;
+        var box = ar.closest(".question-box");
+        if(box) box.classList.add("active");
+      }
+    }
+  }
+
+  updateScoreBanner();
+}
+
+/* 치매 선택 안 했는데 ADL 누르면 차단 */
+document.querySelectorAll('#adlSection .options input[type="radio"]').forEach(function(radio){
+  radio.addEventListener("change", function(){
+    var dementia = document.querySelector('input[name="dementia"]:checked');
+
+    if(!dementia){
+      this.checked = false;
+      showCareGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를<br> 선택해주세요.");
+      updateScoreBanner();
+      return;
+    }
+
+    var box = this.closest(".question-box");
+    if(box) box.classList.add("active");
+
+    updateScoreBanner();
+    saveCareState();
+  });
+});
+
+/* 치매 선택 처리 */
+document.querySelectorAll('input[name="dementia"]').forEach(function(radio){
+  radio.addEventListener("change", function(){
+    if(this.value === "y"){
+      document.getElementById("adlSection").style.opacity = "0.4";
+      showCareGuide("치매약을 복약 중인 경우 일상생활 수행능력과 관계없이 <b>통합돌봄 대상</b>입니다.");
+    }else{
+      document.getElementById("adlSection").style.opacity = "1";
+    }
+
+    updateScoreBanner();
+    saveCareState();
+  });
+});
+
+/* 검사하기 클릭 시 */
+document.getElementById("careForm").onsubmit = async function(e){
+  e.preventDefault();
+
+  var dementia = document.querySelector('input[name="dementia"]:checked');
+
+  if(!dementia){
+    showCareGuide("먼저 <b>치매 관련 약 복용 여부(예/아니오)</b>를 선택해주세요.");
+    return;
+  }
+
+  if(dementia.value === "y") return;
+
+  for(var i=0; i<7; i++){
+    var checked = document.querySelector('input[name="q'+i+'"]:checked');
+    if(!checked){
+      showCareGuide((i+1) + "번 문항을 선택해주세요.");
+      return;
+    }
+  }
+
+  var formData = new FormData(this);
+
+  var res = await fetch("/care_check",{
+    method:"POST",
+    body:formData
+  });
+
+  var data = await res.json();
+
+  updateScoreBanner();
+  showCareResult("사전조사 결과 안내", data.result + "\\n총점: " + data.score);
+};
+
+/* 사전조사 상태 복원 */
+restoreCareState();
+updateScoreBanner();
+
+/* ══════════════════════════════════
+   서식(자체/연계) 상태 저장/복원
+   ══════════════════════════════════ */
+function saveSurveyState(){
+  var state = { tab: currentTab, self: {}, relay: {} };
+  ['self','relay'].forEach(function(tabName){
+    var panel = document.getElementById('panel-' + tabName);
+    var s = state[tabName];
+    panel.querySelectorAll('input[type=radio]:checked, input[type=checkbox]:checked').forEach(function(el){
+      if(!s[el.name]) s[el.name] = [];
+      s[el.name].push(el.value);
+    });
+    panel.querySelectorAll('input[type=text], input[type=date], textarea').forEach(function(el){
+      if(el.name) s[el.name] = el.value;
+    });
+  });
+  try{ sessionStorage.setItem(SURVEY_STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+/* ── 서식 상태 복원 ── */
+function restoreSurveyState(){
+  var raw;
+  try{ raw = sessionStorage.getItem(SURVEY_STORAGE_KEY); }catch(e){}
+  if(!raw) return;
+  var state;
+  try{ state = JSON.parse(raw); }catch(e){ return; }
+
+  if(state.tab && state.tab !== 'care'){
+    switchTab(state.tab);
+  }
+
+  ['self','relay'].forEach(function(tabName){
+    var panel = document.getElementById('panel-' + tabName);
+    var s = state[tabName];
+    if(!s) return;
+
+    panel.querySelectorAll('input[type=radio], input[type=checkbox]').forEach(function(el){
+      if(s[el.name] && s[el.name].indexOf(el.value) !== -1){
+        el.checked = true;
+      }
+    });
+    panel.querySelectorAll('input[type=text], input[type=date]').forEach(function(el){
+      if(el.name && s[el.name] !== undefined) el.value = s[el.name];
+    });
+    panel.querySelectorAll('textarea').forEach(function(el){
+      if(el.name && s[el.name] !== undefined) el.value = s[el.name];
+    });
+  });
+}
+
+/* ── 자체조사/연계조사 괄호 하위항목 자동 연동 ── */
+function getOptGroupParentInput(group){
+  if(!group) return null;
+  for(var i=0; i<group.children.length; i++){
+    var child = group.children[i];
+    if(child.tagName && child.tagName.toLowerCase() === 'label'){
+      var input = child.querySelector('input[type=radio], input[type=checkbox]');
+      if(input) return input;
+    }
+  }
+  return null;
+}
+
+function clearChildrenInGroup(group){
+  if(!group) return;
+  group.querySelectorAll('.sub-paren input[type=checkbox], .sub-paren input[type=radio]').forEach(function(child){
+    child.checked = false;
+  });
+}
+
+function clearInactiveRadioChildren(panel, radioName){
+  if(!panel || !radioName) return;
+  panel.querySelectorAll('.opt-group').forEach(function(group){
+    var parent = getOptGroupParentInput(group);
+    if(parent && parent.type === 'radio' && parent.name === radioName && !parent.checked){
+      clearChildrenInGroup(group);
+    }
+  });
+}
+
+function handleSurveyParentChildSync(target){
+  var panel = target.closest('#panel-self, #panel-relay');
+  if(!panel) return;
+
+  if(target.matches('input[name="s_tt"], input[name="r_tt"]')){
+    var isNone = (target.value === '해당없음' || target.value === '해당 없음');
+    if(target.checked && isNone){
+      panel.querySelectorAll('input[name="' + target.name + '"]').forEach(function(el){
+        if(el !== target) el.checked = false;
+      });
+      panel.querySelectorAll('.opt-group').forEach(function(group){
+        var parent = getOptGroupParentInput(group);
+        if(parent && parent.name === target.name) clearChildrenInGroup(group);
+      });
+    }else if(target.checked && !isNone){
+      panel.querySelectorAll('input[name="' + target.name + '"]').forEach(function(el){
+        if(el.value === '해당없음' || el.value === '해당 없음') el.checked = false;
+      });
+    }
+  }
+
+  var subParen = target.closest('.sub-paren');
+  if(subParen && (target.type === 'checkbox' || target.type === 'radio')){
+    var group = target.closest('.opt-group');
+    var parent = getOptGroupParentInput(group);
+    if(parent && target.checked){
+      parent.checked = true;
+      if(parent.type === 'radio') clearInactiveRadioChildren(panel, parent.name);
+    }
+    return;
+  }
+
+  if(target.matches('input[type=radio], input[type=checkbox]')){
+    var parentGroup = target.closest('.opt-group');
+    var parentInput = getOptGroupParentInput(parentGroup);
+
+    if(parentInput === target && target.type === 'checkbox' && !target.checked){
+      clearChildrenInGroup(parentGroup);
+    }
+
+    if(target.type === 'radio'){
+      clearInactiveRadioChildren(panel, target.name);
+    }
+  }
+}
+
+document.addEventListener('change', function(e){
+  if(e.target.closest('#panel-self, #panel-relay')){
+    handleSurveyParentChildSync(e.target);
+  }
+});
+
+/* 입력 이벤트마다 저장 (debounce) */
+var surveyDebounceTimer = null;
+function debouncedSave(){
+  clearTimeout(surveyDebounceTimer);
+  surveyDebounceTimer = setTimeout(saveSurveyState, 300);
+}
+document.addEventListener('change', function(e){
+  if(e.target.closest('#panel-self, #panel-relay')) debouncedSave();
+});
+document.addEventListener('input', function(e){
+  if(e.target.closest('#panel-self, #panel-relay')) debouncedSave();
+});
+
+function resetForm() {
+  if (!confirm("입력한 내용을 모두 초기화하시겠습니까?")) return;
+
+  if(currentTab === 'care'){
+    /* 사전조사 탭 초기화 */
+    var carePanel = document.getElementById('panel-care');
+    carePanel.querySelectorAll("input[type=radio], input[type=checkbox]").forEach(function(el){ el.checked = false; });
+    carePanel.querySelectorAll("input[type=text], input[type=date], textarea").forEach(function(el){ el.value = ""; });
+    carePanel.querySelectorAll(".question-box").forEach(function(el){ el.classList.remove("active"); });
+    document.getElementById("adlSection").style.opacity = "1";
+    try{ sessionStorage.removeItem(CARE_STORAGE_KEY); }catch(e){}
+    updateScoreBanner();
+    return;
+  }
+
+  var panel = document.getElementById('panel-' + currentTab);
+  panel.querySelectorAll("input[type=radio], input[type=checkbox]").forEach(function(el){ el.checked = false; });
+  panel.querySelectorAll("input[type=text], input[type=date], textarea").forEach(function(el){ el.value = ""; });
+  /* 해당 탭 저장 상태도 지우기 */
+  try{
+    var raw = sessionStorage.getItem(SURVEY_STORAGE_KEY);
+    if(raw){
+      var st = JSON.parse(raw);
+      st[currentTab] = {};
+      sessionStorage.setItem(SURVEY_STORAGE_KEY, JSON.stringify(st));
+    }
+  }catch(e){}
+  toggleHosp2sub();
+}
+function doPrint() {
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('print-target'); });
+  document.getElementById('panel-' + currentTab).classList.add('print-target');
+  window.print();
+}
+
+/* ── 메일 보내기 팝업 ── */
+function openEmailPopup() {
+  var existing = document.getElementById('emailModal');
+  if (existing) existing.remove();
+
+  /* 기본 파일명 생성 */
+  var tabLabels = { care: '사전조사', self: '자체조사', relay: '연계조사' };
+  var now = new Date();
+  var pad2 = function(n){ return n < 10 ? '0'+n : ''+n; };
+  var dateStr = now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate())
+              + '_' + pad2(now.getHours()) + pad2(now.getMinutes());
+  var defaultFileName = (tabLabels[currentTab] || '조사서식') + '_' + dateStr;
+
+  var modal = document.createElement('div');
+  modal.id = 'emailModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = [
+    '<div style="background:#fff;border-radius:14px;padding:28px 24px 22px;width:90%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.18);font-family:inherit;">',
+    '  <h3 style="margin:0 0 6px;font-size:16px;color:#1f2937;">&#9993; 메일로 보내기</h3>',
+    '  <p style="margin:0 0 18px;font-size:12.5px;color:#6b7280;line-height:1.5;">현재 탭의 서식을 PDF로 변환하여<br>입력한 이메일 주소로 발송합니다.</p>',
+    '  <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">수신자 이메일</label>',
+    '  <input type="email" id="emailInput" placeholder="수신자 이메일 주소" ',
+    '    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:12px;">',
+    '  <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">첨부 파일명</label>',
+    '  <div style="display:flex;align-items:center;gap:0;margin-bottom:16px;">',
+    '    <input type="text" id="pdfFileNameInput" value="' + defaultFileName + '" ',
+    '      style="flex:1;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px 0 0 8px;font-size:13px;outline:none;box-sizing:border-box;">',
+    '    <span style="padding:10px 12px;background:#f3f4f6;border:1.5px solid #d1d5db;border-left:none;border-radius:0 8px 8px 0;font-size:13px;color:#6b7280;white-space:nowrap;">.pdf</span>',
+    '  </div>',
+    '  <div id="emailStatus" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;"></div>',
+    '  <div style="display:flex;gap:8px;justify-content:flex-end;">',
+    '    <button onclick="closeEmailPopup()" style="padding:8px 18px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;">취소</button>',
+    '    <button id="emailSendBtn" onclick="sendEmailPDF()" style="padding:8px 18px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">발송</button>',
+    '  </div>',
+    '</div>'
+  ].join('');
+  document.body.appendChild(modal);
+  modal.querySelector('#emailInput').focus();
+}
+
+function closeEmailPopup() {
+  var m = document.getElementById('emailModal');
+  if (m) m.remove();
+}
+
+function sendEmailPDF() {
+  var emailVal = document.getElementById('emailInput').value.trim();
+  if (!emailVal) {
+    showEmailStatus('이메일 주소를 입력해주세요.', false);
+    return;
+  }
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(emailVal)) {
+    showEmailStatus('올바른 이메일 형식이 아닙니다.', false);
+    return;
+  }
+
+  var btn = document.getElementById('emailSendBtn');
+  btn.disabled = true;
+  btn.textContent = '발송 중...';
+  btn.style.opacity = '0.6';
+  showEmailStatus('PDF를 생성하고 메일을 발송 중입니다...', null);
+
+  /* 현재 탭 패널을 html2pdf로 실제 PDF 변환 후 서버로 전송 */
+  var panel = document.getElementById('panel-' + currentTab);
+
+  /* 사용자가 입력한 파일명 사용 */
+  var fileNameInput = document.getElementById('pdfFileNameInput');
+  var pdfFileName = (fileNameInput ? fileNameInput.value.trim() : '') || '조사서식';
+  if(!pdfFileName.endsWith('.pdf')) pdfFileName += '.pdf';
+
+  var opt = {
+    margin:       [8, 6, 8, 6],
+    filename:     pdfFileName,
+    image:        { type: 'jpeg', quality: 0.95 },
+    html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(panel).outputPdf('blob').then(function(pdfBlob) {
+    var formData = new FormData();
+    formData.append('to_email', emailVal);
+    formData.append('pdf_file', pdfBlob, pdfFileName);
+    formData.append('pdf_filename', pdfFileName);
+
+    fetch('/send_email_pdf', {
+      method: 'POST',
+      body: formData
+    })
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      showEmailStatus(data.message, data.success);
+      if (data.success) {
+        btn.textContent = '발송 완료';
+        btn.style.background = '#22c55e';
+        setTimeout(closeEmailPopup, 1500);
+      } else {
+        btn.disabled = false;
+        btn.textContent = '발송';
+        btn.style.opacity = '1';
+      }
+    })
+    .catch(function(err){
+      btn.disabled = false;
+      btn.textContent = '발송';
+      btn.style.opacity = '1';
+      showEmailStatus('네트워크 오류가 발생했습니다.', false);
+    });
+  }).catch(function(err){
+    btn.disabled = false;
+    btn.textContent = '발송';
+    btn.style.opacity = '1';
+    showEmailStatus('PDF 생성 중 오류가 발생했습니다.', false);
+  });
+}
+
+function showEmailStatus(msg, success) {
+  var st = document.getElementById('emailStatus');
+  st.style.display = 'block';
+  st.textContent = msg;
+  if (success === true) {
+    st.style.background = '#ecfdf5';
+    st.style.color = '#065f46';
+    st.style.border = '1px solid #6ee7b7';
+  } else if (success === false) {
+    st.style.background = '#fef2f2';
+    st.style.color = '#991b1b';
+    st.style.border = '1px solid #fca5a5';
+  } else {
+    st.style.background = '#eff6ff';
+    st.style.color = '#1e40af';
+    st.style.border = '1px solid #93c5fd';
+  }
+}
+
+/* 페이지 로드 시 상태 복원 */
+restoreSurveyState();
+toggleHosp2sub();
+
+/* ── 은행 앱 스타일 가이드 (한 화면에 전체 표시) ── */
+/* ── 4번 카드 가이드 (개별 위치 계산) ── */
+function guideStart() {
+  if (sessionStorage.getItem('sg_done')) return;
+
+  var isMobile = window.innerWidth < 600;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+
+  window.scrollTo(0, 0);
+
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.62);';
+  document.body.appendChild(overlay);
+
+  var prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+
+  var bubbles = [];
+
+  /* ── 헬퍼: 하이라이트 ── */
+  function addHighlight(elId) {
+    var el = document.getElementById(elId);
+    if (!el) return null;
+    var pad = isMobile ? 4 : 6;
+    var r = el.getBoundingClientRect();
+    var hl = document.createElement('div');
+    hl.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(91,126,229,0.45);',
+      'top:'+(r.top-pad)+'px;left:'+(r.left-pad)+'px;',
+      'width:'+(r.width+pad*2)+'px;height:'+(r.height+pad*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl);
+    bubbles.push(hl);
+    return r;
+  }
+
+  /* ── 헬퍼: 말풍선 ── */
+  function makeBubble(title, text, w) {
+    var fs      = isMobile ? '10.5px' : '12px';
+    var fsTitle = isMobile ? '11px'   : '12.5px';
+    var bpd     = isMobile ? '8px 10px 7px' : '13px 16px 12px';
+    var b = document.createElement('div');
+    b.style.cssText = [
+      'position:fixed;z-index:10000;background:#fff;border-radius:11px;',
+      'padding:'+bpd+';width:'+w+'px;',
+      'box-shadow:0 5px 20px rgba(0,0,0,0.22);',
+      'font-family:inherit;pointer-events:none;'
+    ].join('');
+    b.innerHTML =
+      '<div style="font-size:'+fsTitle+';font-weight:700;color:#4a6cd4;margin-bottom:4px;">&#128161; '+title+'</div>'+
+      '<div style="font-size:'+fs+';color:#374151;line-height:1.55;word-break:keep-all;">'+text+'</div>';
+    document.body.appendChild(b);
+    bubbles.push(b);
+    return b;
+  }
+
+  /* ── 헬퍼: 화살표 ── */
+  function addArrow(bubble, dir, posFromEdge) {
+    var arrow = document.createElement('div');
+    arrow.style.position = 'absolute';
+    arrow.style.width = '0';
+    arrow.style.height = '0';
+    if (dir === 'left') {
+      arrow.style.borderTop = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid transparent';
+      arrow.style.borderRight = '8px solid #fff';
+      arrow.style.left = '-8px';
+      arrow.style.top = posFromEdge + 'px';
+    } else if (dir === 'right') {
+      arrow.style.borderTop = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid transparent';
+      arrow.style.borderLeft = '8px solid #fff';
+      arrow.style.right = '-8px';
+      arrow.style.top = posFromEdge + 'px';
+    } else if (dir === 'up') {
+      arrow.style.borderLeft = '8px solid transparent';
+      arrow.style.borderRight = '8px solid transparent';
+      arrow.style.borderBottom = '8px solid #fff';
+      arrow.style.top = '-8px';
+      arrow.style.left = posFromEdge + 'px';
+    } else if (dir === 'down') {
+      arrow.style.borderLeft = '8px solid transparent';
+      arrow.style.borderRight = '8px solid transparent';
+      arrow.style.borderTop = '8px solid #fff';
+      arrow.style.bottom = '-8px';
+      arrow.style.left = posFromEdge + 'px';
+    }
+    bubble.appendChild(arrow);
+  }
+
+  /* ========================================
+     ① 조사 유형 전환 (탭바) — 말풍선 아래에 여유 있게
+     ======================================== */
+  var r1 = addHighlight('gt-tabs');
+  var b1 = null;
+  if (r1) {
+    var bw1 = isMobile ? Math.min(Math.floor(vw * 0.72), 260) : 230;
+    b1 = makeBubble('조사 유형 전환', '탭을 눌러 <b>사전조사</b>, <b>자체조사</b>, <b>연계조사</b> 서식을 전환할 수 있어요.', bw1);
+    if (!isMobile) {
+      /* PC: 기존 로직 그대로 */
+      requestAnimationFrame(function(){
+        var bh1 = b1.offsetHeight;
+        var gap1 = 20;
+        var bubbleTop = r1.bottom + gap1;
+        if (bubbleTop + bh1 > vh - 80) bubbleTop = r1.top - bh1 - gap1;
+        var bubbleLeft = Math.max(6, Math.min(r1.left, vw - bw1 - 6));
+        b1.style.top = bubbleTop + 'px';
+        b1.style.left = bubbleLeft + 'px';
+        var arrowLeft = Math.max(10, Math.min(r1.left + r1.width/2 - bubbleLeft - 8, bw1 - 26));
+        if (bubbleTop > r1.bottom) { addArrow(b1, 'up', arrowLeft); }
+        else { addArrow(b1, 'down', arrowLeft); }
+      });
+    }
+    /* 모바일은 b3 배치 완료 후 아래에서 처리 */
+  }
+
+  /* ========================================
+     ③ 상단 버튼 그룹 (메일보내기 · 출력/PDF · 다시입력)
+     — 3개 버튼을 하나로 묶어 하이라이트, 말풍선 1개로 안내
+     ======================================== */
+  var btnGroupEl = document.querySelector('.btn-group');
+  var r3 = null;
+  if (btnGroupEl) {
+    var pad3 = isMobile ? 4 : 6;
+    var bgR = btnGroupEl.getBoundingClientRect();
+    r3 = { top: bgR.top, bottom: bgR.bottom, left: bgR.left, right: bgR.right,
+           width: bgR.width, height: bgR.height };
+    var hl3 = document.createElement('div');
+    hl3.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none;border-radius:7px;',
+      'border:2px solid rgba(255,255,255,0.9);',
+      'box-shadow:0 0 0 3px rgba(91,126,229,0.45);',
+      'top:'+(r3.top-pad3)+'px;left:'+(r3.left-pad3)+'px;',
+      'width:'+(r3.width+pad3*2)+'px;height:'+(r3.height+pad3*2)+'px;'
+    ].join('');
+    document.body.appendChild(hl3);
+    bubbles.push(hl3);
+  }
+  if (r3) {
+    var bw3 = isMobile ? Math.min(Math.floor(vw * 0.72), 260) : 260;
+    var b3 = makeBubble('상단 버튼 안내',
+      '<b>메일 보내기</b> : 서식을 PDF로 변환하여 이메일 발송<br>' +
+      '<b>출력 / PDF 저장</b> : 현재 탭 서식을 인쇄하거나 PDF로 저장<br>' +
+      '<b>다시 입력</b> : 입력 내용을 초기화', bw3);
+    requestAnimationFrame(function(){
+      var bh3 = b3.offsetHeight;
+      var gap3 = isMobile ? 14 : 20;
+
+      if (isMobile) {
+        /* ── 모바일 전용: b3(우측) / b1(좌측) 완전 분리 배치 ──
+           좌우 절반씩 차지하므로 가로로 겹쳐도 시각적으로 구분됨 */
+        var halfW = Math.floor((vw - 18) / 2);
+
+        /* b3: 상단 버튼 안내 → 우측 고정, r3 우측 끝 가리킴 */
+        var left3 = vw - halfW - 6;
+        var top3  = r3.bottom + gap3;
+        b3.style.width = halfW + 'px';
+        b3.style.top   = top3 + 'px';
+        b3.style.left  = left3 + 'px';
+        addArrow(b3, 'up', Math.max(10, Math.min(
+          Math.round(r3.right) - left3 - 16, halfW - 26
+        )));
+
+        /* b1: 조사 유형 전환 → 좌측 고정, r1 바로 아래에 붙임 (밀림 없음) */
+        if (b1 && r1) {
+          var top1  = r1.bottom + gap3;
+          var left1 = 6;
+          b1.style.width = halfW + 'px';
+          b1.style.top   = top1 + 'px';
+          b1.style.left  = left1 + 'px';
+          addArrow(b1, 'up', Math.max(10, Math.min(
+            Math.round(r1.left) - left1 + 12, halfW - 26
+          )));
+        }
+      } else {
+        /* PC: 기존처럼 바로 아래에 말풍선 + 화살표 */
+        var bubbleLeft = Math.max(6, Math.min(r3.left + r3.width/2 - bw3/2, vw - bw3 - 6));
+        var bubbleTop3 = r3.bottom + gap3;
+        if (bubbleTop3 + bh3 > vh - 80) bubbleTop3 = r3.top - bh3 - gap3;
+        b3.style.top = bubbleTop3 + 'px';
+        b3.style.left = bubbleLeft + 'px';
+        var arrowLeft3 = Math.max(10, Math.min(r3.left + r3.width/2 - bubbleLeft - 8, bw3 - 26));
+        if (bubbleTop3 > r3.bottom) {
+          addArrow(b3, 'up', arrowLeft3);
+        } else {
+          addArrow(b3, 'down', arrowLeft3);
+        }
+      }
+    });
+  }
+
+  /* 확인 버튼 */
+  var confirmBtn = document.createElement('button');
+  confirmBtn.textContent = '확인';
+  confirmBtn.style.cssText = [
+    'position:fixed;z-index:10001;',
+    'left:50%;transform:translateX(-50%);bottom:14%;',
+    'background:#2563eb;color:#fff;border:none;',
+    'border-radius:10px;',
+    'padding:'+(isMobile?'10px 40px':'11px 52px')+';',
+    'font-size:'+(isMobile?'13px':'14px')+';font-weight:700;cursor:pointer;',
+    'box-shadow:0 4px 16px rgba(37,99,235,0.35);white-space:nowrap;'
+  ].join('');
+  document.body.appendChild(confirmBtn);
+  bubbles.push(confirmBtn);
+
+  function closeGuide() {
+    bubbles.forEach(function(b){ b.remove(); });
+    overlay.remove();
+    document.body.style.overflow = prevOverflow;
+    sessionStorage.setItem('sg_done', '1');
+  }
+
+  confirmBtn.addEventListener('click', function(e){ e.stopPropagation(); closeGuide(); });
+  overlay.addEventListener('click', closeGuide);
+}
+
+
+// 직접욕구 툴팁 — 인라인 onclick으로 처리(iOS 사파리 탭 지원). 바깥 클릭 시 닫기만 유지
+document.addEventListener('click', function(){
+  document.querySelectorAll('.direct-need-tooltip-box').forEach(function(b){ b.style.display='none'; });
+});
+
+// 가이드 투어 제거: 자동 실행하지 않음
+</script>
+</body>
+</html>
+"""
+
+@app.route("/send_email_pdf", methods=["POST"])
+@login_required
+def send_email_pdf():
+    """클라이언트에서 생성한 PDF를 메일로 전송"""
+    try:
+        to_email = request.form.get("to_email", "").strip()
+        if not to_email:
+            return jsonify({"success": False, "message": "수신 이메일 주소를 입력해주세요."})
+
+        pdf_file = request.files.get("pdf_file")
+        if not pdf_file:
+            return jsonify({"success": False, "message": "PDF 파일이 전송되지 않았습니다."})
+
+        gmail_user = os.getenv("GMAIL_USER", "")
+        gmail_app_pw = os.getenv("GMAIL_APP_PASSWORD", "")
+        if not gmail_user or not gmail_app_pw:
+            return jsonify({"success": False, "message": "메일 설정이 되어있지 않습니다. 관리자에게 문의하세요."})
+
+        pdf_bytes = pdf_file.read()
+
+        # 클라이언트에서 보낸 파일명 사용 (없으면 기본값)
+        pdf_filename = request.form.get("pdf_filename", "").strip()
+        if not pdf_filename:
+            now_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
+            pdf_filename = f"조사서식_{now_kst.strftime('%Y%m%d_%H%M')}.pdf"
+
+        msg = MIMEMultipart()
+        msg["From"] = gmail_user
+        msg["To"] = to_email
+        msg["Subject"] = "통합돌봄 지자체 조사 서식"
+
+        body = MIMEText("통합돌봄 지자체 조사 서식 PDF를 첨부합니다.\n\n※ 본 메일은 케어네비 시스템에서 자동 발송되었습니다.", "plain", "utf-8")
+        msg.attach(body)
+
+        part = MIMEBase("application", "pdf")
+        part.set_payload(pdf_bytes)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=pdf_filename)
+        msg.attach(part)
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_app_pw)
+            server.sendmail(gmail_user, to_email, msg.as_string())
+
+        return jsonify({"success": True, "message": f"{to_email}로 메일이 발송되었습니다."})
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"메일 발송 중 오류가 발생했습니다: {str(e)}"})
+
+
+@app.route("/survey")
+@login_required
+def survey():
+    return render_template_string(
+        SURVEY_HTML,
+        questions=list(enumerate(CARE_QUESTIONS))
+    )
+
+@app.route("/nhis25")
+@login_required
+def nhis25():
+    return render_template_string(NHIS25_HTML, style=BASE_STYLE)
+
+@app.route("/app-version.json")
+def app_version():
+    return {
+        "latestAppVersionCode": 8,
+        "latestAppVersionName": "1.8",
+        "apkUrl": "https://carenavi.kr/static/carenavi.apk",
+        "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
+    }
 
 if __name__ == "__main__":
-
-
-
-    port = int(os.environ.get("PORT", 5000))
-
-
-
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run()
