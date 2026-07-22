@@ -3697,7 +3697,7 @@ def home():
     try:
         if os.getenv("RENDER") is not None:
             res = requests.get(
-                f"{SUPABASE_URL}/rest/v1/notices?select=*&is_active=eq.true&order=is_pinned.desc.nullslast,created_at.desc&limit=100",
+                f"{SUPABASE_URL}/rest/v1/notices?select=*&is_active=eq.true&order=is_pinned.desc.nullslast,pinned_at.desc.nullslast,created_at.desc&limit=100",
                 headers=SUPABASE_HEADERS
             )
             if res.ok:
@@ -5840,6 +5840,7 @@ h2{ margin:0 0 16px 0; font-size:20px; }
 .btn-cancel{ background:#f3f4f6; color:#6b7280; }
 .btn-pin{ background:#fee2e2; color:#b91c1c; }
 .btn-unpin{ background:#f3f4f6; color:#6b7280; }
+.btn-top{ background:#fef3c7; color:#92400e; }
 .pin-badge{ display:inline-block; font-size:11px; font-weight:800; color:#b91c1c; background:#fee2e2; border-radius:6px; padding:2px 8px; margin-bottom:6px; }
 .card.pinned{ border:1.5px solid #fecaca; background:#fffbeb; }
 .write-card label.pin-check, .edit-area label.pin-check{ display:flex; align-items:center; gap:8px; margin-top:12px; font-size:13px; font-weight:700; }
@@ -5884,17 +5885,22 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <div class="meta">{{ n.created_datetime }}</div>
 
       <div class="view-area" id="view-{{ n.id }}">
-        {% if n.is_pinned %}<div class="pin-badge">필독 · 맨 위 고정</div>{% endif %}
+        {% if n.is_pinned %}<div class="pin-badge">필독</div>{% endif %}
         <div class="title">{{ n.title }}</div>
         <div class="content">{{ n.content }}</div>
         <div class="btn-row">
-          <form method="post" action="/notice/admin/pin/{{ n.id }}">
-            {% if n.is_pinned %}
-            <button type="submit" class="btn-sm btn-unpin">고정해제</button>
-            {% else %}
-            <button type="submit" class="btn-sm btn-pin">필독 고정</button>
-            {% endif %}
+          {% if n.is_pinned %}
+          <form method="post" action="/notice/admin/bump/{{ n.id }}">
+            <button type="submit" class="btn-sm btn-top">↑ 맨 위로</button>
           </form>
+          <form method="post" action="/notice/admin/pin/{{ n.id }}">
+            <button type="submit" class="btn-sm btn-unpin">고정해제</button>
+          </form>
+          {% else %}
+          <form method="post" action="/notice/admin/pin/{{ n.id }}">
+            <button type="submit" class="btn-sm btn-pin">필독 고정</button>
+          </form>
+          {% endif %}
           <button type="button" class="btn-sm btn-edit" onclick="toggleEdit({{ n.id }})">수정</button>
           <form method="post" action="/notice/admin/delete/{{ n.id }}" onsubmit="return confirm('삭제할까요?');">
             <button type="submit" class="btn-sm btn-del">삭제</button>
@@ -5940,7 +5946,7 @@ def notice_admin():
     notices = []
     if os.getenv("RENDER") is not None:
         res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/notices?select=*&order=is_pinned.desc.nullslast,created_at.desc",
+            f"{SUPABASE_URL}/rest/v1/notices?select=*&order=is_pinned.desc.nullslast,pinned_at.desc.nullslast,created_at.desc",
             headers=SUPABASE_HEADERS
         )
         if res.ok:
@@ -5960,10 +5966,13 @@ def notice_admin_write():
     if title and content and os.getenv("RENDER") is not None:
         try:
             now = datetime.datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+            new_notice = {"title": title, "content": content, "is_active": True, "is_pinned": is_pinned, "created_at": now}
+            if is_pinned:
+                new_notice["pinned_at"] = now
             res = requests.post(
                 f"{SUPABASE_URL}/rest/v1/notices",
                 headers=SUPABASE_HEADERS,
-                json={"title": title, "content": content, "is_active": True, "is_pinned": is_pinned, "created_at": now}
+                json=new_notice
             )
             if not res.ok:
                 app.logger.error("notice insert failed: %s %s", res.status_code, res.text)
@@ -6000,11 +6009,28 @@ def notice_admin_pin(notice_id):
         )
         if res.ok and res.json():
             current = res.json()[0].get("is_pinned", False)
+            new_pinned = not current
+            payload = {"is_pinned": new_pinned}
+            if new_pinned:
+                payload["pinned_at"] = datetime.datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
             requests.patch(
                 f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
                 headers=SUPABASE_HEADERS,
-                json={"is_pinned": not current}
+                json=payload
             )
+    return redirect(url_for("notice_admin"))
+
+@app.route("/notice/admin/bump/<int:notice_id>", methods=["POST"])
+def notice_admin_bump(notice_id):
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+    if os.getenv("RENDER") is not None:
+        now = datetime.datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
+            headers=SUPABASE_HEADERS,
+            json={"is_pinned": True, "pinned_at": now}
+        )
     return redirect(url_for("notice_admin"))
 
 @app.route("/notice/admin/delete/<int:notice_id>", methods=["POST"])
