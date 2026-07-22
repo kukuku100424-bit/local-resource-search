@@ -10475,7 +10475,7 @@ transition:0.2s;
 
 {% macro render_family_card(c) %}
 <div class="result-card grouped-result-card" style="border:2px solid #EF9F27;">
-  <div style="margin-bottom:10px;">
+  <div style="padding:14px 14px 0;">
     <span style="display:inline-flex;align-items:center;gap:5px;background:#FAEEDA;color:#854F0B;font-size:12px;font-weight:700;padding:4px 11px;border-radius:8px;">★ 장기요양 가족휴가제</span>
   </div>
   <div class="group-card-top">
@@ -10493,7 +10493,7 @@ transition:0.2s;
       onclick="return openComboGuideModal(this.href)"
     >기관검색</a>
   </div>
-  <div style="margin-top:10px;font-size:13px;color:#4b5563;line-height:1.6;">{{c['설명']}}</div>
+  <div style="padding:12px 14px 14px;font-size:13px;color:#4b5563;line-height:1.6;">{{c['설명']}}</div>
 </div>
 {% endmacro %}
 
