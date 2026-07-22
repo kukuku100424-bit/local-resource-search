@@ -5842,8 +5842,8 @@ h2{ margin:0 0 16px 0; font-size:20px; }
 .btn-unpin{ background:#f3f4f6; color:#6b7280; }
 .pin-badge{ display:inline-block; font-size:11px; font-weight:800; color:#b91c1c; background:#fee2e2; border-radius:6px; padding:2px 8px; margin-bottom:6px; }
 .card.pinned{ border:1.5px solid #fecaca; background:#fffbeb; }
-.pin-check{ display:flex; align-items:center; gap:8px; margin-top:12px; font-size:13px; font-weight:700; }
-.pin-check input{ width:auto; margin:0; }
+.write-card label.pin-check, .edit-area label.pin-check{ display:flex; align-items:center; gap:8px; margin-top:12px; font-size:13px; font-weight:700; }
+.write-card label.pin-check input, .edit-area label.pin-check input{ width:auto; margin:0; flex:none; }
 .edit-area{ margin-top:10px; }
 .edit-area label{ display:block; margin-top:10px; font-size:13px; font-weight:700; }
 .edit-area input,.edit-area textarea{ width:100%; box-sizing:border-box; margin-top:5px; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font-size:14px; font-family:inherit; }
