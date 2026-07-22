@@ -720,7 +720,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   {% endif %}
 
   <form method="post" class="form-area">
-    <input type="password" name="password" placeholder="비밀번호를 입력하세요">
+    <input type="password" name="password" placeholder="비밀번호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
     <button type="submit">로그인</button>
   </form>
 
@@ -935,7 +935,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   {% endif %}
 
   <form method="post" class="form-area">
-    <input type="password" name="password" placeholder="관리자 암호를 입력하세요">
+    <input type="password" name="password" placeholder="관리자 암호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
     <button type="submit">통계 페이지로 이동</button>
   </form>
 
@@ -954,7 +954,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        pw = request.form.get("password", "")
+        pw = request.form.get("password", "").strip()
 
         if USER_PASSWORD_HASH and check_password_hash(USER_PASSWORD_HASH, pw):
             session["logged_in"] = True
@@ -968,7 +968,7 @@ def login():
 @app.route("/admin", methods=["GET", "POST"])
 def admin_login():
     if request.method == "POST":
-        pw = request.form.get("password", "")
+        pw = request.form.get("password", "").strip()
 
         if ADMIN_PASSWORD_HASH and check_password_hash(ADMIN_PASSWORD_HASH, pw):
             session["is_admin"] = True
@@ -6946,6 +6946,60 @@ def build_grouped_service_results(service_results):
 
     return grouped_service_results
 
+# =========================
+# 장기요양 가족휴가제 특수 카드 (사례검색 최상단 별도 블록)
+# - 일반 결과(service_results)와 완전히 분리된 별도 블록으로 렌더한다.
+# - 트리거: '가족휴가제' 직접 언급, 또는 (치매/인지저하/배회/1·2등급) + (가족 부재·휴식 맥락)이 동시에 있을 때
+#   ※ '장기요양등급'은 트리거에서 제외(치매 없고 3~4등급은 대상 아님)
+# - 기관검색으로 넘길 때: 대분류=요양, 중분류(단기보호/방문요양) 그대로 + 프로그램명 '가족휴가제' 자동입력
+# 키워드는 현장 표현에 맞게 자유롭게 추가/수정하세요.
+# =========================
+FAMILY_LEAVE_TARGET_KW = ["치매", "인지저하", "배회", "1등급", "2등급"]
+FAMILY_LEAVE_CONTEXT_KW = [
+    "가족휴가", "보호자", "여행", "경조사", "입원", "출장",
+    "며칠", "잠깐맡", "돌봄부담", "쉬고싶", "자리비움", "부재",
+]
+
+def _family_leave_triggered(query):
+    q = (query or "").replace(" ", "")
+    if "가족휴가제" in q:
+        return True
+    has_target = any(k in q for k in FAMILY_LEAVE_TARGET_KW)
+    has_context = any(k in q for k in FAMILY_LEAVE_CONTEXT_KW)
+    return has_target and has_context
+
+def build_family_leave_cards(query, selected_sido, selected_sigungu):
+    """장기요양 가족휴가제 특수 카드 목록. 트리거 미충족 시 빈 리스트.
+    선택 지역에 실제 해당 자원이 있는 중분류(단기보호/방문요양)만 카드로 만든다."""
+    if not _family_leave_triggered(query):
+        return []
+
+    prog_col = "프로그램명(사업명)"
+    if prog_col not in df.columns or "중분류" not in df.columns or "대분류" not in df.columns:
+        return []
+
+    fam = df[
+        df[prog_col].fillna("").astype(str).str.contains("가족휴가", na=False)
+        & (df["대분류"].fillna("").astype(str).str.strip() == "요양")
+    ]
+
+    if selected_sido and "시도" in fam.columns:
+        fam = fam[fam["시도"].fillna("").astype(str).apply(normalize_sido) == selected_sido]
+    if selected_sigungu and "시군구" in fam.columns:
+        fam = fam[fam["시군구"].fillna("").astype(str).apply(normalize_sigungu) == selected_sigungu]
+
+    available_mids = set(fam["중분류"].fillna("").astype(str).str.strip())
+
+    cards = []
+    for mid in ["방문요양", "단기보호"]:
+        if mid in available_mids:
+            cards.append({
+                "대분류": "요양",
+                "중분류": mid,
+                "설명": "보호자의 휴식·부재 시 이용할 수 있는 대체 돌봄 서비스입니다.",
+            })
+    return cards
+
 @app.route("/desc", methods=["GET","POST"])
 def desc():
     query = (request.values.get("query", "") or "").strip()
@@ -7041,6 +7095,7 @@ def desc():
                     count=count,
                     service_results=service_results,
                                  grouped_service_results=build_grouped_service_results(service_results),
+                    family_leave_cards=build_family_leave_cards(query, selected_sido, selected_sigungu),
                     warning_msg=warning_msg,
                     selected_sido=selected_sido,
                     selected_sigungu=selected_sigungu,
@@ -7931,6 +7986,7 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
         count=count,
         service_results=service_results,
              grouped_service_results=build_grouped_service_results(service_results),
+        family_leave_cards=build_family_leave_cards(query, selected_sido, selected_sigungu),
         warning_msg=warning_msg,
         selected_sido=selected_sido,
         selected_sigungu=selected_sigungu,
@@ -10347,44 +10403,14 @@ transition:0.2s;
 </div>
 
 <div id="searchResultSection">
-{% if warning_msg %}
+{% if warning_msg and not (family_leave_cards|default([]) and count == 0) %}
 <div class="warning-box">
   <span class="warning-icon">⚠️</span>
   <span class="warning-text">{{ warning_msg }}</span>
 </div>
 {% endif %}
-{% if service_results %}
 
-<div class="result" id="resultArea">
-
-<h3>{{count}}건의 추천 서비스</h3>
-
-{% set ns = namespace(direct_box_open=false) %}
-
-{% for group in grouped_service_results|default([]) %}
-
-{% if not group.direct_need and ns.direct_box_open %}
-</div>
-{% set ns.direct_box_open = false %}
-{% endif %}
-
-{% if group.direct_need and not ns.direct_box_open %}
-<div class="direct-need-box">
-  <div style="display:flex;align-items:center;gap:7px;margin-bottom:16px;">
-    <div class="direct-need-title" style="margin-bottom:0;">
-      <svg style="width:17px;height:17px;flex-shrink:0;vertical-align:-3px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
-      </svg>
-      <span>주요욕구</span>
-    </div>
-    <div class="direct-need-tooltip-wrap">
-      <button type="button" class="direct-need-tooltip-icon" aria-label="안내" onclick="var e=event;e.stopPropagation();var b=this.parentElement.querySelector('.direct-need-tooltip-box');if(!b)return;var vis=(b.style.display==='block');document.querySelectorAll('.direct-need-tooltip-box').forEach(function(x){x.style.display='none';});b.style.display=vis?'none':'block';">?</button>
-      <div class="direct-need-tooltip-box">대상자·보호자의 희망욕구와 조사자 판단 필요 서비스가 모두 포함되었습니다.</div>
-    </div>
-  </div>
-{% set ns.direct_box_open = true %}
-{% endif %}
-
+{% macro render_group_card(group) %}
 <div class="result-card grouped-result-card {% if group.direct_need %}direct-need-card{% else %}normal-need-card{% endif %}">
 
   <div class="group-card-top">
@@ -10445,18 +10471,80 @@ transition:0.2s;
   </div>
 
 </div>
+{% endmacro %}
 
-{% endfor %}
+{% macro render_family_card(c) %}
+<div class="result-card grouped-result-card" style="border:2px solid #EF9F27;">
+  <div style="margin-bottom:10px;">
+    <span style="display:inline-flex;align-items:center;gap:5px;background:#FAEEDA;color:#854F0B;font-size:12px;font-weight:700;padding:4px 11px;border-radius:8px;">★ 장기요양 가족휴가제</span>
+  </div>
+  <div class="group-card-top">
+    <div class="group-title-area">
+      <div class="group-title-meta">대분류 · 중분류</div>
+      <div class="group-title-grid">
+        <div class="group-title-col"><div class="group-title-value main-val">{{c['대분류']}}</div></div>
+        <div class="group-title-arrow">›</div>
+        <div class="group-title-col"><div class="group-title-value">{{c['중분류']}}</div></div>
+      </div>
+    </div>
+    <a
+      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{c['대분류']|urlencode}}&middle_category={{c['중분류']|urlencode}}&program_kw={{'가족휴가제'|urlencode}}&from_desc=1"
+      class="group-search-btn"
+      onclick="return openComboGuideModal(this.href)"
+    >기관검색</a>
+  </div>
+  <div style="margin-top:10px;font-size:13px;color:#4b5563;line-height:1.6;">{{c['설명']}}</div>
+</div>
+{% endmacro %}
 
-{% if ns.direct_box_open %}
+{% set direct_groups = grouped_service_results|default([])|selectattr('direct_need')|list %}
+{% set normal_groups = grouped_service_results|default([])|rejectattr('direct_need')|list %}
+
+{% if service_results or family_leave_cards|default([]) %}
+<div class="result" id="resultArea">
+
+{% if count > 0 %}
+<h3>{{count}}건의 추천 서비스</h3>
+{% endif %}
+
+{% if direct_groups %}
+<div class="direct-need-box">
+  <div style="display:flex;align-items:center;gap:7px;margin-bottom:16px;">
+    <div class="direct-need-title" style="margin-bottom:0;">
+      <svg style="width:17px;height:17px;flex-shrink:0;vertical-align:-3px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#EF9F27"/>
+      </svg>
+      <span>주요욕구</span>
+    </div>
+    <div class="direct-need-tooltip-wrap">
+      <button type="button" class="direct-need-tooltip-icon" aria-label="안내" onclick="var e=event;e.stopPropagation();var b=this.parentElement.querySelector('.direct-need-tooltip-box');if(!b)return;var vis=(b.style.display==='block');document.querySelectorAll('.direct-need-tooltip-box').forEach(function(x){x.style.display='none';});b.style.display=vis?'none':'block';">?</button>
+      <div class="direct-need-tooltip-box">대상자·보호자의 희망욕구와 조사자 판단 필요 서비스가 모두 포함되었습니다.</div>
+    </div>
+  </div>
+  {% for group in direct_groups %}
+  {{ render_group_card(group) }}
+  {% endfor %}
 </div>
 {% endif %}
 
+{% if family_leave_cards|default([]) %}
+<div id="familyLeaveArea" style="{% if direct_groups %}margin-top:14px;{% endif %}">
+{% for c in family_leave_cards %}
+{{ render_family_card(c) }}
+{% endfor %}
+</div>
+{% endif %}
+
+{% for group in normal_groups %}
+{{ render_group_card(group) }}
+{% endfor %}
+
+{% if service_results %}
 <div style="margin-top:18px;padding:12px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;font-size:12.5px;line-height:1.6;color:#64748b;text-align:center;">
   본 추천 결과는 AI 기반 참고 자료이며, 최종 판단과 책임은 담당자의 전문적 판단에 따릅니다.
 </div>
+{% endif %}
 </div>
-
 {% endif %}
 
 
