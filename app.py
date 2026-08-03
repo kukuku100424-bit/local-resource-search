@@ -373,10 +373,15 @@ _PV_TRACK = {
 
 def _pv_insert(path):
     try:
+        # created_at을 KST 자정(00:00:00)으로 고정 — 일자별 집계는 그대로 유지하되
+        # 초 단위 접속 시각은 DB에 남기지 않음 (page_view_logs 한정, region_logs는 무관)
+        _kst_midnight = datetime.datetime.now(ZoneInfo("Asia/Seoul")).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         requests.post(
             f"{SUPABASE_URL}/rest/v1/page_view_logs",
             headers=SUPABASE_HEADERS,
-            json={"path": path},
+            json={"path": path, "created_at": _kst_midnight.isoformat()},
             timeout=5
         )
     except Exception:
