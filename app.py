@@ -291,7 +291,7 @@ def favicon():
 
 @app.errorhandler(405)
 def method_not_allowed(e):
-    app.logger.error(f"405 - {request.method} {request.path} - UA: {request.headers.get('User-Agent')}")
+    app.logger.error(f"405 - {request.method} {request.path}")
     return e, 405
 
 import logging
