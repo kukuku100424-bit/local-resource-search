@@ -496,7 +496,7 @@ LOGIN_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>케어네비 로그인</title>
+<title>케어내비 로그인</title>
 
 <style>
 *{ box-sizing:border-box; }
@@ -711,7 +711,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="box">
   <a href="/admin" class="admin-link">관리자</a>
 
-  <div class="simple-logo">케어네비</div>
+  <div class="simple-logo">케어내비</div>
   <div class="logo-line"></div>
   <div class="sub-title">통합돌봄 지원 프로그램 사용자 로그인</div>
 
@@ -751,7 +751,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     try{
       var name = window.AndroidAppInfo.getVersionName();
       var el = document.getElementById('cn-app-version');
-      if(el) el.textContent = '케어네비 v' + name;
+      if(el) el.textContent = '케어내비 v' + name;
     }catch(e){}
   }
 })();
@@ -2648,7 +2648,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   {% if notices %}<span class="notice-dot"></span>{% endif %}
 </button>
 <button type="button" class="home-help-btn" onclick="openGuide()" aria-label="사용설명서">?</button>
-<h1>NHIS-G <span>케어네비</span></h1>
+<h1>NHIS-G <span>케어내비</span></h1>
 <p>통합돌봄 자원 검색 및 안내 서비스</p>
 </div>
 
@@ -2802,7 +2802,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
     <div class="apk-install-icon">📱</div>
 
-    <div class="apk-install-title">케어네비 앱 설치 안내</div>
+    <div class="apk-install-title">케어내비 앱 설치 안내</div>
 
     <div class="apk-install-subtitle">
       안드로이드용 설치 파일을 다운로드합니다.
@@ -3482,7 +3482,7 @@ window.addEventListener("popstate", function (e) {
 <div id="tourOverlay" class="tour-overlay" onclick="closeTour()"></div>
 <div id="tourSpotlight" class="tour-spotlight" style="display:none;"></div>
 <div id="tourPopup" class="tour-popup">
-  <div class="tour-popup-title">케어네비를 처음 방문해주셨네요 👋</div>
+  <div class="tour-popup-title">케어내비를 처음 방문해주셨네요 👋</div>
   <div class="tour-popup-text">사용법은 우측 상단 <span style="white-space:nowrap;"><span class="tour-q-icon">?</span> 버튼을</span> 눌러보세요.</div>
   <div class="tour-popup-buttons">
     <button type="button" class="tour-btn tour-btn-primary" onclick="openGuideFromTour()">설명서 보기</button>
@@ -4089,7 +4089,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <div class="top-right-menu">
       <a href="/board/admin" class="home-button">의견확인</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
-      <a href="/stats/export/xlsx/케어네비_통계.xlsx" class="home-button">엑셀받기</a>
+      <a href="/stats/export/xlsx/케어내비_통계.xlsx" class="home-button">엑셀받기</a>
       <a href="/admin/maintenance" class="home-button maint-btn">점검모드</a>
     </div>
   </div>
@@ -4815,7 +4815,7 @@ def export_stats_all(fname=None):
         pages_df.to_excel(writer, index=False, sheet_name="페이지별조회수")
     output.seek(0)
 
-    # 파일명을 헤더에 넣지 않고(attachment만), URL 마지막 경로(케어네비_통계.xlsx)를
+    # 파일명을 헤더에 넣지 않고(attachment만), URL 마지막 경로(케어내비_통계.xlsx)를
     # 파일명으로 쓰게 함 → PC 브라우저·모바일 브라우저·웹앱(WebView) 모두 동일하게 한글 파일명.
     resp = Response(
         output.read(),
@@ -5591,7 +5591,7 @@ PRIVACY_HTML = """
   <h1>개인정보 처리방침</h1>
   <div class="updated">시행일: 2026년 6월 14일</div>
 
-  <p>케어네비(이하 "서비스")는 「개인정보 보호법」을 준수하며, 이용자의 개인정보를 다음과 같이 처리합니다.</p>
+  <p>케어내비(이하 "서비스")는 「개인정보 보호법」을 준수하며, 이용자의 개인정보를 다음과 같이 처리합니다.</p>
 
   <div class="notice">
     본 서비스는 업무 참고용 서비스입니다. 이름, 주민등록번호, 연락처, 상세주소, 진단서·처방전 원본 등 직접 식별 가능한 개인정보나 민감정보는 입력 또는 업로드하지 않도록 주의해 주세요.
@@ -11809,7 +11809,7 @@ def is_irrelevant_query(query: str) -> bool:
     if q_norm in short_block_words:
         return True
 
-    # 케어네비 관련 기본 키워드
+    # 케어내비 관련 기본 키워드
     care_keywords = [
         "어르신", "노인", "고령", "돌봄", "통합돌봄", "복지", "복지용구",
         "장기요양", "요양", "건강", "질환", "통증", "병원", "의료", "간호",
@@ -14602,7 +14602,7 @@ def send_email_pdf():
         msg["To"] = to_email
         msg["Subject"] = "통합돌봄 지자체 조사 서식"
 
-        body = MIMEText("통합돌봄 지자체 조사 서식 PDF를 첨부합니다.\n\n※ 본 메일은 케어네비 시스템에서 자동 발송되었습니다.", "plain", "utf-8")
+        body = MIMEText("통합돌봄 지자체 조사 서식 PDF를 첨부합니다.\n\n※ 본 메일은 케어내비 시스템에서 자동 발송되었습니다.", "plain", "utf-8")
         msg.attach(body)
 
         part = MIMEBase("application", "pdf")
@@ -14640,7 +14640,7 @@ def app_version():
         "latestAppVersionCode": 8,
         "latestAppVersionName": "1.8",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
-        "message": "케어네비 새 버전이 있습니다. 업데이트해 주세요."
+        "message": "케어내비 새 버전이 있습니다. 업데이트해 주세요."
     }
 
 if __name__ == "__main__":
