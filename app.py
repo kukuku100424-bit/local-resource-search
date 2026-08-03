@@ -4384,15 +4384,34 @@ def _friendly_page(path):
 
 def _compute_pv_stats():
     """페이지뷰 통계 (화이트리스트 6개만 집계). 테이블 없거나 오류면 0/빈값."""
+    # ⚠️ PostgREST 기본 행수 상한(1000)이 있어, 테이블이 1000행을 넘으면
+    #    단일 요청은 일부만 돌려줘 집계가 틀어진다. id 기준 Range 페이지네이션으로
+    #    전체 행을 나눠 받아 정확히 집계한다. (정렬은 개수 집계용이라 무관)
+    rows = []
     try:
-        res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/page_view_logs?select=created_at,path&order=created_at.desc",
-            headers=SUPABASE_HEADERS,
-            timeout=8
-        )
-        rows = res.json() if res.ok else []
-        if not isinstance(rows, list):
-            rows = []
+        _step = 1000
+        _offset = 0
+        while True:
+            _res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/page_view_logs?select=created_at,path&order=id.asc",
+                headers={
+                    **SUPABASE_HEADERS,
+                    "Range-Unit": "items",
+                    "Range": f"{_offset}-{_offset + _step - 1}",
+                },
+                timeout=8
+            )
+            if not _res.ok:
+                break
+            _batch = _res.json()
+            if not isinstance(_batch, list) or not _batch:
+                break
+            rows.extend(_batch)
+            if len(_batch) < _step:      # 마지막 페이지
+                break
+            _offset += _step
+            if _offset > 500000:         # 안전장치 (무한루프 방지)
+                break
     except Exception:
         rows = []
 
