@@ -373,15 +373,17 @@ _PV_TRACK = {
 
 def _pv_insert(path):
     try:
-        # created_at을 KST 자정(00:00:00)으로 고정 — 일자별 집계는 그대로 유지하되
-        # 초 단위 접속 시각은 DB에 남기지 않음 (page_view_logs 한정, region_logs는 무관)
-        _kst_midnight = datetime.datetime.now(ZoneInfo("Asia/Seoul")).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        # 접속 시각을 그날(KST 기준) 자정으로 뭉갬 — 일자별 집계는 그대로 유지하되
+        # 초 단위 접속 시각은 DB에 남기지 않음 (page_view_logs 한정, region_logs는 무관).
+        # KST '오늘 날짜'에 00:00:00 UTC를 붙여 저장 → Supabase(UTC 표시)에서도
+        # 'YYYY-MM-DD 00:00:00'으로 깔끔히 보이고, 읽을 때 _kst_date_str로 KST 변환해도
+        # 00:00 UTC = 09:00 KST 라 같은 날짜로 집계됨.
+        _today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+        _created = f"{_today_kst}T00:00:00+00:00"
         requests.post(
             f"{SUPABASE_URL}/rest/v1/page_view_logs",
             headers=SUPABASE_HEADERS,
-            json={"path": path, "created_at": _kst_midnight.isoformat()},
+            json={"path": path, "created_at": _created},
             timeout=5
         )
     except Exception:
