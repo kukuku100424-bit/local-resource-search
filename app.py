@@ -207,7 +207,7 @@ def update_visitors():
             last_visit = datetime.datetime.fromisoformat(last_visit_str)
             if (now - last_visit).total_seconds() < 3600:
                 select_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*"
-                res = requests.get(select_url, headers=SUPABASE_HEADERS)
+                res = requests.get(select_url, headers=SUPABASE_HEADERS, timeout=5)
                 rows = res.json()
 
                 if rows:
@@ -221,7 +221,7 @@ def update_visitors():
     today = now.strftime("%Y-%m-%d")
 
     select_url = f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*"
-    res = requests.get(select_url, headers=SUPABASE_HEADERS)
+    res = requests.get(select_url, headers=SUPABASE_HEADERS, timeout=5)
     rows = res.json()
 
     if not rows:
@@ -237,7 +237,8 @@ def update_visitors():
                 "total_count": total,
                 "today_date": today,
                 "today_count": today_count
-            }
+            },
+            timeout=5
         )
     else:
         data = rows[0]
@@ -256,7 +257,8 @@ def update_visitors():
                 "total_count": total,
                 "today_date": today,
                 "today_count": today_count
-            }
+            },
+            timeout=5
         )
 
     # 접속 환경 집계 — User-Agent 원문은 저장하지 않고 PC/Android/iOS/기타 카운트만 누적
@@ -3705,7 +3707,7 @@ def home():
         if os.getenv("RENDER") is not None:
             res = requests.get(
                 f"{SUPABASE_URL}/rest/v1/notices?select=*&is_active=eq.true&order=is_pinned.desc.nullslast,pinned_at.desc.nullslast,created_at.desc&limit=100",
-                headers=SUPABASE_HEADERS
+                headers=SUPABASE_HEADERS, timeout=5
             )
             if res.ok:
                 notices = res.json()
@@ -4540,7 +4542,7 @@ def stats():
     else:
         stats_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         stats_rows = stats_res.json() if stats_res.ok else []
         stats_row = stats_rows[0] if stats_rows else {}
@@ -4550,7 +4552,7 @@ def stats():
 
         visit_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         visit_rows = visit_res.json() if visit_res.ok else []
 
@@ -4565,7 +4567,7 @@ def stats():
 
         region_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         region_rows = region_res.json() if region_res.ok else []
 
@@ -4672,7 +4674,7 @@ def export_stats_visits():
     else:
         visit_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         visit_rows = visit_res.json() if visit_res.ok else []
 
@@ -4712,7 +4714,7 @@ def export_stats_regions():
     else:
         region_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         region_rows = region_res.json() if region_res.ok else []
 
@@ -4779,7 +4781,7 @@ def export_stats_all(fname=None):
     else:
         stats_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/visit_stats?id=eq.1&select=*",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         stats_rows = stats_res.json() if stats_res.ok else []
         stats_row = stats_rows[0] if stats_rows else {}
@@ -4788,7 +4790,7 @@ def export_stats_all(fname=None):
 
         visit_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count&order=visit_date.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         visit_rows = visit_res.json() if visit_res.ok else []
         daily_visits = [
@@ -4798,7 +4800,7 @@ def export_stats_all(fname=None):
 
         region_res = requests.get(
             f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         region_rows = region_res.json() if region_res.ok else []
         drm = defaultdict(int)
@@ -5737,7 +5739,8 @@ def board_write():
                         "content": content,
                         "org_type": org_type,
                         "reply_contact": reply_contact
-                    }
+                    },
+                    timeout=5
                 )
 
         return render_template_string(BOARD_SUCCESS_HTML)
@@ -5757,7 +5760,7 @@ def board_admin():
     if os.getenv("RENDER") is not None:
         res = requests.get(
             f"{SUPABASE_URL}/rest/v1/board_posts?select=*&is_deleted=eq.false&order=created_at.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         posts = res.json() if res.ok else []
     else:
@@ -5784,7 +5787,7 @@ def board_admin_view(post_id):
     if os.getenv("RENDER") is not None:
         res = requests.get(
             f"{SUPABASE_URL}/rest/v1/board_posts?select=*&id=eq.{post_id}&is_deleted=eq.false",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         rows = res.json() if res.ok else []
         post = rows[0] if rows else None
@@ -5813,7 +5816,8 @@ def board_delete(post_id):
             headers=SUPABASE_HEADERS,
             json={
                 "is_deleted": True
-            }
+            },
+            timeout=5
         )
 
     return redirect(url_for("board_admin"))
@@ -5973,7 +5977,7 @@ def notice_admin():
     if os.getenv("RENDER") is not None:
         res = requests.get(
             f"{SUPABASE_URL}/rest/v1/notices?select=*&order=is_pinned.desc.nullslast,pinned_at.desc.nullslast,created_at.desc",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         if res.ok:
             notices = res.json()
@@ -5998,7 +6002,7 @@ def notice_admin_write():
             res = requests.post(
                 f"{SUPABASE_URL}/rest/v1/notices",
                 headers=SUPABASE_HEADERS,
-                json=new_notice
+                json=new_notice, timeout=5
             )
             if not res.ok:
                 app.logger.error("notice insert failed: %s %s", res.status_code, res.text)
@@ -6013,14 +6017,15 @@ def notice_admin_toggle(notice_id):
     if os.getenv("RENDER") is not None:
         res = requests.get(
             f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}&select=is_active",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         if res.ok and res.json():
             current = res.json()[0].get("is_active", True)
             requests.patch(
                 f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
                 headers=SUPABASE_HEADERS,
-                json={"is_active": not current}
+                json={"is_active": not current},
+                timeout=5
             )
     return redirect(url_for("notice_admin"))
 
@@ -6031,7 +6036,7 @@ def notice_admin_pin(notice_id):
     if os.getenv("RENDER") is not None:
         res = requests.get(
             f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}&select=is_pinned",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
         if res.ok and res.json():
             current = res.json()[0].get("is_pinned", False)
@@ -6042,7 +6047,7 @@ def notice_admin_pin(notice_id):
             requests.patch(
                 f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
                 headers=SUPABASE_HEADERS,
-                json=payload
+                json=payload, timeout=5
             )
     return redirect(url_for("notice_admin"))
 
@@ -6055,7 +6060,8 @@ def notice_admin_bump(notice_id):
         requests.patch(
             f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
             headers=SUPABASE_HEADERS,
-            json={"is_pinned": True, "pinned_at": now}
+            json={"is_pinned": True, "pinned_at": now},
+            timeout=5
         )
     return redirect(url_for("notice_admin"))
 
@@ -6066,7 +6072,7 @@ def notice_admin_delete(notice_id):
     if os.getenv("RENDER") is not None:
         requests.delete(
             f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
-            headers=SUPABASE_HEADERS
+            headers=SUPABASE_HEADERS, timeout=5
         )
     return redirect(url_for("notice_admin"))
 
@@ -6083,7 +6089,8 @@ def notice_admin_edit(notice_id):
             res = requests.patch(
                 f"{SUPABASE_URL}/rest/v1/notices?id=eq.{notice_id}",
                 headers=SUPABASE_HEADERS,
-                json={"title": title, "content": content, "is_pinned": is_pinned}
+                json={"title": title, "content": content, "is_pinned": is_pinned},
+                timeout=5
             )
             if not res.ok:
                 app.logger.error("notice edit failed: %s %s", res.status_code, res.text)
@@ -11783,15 +11790,6 @@ def infer_direct_need_from_query(query, item):
         return True
 
     return False
-
-def normalize_sigungu(text: str) -> str:
-    if not text:
-        return ""
-    t = str(text).strip()
-    mapping = {"나주":"나주시", "목포":"목포시", "영암":"영암군"}
-    if t in mapping:
-        return mapping[t]
-    return t
 
 def normalize_health(text: str) -> str:
     if not text:
