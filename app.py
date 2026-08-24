@@ -433,6 +433,38 @@ def _region_log_insert(sido, sigungu, search_type):
     except Exception:
         pass
 
+def fetch_all_rows(path_and_query, step=1000, timeout=8):
+    """PostgREST 기본 행수 상한(1000) 우회 — Range 헤더로 전체 행을 나눠 받는다.
+    path_and_query 예: "region_logs?select=created_at,sido&order=created_at.desc"
+    (테이블이 1000행을 넘으면 단일 요청은 일부만 돌려줘 집계가 틀어지므로 필수)"""
+    rows = []
+    try:
+        offset = 0
+        while True:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/{path_and_query}",
+                headers={
+                    **SUPABASE_HEADERS,
+                    "Range-Unit": "items",
+                    "Range": f"{offset}-{offset + step - 1}",
+                },
+                timeout=timeout
+            )
+            if not res.ok:
+                break
+            batch = res.json()
+            if not isinstance(batch, list) or not batch:
+                break
+            rows.extend(batch)
+            if len(batch) < step:      # 마지막 페이지
+                break
+            offset += step
+            if offset > 500000:        # 안전장치 (무한루프 방지)
+                break
+    except Exception:
+        pass
+    return rows
+
 def cleanup_old_board_posts():
     """의견보내기 게시글 1년 경과 시 자동 삭제"""
     if os.getenv("RENDER") is None:
@@ -4565,11 +4597,9 @@ def stats():
                     "count": int(row.get("count", 0) or 0)
                 })
 
-        region_res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
-            headers=SUPABASE_HEADERS, timeout=5
+        region_rows = fetch_all_rows(
+            "region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc"
         )
-        region_rows = region_res.json() if region_res.ok else []
 
         # 클릭별 상세 내역 — KST 일시 표시. region_rows는 created_at desc 정렬이라 최신순.
         daily_regions = []
@@ -4712,11 +4742,9 @@ def export_stats_regions():
             {"날짜": "2026-04-19", "시도": "전남광주통합특별시", "시군구": "서구", "검색구분": "조건기반", "클릭수": 1}
         ]
     else:
-        region_res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
-            headers=SUPABASE_HEADERS, timeout=5
+        region_rows = fetch_all_rows(
+            "region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc"
         )
-        region_rows = region_res.json() if region_res.ok else []
 
         daily_region_map = defaultdict(int)
         for row in region_rows:
@@ -4798,11 +4826,9 @@ def export_stats_all(fname=None):
             for row in visit_rows if row.get("visit_date")
         ]
 
-        region_res = requests.get(
-            f"{SUPABASE_URL}/rest/v1/region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc",
-            headers=SUPABASE_HEADERS, timeout=5
+        region_rows = fetch_all_rows(
+            "region_logs?select=created_at,sido,sigungu,search_type&order=created_at.desc"
         )
-        region_rows = region_res.json() if region_res.ok else []
         drm = defaultdict(int)
         for row in region_rows:
             ca = str(row.get("created_at", ""))
