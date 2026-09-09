@@ -11002,97 +11002,200 @@ function finishVoiceUI(){
   }
 }
 
+// 사례검색 음성 입력: 중간 인식 결과는 화면에만 표시하고, 종료 후 한 번만 검색한다.
+let voiceSession = 0;
+let voiceFinalText = "";
+let voiceInterimText = "";
+let voiceStartValue = "";
+let voiceSubmitted = false;
+let voiceStopping = false;
+let voiceNativeActive = false;
+let voiceFallbackUsed = false;
+let voiceError = "";
+
+function showVoiceText(text){
+  if(!queryInput) return;
+  queryInput.value = String(text || "").slice(0, 2000);
+  queryInput.dispatchEvent(new Event("input", {bubbles:true}));
+  queryInput.scrollTop = queryInput.scrollHeight;
+}
+
+function beginVoiceInput(){
+  voiceSession++;
+  voiceFinalText = "";
+  voiceInterimText = "";
+  voiceStartValue = queryInput ? queryInput.value : "";
+  voiceSubmitted = false;
+  voiceStopping = false;
+  voiceNativeActive = false;
+  voiceFallbackUsed = false;
+  voiceError = "";
+  isRecording = true;
+  setVoiceButtonRecording(true);
+  playBeep("start");
+  const overlay = document.getElementById("voiceOverlay");
+  if(overlay) overlay.style.display = "block";
+}
+
 function submitVoiceText(transcript){
-  if(!transcript) {
+  // 인식 결과가 여러 번 전달되거나 종료 콜백이 중복되어도 검색은 한 번만 실행한다.
+  if(voiceSubmitted) return;
+  const text = String(transcript || "").trim();
+  if(!text){
     finishVoiceUI();
     return;
   }
-
-  queryInput.value = transcript;
-
+  voiceSubmitted = true;
+  showVoiceText(text);
   finishVoiceUI();
-
-  if(loading){
-    loading.style.display = "flex";
-  }
-
-  startLoadingMessages();
-
   document.getElementById("descAction").value = "search";
-  searchForm.submit();
+  // 기존 form submit 리스너(개인정보 확인 및 로딩 표시)를 그대로 통과한다.
+  if(searchForm.requestSubmit){
+    searchForm.requestSubmit();
+  }else{
+    if(window.__hasPII && window.__hasPII(queryInput.value)){
+      if(typeof openPiiModal === "function") openPiiModal();
+      return;
+    }
+    if(loading) loading.style.display = "flex";
+    startLoadingMessages();
+    searchForm.submit();
+  }
 }
 
+function completeVoiceInput(){
+  if(voiceSubmitted) return;
+  const text = (voiceFinalText + (voiceInterimText ? " " + voiceInterimText : "")).trim();
+  voiceNativeActive = false;
+  recognition = null;
+  if(text){
+    submitVoiceText(text);
+  }else{
+    finishVoiceUI();
+  }
+}
+
+function startNativeVoiceInput(){
+  if(!window.AndroidVoice || !window.AndroidVoice.startVoiceSearch) return false;
+  voiceFallbackUsed = true;
+  voiceNativeActive = true;
+  recognition = null;
+  voiceError = "";
+  try{
+    window.AndroidVoice.startVoiceSearch();
+    return true;
+  }catch(e){
+    voiceNativeActive = false;
+    finishVoiceUI();
+    return false;
+  }
+}
+
+// 기존 안드로이드 브리지와 호환. 결과를 받은 순간에는 검색하지 않는다.
 window.__careNaviVoiceResult = function(text){
-  submitVoiceText(text);
+  if(!voiceNativeActive || voiceSubmitted) return;
+  voiceFinalText = String(text || "");
+  voiceInterimText = "";
+  showVoiceText(voiceFinalText);
 };
 
+// 네이티브 쪽에서 중간 결과를 전달하는 버전도 사용할 수 있도록 콜백을 제공한다.
+window.__careNaviVoicePartial = function(text){
+  if(!voiceNativeActive || voiceSubmitted) return;
+  voiceInterimText = String(text || "");
+  showVoiceText(voiceInterimText || voiceFinalText);
+};
+window.__careNaviVoiceInterim = window.__careNaviVoicePartial;
+
 window.__careNaviVoiceEnd = function(){
-  finishVoiceUI();
+  if(!voiceNativeActive || voiceSubmitted) return;
+  completeVoiceInput();
 };
 
 function startVoiceInput(event){
   if(event) event.preventDefault();
 
-  const isCareNaviApp = navigator.userAgent.indexOf("CareNaviApp") !== -1;
-
-  if(isCareNaviApp && window.AndroidVoice){
-    if(isRecording){
-      if(window.AndroidVoice.stopVoiceSearch){
+  // 두 번째 누름은 인식을 종료하고 지금까지 입력된 문장으로 검색한다.
+  if(isRecording){
+    if(voiceStopping) return;
+    voiceStopping = true;
+    if(voiceNativeActive){
+      if(window.AndroidVoice && window.AndroidVoice.stopVoiceSearch){
         window.AndroidVoice.stopVoiceSearch();
       }
-      finishVoiceUI();
-      return;
+      // 네이티브 종료 콜백에서 최종 결과를 받아 검색한다.
+    }else if(recognition){
+      recognition.stop();
     }
-
-    isRecording = true;
-    setVoiceButtonRecording(true);
-    playBeep("start");
-
-    const overlay = document.getElementById("voiceOverlay");
-    if(overlay){
-      overlay.style.display = "block";
-    }
-
-    window.AndroidVoice.startVoiceSearch();
     return;
   }
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const hasNativeVoice = navigator.userAgent.indexOf("CareNaviApp") !== -1 &&
+    window.AndroidVoice && window.AndroidVoice.startVoiceSearch;
 
-  if(!SpeechRecognition){
+  if(!SpeechRecognition && !hasNativeVoice){
     alert("이 브라우저는 음성인식을 지원하지 않습니다.");
     return;
   }
 
-  if(isRecording && recognition){
-    recognition.stop();
+  beginVoiceInput();
+
+  // 실시간 중간 결과를 지원하는 브라우저 음성인식을 우선 사용한다.
+  // 앱 WebView에서 지원하지 않으면 기존 AndroidVoice 연결로 돌아간다.
+  if(!SpeechRecognition){
+    startNativeVoiceInput();
     return;
   }
 
-  recognition = new SpeechRecognition();
-  recognition.lang = "ko-KR";
+  const currentSession = voiceSession;
+  const currentRecognition = new SpeechRecognition();
+  recognition = currentRecognition;
+  currentRecognition.lang = "ko-KR";
+  currentRecognition.interimResults = true;
+  currentRecognition.continuous = true;
 
-  recognition.onstart = function(){
-    isRecording = true;
-    setVoiceButtonRecording(true);
-    playBeep("start");
-
-    const overlay = document.getElementById("voiceOverlay");
-    if(overlay){
-      overlay.style.display = "block";
+  currentRecognition.onresult = function(e){
+    if(currentSession !== voiceSession || recognition !== currentRecognition || voiceSubmitted) return;
+    let finalText = "";
+    let interimText = "";
+    for(let i = 0; i < e.results.length; i++){
+      const result = e.results[i];
+      if(!result || !result[0]) continue;
+      if(result.isFinal){
+        finalText += result[0].transcript + " ";
+      }else{
+        interimText += result[0].transcript + " ";
+      }
     }
+    voiceFinalText = finalText.trim();
+    voiceInterimText = interimText.trim();
+    showVoiceText((voiceFinalText + " " + voiceInterimText).trim());
   };
 
-  recognition.onresult = function(e){
-    const transcript = e.results[0][0].transcript;
-    submitVoiceText(transcript);
+  currentRecognition.onerror = function(e){
+    if(currentSession !== voiceSession || recognition !== currentRecognition) return;
+    voiceError = e.error || "unknown";
   };
 
-  recognition.onend = function(){
-    finishVoiceUI();
+  currentRecognition.onend = function(){
+    if(currentSession !== voiceSession || recognition !== currentRecognition || voiceSubmitted) return;
+    // WebView에서 음성 서비스가 동작하지 않는 경우에만 기존 앱 브리지를 사용한다.
+    if(!voiceStopping && !voiceFinalText && !voiceInterimText &&
+       voiceError !== "no-speech" && voiceError !== "aborted" &&
+       hasNativeVoice && !voiceFallbackUsed){
+      startNativeVoiceInput();
+      return;
+    }
+    completeVoiceInput();
   };
 
-  recognition.start();
+  try{
+    currentRecognition.start();
+  }catch(e){
+    recognition = null;
+    if(!hasNativeVoice || !startNativeVoiceInput()) finishVoiceUI();
+  }
 }
 
 function openImage(){
