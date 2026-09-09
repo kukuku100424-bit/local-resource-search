@@ -11006,12 +11006,52 @@ function finishVoiceUI(){
 let voiceSession = 0;
 let voiceFinalText = "";
 let voiceInterimText = "";
+let voiceResultSegments = [];
 let voiceStartValue = "";
 let voiceSubmitted = false;
 let voiceStopping = false;
 let voiceNativeActive = false;
 let voiceFallbackUsed = false;
 let voiceError = "";
+
+// 인식 엔진이 같은 구절을 누적 결과와 중간 결과에 반복해서 넣어도 한 번만 표시한다.
+// 공백을 제외한 겹침을 비교하되, 실제 인식된 글자의 순서와 내용은 유지한다.
+function mergeVoiceSegments(base, addition){
+  base = String(base || "").trim();
+  addition = String(addition || "").trim();
+  if(!base) return addition;
+  if(!addition) return base;
+  const compactBase = base.replace(/\\s+/g, "");
+  const compactNext = addition.replace(/\\s+/g, "");
+  if(!compactNext) return base;
+  if(compactNext === compactBase) return addition;
+  if(compactNext.startsWith(compactBase)) return addition;
+  if(compactBase.startsWith(compactNext)) return base;
+
+  // 이전 문장의 끝과 새 결과의 시작이 겹치는 가장 긴 구절을 찾는다.
+  const limit = Math.min(compactBase.length, compactNext.length);
+  let overlap = 0;
+  for(let n = limit; n >= 2; n--){
+    if(compactBase.slice(-n) === compactNext.slice(0, n)){
+      overlap = n;
+      break;
+    }
+  }
+  if(!overlap) return base + " " + addition;
+  let consumed = 0;
+  let offset = 0;
+  while(offset < addition.length && consumed < overlap){
+    if(!/\\s/.test(addition[offset])) consumed++;
+    offset++;
+  }
+  const rest = addition.slice(offset);
+  if(!rest.trim()) return base;
+  return base + (/^\\s/.test(rest) ? "" : " ") + rest.trimEnd();
+}
+
+function getVoiceTranscript(){
+  return mergeVoiceSegments(voiceFinalText, voiceInterimText).trim();
+}
 
 function showVoiceText(text){
   if(!queryInput) return;
@@ -11024,6 +11064,7 @@ function beginVoiceInput(){
   voiceSession++;
   voiceFinalText = "";
   voiceInterimText = "";
+  voiceResultSegments = [];
   voiceStartValue = queryInput ? queryInput.value : "";
   voiceSubmitted = false;
   voiceStopping = false;
@@ -11065,7 +11106,7 @@ function submitVoiceText(transcript){
 
 function completeVoiceInput(){
   if(voiceSubmitted) return;
-  const text = (voiceFinalText + (voiceInterimText ? " " + voiceInterimText : "")).trim();
+  const text = getVoiceTranscript();
   voiceNativeActive = false;
   recognition = null;
   if(text){
@@ -11103,7 +11144,7 @@ window.__careNaviVoiceResult = function(text){
 window.__careNaviVoicePartial = function(text){
   if(!voiceNativeActive || voiceSubmitted) return;
   voiceInterimText = String(text || "");
-  showVoiceText(voiceInterimText || voiceFinalText);
+  showVoiceText(getVoiceTranscript());
 };
 window.__careNaviVoiceInterim = window.__careNaviVoicePartial;
 
@@ -11157,20 +11198,29 @@ function startVoiceInput(event){
 
   currentRecognition.onresult = function(e){
     if(currentSession !== voiceSession || recognition !== currentRecognition || voiceSubmitted) return;
-    let finalText = "";
-    let interimText = "";
+    // e.results는 누적 목록이다. 매 이벤트마다 더하지 않고 각 인덱스를 교체한다.
+    // 브라우저가 중간 결과를 수정하거나 최종 결과로 바꾸더라도 중복되지 않는다.
+    voiceResultSegments.length = e.results.length;
     for(let i = 0; i < e.results.length; i++){
       const result = e.results[i];
-      if(!result || !result[0]) continue;
-      if(result.isFinal){
-        finalText += result[0].transcript + " ";
+      voiceResultSegments[i] = {
+        text: result && result[0] ? String(result[0].transcript || "") : "",
+        isFinal: !!(result && result.isFinal)
+      };
+    }
+    let finalText = "";
+    let interimText = "";
+    for(const segment of voiceResultSegments){
+      if(!segment || !segment.text) continue;
+      if(segment.isFinal){
+        finalText = mergeVoiceSegments(finalText, segment.text);
       }else{
-        interimText += result[0].transcript + " ";
+        interimText = mergeVoiceSegments(interimText, segment.text);
       }
     }
-    voiceFinalText = finalText.trim();
-    voiceInterimText = interimText.trim();
-    showVoiceText((voiceFinalText + " " + voiceInterimText).trim());
+    voiceFinalText = finalText;
+    voiceInterimText = interimText;
+    showVoiceText(getVoiceTranscript());
   };
 
   currentRecognition.onerror = function(e){
