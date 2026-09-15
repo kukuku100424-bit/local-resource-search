@@ -4627,6 +4627,11 @@ def stats():
         pv_total, pv_today, daily_pv, top_pages = _compute_pv_stats()
         env_stats, env_total, env_chart_style = _compute_env_stats()
 
+    # 총 방문자수/오늘 방문자수는 일자별 방문자수 기준으로 표시
+    total_count = sum(row.get("count", 0) for row in daily_visits)
+    today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+    today_count = next((row.get("count", 0) for row in daily_visits if row.get("date") == today_kst), 0)
+
     chart_visits, chart_visits_max = _chart_data(daily_visits, 10)
     chart_pv, chart_pv_max = _chart_data(daily_pv)
     top_pages_max = max([r["count"] for r in top_pages], default=0)
