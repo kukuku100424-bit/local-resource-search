@@ -3734,6 +3734,23 @@ window.addEventListener('pageshow', function(e){
 def home():
     total, today = update_visitors()
 
+    # 홈 하단 방문자수도 관리자 페이지와 동일하게 일자별 방문자수 기준으로 표시
+    try:
+        if os.getenv("RENDER") is not None:
+            visit_res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/visit_daily_counts?select=visit_date,count",
+                headers=SUPABASE_HEADERS, timeout=5
+            )
+            visit_rows = visit_res.json() if visit_res.ok else []
+            total = sum(int(row.get("count", 0) or 0) for row in visit_rows)
+            today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
+            today = next(
+                (int(row.get("count", 0) or 0) for row in visit_rows if str(row.get("visit_date", "")) == today_kst),
+                0
+            )
+    except Exception:
+        pass
+
     notices = []
     try:
         if os.getenv("RENDER") is not None:
