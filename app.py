@@ -4649,6 +4649,29 @@ def stats():
     today_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
     today_count = next((row.get("count", 0) for row in daily_visits if row.get("date") == today_kst), 0)
 
+    # 접속 환경도 요약 통계의 총 방문자수를 기준으로 표시
+    # 환경별 집계에서 빠진 방문은 별도 항목을 만들지 않고 기타에 합산
+    if os.getenv("RENDER") is not None:
+        missing_env_count = total_count - env_total
+        if missing_env_count > 0:
+            for env_row in env_stats:
+                if env_row["env"] == "Other":
+                    env_row["count"] += missing_env_count
+                    break
+        env_total = total_count
+        start_angle = 0.0
+        segments = []
+        for env_row in env_stats:
+            env_count = env_row["count"]
+            env_row["percent"] = round(env_count / env_total * 100, 1) if env_total else 0
+            if env_total and env_count > 0:
+                end_angle = start_angle + env_count / env_total * 360
+                segments.append(
+                    f'{env_row["color"]} {start_angle:.2f}deg {end_angle:.2f}deg'
+                )
+                start_angle = end_angle
+        env_chart_style = ("conic-gradient(" + ", ".join(segments) + ")") if segments else "#e5e7eb"
+
     chart_visits, chart_visits_max = _chart_data(daily_visits, 10)
     chart_pv, chart_pv_max = _chart_data(daily_pv)
     top_pages_max = max([r["count"] for r in top_pages], default=0)
