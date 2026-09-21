@@ -998,9 +998,25 @@ def login():
         pw = request.form.get("password", "").strip()
 
         if USER_PASSWORD_HASH and check_password_hash(USER_PASSWORD_HASH, pw):
+            # 직전 로그인 실패가 있었다면 재시도 성공을 한 번만 기록합니다.
+            if session.pop("_user_login_diag_failed", False):
+                app.logger.error(
+                    "[CARE_LOGIN_DIAG] result=success_after_failure input_length=%d "
+                    "hash_configured=%s worker_pid=%d",
+                    len(pw), bool(USER_PASSWORD_HASH), os.getpid()
+                )
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
+            # 입력값/해시/IP/User-Agent는 기록하지 않고 실패 원인만 구분합니다.
+            reason = ("hash_not_configured" if not USER_PASSWORD_HASH else
+                      "empty_input" if not pw else "password_mismatch")
+            app.logger.error(
+                "[CARE_LOGIN_DIAG] result=failed reason=%s input_length=%d "
+                "hash_configured=%s worker_pid=%d",
+                reason, len(pw), bool(USER_PASSWORD_HASH), os.getpid()
+            )
+            session["_user_login_diag_failed"] = True
             # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
             return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
 
