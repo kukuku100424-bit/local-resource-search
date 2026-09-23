@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session, send_file, Response
 import pandas as pd
 import os
+import hashlib
 import re
 import json
 import time
@@ -655,6 +656,28 @@ input:focus{
   box-shadow:0 0 0 3px rgba(37,99,235,0.08);
 }
 
+/* 일반 사용자 로그인: 비밀번호 확인 버튼 (기본값은 숨김) */
+.login-pw-wrap{ position:relative; }
+.login-pw-wrap input{ padding-right:72px; }
+.login-pw-toggle{
+  position:absolute;
+  right:9px;
+  top:9px;
+  width:54px;
+  height:36px;
+  margin:0;
+  padding:0;
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  background:#f8fafc;
+  color:#374151;
+  box-shadow:none;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.login-pw-toggle:hover{ background:#f1f5f9; }
+
 button{
   width:100%;
   height:54px;
@@ -761,7 +784,10 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   {% endif %}
 
   <form method="post" class="form-area">
-    <input type="password" name="password" placeholder="비밀번호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="login-pw-wrap">
+      <input type="password" id="care-login-password" name="password" placeholder="비밀번호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button type="button" id="care-login-pw-toggle" class="login-pw-toggle" aria-label="비밀번호 보기" aria-pressed="false">보기</button>
+    </div>
     <button type="submit">로그인</button>
   </form>
 
@@ -787,6 +813,18 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 (function(){
   /* 로그인 페이지 진입 시 가이드투어 세션 dismiss 해제 → 재로그인하면 다시 보임 */
   try { sessionStorage.removeItem('careNaviTourSessionDismissed'); } catch(e){}
+
+  var pwInput = document.getElementById('care-login-password');
+  var pwToggle = document.getElementById('care-login-pw-toggle');
+  if(pwInput && pwToggle){
+    pwToggle.addEventListener('click', function(){
+      var show = pwInput.type === 'password';
+      pwInput.type = show ? 'text' : 'password';
+      pwToggle.textContent = show ? '숨기기' : '보기';
+      pwToggle.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 보기');
+      pwToggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+    });
+  }
 
   if(window.AndroidAppInfo){
     try{
@@ -991,20 +1029,48 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 # =========================
 # 로그인 라우트
 # =========================
+# 비밀번호 원문이나 검증용 값을 로그에 저장하지 않고, 직전 입력과 동일했는지만 비교합니다.
+# 비밀 키는 서버 프로세스 메모리에만 존재하고 재시작 시 교체됩니다.
+_LOGIN_DIAG_KEY = os.urandom(32)
+_LOGIN_DIAG_INSTANCE = os.urandom(8).hex()
+
+def _login_diag_input_tag(password):
+    return hashlib.blake2b(
+        password.encode("utf-8"), key=_LOGIN_DIAG_KEY, digest_size=16
+    ).hexdigest()
+
+def _login_diag_same_previous(password):
+    if (session.get("_user_login_diag_instance") != _LOGIN_DIAG_INSTANCE or
+            session.get("_user_login_diag_at", 0) < time.time() - 120 or
+            not session.get("_user_login_diag_tag")):
+        return "unknown"
+    current_tag = _login_diag_input_tag(password)
+    return "true" if secrets_compare_digest(
+        session["_user_login_diag_tag"], current_tag
+    ) else "false"
+
+from hmac import compare_digest as secrets_compare_digest
+
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         pw = request.form.get("password", "").strip()
+        # 문자열이 동일한지만 진단합니다. 원문/비밀번호 식별값은 로그에 남기지 않습니다.
+        same_as_previous = _login_diag_same_previous(pw)
 
         if USER_PASSWORD_HASH and check_password_hash(USER_PASSWORD_HASH, pw):
             # 직전 로그인 실패가 있었다면 재시도 성공을 한 번만 기록합니다.
             if session.pop("_user_login_diag_failed", False):
                 app.logger.error(
                     "[CARE_LOGIN_DIAG] result=success_after_failure input_length=%d "
-                    "hash_configured=%s worker_pid=%d",
-                    len(pw), bool(USER_PASSWORD_HASH), os.getpid()
+                    "hash_configured=%s worker_pid=%d same_input_as_previous=%s",
+                    len(pw), bool(USER_PASSWORD_HASH), os.getpid(), same_as_previous
                 )
+            # 세션의 이전 입력 비교값은 로그인 성공 시 즉시 폐기합니다.
+            session.pop("_user_login_diag_tag", None)
+            session.pop("_user_login_diag_instance", None)
+            session.pop("_user_login_diag_at", None)
             session["logged_in"] = True
             return redirect(url_for("home"))
         else:
@@ -1013,10 +1079,13 @@ def login():
                       "empty_input" if not pw else "password_mismatch")
             app.logger.error(
                 "[CARE_LOGIN_DIAG] result=failed reason=%s input_length=%d "
-                "hash_configured=%s worker_pid=%d",
-                reason, len(pw), bool(USER_PASSWORD_HASH), os.getpid()
+                "hash_configured=%s worker_pid=%d same_input_as_previous=%s",
+                reason, len(pw), bool(USER_PASSWORD_HASH), os.getpid(), same_as_previous
             )
             session["_user_login_diag_failed"] = True
+            session["_user_login_diag_tag"] = _login_diag_input_tag(pw)
+            session["_user_login_diag_instance"] = _LOGIN_DIAG_INSTANCE
+            session["_user_login_diag_at"] = time.time()
             # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
             return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
 
