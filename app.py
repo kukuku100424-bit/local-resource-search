@@ -673,17 +673,17 @@ input:focus{
   border:0;
   border-radius:8px;
   background:transparent;
-  color:#64748b;
+  color:#b0b9c6;
   box-shadow:none;
   cursor:pointer;
 }
 .login-pw-toggle:hover{ background:#f1f5f9; }
-.login-pw-toggle svg{ width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.login-pw-toggle svg{ width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
 .login-pw-toggle[aria-pressed="true"]::after{
   content:"";
   position:absolute;
   width:27px;
-  height:2px;
+  height:1.5px;
   background:currentColor;
   transform:rotate(-43deg);
   border-radius:2px;
