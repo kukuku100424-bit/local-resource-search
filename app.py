@@ -658,25 +658,37 @@ input:focus{
 
 /* 일반 사용자 로그인: 비밀번호 확인 버튼 (기본값은 숨김) */
 .login-pw-wrap{ position:relative; }
-.login-pw-wrap input{ padding-right:72px; }
+.login-pw-wrap input{ padding-right:58px; }
 .login-pw-toggle{
   position:absolute;
-  right:9px;
-  top:9px;
-  width:54px;
-  height:36px;
+  right:8px;
+  top:7px;
+  width:42px;
+  height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   margin:0;
   padding:0;
-  border:1px solid #d1d5db;
+  border:0;
   border-radius:8px;
-  background:#f8fafc;
-  color:#374151;
+  background:transparent;
+  color:#64748b;
   box-shadow:none;
-  font-size:12px;
-  font-weight:600;
   cursor:pointer;
 }
 .login-pw-toggle:hover{ background:#f1f5f9; }
+.login-pw-toggle svg{ width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.login-pw-toggle[aria-pressed="true"]::after{
+  content:"";
+  position:absolute;
+  width:27px;
+  height:2px;
+  background:currentColor;
+  transform:rotate(-43deg);
+  border-radius:2px;
+  box-shadow:0 -2px #fff;
+}
 
 button{
   width:100%;
@@ -786,7 +798,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   <form method="post" class="form-area">
     <div class="login-pw-wrap">
       <input type="password" id="care-login-password" name="password" placeholder="비밀번호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
-      <button type="button" id="care-login-pw-toggle" class="login-pw-toggle" aria-label="비밀번호 보기" aria-pressed="false">보기</button>
+      <button type="button" id="care-login-pw-toggle" class="login-pw-toggle" aria-label="비밀번호 보기" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
     <button type="submit">로그인</button>
   </form>
@@ -820,7 +832,6 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     pwToggle.addEventListener('click', function(){
       var show = pwInput.type === 'password';
       pwInput.type = show ? 'text' : 'password';
-      pwToggle.textContent = show ? '숨기기' : '보기';
       pwToggle.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 보기');
       pwToggle.setAttribute('aria-pressed', show ? 'true' : 'false');
     });
