@@ -794,6 +794,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   {% if error %}
     <div class="error-msg">❌ {{error}}</div>
   {% endif %}
+  <div id="care-login-error" class="error-msg" role="alert" style="display:none;"></div>
 
   <form method="post" class="form-area">
     <div class="login-pw-wrap">
@@ -828,6 +829,37 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
   var pwInput = document.getElementById('care-login-password');
   var pwToggle = document.getElementById('care-login-pw-toggle');
+  var loginForm = pwInput && pwInput.form;
+  var loginError = document.getElementById('care-login-error');
+  if(loginForm && loginError && window.fetch){
+    loginForm.addEventListener('submit', function(event){
+      event.preventDefault();
+      var submitButton = loginForm.querySelector('button[type="submit"]');
+      if(submitButton.disabled) return;
+      submitButton.disabled = true;
+      fetch(loginForm.action || window.location.href, {
+        method: 'POST',
+        headers: {'X-CareNavi-Async-Login': '1', 'Accept': 'application/json'},
+        body: new FormData(loginForm),
+        credentials: 'same-origin'
+      }).then(function(response){
+        return response.json();
+      }).then(function(data){
+        if(data.ok && data.redirect){
+          window.location.assign(data.redirect);
+          return;
+        }
+        loginError.textContent = '❌ ' + (data.error || '로그인에 실패했습니다.');
+        loginError.style.display = 'block';
+        // 입력창과 눈 아이콘의 상태를 유지해 사용자가 입력 내용을 확인할 수 있게 합니다.
+      }).catch(function(){
+        loginError.textContent = '❌ 연결 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+        loginError.style.display = 'block';
+      }).finally(function(){
+        submitButton.disabled = false;
+      });
+    });
+  }
   if(pwInput && pwToggle){
     pwToggle.addEventListener('click', function(){
       var show = pwInput.type === 'password';
@@ -1083,6 +1115,8 @@ def login():
             session.pop("_user_login_diag_instance", None)
             session.pop("_user_login_diag_at", None)
             session["logged_in"] = True
+            if request.headers.get("X-CareNavi-Async-Login") == "1":
+                return jsonify({"ok": True, "redirect": url_for("home")})
             return redirect(url_for("home"))
         else:
             # 입력값/해시/IP/User-Agent는 기록하지 않고 실패 원인만 구분합니다.
@@ -1097,6 +1131,8 @@ def login():
             session["_user_login_diag_tag"] = _login_diag_input_tag(pw)
             session["_user_login_diag_instance"] = _LOGIN_DIAG_INSTANCE
             session["_user_login_diag_at"] = time.time()
+            if request.headers.get("X-CareNavi-Async-Login") == "1":
+                return jsonify({"ok": False, "error": "비밀번호가 올바르지 않습니다."}), 401
             # ✅ alert 대신 페이지 내부 에러 문구로 표시 (주소 안 뜸)
             return render_template_string(LOGIN_HTML, error="비밀번호가 올바르지 않습니다.")
 
