@@ -13601,6 +13601,40 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
 button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+
+/* 치매 관련 약물 사진 보기: 기존 디자인과 격리 */
+/* 사전조사: 제목 표시줄의 버튼을 세로 중앙·오른쪽 정렬 */
+#panel-care #gt-dementia .section-header{display:flex;align-items:center;gap:6px;min-height:34px;padding-top:4px;padding-bottom:4px}
+#panel-care #gt-dementia .dementia-med-open{display:inline-flex;align-items:center;justify-content:center;margin:0 0 0 auto;padding:0 9px;height:25px;font-size:11px;line-height:1;white-space:nowrap;flex:0 0 auto;box-shadow:none}
+/* 모바일: 화면 오른쪽의 고정 점수 배너가 차지하는 영역을 비워 둠 */
+@media (max-width:600px){ #panel-care #gt-dementia .section-header{padding-right:106px;gap:4px}#panel-care #gt-dementia .dementia-med-open{height:24px;padding:0 7px;font-size:10px}}
+@media (max-width:380px){ #panel-care #gt-dementia .section-header{flex-wrap:wrap}}
+
+.dementia-med-open{margin-top:12px;border:1px solid #a5b4fc;background:#fff;color:#3730a3;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 2px 7px rgba(75,110,220,.09)}
+.dementia-med-open:hover{background:#eef2ff}
+.dementia-med-overlay{display:none;position:fixed;inset:0;z-index:12000;background:rgba(17,24,39,.60);padding:18px;overflow-y:auto;align-items:center;justify-content:center}
+.dementia-med-overlay.dementia-med-show{display:flex}
+.dementia-med-dialog{background:#fff;width:100%;max-width:650px;max-height:calc(100dvh - 36px);overflow-y:auto;padding:22px;border-radius:17px;box-shadow:0 16px 45px rgba(0,0,0,.2)}
+.dementia-med-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dementia-med-heading h3{margin:0;color:#2d3a6e;font-size:19px}
+.dementia-med-x{border:0;background:#f1f5f9;color:#475569;border-radius:8px;font-size:24px;line-height:1;width:34px;height:34px;cursor:pointer}
+.dementia-med-caption{color:#64748b;line-height:1.65;margin:12px 0;font-size:12px;word-break:keep-all;overflow-wrap:break-word}
+.dementia-med-note{display:flex;align-items:flex-start;gap:4px}
+.dementia-med-note-mark{flex:none}
+.dementia-med-note > span:last-child{min-width:0;word-break:keep-all;overflow-wrap:break-word}
+/* 모바일에서만 문장 사이 줄바꿈, 기존 ※ 들여쓰기 유지 */
+.dementia-med-mobile-break{display:none}
+@media(max-width:600px){.dementia-med-mobile-break{display:initial}}
+.dementia-med-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.dementia-med-item{border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center;min-width:0}
+.dementia-med-item b{display:block;font-size:13px;margin-bottom:8px;color:#334155}
+.dementia-med-item img{display:block;width:100%;height:155px;object-fit:contain;background:#fff}
+.dementia-med-item img[hidden]{display:none}
+.dementia-med-missing{display:block;padding:45px 5px;background:#f8fafc;color:#94a3b8;font-size:12px}
+.dementia-med-missing[hidden]{display:none}
+.dementia-med-close{border:0;background:#5b7ee5;border-radius:10px;color:white;font-size:14px;font-weight:700;width:100%;padding:12px;cursor:pointer}
+@media(max-width:520px){.dementia-med-dialog{padding:16px}.dementia-med-grid{grid-template-columns:1fr}.dementia-med-item img{height:180px}}
+@media print{.dementia-med-open,.dementia-med-overlay{display:none !important}}
 </style>
 </head>
 <body>
@@ -13642,7 +13676,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
       <form id="careForm">
         <div id="gt-dementia">
-        <div class="section-header">&#9632; 치매 관련 약 복용 여부</div>
+        <div class="section-header"><span>&#9632; 치매 관련 약 복용 여부</span><button type="button" class="dementia-med-open" onclick="openDementiaMedGuide()" aria-haspopup="dialog">&#128138; 치매약물</button></div>
         <div class="dementia-box">
           <b style="font-size:13.5px;display:block;margin-bottom:10px;">치매 관련 약을 복용 중이십니까?</b>
           <div class="dementia-options">
@@ -14087,6 +14121,25 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
   </div><!-- /form-card -->
 
+
+<!-- 치매약 사진 참고 팝업: 기존 조사 데이터/채점 로직과 별개 -->
+<div id="dementiaMedModal" class="dementia-med-overlay" role="dialog" aria-modal="true" aria-labelledby="dementiaMedTitle" aria-hidden="true" onclick="if(event.target===this) closeDementiaMedGuide()">
+  <div class="dementia-med-dialog">
+    <div class="dementia-med-heading">
+      <h3 id="dementiaMedTitle">치매 관련 약물 사진</h3>
+      <button type="button" class="dementia-med-x" onclick="closeDementiaMedGuide()" aria-label="닫기">&times;</button>
+    </div>
+    <div class="dementia-med-grid">
+      <div class="dementia-med-item"><b>도네페질 (Donepezil)</b><img src="/static/donepezil.jpg" alt="도네페질 약물 참고 사진" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="dementia-med-missing" hidden>사진을 추가하면 여기에 표시됩니다.</span></div>
+      <div class="dementia-med-item"><b>갈란타민 (Galantamine)</b><img src="/static/galantamine.jpg" alt="갈란타민 약물 참고 사진" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="dementia-med-missing" hidden>사진을 추가하면 여기에 표시됩니다.</span></div>
+      <div class="dementia-med-item"><b>리바스티그민 (Rivastigmine)</b><img src="/static/rivastigmine.jpg" alt="리바스티그민 약물 참고 사진" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="dementia-med-missing" hidden>사진을 추가하면 여기에 표시됩니다.</span></div>
+      <div class="dementia-med-item"><b>메만틴 (Memantine)</b><img src="/static/memantine.jpg" alt="메만틴 약물 참고 사진" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="dementia-med-missing" hidden>사진을 추가하면 여기에 표시됩니다.</span></div>
+    </div>
+    <p class="dementia-med-caption dementia-med-note"><span class="dementia-med-note-mark">※</span><span>약의 모양은 제조사와 용량에 따라 다를 수 있습니다.</p>
+    <button type="button" class="dementia-med-close" onclick="closeDementiaMedGuide()">닫기</button>
+  </div>
+</div>
+
 <!-- 사전조사 결과 모달 -->
 <div id="careResultModal" class="care-modal-overlay">
   <div class="care-modal-box">
@@ -14114,6 +14167,27 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 </div><!-- /page-wrap -->
 
 <script>
+
+/* 복약 참고 사진 전용: 설문 선택/채점/저장과 무관 */
+function openDementiaMedGuide(){
+  var modal=document.getElementById('dementiaMedModal');
+  if(!modal) return;
+  modal.classList.add('dementia-med-show');
+  modal.setAttribute('aria-hidden','false');
+  document.body.dataset.dementiaMedPrevOverflow=document.body.style.overflow;
+  document.body.style.overflow='hidden';
+  var btn=modal.querySelector('.dementia-med-x');if(btn)btn.focus();
+}
+function closeDementiaMedGuide(){
+  var modal=document.getElementById('dementiaMedModal');
+  if(!modal)return;
+  modal.classList.remove('dementia-med-show');
+  modal.setAttribute('aria-hidden','true');
+  document.body.style.overflow=document.body.dataset.dementiaMedPrevOverflow||'';
+  var btn=document.querySelector('.dementia-med-open');if(btn)btn.focus();
+}
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&document.getElementById('dementiaMedModal')?.classList.contains('dementia-med-show'))closeDementiaMedGuide()});
+
 var currentTab = 'care';
 var SURVEY_STORAGE_KEY = 'survey_form_state';
 
