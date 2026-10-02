@@ -9441,9 +9441,35 @@ button:hover{
 
 @media (max-width:768px){
   #queryInput::placeholder{
-    white-space:pre-wrap;
+    color:transparent;
+  }
+  .textarea-wrap{
+    position:relative;
+  }
+  .mobile-query-placeholder{
+    position:absolute;
+    left:14px;
+    top:14px;
+    display:grid;
+    grid-template-columns:max-content 1fr;
+    grid-auto-rows:auto;
+    column-gap:0;
     color:#6b7280;
+    font-size:15px;
     line-height:1.7;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .mobile-query-placeholder .ph-empty{
+    visibility:hidden;
+  }
+  #queryInput:not(:placeholder-shown) + .mobile-query-placeholder{
+    display:none;
+  }
+}
+@media (min-width:769px){
+  .mobile-query-placeholder{
+    display:none;
   }
 }
 
@@ -10666,8 +10692,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 <div class="textarea-wrap">
 
-<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;   어르신에게 맞는 서비스">{{query}}</textarea>
-
+<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
+<div class="mobile-query-placeholder" aria-hidden="true">
+  <span>예)&nbsp;</span><span>식사도움이 필요한</span>
+  <span class="ph-empty">예)&nbsp;</span><span>어르신에게 맞는 서비스</span>
+</div>
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
 style="
