@@ -6473,6 +6473,11 @@ def combo():
                 "label": f"{row.get('프로그램명(사업명)','')} ({row.get('서비스제공기관명','')})"
             })
 
+        # 각 지역/관리주체 안의 자원 목록을 프로그램명 기준 가나다 오름차순 정렬
+        for manager_groups in results.values():
+            for items in manager_groups.values():
+                items.sort(key=lambda item: item["label"])
+
         sorted_managers_by_region = {}
         for rk, mgrs in results.items():
             sorted_managers_by_region[rk] = sorted(
@@ -10661,7 +10666,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 <div class="textarea-wrap">
 
-<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;    어르신에게 맞는 서비스">{{query}}</textarea>
+<textarea id="queryInput" name="query" maxlength="2000" placeholder="예) 식사도움이 필요한&#10;   어르신에게 맞는 서비스">{{query}}</textarea>
 
 
 <button type="button" id="voiceBtn" onclick="startVoiceInput(event)"
