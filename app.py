@@ -11463,13 +11463,59 @@ function openImage(){
   document.getElementById("imgInput").click();
 }
 
+/* 카메라 원본 사진이 클 때 모바일/서버 메모리 부담을 줄이기 위해 OCR 전송본만 축소·압축 */
+async function prepareOcrImage(file){
+  const COMPRESS_MIN_BYTES = 1.5 * 1024 * 1024;
+  const OCR_IMAGE_WIDTH = 1600;
+  const OCR_JPEG_QUALITY = 0.80;
+
+  if(!file || file.size <= COMPRESS_MIN_BYTES || typeof createImageBitmap !== "function"){
+    return file;
+  }
+
+  let bitmap = null;
+  try{
+    bitmap = await createImageBitmap(file, {
+      resizeWidth: OCR_IMAGE_WIDTH,
+      resizeQuality: "high"
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+
+    const ctx = canvas.getContext("2d", {alpha:false});
+    if(!ctx){
+      if(bitmap.close) bitmap.close();
+      return file;
+    }
+
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    if(bitmap.close) bitmap.close();
+    bitmap = null;
+
+    const blob = await new Promise(function(resolve){
+      canvas.toBlob(resolve, "image/jpeg", OCR_JPEG_QUALITY);
+    });
+
+    canvas.width = 1;
+    canvas.height = 1;
+
+    return (blob && blob.size > 0) ? blob : file;
+  }catch(e){
+    if(bitmap && bitmap.close) bitmap.close();
+    return file;
+  }
+}
+
 document.getElementById("imgInput").addEventListener("change", async function(){
   const file = this.files[0];
   if(!file) return;
 
+  const uploadImage = await prepareOcrImage(file);
 
   const formData = new FormData();
-  formData.append("image", file);
+  formData.append("image", uploadImage, uploadImage === file ? file.name : "camera_ocr.jpg");
   formData.append("ocr_privacy_confirmed", "yes");
 
   if(loading){
