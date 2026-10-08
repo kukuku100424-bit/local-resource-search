@@ -7737,10 +7737,20 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
 - 환경·건강·위생·낙상·영양 문제를 조사자 또는 시스템이 필요하다고 판단한 경우
 - 벌레·주거 문제 등으로 방역소독이 추천되더라도 사용자가 직접 원한다고 표현하지 않은 경우
 
+[명시적 서비스 거부 판별 — 기존 AI 호출에서 함께 수행]
+- 반드시 아래 '사용자 원문'만을 기준으로 서비스 거부/불필요를 판단한다. 검색어 보강 표현은 거부 여부 판단에 사용하지 않는다.
+- '방문목욕을 원하지 않음', '식사도움을 희망하지 않음', '이용할 생각이 없음'처럼 명시적으로 거부한 서비스만 제외한다.
+- '혼자 목욕하지 못함', '식사를 못함'은 수행능력 부족이지 서비스 거부가 아니다.
+- '예전에는 원하지 않았지만 지금은 필요함'은 현재 거부가 아니다.
+- 거부한 서비스와 독립적인 다른 서비스는 제외하지 않는다. 방문목욕 거부만으로 목욕의자·안전손잡이를 제외하지 않는다.
+- 'declined_indices'는 아래 서비스 목록에서 명시적으로 거부한 서비스의 index만 담는다. 같은 중분류 전체를 명시적으로 거부했다면 그 중분류에 속하는 index를 모두 담는다. 애매하면 넣지 않는다.
+- 'results'에는 declined_indices의 서비스를 추천하지 않는다.
+
 설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
 
 출력 형식:
 {{
+  "declined_indices": [],
   "results": [
     {{
       "index": 12,
@@ -7753,7 +7763,10 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
 서비스 목록:
 {service_text}
 
-사용자 사례:
+사용자 원문 (거부 판별은 이 원문만 사용):
+{query}
+
+검색용 보강 문장 (서비스 추천에만 참고):
 {query_for_ai}
 """
         try:
@@ -7780,6 +7793,22 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     parsed = json.loads(match.group())
                 else:
                     parsed = {"results": []}
+
+            # 기존 AI 응답에 포함된 거부 서비스 인덱스만 재사용 (추가 AI 호출 없음).
+            declined_indices = set()
+            for value in parsed.get("declined_indices", []):
+                try:
+                    index = int(value)
+                    if 0 <= index < len(service_df):
+                        declined_indices.add(index)
+                except (ValueError, TypeError):
+                    pass
+            declined_keys = set()
+            for index in declined_indices:
+                row = service_df.iloc[index]
+                declined_keys.add((str(row.get("대분류", "")).strip(),
+                                   str(row.get("중분류", "")).strip(),
+                                   str(row.get("서비스내용", "")).strip()))
 
             raw_results = parsed.get("results", [])[:50]
 
@@ -8227,6 +8256,13 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                     )
                 ]
 
+            # 수기 추천/보정 이후 마지막에 같은 AI 판별 결과만 적용한다.
+            # 새로운 AI 호출이나 추가 추론은 수행하지 않는다.
+            final_results = [item for item in final_results if (
+                str(item.get("대분류", "")).strip(),
+                str(item.get("중분류", "")).strip(),
+                str(item.get("서비스내용", "")).strip()
+            ) not in declined_keys]
             filtered_results = final_results
 
 
