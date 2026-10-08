@@ -7326,6 +7326,22 @@ def build_family_leave_cards(query, selected_sido, selected_sigungu):
             })
     return cards
 
+
+def apply_common_decline_filter(query, service_results, family_leave_cards,
+                                declined_keys=None, declined_special_cards=None):
+    """AI 1회 판별값을 일반 추천/별도 카드에 공통 적용 (추가 AI 호출 없음)."""
+    declined_keys = declined_keys or set()
+    declined_special_cards = set(declined_special_cards or [])
+    services = [item for item in service_results if (
+        str(item.get("대분류", "")).strip(),
+        str(item.get("중분류", "")).strip(),
+        str(item.get("서비스내용", "")).strip()
+    ) not in declined_keys]
+    # 특수 카드는 일반 서비스 인덱스가 없으므로 카드 ID로 판별한다.
+    hide_family = "family_leave" in declined_special_cards
+    cards = [] if hide_family else list(family_leave_cards)
+    return services, cards
+
 @app.route("/desc", methods=["GET","POST"])
 def desc():
     query = (request.values.get("query", "") or "").strip()
@@ -7334,6 +7350,9 @@ def desc():
     cond_display = None
     count = 0
     service_results = []
+    family_cards = []
+    declined_keys = set()
+    declined_special_cards = set()
     warning_msg = ""
     action = (request.values.get("action", "") or "").strip()
 
@@ -7409,6 +7428,12 @@ def desc():
 
             if time.time() - cached["time"] < 600:
                 service_results = cached["results"]
+                service_results, family_cards = apply_common_decline_filter(
+                    query, service_results,
+                    build_family_leave_cards(query, selected_sido, selected_sigungu),
+                    set(tuple(k) for k in cached.get("declined_keys", [])),
+                    cached.get("declined_special_cards", []),
+                )
                 count = len(service_results)
                 warning_msg = cached["warning"]
 
@@ -7421,7 +7446,7 @@ def desc():
                     count=count,
                     service_results=service_results,
                                  grouped_service_results=build_grouped_service_results(service_results),
-                    family_leave_cards=build_family_leave_cards(query, selected_sido, selected_sigungu),
+                    family_leave_cards=family_cards,
                     warning_msg=warning_msg,
                     selected_sido=selected_sido,
                     selected_sigungu=selected_sigungu,
@@ -7745,12 +7770,15 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
 - 거부한 서비스와 독립적인 다른 서비스는 제외하지 않는다. 방문목욕 거부만으로 목욕의자·안전손잡이를 제외하지 않는다.
 - 'declined_indices'는 아래 서비스 목록에서 명시적으로 거부한 서비스의 index만 담는다. 같은 중분류 전체를 명시적으로 거부했다면 그 중분류에 속하는 index를 모두 담는다. 애매하면 넣지 않는다.
 - 'results'에는 declined_indices의 서비스를 추천하지 않는다.
+- 가족휴가제처럼 일반 서비스 목록과 별도로 표시되는 카드도 사용자 원문에서 명시적으로 거부하면 'declined_special_cards'에 "family_leave"를 담는다. 치매/보호자 부재로 카드가 자동 생성될 상황도 포함한다.
+- 가족휴가제에 대한 거부가 아닌 다른 서비스의 거부는 "family_leave"에 넣지 않는다.
 
 설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
 
 출력 형식:
 {{
   "declined_indices": [],
+  "declined_special_cards": [],
   "results": [
     {{
       "index": 12,
@@ -7809,6 +7837,13 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                 declined_keys.add((str(row.get("대분류", "")).strip(),
                                    str(row.get("중분류", "")).strip(),
                                    str(row.get("서비스내용", "")).strip()))
+
+            declined_special_cards = set()
+            if isinstance(parsed.get("declined_special_cards"), list):
+                declined_special_cards = {
+                    v for v in parsed["declined_special_cards"]
+                    if isinstance(v, str) and v == "family_leave"
+                }
 
             raw_results = parsed.get("results", [])[:50]
 
@@ -8325,10 +8360,19 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                 warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 구체적으로 입력해 주세요."
                 count = 0
 
+        # 검색 경로와 별도 특수 카드 모두 동일한 AI 거부 판별을 사용한다.
+        service_results, family_cards = apply_common_decline_filter(
+            query, service_results,
+            build_family_leave_cards(query, selected_sido, selected_sigungu),
+            declined_keys, declined_special_cards,
+        )
+        count = len(service_results)
         DESC_CACHE[cache_key] = {
             "results": service_results,
             "warning": warning_msg,
-            "time": time.time()
+            "time": time.time(),
+            "declined_keys": [list(k) for k in declined_keys],
+            "declined_special_cards": sorted(declined_special_cards),
         }
         trim_desc_cache()
 
@@ -8348,7 +8392,7 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
         count=count,
         service_results=service_results,
              grouped_service_results=build_grouped_service_results(service_results),
-        family_leave_cards=build_family_leave_cards(query, selected_sido, selected_sigungu) if do_search else [],
+        family_leave_cards=family_cards if do_search else [],
         warning_msg=warning_msg,
         selected_sido=selected_sido,
         selected_sigungu=selected_sigungu,
