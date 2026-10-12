@@ -6845,8 +6845,8 @@ function renderCareDetail(elementId, value){
     const content = document.createElement("span");
     content.className = "care-detail-text";
     // 독립된 목록 기호만 화면에서 통일. 숫자, 금액, 본문 내 기호는 그대로 둔다.
-    const match = raw.match(/^\\s*([-–—•●○▪■▶▷►▸·*])\\s+(.*)$/);
-    const caution = raw.match(/^\\s*(※)\\s*(.*)$/);
+    const match = raw.match(/^\s*([-–—•●○▪■▶▷►▸·*])\s+(.*)$/);
+    const caution = raw.match(/^\s*(※)\s*(.*)$/);
     if(caution){
       line.classList.add("care-detail-note");
       marker.textContent = "※";
@@ -6856,7 +6856,7 @@ function renderCareDetail(elementId, value){
     } else {
       marker.style.visibility = "hidden";
       content.textContent = raw.trim();
-      if(/^[\\[【(（][^\\]】)）]{1,28}[\\]】)）]\\s*[:：]?$/.test(raw.trim())){
+      if(/^[\[【(（].{1,28}[\]】)）]\s*[:：]?$/.test(raw.trim())){
         line.classList.add("care-detail-heading");
       }
     }
