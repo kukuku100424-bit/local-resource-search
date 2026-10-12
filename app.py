@@ -6598,14 +6598,6 @@ label.field-label:first-of-type{ margin-top:8px; }
 .m-acc-ico{ flex:none; transition:transform .15s; color:#9aa1b0; }
 .m-acc-btn.open .m-acc-ico{ transform:rotate(180deg); color:#5b7ee5; }
 .m-acc-body{ display:none; margin-top:8px; padding:9px 12px; border:1px solid #e3e7ef; border-radius:8px; background:#fafbfc; font-size:13px; line-height:1.6; color:#333; word-break:keep-all; }
-/* 기관 상세 팝업의 대상·주요내용·서비스단가 표시만 정돈 */
-.m-acc-body .care-detail-line{ display:flex; align-items:flex-start; gap:8px; margin:5px 0; line-height:1.7; }
-.m-acc-body .care-detail-bullet{ flex:0 0 5px; width:5px; height:5px; margin-top:9px; border-radius:50%; background:#8292ae; }
-.m-acc-body .care-detail-text{ flex:1; min-width:0; overflow-wrap:anywhere; white-space:pre-wrap; }
-.m-acc-body .care-detail-note .care-detail-bullet{ flex-basis:auto; width:auto; height:auto; margin-top:0; background:none; color:#a36c25; font-weight:700; }
-.m-acc-body .care-detail-heading{ font-weight:700; color:#283850; }
-.m-acc-body .care-detail-gap{ height:7px; }
-
 .modal-btn{ margin-top:14px; width:100%; height:44px; border:none; border-radius:10px; background:#5b7ee5; color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
 .modal-btn:hover{ background:#4a6cd4; }
 
@@ -6825,46 +6817,6 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 </div>
 
 <script>
-// 엑셀 원문은 변경하지 않고, 상세 팝업에서만 목록 기호와 들여쓰기를 통일한다.
-function renderCareDetail(elementId, value){
-  const root = document.getElementById(elementId);
-  root.replaceChildren();
-  const lines = String(value || "").replace(/\r\n?/g, "\n").split("\n");
-  lines.forEach(function(raw){
-    if(!raw.trim()){
-      const gap = document.createElement("div");
-      gap.className = "care-detail-gap";
-      root.appendChild(gap);
-      return;
-    }
-    const line = document.createElement("div");
-    line.className = "care-detail-line";
-    const marker = document.createElement("span");
-    marker.className = "care-detail-bullet";
-    marker.setAttribute("aria-hidden", "true");
-    const content = document.createElement("span");
-    content.className = "care-detail-text";
-    // 독립된 목록 기호만 화면에서 통일. 숫자, 금액, 본문 내 기호는 그대로 둔다.
-    const match = raw.match(/^\s*([-–—•●○▪■▶▷►▸·*])\s+(.*)$/);
-    const caution = raw.match(/^\s*(※)\s*(.*)$/);
-    if(caution){
-      line.classList.add("care-detail-note");
-      marker.textContent = "※";
-      content.textContent = caution[2];
-    } else if(match){
-      content.textContent = match[2];
-    } else {
-      marker.style.visibility = "hidden";
-      content.textContent = raw.trim();
-      if(/^[\[【(（].{1,28}[\]】)）]\s*[:：]?$/.test(raw.trim())){
-        line.classList.add("care-detail-heading");
-      }
-    }
-    line.appendChild(marker);
-    line.appendChild(content);
-    root.appendChild(line);
-  });
-}
 function openDetail(idx){
   fetch("/detail/" + idx)
     .then(r => r.json())
@@ -6881,9 +6833,9 @@ function openDetail(idx){
       const content = d["주요내용"] || "";
       const target = d["대상"] || "";
 
-      renderCareDetail("m_price", price);
-      renderCareDetail("m_content", content);
-      renderCareDetail("m_target", target);
+      document.getElementById("m_price").innerText = price;
+      document.getElementById("m_content").innerText = content;
+      document.getElementById("m_target").innerText = target;
 
       priceRow.style.display = price ? "flex" : "none";
       contentRow.style.display = content ? "flex" : "none";
