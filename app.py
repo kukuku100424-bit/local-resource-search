@@ -4550,6 +4550,8 @@ app.jinja_env.filters['kst'] = _kst_datetime_str
 import re as _re_pii
 _PII_PATTERNS = [
     r'[\w.+-]+@[\w-]+\.[\w.-]+',              # 이메일
+    r'(?<!\d)(?:19|20)\d{2}[-./년\s]+(?:0?[1-9]|1[0-2])[-./월\s]+(?:0?[1-9]|[12]\d|3[01])일?(?!\d)',  # 생년월일(구분자 포함)
+    r'(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?!\d)',  # 생년월일(8자리)
     r'\d{6}\s*-\s*\d{7}',                     # 주민등록번호
     r'01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}',  # 휴대폰
     r'\d{2,3}[-\s.]\d{3,4}[-\s.]\d{4}',       # 일반전화
@@ -11817,6 +11819,7 @@ window.addEventListener("load", function(){
     <div style="font-size:38px;line-height:1;margin-bottom:12px;">🔒</div>
     <div style="font-size:18px;font-weight:800;color:#111827;margin-bottom:10px;">개인정보가 감지되었습니다</div>
     <div style="font-size:14px;color:#4b5563;line-height:1.65;">전화번호 · 주민등록번호 · 이메일 등<br>개인정보가 포함되어 <b>검색이 차단</b>되었습니다.<br>해당 정보를 지우고 다시 검색해 주세요.</div>
+    <div id="piiDetectedPart" style="display:none;margin-top:12px;padding:10px;background:#f3f4f6;border-radius:8px;font-size:13px;color:#374151;overflow-wrap:anywhere;"></div>
     <button type="button" onclick="closePiiModal()" style="margin-top:20px;width:100%;padding:13px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">확인</button>
   </div>
 </div>
@@ -11825,16 +11828,37 @@ window.addEventListener("load", function(){
 (function(){
   var PII = [
     /[\\w.+-]+@[\\w-]+\\.[\\w.-]+/,
+    /(?:^|[^\\d])(?:19|20)\\d{2}[-./년\\s]+(?:0?[1-9]|1[0-2])[-./월\\s]+(?:0?[1-9]|[12]\\d|3[01])일?(?!\\d)/,
+    /(?:^|[^\\d])(?:19|20)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])(?!\\d)/,
     /\\d{6}\\s*-\\s*\\d{7}/,
     /01[016789][-\\s.]?\\d{3,4}[-\\s.]?\\d{4}/,
     /\\d{2,3}[-\\s.]\\d{3,4}[-\\s.]\\d{4}/
   ];
+  var piiTypes = ["이메일", "생년월일", "생년월일", "주민등록번호", "휴대전화번호", "전화번호"];
   window.__hasPII = function(t){
     if(!t) return false;
     for(var i=0;i<PII.length;i++){ if(PII[i].test(t)) return true; }
     return false;
   };
+  window.__showPiiDetectedPart = function(t){
+    var el = document.getElementById("piiDetectedPart");
+    if(!el) return;
+    var matches = [];
+    for(var i=0;i<PII.length;i++){
+      var match = PII[i].exec(t || "");
+      if(match){
+        var value = match[0].trim();
+        // 탐지된 원문은 팝업에 다시 노출하지 않고 유형과 마스킹된 값만 표시
+        var masked = value.length <= 4 ? "****" : value.slice(0,2) + "***" + value.slice(-2);
+        matches.push(piiTypes[i] + " (" + masked + ")");
+      }
+    }
+    el.textContent = matches.length ? "차단된 부분: " + matches.join(", ") : "";
+    el.style.display = matches.length ? "block" : "none";
+  };
   window.openPiiModal = function(){
+    var q = document.querySelector('textarea[name="query"], input[name="query"]');
+    if(window.__showPiiDetectedPart) window.__showPiiDetectedPart(q ? q.value : "");
     var m = document.getElementById("piiModal");
     if(m){ m.style.display = "flex"; }
   };
