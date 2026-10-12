@@ -334,10 +334,15 @@ def require_login_all_pages():
         or request.path == "/admin"
         or request.path == "/privacy"
         or request.path == "/app-version.json"
+        or request.path == "/feedback"
         or request.path.startswith("/static")
     ):
         return None
 
+    if request.path.startswith("/admin/feedback"):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return None
     if request.path.startswith("/admin/maintenance"):
         if not session.get("is_admin"):
             return redirect(url_for("admin_login"))
@@ -2908,6 +2913,12 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
           </div>
           <span class="fab-item-label">의견보내기</span>
         </div>
+        {% if feedback_active %}
+        <div id="fabItem_feedback" class="fab-item" role="link" tabindex="0">
+          <div class="fab-item-btn" style="position:relative;">✎<span class="fab-item-dot"></span></div>
+          <span class="fab-item-label">설문조사</span>
+        </div>
+        {% endif %}
         <div id="fabItem_apk" class="fab-item">
           <div class="fab-item-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
@@ -2921,7 +2932,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
         </div>
       </div>
       <div id="fabMain">
-        {% if notices %}<span id="fabMainDot" class="fab-main-dot"></span>{% endif %}
+        {% if notices or feedback_active %}<span id="fabMainDot" class="fab-main-dot"></span>{% endif %}
         <svg id="fabIconPlus" xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 24 24">
           <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
         </svg>
@@ -3439,6 +3450,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   var fabItemNotice = document.getElementById("fabItem_notice");
   var fabItemRep    = document.getElementById("fabItem_report");
   var fabItemApk    = document.getElementById("fabItem_apk");
+  var fabItemFeedback = document.getElementById("fabItem_feedback");
   var fabIconPlus   = document.getElementById("fabIconPlus");
   var fabIconClose  = document.getElementById("fabIconClose");
   var singleBtn     = document.getElementById("singleReportBtn");
@@ -3453,6 +3465,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
   // 열렸을 때 보여줄 항목 (공지/의견은 항상, 앱다운은 조건부)
   var activeItems = [fabItemNotice, fabItemRep];
+  if(fabItemFeedback) activeItems.push(fabItemFeedback);
   if(showApk) activeItems.push(fabItemApk);
 
   function openFab(){
@@ -3492,6 +3505,10 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       location.href = "/board/write";
     });
   }
+  if(fabItemFeedback){
+    fabItemFeedback.addEventListener("click", function(e){ e.stopPropagation(); location.href="/feedback"; });
+    fabItemFeedback.addEventListener("keydown", function(e){ if(e.key==="Enter") location.href="/feedback"; });
+  }
   if(fabItemApk){
     fabItemApk.addEventListener("click", function(e){
       e.stopPropagation();
@@ -3510,7 +3527,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   function hideDots(){
     var d1 = document.getElementById("fabMainDot");
     var d2 = document.querySelector("#fabItem_notice .fab-item-dot");
-    if(d1) d1.style.display = "none";
+    if(d1 && !{{ feedback_active|tojson }}) d1.style.display = "none";
     if(d2) d2.style.display = "none";
   }
   // 이미 본 최신 공지면 점 숨김
@@ -3905,7 +3922,7 @@ def home():
             or n0.get("created_datetime")
             or ""
         )
-    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key)
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key, feedback_active=_feedback_active())
 
 STATS_HTML = """
 <!DOCTYPE html>
@@ -4276,6 +4293,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <div class="top-right-menu">
       <a href="/board/admin" class="home-button">의견확인</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
+      <a href="/admin/feedback" class="home-button">설문 관리</a>
       <a href="/stats/export/xlsx/케어내비_통계.xlsx" class="home-button">엑셀받기</a>
       <a href="/admin/maintenance" class="home-button maint-btn">점검모드</a>
     </div>
@@ -15279,6 +15297,148 @@ def app_version():
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어내비 새 버전이 있습니다. 업데이트해 주세요."
     }
+
+
+# ===== 케어내비 기간제 설문조사 (독립 기능) =====
+from flask import abort
+from datetime import date as _feedback_date
+
+_FEEDBACK_QUESTIONS = [
+    ("이용 빈도", ["거의 매일", "주 1~2회", "월 1~2회", "처음 이용"]),
+    ("복지서비스 검색에 도움이 되었습니까?", ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"]),
+    ("업무 시간이 단축되었다고 생각하십니까?", ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"]),
+    ("기존 방식보다 서비스 검색이 편리해졌습니까?", ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"]),
+]
+_FEEDBACK_REGIONS = ["전남광주통합특별시", "전북특별자치도", "제주특별자치도"]
+
+def _feedback_get(path):
+    r = requests.get(f"{SUPABASE_URL}/rest/v1/{path}", headers=SUPABASE_HEADERS, timeout=8)
+    r.raise_for_status()
+    return r.json()
+
+def _feedback_config():
+    try:
+        rows = _feedback_get("feedback_campaigns?select=*&order=id.desc&limit=1")
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+def _feedback_active(config=None):
+    c = config if config is not None else _feedback_config()
+    if not c or not c.get("enabled"):
+        return False
+    today = datetime.datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
+    return bool(c.get("start_date") and c.get("end_date") and c["start_date"] <= today <= c["end_date"])
+
+_FEEDBACK_CSS = """<meta name='viewport' content='width=device-width,initial-scale=1'><style>
+*{box-sizing:border-box}body{font-family:Arial,'Malgun Gothic',sans-serif;background:#e8ecf4;color:#172033;margin:0;padding:22px 12px}
+main{max-width:640px;margin:auto;background:white;border-radius:18px;padding:26px;box-shadow:0 8px 26px #15223818}
+h1{font-size:23px}fieldset{border:0;border-top:1px solid #e5e7eb;padding:20px 0;margin:0}legend{font-weight:700;padding-top:12px}label{display:block;padding:7px 0;font-size:15px}
+input[type=tel],input[type=date],textarea{width:100%;border:1px solid #ccd2db;border-radius:8px;padding:12px;font-size:16px}textarea{min-height:90px}button,.btn{display:inline-block;background:#2563eb;color:white;padding:13px 20px;border:0;border-radius:9px;text-decoration:none;font-size:15px;cursor:pointer}
+small{color:#64748b;line-height:1.7}.err{color:#b91c1c}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #ddd;padding:9px;text-align:left}a{color:#2563eb}
+</style>"""
+
+_FEEDBACK_FORM = """<!doctype html><html lang='ko'><head><meta charset='utf-8'>""" + _FEEDBACK_CSS + """<title>케어내비 설문조사</title></head><body><main>
+<h1>케어내비 설문조사</h1><p>서비스 개선을 위한 설문입니다. 응답자 접속기록은 설문 데이터에 저장하지 않습니다.</p>
+{% if error %}<p class='err'>{{error}}</p>{% endif %}
+<form method='post' action='/feedback'>
+<fieldset><legend>소속 기관 (필수)</legend>{% for v in ['지자체','공단'] %}<label><input type='radio' name='organization' value='{{v}}' required> {{v}}</label>{% endfor %}</fieldset>
+<fieldset><legend>근무 지역 (필수)</legend>{% for v in regions %}<label><input type='radio' name='region' value='{{v}}' required> {{v}}</label>{% endfor %}</fieldset>
+{% for q,opts in questions %}<fieldset><legend>{{loop.index}}. {{q}}</legend>{% set idx=loop.index %}{% for opt in opts %}<label><input type='radio' name='q{{idx}}' value='{{opt}}' required> {{opt}}</label>{% endfor %}</fieldset>{% endfor %}
+<fieldset><legend>5. 개선이 필요한 점이나 기타 의견이 있으시면 자유롭게 작성해 주세요. (선택)</legend><textarea name='opinion' maxlength='1000' placeholder='기타 의견'></textarea></fieldset>
+<fieldset><legend>상품 지급용 연락처 (선택)</legend><input type='tel' name='phone' maxlength='13' placeholder='010-0000-0000'><small>연락처를 입력하는 경우에만 아래 동의가 필요합니다. 연락처는 상품 지급 목적에 한해 별도 보관하고 지급 완료 후 30일 이내 삭제합니다. 동의하지 않아도 설문에 참여할 수 있습니다.</small><label><input type='checkbox' name='phone_consent' value='yes'> 연락처 수집·이용에 동의합니다. (선택)</label></fieldset>
+<button type='submit'>설문 제출하기</button></form></main></body></html>"""
+
+@app.route('/feedback', methods=['GET','POST'])
+def feedback_page():
+    c = _feedback_config()
+    if not _feedback_active(c):
+        return '<meta name="viewport" content="width=device-width,initial-scale=1"><h2>현재 진행 중인 설문조사가 없습니다.</h2>', 200
+    if request.method == 'GET':
+        return render_template_string(_FEEDBACK_FORM, questions=_FEEDBACK_QUESTIONS, regions=_FEEDBACK_REGIONS, error='')
+    f = request.form
+    org,region = f.get('organization',''),f.get('region','')
+    vals=[f.get('q'+str(i),'') for i in range(1,5)]
+    opinion=f.get('opinion','').strip()
+    phone=f.get('phone','').strip()
+    error=''
+    if org not in ('지자체','공단') or region not in _FEEDBACK_REGIONS or any(v not in _FEEDBACK_QUESTIONS[i][1] for i,v in enumerate(vals)):
+        error='필수 항목을 모두 선택해 주세요.'
+    elif len(opinion)>1000:
+        error='기타 의견이 너무 깁니다.'
+    elif phone and (not re.fullmatch(r'01[016789]-?\d{3,4}-?\d{4}',phone) or f.get('phone_consent')!='yes'):
+        error='연락처 형식과 수집 동의를 확인해 주세요.'
+    if error:
+        return render_template_string(_FEEDBACK_FORM, questions=_FEEDBACK_QUESTIONS, regions=_FEEDBACK_REGIONS,error=error),400
+    try:
+        payload={'campaign_id':c['id'],'organization':org,'region':region,'q1':vals[0],'q2':vals[1],'q3':vals[2],'q4':vals[3],'opinion':opinion}
+        r=requests.post(f'{SUPABASE_URL}/rest/v1/feedback_responses',headers={**SUPABASE_HEADERS,'Prefer':'return=representation'},json=payload,timeout=8)
+        r.raise_for_status()
+        inserted=r.json()
+        if phone:
+            r2=requests.post(f'{SUPABASE_URL}/rest/v1/feedback_prize_contacts',headers=SUPABASE_HEADERS,json={'response_id':inserted[0]['id'],'phone':phone},timeout=8)
+            r2.raise_for_status()
+    except Exception:
+        return '설문 저장에 실패했습니다. 관리자에게 문의해 주세요.',503
+    return '<meta name="viewport" content="width=device-width,initial-scale=1"><h2>설문에 참여해 주셔서 감사합니다.</h2>'
+
+@app.route('/admin/feedback',methods=['GET','POST'])
+def feedback_admin():
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_login'))
+    error=''
+    if request.method=='POST':
+        start,end=request.form.get('start_date',''),request.form.get('end_date','')
+        enabled=request.form.get('enabled')=='yes'
+        try:
+            _feedback_date.fromisoformat(start);_feedback_date.fromisoformat(end)
+            if start>end: raise ValueError('기간 오류')
+            data={'start_date':start,'end_date':end,'enabled':enabled}
+            r=requests.post(f'{SUPABASE_URL}/rest/v1/feedback_campaigns',headers=SUPABASE_HEADERS,json=data,timeout=8)
+            r.raise_for_status()
+            return redirect('/admin/feedback')
+        except Exception:
+            error='설문 설정을 저장하지 못했습니다. DB 테이블과 날짜를 확인하세요.'
+    c=_feedback_config()
+    rows=[]
+    if c:
+        try: rows=fetch_all_rows(f"feedback_responses?campaign_id=eq.{int(c['id'])}&select=organization,region,q1,q2,q3,q4,opinion",timeout=8)
+        except Exception: pass
+    from collections import Counter
+    distributions=[Counter(r.get('q'+str(i),'') for r in rows) for i in range(1,5)]
+    return render_template_string("""<!doctype html><html lang="ko"><head><meta charset="utf-8">"""+_FEEDBACK_CSS+"""<title>설문 관리</title></head><body><main><p><a href="/stats">← 관리자 통계</a></p><h1>설문 관리</h1>
+<p>현재 상태: <b>{{'진행 중' if active else '중지 또는 기간 외'}}</b></p>{% if error %}<p class="err">{{error}}</p>{% endif %}
+<form method="post"><label>시작일<input type="date" name="start_date" value="{{c.start_date if c else ''}}" required></label><label>종료일<input type="date" name="end_date" value="{{c.end_date if c else ''}}" required></label><label><input type="checkbox" name="enabled" value="yes" {% if c and c.enabled %}checked{% endif %}> 설문 운영 활성화</label><button>새 설문 회차로 저장</button></form>
+<p><small>저장할 때마다 새 회차가 생성됩니다. 이전 회차의 응답은 삭제되지 않습니다.</small></p><h2>현재 회차 응답 {{rows|length}}건</h2><p><a href="/admin/feedback/export">응답 엑셀 다운로드</a> · <a href="/admin/feedback/contacts">경품 연락처 관리</a></p>
+{% for dist in distributions %}<h3>{{loop.index}}번 문항</h3><table><tr><th>응답</th><th>건수</th></tr>{% for name,count in dist.items() %}<tr><td>{{name}}</td><td>{{count}}</td></tr>{% endfor %}</table>{% endfor %}
+<h3>기타 의견</h3>{% for r in rows if r.opinion %}<p>{{r.opinion}}</p>{% endfor %}</main></body></html>""",c=c,active=_feedback_active(c),rows=rows,distributions=distributions,error=error)
+
+@app.route('/admin/feedback/export')
+def feedback_export():
+    if not session.get('is_admin'): return redirect(url_for('admin_login'))
+    c=_feedback_config()
+    if not c: abort(404)
+    rows=fetch_all_rows(f"feedback_responses?campaign_id=eq.{int(c['id'])}&select=organization,region,q1,q2,q3,q4,opinion",timeout=8)
+    output=BytesIO()
+    with pd.ExcelWriter(output,engine='openpyxl') as writer:
+        pd.DataFrame(rows,columns=['organization','region','q1','q2','q3','q4','opinion']).to_excel(writer,index=False,sheet_name='설문응답')
+    output.seek(0)
+    return send_file(output,as_attachment=True,download_name='케어내비_설문응답.xlsx',mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/admin/feedback/contacts')
+def feedback_contacts():
+    if not session.get('is_admin'): return redirect(url_for('admin_login'))
+    c=_feedback_config()
+    if not c: abort(404)
+    ids=[r['id'] for r in fetch_all_rows(f"feedback_responses?campaign_id=eq.{int(c['id'])}&select=id",timeout=8)]
+    contacts=[]
+    if ids:
+        # 조회 대상 회차에 속한 응답 ID만 추림
+        all_contacts=fetch_all_rows('feedback_prize_contacts?select=response_id,phone',timeout=8)
+        idset=set(ids)
+        contacts=[r for r in all_contacts if r['response_id'] in idset]
+    return render_template_string('<meta name="viewport" content="width=device-width,initial-scale=1"><h2>경품 지급용 연락처 (관리자 전용)</h2><p>상품 지급 완료 후 30일 이내 삭제해야 합니다.</p><p><a href="/admin/feedback">돌아가기</a></p>{% for r in contacts %}<p>{{r.phone}}</p>{% endfor %}',contacts=contacts)
+# ===== 설문조사 끝 =====
 
 if __name__ == "__main__":
     app.run()
