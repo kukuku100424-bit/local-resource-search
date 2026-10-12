@@ -15382,11 +15382,60 @@ def feedback_page():
         return '설문 저장에 실패했습니다. 관리자에게 문의해 주세요.',503
     return '<meta name="viewport" content="width=device-width,initial-scale=1"><h2>설문에 참여해 주셔서 감사합니다.</h2>'
 
+_FEEDBACK_ADMIN_CSS = """
+<style>
+*{box-sizing:border-box}body{margin:0;background:#e8ecf4;color:#1f2937;font-family:Pretendard,'Malgun Gothic',sans-serif}
+.wrap{max-width:1040px;margin:35px auto;padding:0 18px 40px}
+.panel{background:white;border:1px solid #e5e7eb;border-radius:20px;padding:26px;margin-bottom:18px;box-shadow:0 12px 30px rgba(15,23,42,.07)}
+h1{font-size:25px;margin:0 0 10px}h2{font-size:19px;margin:0 0 18px}h3{font-size:15px;margin:20px 0 12px}
+.muted{color:#64748b;font-size:13px;line-height:1.7}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.back{color:#64748b;text-decoration:none;font-size:13px;font-weight:600}
+.pill{display:inline-block;border-radius:30px;background:#eff6ff;color:#2563eb;padding:7px 12px;font-size:13px;font-weight:700}
+.pill.off{background:#f1f5f9;color:#64748b}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+label{display:block;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px}
+input[type=date]{width:100%;height:47px;padding:0 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;background:white}
+.check{display:flex;align-items:center;gap:9px;margin:18px 0}.check label{margin:0}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;background:#2563eb;color:white;border:0;border-radius:10px;padding:12px 17px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer}
+.btn.secondary{background:#f1f5f9;color:#334155}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.metric{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:17px;text-align:center}
+.metric strong{display:block;font-size:23px;color:#1d4ed8}.metric span{font-size:12px;color:#64748b}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:12px 8px;border-bottom:1px solid #e5e7eb;text-align:left}
+th{background:#f8fafc;color:#475569} .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.note{background:#f8fafc;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.error{color:#b91c1c;font-weight:700}
+@media(max-width:640px){.wrap{margin:16px auto}.panel{padding:19px}.grid,.split{grid-template-columns:1fr}.metrics{gap:6px}.metric{padding:12px 6px}.metric strong{font-size:19px}}
+</style>
+"""
+_FEEDBACK_ADMIN_HTML = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>케어내비 설문 관리</title>""" + _FEEDBACK_ADMIN_CSS + """</head><body><div class="wrap">
+<div class="top"><a class="back" href="/stats">← 관리자 통계로 돌아가기</a><span class="pill {{'' if active else 'off'}}">{{'설문 진행 중' if active else '설문 중지 · 기간 외'}}</span></div>
+<div class="panel"><h1>설문 관리</h1><p class="muted">운영 기간을 설정하고 설문을 활성화할 수 있습니다. 종료되면 사용자 메뉴와 알림이 자동으로 숨겨집니다.</p>
+{% if error %}<p class="error">{{error}}</p>{% endif %}
+<form method="post"><div class="grid"><div><label for="start">시작일</label><input id="start" type="date" name="start_date" value="{{c.start_date if c else ''}}" required></div><div><label for="end">종료일</label><input id="end" type="date" name="end_date" value="{{c.end_date if c else ''}}" required></div></div>
+<div class="check"><input id="enabled" type="checkbox" name="enabled" value="yes" {% if c and c.enabled %}checked{% endif %}><label for="enabled">설문 운영 활성화</label></div>
+<button type="submit">{{'운영 설정 저장' if c else '첫 설문 회차 생성'}}</button></form>
+<p class="muted">기존 회차의 기간·활성화 설정을 변경해도 새 회차는 생성되지 않습니다. 새 회차는 별도로 시작해야 이전 응답과 구분됩니다.</p>
+{% if c %}<div class="actions"><a class="btn secondary" href="/feedback" target="_blank" rel="noopener">설문 페이지 확인</a><a class="btn secondary" href="/admin/feedback/new">새 설문 회차 만들기</a></div>{% endif %}
+</div>
+<div class="panel"><h2>설문 응답 현황 {% if c %}<span class="muted">(회차 #{{c.id}})</span>{% endif %}</h2>
+<div class="metrics"><div class="metric"><strong>{{rows|length}}</strong><span>총 응답 수</span></div><div class="metric"><strong>{{positive_rate}}%</strong><span>2~4번 긍정 응답률</span></div><div class="metric"><strong>{{opinion_count}}</strong><span>기타 의견 수</span></div></div>
+<div class="actions"><a class="btn" href="/admin/feedback/export">응답 엑셀 다운로드</a><a class="btn secondary" href="/admin/feedback/contacts">상품 지급용 연락처 관리</a></div>
+</div>
+<div class="split">
+<div class="panel"><h2>소속 기관별 응답</h2><table><tr><th>소속</th><th>응답 수</th></tr>{% for name,count in org_counts.items() %}<tr><td>{{name}}</td><td>{{count}}건</td></tr>{% endfor %}</table></div>
+<div class="panel"><h2>근무 지역별 응답</h2><table><tr><th>지역</th><th>응답 수</th></tr>{% for name,count in region_counts.items() %}<tr><td>{{name}}</td><td>{{count}}건</td></tr>{% endfor %}</table></div>
+</div>
+<div class="panel"><h2>문항별 응답 분포</h2>{% for dist in distributions %}<h3>{{loop.index}}. {{questions[loop.index0][0]}}</h3><table><tr><th>응답</th><th>건수</th><th>비율</th></tr>{% for name,count in dist.items() %}<tr><td>{{name}}</td><td>{{count}}</td><td>{{'%.1f'|format(count*100/(rows|length)) if rows else '0.0'}}%</td></tr>{% endfor %}</table>{% endfor %}</div>
+<div class="panel"><h2>5. 기타 의견</h2>{% for r in rows if r.opinion %}<div class="note">{{r.opinion}}</div><div style="height:8px"></div>{% else %}<p class="muted">아직 등록된 의견이 없습니다.</p>{% endfor %}</div>
+</div></body></html>"""
+
 @app.route('/admin/feedback',methods=['GET','POST'])
 def feedback_admin():
     if not session.get('is_admin'):
         return redirect(url_for('admin_login'))
     error=''
+    c=_feedback_config()
     if request.method=='POST':
         start,end=request.form.get('start_date',''),request.form.get('end_date','')
         enabled=request.form.get('enabled')=='yes'
@@ -15394,24 +15443,41 @@ def feedback_admin():
             _feedback_date.fromisoformat(start);_feedback_date.fromisoformat(end)
             if start>end: raise ValueError('기간 오류')
             data={'start_date':start,'end_date':end,'enabled':enabled}
-            r=requests.post(f'{SUPABASE_URL}/rest/v1/feedback_campaigns',headers=SUPABASE_HEADERS,json=data,timeout=8)
+            if c:
+                r=requests.patch(f"{SUPABASE_URL}/rest/v1/feedback_campaigns?id=eq.{int(c['id'])}",headers=SUPABASE_HEADERS,json=data,timeout=8)
+            else:
+                r=requests.post(f'{SUPABASE_URL}/rest/v1/feedback_campaigns',headers=SUPABASE_HEADERS,json=data,timeout=8)
             r.raise_for_status()
             return redirect('/admin/feedback')
         except Exception:
             error='설문 설정을 저장하지 못했습니다. DB 테이블과 날짜를 확인하세요.'
-    c=_feedback_config()
     rows=[]
     if c:
         try: rows=fetch_all_rows(f"feedback_responses?campaign_id=eq.{int(c['id'])}&select=organization,region,q1,q2,q3,q4,opinion",timeout=8)
         except Exception: pass
     from collections import Counter
     distributions=[Counter(r.get('q'+str(i),'') for r in rows) for i in range(1,5)]
-    return render_template_string("""<!doctype html><html lang="ko"><head><meta charset="utf-8">"""+_FEEDBACK_CSS+"""<title>설문 관리</title></head><body><main><p><a href="/stats">← 관리자 통계</a></p><h1>설문 관리</h1>
-<p>현재 상태: <b>{{'진행 중' if active else '중지 또는 기간 외'}}</b></p>{% if error %}<p class="err">{{error}}</p>{% endif %}
-<form method="post"><label>시작일<input type="date" name="start_date" value="{{c.start_date if c else ''}}" required></label><label>종료일<input type="date" name="end_date" value="{{c.end_date if c else ''}}" required></label><label><input type="checkbox" name="enabled" value="yes" {% if c and c.enabled %}checked{% endif %}> 설문 운영 활성화</label><button>새 설문 회차로 저장</button></form>
-<p><small>저장할 때마다 새 회차가 생성됩니다. 이전 회차의 응답은 삭제되지 않습니다.</small></p><h2>현재 회차 응답 {{rows|length}}건</h2><p><a href="/admin/feedback/export">응답 엑셀 다운로드</a> · <a href="/admin/feedback/contacts">경품 연락처 관리</a></p>
-{% for dist in distributions %}<h3>{{loop.index}}번 문항</h3><table><tr><th>응답</th><th>건수</th></tr>{% for name,count in dist.items() %}<tr><td>{{name}}</td><td>{{count}}</td></tr>{% endfor %}</table>{% endfor %}
-<h3>기타 의견</h3>{% for r in rows if r.opinion %}<p>{{r.opinion}}</p>{% endfor %}</main></body></html>""",c=c,active=_feedback_active(c),rows=rows,distributions=distributions,error=error)
+    org_counts=Counter(r.get('organization','') for r in rows)
+    region_counts=Counter(r.get('region','') for r in rows)
+    positives=sum(r.get('q'+str(i)) in ('매우 그렇다','그렇다') for r in rows for i in range(2,5))
+    positive_rate=round(positives/(len(rows)*3)*100,1) if rows else 0
+    return render_template_string(_FEEDBACK_ADMIN_HTML,c=c,active=_feedback_active(c),rows=rows,distributions=distributions,error=error,org_counts=org_counts,region_counts=region_counts,positive_rate=positive_rate,opinion_count=sum(bool(r.get('opinion')) for r in rows),questions=_FEEDBACK_QUESTIONS)
+
+@app.route('/admin/feedback/new',methods=['GET','POST'])
+def feedback_new_campaign():
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_login'))
+    if request.method=='GET':
+        return render_template_string("""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">""" + _FEEDBACK_ADMIN_CSS + """</head><body><div class="wrap"><div class="panel"><a class="back" href="/admin/feedback">← 설문 관리</a><h1 style="margin-top:18px">새 설문 회차 만들기</h1><p class="muted">기존 응답은 보존되며 새 회차에서 응답을 별도로 수집합니다.</p><form method="post"><div class="grid"><div><label>시작일</label><input type="date" name="start_date" required></div><div><label>종료일</label><input type="date" name="end_date" required></div></div><div class="check"><input type="checkbox" id="on" name="enabled" value="yes"><label for="on">새 회차 즉시 활성화</label></div><button>새 회차 생성</button></form></div></div></body></html>""")
+    start,end=request.form.get('start_date',''),request.form.get('end_date','')
+    try:
+        _feedback_date.fromisoformat(start);_feedback_date.fromisoformat(end)
+        if start>end: raise ValueError()
+        r=requests.post(f'{SUPABASE_URL}/rest/v1/feedback_campaigns',headers=SUPABASE_HEADERS,json={'start_date':start,'end_date':end,'enabled':request.form.get('enabled')=='yes'},timeout=8)
+        r.raise_for_status()
+        return redirect('/admin/feedback')
+    except Exception:
+        return '회차 생성 실패: 날짜와 데이터베이스 설정을 확인해 주세요.',400
 
 @app.route('/admin/feedback/export')
 def feedback_export():
