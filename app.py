@@ -15570,6 +15570,10 @@ def _sat_load(org="", region=""):
             continue
         r["created_kst"] = _kst_datetime_str(r.get("created_at", ""))
         out.append(r)
+    # 화면/엑셀에 보이는 번호는 DB id가 아닌 순번 (가장 오래된 응답 = 1번) → 리셋 후에도 1번부터 시작
+    n = len(out)
+    for i, r in enumerate(out):
+        r["no"] = n - i
     return out
 
 def _sat_stats(rows):
@@ -15723,7 +15727,7 @@ tr.row:hover{ background:#f8faff; }
         {% for r in rows %}
         <tr class="row" onclick="openOne({{ loop.index0 }}, event)">
           <td><input type="checkbox" class="chk" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation()"></td>
-          <td>{{ r.id }}</td>
+          <td>{{ r.no }}</td>
           <td>{{ r.created_kst }}</td>
           <td>{{ r.org }}</td>
           <td>{{ r.region }}</td>
@@ -15808,7 +15812,7 @@ function sec(q, a){ return '<div class="m-sec"><div class="m-q">'+esc(q)+'</div>
 
 function render(){
   var r = ROWS[list[pos]];
-  document.getElementById('vCount').textContent = '설문지 #'+r.id+'  ('+(pos+1)+' / '+list.length+')';
+  document.getElementById('vCount').textContent = '설문지 #'+r.no+'  ('+(pos+1)+' / '+list.length+')';
   var h = sec('제출일시', r.created_kst) + sec('소속 기관', r.org) + sec('근무 지역', r.region)
         + sec('연락처', r.contact ? r.contact : (r.consent ? '-' : '미동의'));
   ['q1','q2','q3','q4'].forEach(function(k,i){ h += sec((i+1)+'. '+QS[i], r[k]); });
@@ -15897,7 +15901,7 @@ def satisfaction_export():
     data = []
     for r in rows:
         data.append([
-            r.get("id"), r.get("created_kst"), r.get("org"), r.get("region"),
+            r.get("no"), r.get("created_kst"), r.get("org"), r.get("region"),
             "동의" if r.get("consent") else "미동의", r.get("contact") or "",
             r.get("q1"), r.get("q2"), r.get("q3"), r.get("q4"), r.get("q5") or "",
         ])
