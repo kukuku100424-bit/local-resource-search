@@ -4127,9 +4127,9 @@ h2{
   }
 
   .home-button{
-    height:30px !important;
-    padding:0 8px !important;
-    font-size:12px !important;
+    height:34px !important;
+    padding:0 10px !important;
+    font-size:13px !important;
     white-space:nowrap !important;
     flex:0 0 auto !important;
   }
@@ -4145,8 +4145,9 @@ h2{
 
 @media (max-width:380px){
   .home-button{
-    padding:0 6px !important;
-    font-size:11.5px !important;
+    height:32px !important;
+    padding:0 8px !important;
+    font-size:12.5px !important;
   }
   .top-bar,
   .top-right-menu{
@@ -15768,7 +15769,7 @@ function surveyToggle(on){
     .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
 }
 function surveyReset(){
-  var pw = prompt('설문 응답을 모두 삭제합니다. (복구 불가)\n비밀번호를 입력하세요.');
+  var pw = prompt('설문 응답을 모두 삭제합니다. (복구 불가)\\n비밀번호를 입력하세요.');
   if(pw === null) return;
   fetch('/stats/satisfaction/reset', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pw})})
     .then(function(r){ return r.json(); })
