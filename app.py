@@ -15640,7 +15640,10 @@ tr.row:hover{ background:#f8faff; }
 .ctrl-state.off{ background:#fee2e2; color:#991b1b; }
 .ctrl-btns{ display:flex; gap:6px; }
 .btn.danger{ background:#dc2626; }
-.btn.gray2{ }
+.sw{ position:relative; width:48px; height:28px; border:0; border-radius:999px; background:#cbd5e1; cursor:pointer; padding:0; transition:background .2s; flex:none; }
+.sw::after{ content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .2s; }
+.sw.on{ background:#22c55e; }
+.sw.on::after{ transform:translateX(20px); }
 .ctrl-hint{ font-size:12px; color:#6b7280; margin-top:8px; line-height:1.5; }
 .pager{ display:flex; justify-content:center; align-items:center; gap:4px; margin-top:12px; flex-wrap:wrap; }
 .pager button{ min-width:34px; height:34px; border:1px solid #d1d5db; background:#fff; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; color:#374151; padding:0 8px; }
@@ -15662,11 +15665,10 @@ tr.row:hover{ background:#f8faff; }
     <h2>설문 관리</h2>
     <div class="ctrl-row">
       <div class="ctrl-label">메인화면 노출
-        <span class="ctrl-state {{ 'on' if survey_on else 'off' }}">{{ 'ON' if survey_on else 'OFF' }}</span>
+        <button type="button" id="surveySwitch" class="sw {{ 'on' if survey_on else '' }}" role="switch" aria-checked="{{ 'true' if survey_on else 'false' }}" onclick="surveyToggle(!this.classList.contains('on'))"></button>
+        <span class="ctrl-state {{ 'on' if survey_on else 'off' }}" id="surveyState">{{ 'ON' if survey_on else 'OFF' }}</span>
       </div>
       <div class="ctrl-btns">
-        <button type="button" class="btn {{ '' if not survey_on else 'light' }}" onclick="surveyToggle(true)">ON</button>
-        <button type="button" class="btn {{ '' if survey_on else 'light' }} gray2" onclick="surveyToggle(false)">OFF</button>
         <button type="button" class="btn danger" onclick="surveyReset()">리셋</button>
       </div>
     </div>
@@ -15767,6 +15769,10 @@ function checkedIdx(){
 function toggleAll(on){ document.querySelectorAll('.chk').forEach(function(c){ c.checked = on; }); }
 
 function surveyToggle(on){
+  var sw = document.getElementById('surveySwitch');
+  if(sw){ sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  var st = document.getElementById('surveyState');
+  if(st){ st.textContent = on ? 'ON' : 'OFF'; st.className = 'ctrl-state ' + (on ? 'on' : 'off'); }
   fetch('/stats/satisfaction/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({on:on})})
     .then(function(r){ return r.json(); })
     .then(function(j){ if(j.success) location.reload(); else alert(j.message || '변경에 실패했습니다.'); })
