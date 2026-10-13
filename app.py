@@ -15746,8 +15746,8 @@ tr.row:hover{ background:#f8faff; }
     <div class="modal-head"><span id="vCount"></span><button type="button" class="btn gray" onclick="closeViewer()">닫기</button></div>
     <div id="vBody"></div>
     <div class="modal-nav">
-      <button type="button" class="btn light" onclick="step(-1)">← 이전</button>
-      <button type="button" class="btn" onclick="step(1)">다음 →</button>
+      <button type="button" class="btn light" onclick="step(-1)">이전</button>
+      <button type="button" class="btn" onclick="step(1)">다음</button>
     </div>
   </div>
 </div>
@@ -15792,13 +15792,13 @@ function goPage(p){
   var pg = document.getElementById('pager');
   if(!pg) return;
   if(pages <= 1){ pg.innerHTML = ''; return; }
-  var h = '<button type="button" '+(curPage===1?'disabled':'')+' onclick="goPage('+(curPage-1)+')">‹</button>';
+  var h = '<button type="button" '+(curPage===1?'disabled':'')+' onclick="goPage('+(curPage-1)+')">이전</button>';
   var from = Math.max(1, curPage-2), to = Math.min(pages, from+4);
   from = Math.max(1, to-4);
   for(var i=from;i<=to;i++){
     h += '<button type="button" class="'+(i===curPage?'cur':'')+'" onclick="goPage('+i+')">'+i+'</button>';
   }
-  h += '<button type="button" '+(curPage===pages?'disabled':'')+' onclick="goPage('+(curPage+1)+')">›</button>';
+  h += '<button type="button" '+(curPage===pages?'disabled':'')+' onclick="goPage('+(curPage+1)+')">다음</button>';
   pg.innerHTML = h;
 }
 document.addEventListener('DOMContentLoaded', function(){ goPage(1); });
@@ -15854,7 +15854,7 @@ def satisfaction_admin():
         survey_on=_survey_is_on(),
     )
 
-SAT_RESET_PASSWORD = "0240"
+SAT_RESET_PASSWORD = "02401234"
 
 @app.route("/stats/satisfaction/toggle", methods=["POST"])
 def satisfaction_toggle():
