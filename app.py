@@ -109,6 +109,45 @@ def _save_maintenance_state(on, message, resume_at):
         except Exception:
             pass
 
+# =========================
+# 설문조사 ON/OFF (메인화면 + 메뉴 노출 여부)
+# - maintenance_mode 테이블의 id=2 행을 재사용 (is_on=True 이면 노출). 행이 없으면 기본 ON
+# =========================
+_SURVEY_CACHE = {"on": True, "ts": 0}
+_SURVEY_TTL = 5  # 초
+
+def _survey_is_on():
+    now = _maint_time.time()
+    if now - _SURVEY_CACHE["ts"] < _SURVEY_TTL:
+        return _SURVEY_CACHE["on"]
+    if os.getenv("RENDER") is not None:
+        try:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?select=is_on&id=eq.2",
+                headers=SUPABASE_HEADERS, timeout=3
+            )
+            rows = res.json() if res.ok else []
+            if rows:
+                _SURVEY_CACHE["on"] = bool(rows[0].get("is_on"))
+        except Exception:
+            pass
+    _SURVEY_CACHE["ts"] = now
+    return _SURVEY_CACHE["on"]
+
+def _survey_set_on(on):
+    _SURVEY_CACHE["on"] = bool(on)
+    _SURVEY_CACHE["ts"] = _maint_time.time()
+    if os.getenv("RENDER") is not None:
+        try:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?on_conflict=id",
+                headers={**SUPABASE_HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"},
+                json={"id": 2, "is_on": bool(on), "message": "survey", "resume_at": ""},
+                timeout=5
+            )
+        except Exception:
+            pass
+
 # === GPT 토큰 단가/환율 (변동 시 여기만 수정) ===
 GPT_PRICE_INPUT_USD = 0.40    # 입력 100만 토큰당 USD (gpt-4.1-mini)
 GPT_PRICE_OUTPUT_USD = 1.60   # 출력 100만 토큰당 USD (gpt-4.1-mini)
@@ -2910,14 +2949,6 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
           </div>
           <span class="fab-item-label">의견보내기</span>
         </div>
-        <div id="fabItem_survey" class="fab-item">
-          <div class="fab-item-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
-              <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
-            </svg>
-          </div>
-          <span class="fab-item-label">만족도 설문</span>
-        </div>
         <div id="fabItem_apk" class="fab-item">
           <div class="fab-item-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
@@ -2929,6 +2960,16 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
           </div>
           <span class="fab-item-label">앱 설치</span>
         </div>
+        {% if survey_on %}
+        <div id="fabItem_survey" class="fab-item">
+          <div class="fab-item-btn fab-item-btn-survey">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+              <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+            </svg>
+          </div>
+          <span class="fab-item-label">설문조사</span>
+        </div>
+        {% endif %}
       </div>
       <div id="fabMain">
         {% if notices %}<span id="fabMainDot" class="fab-main-dot"></span>{% endif %}
@@ -3180,6 +3221,12 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 .fab-item-btn:hover{
   transform:scale(1.08);
+}
+
+/* 설문조사(임시기능) — 파란색이 아닌 주황색으로 눈에 띄게 */
+.fab-item-btn-survey{
+  background:linear-gradient(135deg,#fb923c,#f97316) !important;
+  box-shadow:0 4px 12px rgba(249,115,22,0.45) !important;
 }
 
 .fab-item-label{
@@ -3923,7 +3970,7 @@ def home():
             or n0.get("created_datetime")
             or ""
         )
-    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key)
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key, survey_on=_survey_is_on())
 
 STATS_HTML = """
 <!DOCTYPE html>
@@ -4064,9 +4111,9 @@ h2{
   }
 
   .top-bar{
-    gap:6px !important;
+    gap:4px !important;
     flex-wrap:nowrap !important;
-    justify-content:flex-start !important;
+    justify-content:space-between !important;
     overflow-x:auto !important;
     white-space:nowrap !important;
     margin-bottom:14px !important;
@@ -4074,15 +4121,15 @@ h2{
   }
 
   .top-right-menu{
-    gap:6px !important;
+    gap:4px !important;
     flex-wrap:nowrap !important;
     flex-shrink:0 !important;
   }
 
   .home-button{
-    height:34px !important;
-    padding:0 12px !important;
-    font-size:13px !important;
+    height:30px !important;
+    padding:0 8px !important;
+    font-size:12px !important;
     white-space:nowrap !important;
     flex:0 0 auto !important;
   }
@@ -4098,12 +4145,12 @@ h2{
 
 @media (max-width:380px){
   .home-button{
-    padding:0 10px !important;
-    font-size:12.5px !important;
+    padding:0 6px !important;
+    font-size:11.5px !important;
   }
   .top-bar,
   .top-right-menu{
-    gap:5px !important;
+    gap:3px !important;
   }
 }
 
@@ -4293,9 +4340,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
     <div class="top-right-menu">
       <a href="/stats/satisfaction" class="home-button">설문</a>
-      <a href="/board/admin" class="home-button">의견확인</a>
-      <a href="/notice/admin" class="home-button">공지관리</a>
-      <a href="/stats/export/xlsx/케어내비_통계.xlsx" class="home-button">엑셀받기</a>
+      <a href="/board/admin" class="home-button">의견</a>
+      <a href="/notice/admin" class="home-button">공지</a>
+      <a href="/stats/export/xlsx/케어내비_통계.xlsx" class="home-button">엑셀</a>
       <a href="/admin/maintenance" class="home-button maint-btn">점검모드</a>
     </div>
   </div>
@@ -15291,7 +15338,7 @@ def nhis25():
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
 
 # =========================================================
-# 만족도 설문 (/satisfaction)
+# 설문조사 (/satisfaction)
 # - 공개: /satisfaction, /satisfaction/submit (로그인 없이 접근, QR용)
 # - 관리자: /stats/satisfaction, /stats/satisfaction/export  (/stats 하위라 관리자 로그인 자동 적용)
 # - 저장: Supabase survey_responses (연락처는 동의한 경우에만 저장, 응답과 같은 행에 연결)
@@ -15314,7 +15361,7 @@ SATISFACTION_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>케어내비 만족도 설문</title>
+<title>케어내비 설문조사</title>
 <style>
 *{ box-sizing:border-box; }
 body{ margin:0; background:#e8ecf4; font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif; color:#111827; padding:16px; }
@@ -15347,7 +15394,7 @@ textarea{ min-height:110px; resize:vertical; }
 <div class="wrap">
   <div id="formArea">
     <div class="card">
-      <h1>케어내비 만족도 설문</h1>
+      <h1>케어내비 설문조사</h1>
       <div class="sub">더 나은 서비스를 위한 설문입니다. 약 1분이 소요됩니다.</div>
     </div>
 
@@ -15389,7 +15436,7 @@ textarea{ min-height:110px; resize:vertical; }
     <div class="big">🙏</div>
     <h1>참여해 주셔서 감사합니다</h1>
     <div class="sub">소중한 의견은 서비스 개선에 활용하겠습니다.</div>
-    <a href="/">케어내비로 이동</a>
+    <a href="/home">메인화면으로 이동</a>
   </div>
 </div>
 
@@ -15541,7 +15588,7 @@ SATISFACTION_ADMIN_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>만족도 설문 통계</title>
+<title>설문조사 통계</title>
 <style>
 *{ box-sizing:border-box; }
 body{ margin:0; background:#e8ecf4; font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif; color:#111827; padding:16px; }
@@ -15581,6 +15628,19 @@ tr.row:hover{ background:#f8faff; }
 .m-a{ font-size:14px; font-weight:700; white-space:pre-wrap; word-break:break-all; }
 .modal-nav{ display:flex; justify-content:space-between; margin-top:14px; gap:8px; }
 .empty{ text-align:center; color:#9ca3af; padding:24px 0; font-size:14px; }
+.ctrl-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.ctrl-label{ font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.ctrl-state{ font-size:12px; font-weight:800; padding:3px 9px; border-radius:999px; }
+.ctrl-state.on{ background:#dcfce7; color:#166534; }
+.ctrl-state.off{ background:#fee2e2; color:#991b1b; }
+.ctrl-btns{ display:flex; gap:6px; }
+.btn.danger{ background:#dc2626; }
+.btn.gray2{ }
+.ctrl-hint{ font-size:12px; color:#6b7280; margin-top:8px; line-height:1.5; }
+.pager{ display:flex; justify-content:center; align-items:center; gap:4px; margin-top:12px; flex-wrap:wrap; }
+.pager button{ min-width:34px; height:34px; border:1px solid #d1d5db; background:#fff; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; color:#374151; padding:0 8px; }
+.pager button.cur{ background:#4b6edc; border-color:#4b6edc; color:#fff; }
+.pager button:disabled{ opacity:.4; cursor:default; }
 @media (max-width:520px){ .bar-row{ grid-template-columns:90px 1fr 64px; } }
 </style>
 </head>
@@ -15589,13 +15649,27 @@ tr.row:hover{ background:#f8faff; }
   <div class="top-bar">
     <a href="/stats" class="btn gray">통계로</a>
     <div class="top-right">
-      <a href="/stats/satisfaction/export?org={{ f_org }}&region={{ f_region }}" class="btn">전체 엑셀</a>
-      <button type="button" class="btn light" onclick="exportSelected()">선택 엑셀</button>
+      <a href="/stats/satisfaction/export?org={{ f_org }}&region={{ f_region }}" class="btn">엑셀 다운로드</a>
     </div>
   </div>
 
   <div class="card">
-    <h2>만족도 설문 요약</h2>
+    <h2>설문 관리</h2>
+    <div class="ctrl-row">
+      <div class="ctrl-label">메인화면 노출
+        <span class="ctrl-state {{ 'on' if survey_on else 'off' }}">{{ 'ON' if survey_on else 'OFF' }}</span>
+      </div>
+      <div class="ctrl-btns">
+        <button type="button" class="btn {{ '' if not survey_on else 'light' }}" onclick="surveyToggle(true)">ON</button>
+        <button type="button" class="btn {{ '' if survey_on else 'light' }} gray2" onclick="surveyToggle(false)">OFF</button>
+        <button type="button" class="btn danger" onclick="surveyReset()">리셋</button>
+      </div>
+    </div>
+    <div class="ctrl-hint">OFF 하면 메인화면 + 메뉴에서 설문조사 버튼이 사라집니다. 리셋은 모든 응답을 영구 삭제합니다.</div>
+  </div>
+
+  <div class="card">
+    <h2>설문조사 요약</h2>
     <div class="sum">
       <div><span>총 응답</span><b>{{ total }}</b></div>
       {% for k, v in org_counts %}<div><span>{{ k }}</span><b>{{ v }}</b></div>{% endfor %}
@@ -15644,7 +15718,7 @@ tr.row:hover{ background:#f8faff; }
     <div class="tbl-wrap">
       <table>
         <thead><tr><th></th><th>번호</th><th>제출일시</th><th>소속</th><th>지역</th><th>연락처</th><th>기타 의견</th></tr></thead>
-        <tbody>
+        <tbody id="respBody">
         {% for r in rows %}
         <tr class="row" onclick="openOne({{ loop.index0 }}, event)">
           <td><input type="checkbox" class="chk" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation()"></td>
@@ -15659,6 +15733,7 @@ tr.row:hover{ background:#f8faff; }
         </tbody>
       </table>
     </div>
+    <div class="pager" id="pager"></div>
     {% else %}
     <div class="empty">아직 응답이 없습니다.</div>
     {% endif %}
@@ -15685,6 +15760,47 @@ function checkedIdx(){
   return Array.prototype.map.call(document.querySelectorAll('.chk:checked'), function(c){ return parseInt(c.dataset.idx,10); });
 }
 function toggleAll(on){ document.querySelectorAll('.chk').forEach(function(c){ c.checked = on; }); }
+
+function surveyToggle(on){
+  fetch('/stats/satisfaction/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({on:on})})
+    .then(function(r){ return r.json(); })
+    .then(function(j){ if(j.success) location.reload(); else alert(j.message || '변경에 실패했습니다.'); })
+    .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
+}
+function surveyReset(){
+  var pw = prompt('설문 응답을 모두 삭제합니다. (복구 불가)\n비밀번호를 입력하세요.');
+  if(pw === null) return;
+  fetch('/stats/satisfaction/reset', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pw})})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(j.success){ alert('초기화되었습니다.'); location.reload(); }
+      else alert(j.message || '초기화에 실패했습니다.');
+    })
+    .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
+}
+
+/* 응답 목록 페이지네이션 (10개씩) */
+var PAGE_SIZE = 10, curPage = 1;
+function goPage(p){
+  var trs = document.querySelectorAll('#respBody tr.row');
+  var pages = Math.max(1, Math.ceil(trs.length / PAGE_SIZE));
+  curPage = Math.min(Math.max(1, p), pages);
+  trs.forEach(function(tr, i){
+    tr.style.display = (i >= (curPage-1)*PAGE_SIZE && i < curPage*PAGE_SIZE) ? '' : 'none';
+  });
+  var pg = document.getElementById('pager');
+  if(!pg) return;
+  if(pages <= 1){ pg.innerHTML = ''; return; }
+  var h = '<button type="button" '+(curPage===1?'disabled':'')+' onclick="goPage('+(curPage-1)+')">‹</button>';
+  var from = Math.max(1, curPage-2), to = Math.min(pages, from+4);
+  from = Math.max(1, to-4);
+  for(var i=from;i<=to;i++){
+    h += '<button type="button" class="'+(i===curPage?'cur':'')+'" onclick="goPage('+i+')">'+i+'</button>';
+  }
+  h += '<button type="button" '+(curPage===pages?'disabled':'')+' onclick="goPage('+(curPage+1)+')">›</button>';
+  pg.innerHTML = h;
+}
+document.addEventListener('DOMContentLoaded', function(){ goPage(1); });
 
 function esc(s){ var d = document.createElement('div'); d.textContent = (s==null?'':s); return d.innerHTML; }
 function sec(q, a){ return '<div class="m-sec"><div class="m-q">'+esc(q)+'</div><div class="m-a">'+(a? esc(a) : '-')+'</div></div>'; }
@@ -15715,12 +15831,6 @@ document.addEventListener('keydown', function(e){
   else if(e.key === 'ArrowRight') step(1);
   else if(e.key === 'Escape') closeViewer();
 });
-function exportSelected(){
-  var idx = checkedIdx();
-  if(!idx.length){ alert('엑셀로 받을 설문지를 먼저 체크해 주세요.'); return; }
-  var ids = idx.map(function(i){ return ROWS[i].id; }).join(',');
-  location.href = '/stats/satisfaction/export?ids=' + ids;
-}
 </script>
 </body>
 </html>
@@ -15740,7 +15850,34 @@ def satisfaction_admin():
         contact_cnt=sum(1 for r in rows if r.get("contact")),
         orgs=SAT_ORGS, regions=SAT_REGIONS, f_org=f_org, f_region=f_region,
         qtitles=[q["title"] for q in SAT_QUESTIONS],
+        survey_on=_survey_is_on(),
     )
+
+SAT_RESET_PASSWORD = "0240"
+
+@app.route("/stats/satisfaction/toggle", methods=["POST"])
+def satisfaction_toggle():
+    d = request.get_json(silent=True) or {}
+    _survey_set_on(bool(d.get("on")))
+    return jsonify({"success": True})
+
+@app.route("/stats/satisfaction/reset", methods=["POST"])
+def satisfaction_reset():
+    d = request.get_json(silent=True) or {}
+    if str(d.get("password", "")).strip() != SAT_RESET_PASSWORD:
+        return jsonify({"success": False, "message": "비밀번호가 올바르지 않습니다."})
+    if os.getenv("RENDER") is None:
+        return jsonify({"success": True})   # 로컬 테스트: 삭제 생략
+    try:
+        res = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/survey_responses?id=gt.0",
+            headers={**SUPABASE_HEADERS, "Prefer": "return=minimal"}, timeout=15
+        )
+        if not res.ok:
+            return jsonify({"success": False, "message": "삭제 중 오류가 발생했습니다."})
+    except Exception:
+        return jsonify({"success": False, "message": "삭제 중 오류가 발생했습니다."})
+    return jsonify({"success": True})
 
 @app.route("/stats/satisfaction/export")
 def satisfaction_export():
@@ -15783,7 +15920,7 @@ def satisfaction_export():
                 ws.column_dimensions[col[0].column_letter].width = min(max(width * 1.6, 10), 50)
     buf.seek(0)
     return send_file(
-        buf, as_attachment=True, download_name="케어내비_만족도설문.xlsx",
+        buf, as_attachment=True, download_name="케어내비_설문조사.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
