@@ -334,16 +334,12 @@ def require_login_all_pages():
         or request.path == "/admin"
         or request.path == "/privacy"
         or request.path == "/satisfaction"
-        or request.path == "/satisfaction/qr.png"
+        or request.path == "/satisfaction/submit"
         or request.path == "/app-version.json"
         or request.path.startswith("/static")
     ):
         return None
 
-    if request.path.startswith("/admin/satisfaction"):
-        if not session.get("is_admin"):
-            return redirect(url_for("admin_login"))
-        return None
     if request.path.startswith("/admin/maintenance"):
         if not session.get("is_admin"):
             return redirect(url_for("admin_login"))
@@ -2914,11 +2910,13 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
           </div>
           <span class="fab-item-label">의견보내기</span>
         </div>
-        <div id="fabItem_satisfaction" class="fab-item">
+        <div id="fabItem_survey" class="fab-item">
           <div class="fab-item-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm3 5v2h8V8H8zm0 4v2h8v-2H8zm0 4v2h5v-2H8z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+              <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+            </svg>
           </div>
-          <span class="fab-item-label">설문조사</span>
+          <span class="fab-item-label">만족도 설문</span>
         </div>
         <div id="fabItem_apk" class="fab-item">
           <div class="fab-item-btn">
@@ -3451,7 +3449,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   var fabItemNotice = document.getElementById("fabItem_notice");
   var fabItemRep    = document.getElementById("fabItem_report");
   var fabItemApk    = document.getElementById("fabItem_apk");
-  var fabItemSurvey = document.getElementById("fabItem_satisfaction");
+  var fabItemSurvey = document.getElementById("fabItem_survey");
   var fabIconPlus   = document.getElementById("fabIconPlus");
   var fabIconClose  = document.getElementById("fabIconClose");
   var singleBtn     = document.getElementById("singleReportBtn");
@@ -4294,9 +4292,9 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <a href="/home" class="home-button">홈으로</a>
 
     <div class="top-right-menu">
+      <a href="/stats/satisfaction" class="home-button">설문</a>
       <a href="/board/admin" class="home-button">의견확인</a>
       <a href="/notice/admin" class="home-button">공지관리</a>
-      <a href="/admin/satisfaction" class="home-button">설문</a>
       <a href="/stats/export/xlsx/케어내비_통계.xlsx" class="home-button">엑셀받기</a>
       <a href="/admin/maintenance" class="home-button maint-btn">점검모드</a>
     </div>
@@ -15292,6 +15290,503 @@ def survey():
 def nhis25():
     return render_template_string(NHIS25_HTML, style=BASE_STYLE)
 
+# =========================================================
+# 만족도 설문 (/satisfaction)
+# - 공개: /satisfaction, /satisfaction/submit (로그인 없이 접근, QR용)
+# - 관리자: /stats/satisfaction, /stats/satisfaction/export  (/stats 하위라 관리자 로그인 자동 적용)
+# - 저장: Supabase survey_responses (연락처는 동의한 경우에만 저장, 응답과 같은 행에 연결)
+# =========================================================
+SAT_ORGS = ["공단", "지자체"]
+SAT_REGIONS = ["전남광주통합특별시", "전북특별자치도", "제주특별자치도"]
+SAT_SCALE = ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"]
+SAT_QUESTIONS = [
+    {"key": "q1", "title": "케어내비를 얼마나 자주 이용하십니까?",
+     "options": ["거의 매일", "주 1~2회", "월 1~2회", "처음 이용"]},
+    {"key": "q2", "title": "케어내비가 필요한 복지서비스를 찾는 데 도움이 되었습니까?", "options": SAT_SCALE},
+    {"key": "q3", "title": "케어내비 사용으로 업무 시간이 단축되었다고 생각하십니까?", "options": SAT_SCALE},
+    {"key": "q4", "title": "기존 방식과 비교해 서비스 검색이 편리해졌습니까?", "options": SAT_SCALE},
+]
+SAT_Q5_TITLE = "기타 하고 싶은 말씀이 있다면 자유롭게 적어 주세요."
+
+SATISFACTION_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>케어내비 만족도 설문</title>
+<style>
+*{ box-sizing:border-box; }
+body{ margin:0; background:#e8ecf4; font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif; color:#111827; padding:16px; }
+.wrap{ max-width:560px; margin:0 auto; }
+.card{ background:#fff; border-radius:18px; padding:22px 20px; margin-bottom:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
+h1{ font-size:20px; margin:0 0 6px; font-weight:800; }
+.sub{ font-size:13px; color:#6b7280; line-height:1.6; word-break:keep-all; }
+.sec-title{ font-size:13px; font-weight:800; color:#4b6edc; margin-bottom:12px; }
+.q-title{ font-size:15px; font-weight:800; line-height:1.5; margin-bottom:12px; word-break:keep-all; }
+.opt{ display:flex; align-items:center; gap:10px; padding:12px 14px; border:1.5px solid #e5e7eb; border-radius:12px; margin-bottom:8px; font-size:14px; cursor:pointer; }
+.opt input{ width:18px; height:18px; margin:0; accent-color:#4b6edc; }
+.opt.sel{ border-color:#4b6edc; background:#eef2ff; font-weight:700; }
+.field-label{ font-size:14px; font-weight:800; margin:16px 0 8px; }
+.field-label:first-of-type{ margin-top:0; }
+.notice{ font-size:12px; color:#6b7280; background:#f3f4f6; border-radius:10px; padding:10px 12px; line-height:1.6; margin-bottom:10px; word-break:keep-all; }
+.consent{ display:flex; align-items:flex-start; gap:10px; font-size:13px; line-height:1.5; margin-bottom:10px; cursor:pointer; }
+.consent input{ width:18px; height:18px; margin:1px 0 0; accent-color:#4b6edc; flex:none; }
+input[type=tel], textarea{ width:100%; border:1.5px solid #e5e7eb; border-radius:12px; padding:12px 14px; font-size:15px; font-family:inherit; }
+input[type=tel]:disabled{ background:#f3f4f6; }
+textarea{ min-height:110px; resize:vertical; }
+.submit{ width:100%; border:0; border-radius:14px; background:#4b6edc; color:#fff; font-size:16px; font-weight:800; padding:15px; cursor:pointer; }
+.submit:disabled{ opacity:.6; }
+.err{ color:#dc2626; font-size:13px; margin:0 0 10px; display:none; text-align:center; }
+.done{ text-align:center; padding:40px 20px; display:none; }
+.done .big{ font-size:44px; margin-bottom:10px; }
+.done a{ display:inline-block; margin-top:18px; color:#4b6edc; font-weight:800; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="formArea">
+    <div class="card">
+      <h1>케어내비 만족도 설문</h1>
+      <div class="sub">더 나은 서비스를 위한 설문입니다. 약 1분이 소요됩니다.</div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title">기본 정보</div>
+      <div class="field-label">1. 소속 기관</div>
+      {% for o in orgs %}
+      <label class="opt"><input type="radio" name="org" value="{{ o }}"> {{ o }}</label>
+      {% endfor %}
+      <div class="field-label">2. 근무 지역</div>
+      {% for r in regions %}
+      <label class="opt"><input type="radio" name="region" value="{{ r }}"> {{ r }}</label>
+      {% endfor %}
+      <div class="field-label">3. 연락처 (경품 지급용)</div>
+      <div class="notice">연락처는 경품 지급 목적으로만 수집하며, 설문 성과분석 데이터와 분리하여 관리합니다.</div>
+      <label class="consent"><input type="checkbox" id="consent"> <span>경품 지급을 위한 연락처 수집·이용에 동의합니다. (선택)</span></label>
+      <input type="tel" id="contact" placeholder="010-0000-0000" inputmode="numeric" maxlength="13" disabled>
+    </div>
+
+    {% for q in questions %}
+    <div class="card">
+      <div class="q-title">{{ loop.index }}. {{ q.title }}</div>
+      {% for o in q.options %}
+      <label class="opt"><input type="radio" name="{{ q.key }}" value="{{ o }}"> {{ o }}</label>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    <div class="card">
+      <div class="q-title">5. {{ q5_title }} (선택)</div>
+      <textarea id="q5" maxlength="1000" placeholder="자유롭게 작성해 주세요."></textarea>
+    </div>
+
+    <div class="err" id="err"></div>
+    <button class="submit" id="submitBtn" type="button">제출하기</button>
+  </div>
+
+  <div class="card done" id="doneArea">
+    <div class="big">🙏</div>
+    <h1>참여해 주셔서 감사합니다</h1>
+    <div class="sub">소중한 의견은 서비스 개선에 활용하겠습니다.</div>
+    <a href="/">케어내비로 이동</a>
+  </div>
+</div>
+
+<script>
+(function(){
+  document.querySelectorAll('.opt input').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      document.querySelectorAll('input[name="'+inp.name+'"]').forEach(function(x){
+        x.closest('.opt').classList.toggle('sel', x.checked);
+      });
+    });
+  });
+
+  var consent = document.getElementById('consent');
+  var contact = document.getElementById('contact');
+  consent.addEventListener('change', function(){
+    contact.disabled = !consent.checked;
+    if(!consent.checked) contact.value = '';
+    else contact.focus();
+  });
+  contact.addEventListener('input', function(){
+    var d = contact.value.replace(/[^0-9]/g,'').slice(0,11), o = d;
+    if(d.length > 7) o = d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7);
+    else if(d.length > 3) o = d.slice(0,3)+'-'+d.slice(3);
+    contact.value = o;
+  });
+
+  function val(name){
+    var el = document.querySelector('input[name="'+name+'"]:checked');
+    return el ? el.value : '';
+  }
+  function showErr(msg){
+    var e = document.getElementById('err');
+    e.textContent = msg; e.style.display = 'block';
+    e.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  document.getElementById('submitBtn').addEventListener('click', function(){
+    var data = {
+      org: val('org'), region: val('region'),
+      consent: consent.checked, contact: contact.value.trim(),
+      q1: val('q1'), q2: val('q2'), q3: val('q3'), q4: val('q4'),
+      q5: document.getElementById('q5').value.trim()
+    };
+    if(!data.org) return showErr('소속 기관을 선택해 주세요.');
+    if(!data.region) return showErr('근무 지역을 선택해 주세요.');
+    if(data.consent && data.contact.replace(/[^0-9]/g,'').length < 10) return showErr('연락처를 정확히 입력해 주세요.');
+    for(var i=1;i<=4;i++){ if(!data['q'+i]) return showErr(i+'번 문항을 선택해 주세요.'); }
+
+    var btn = this; btn.disabled = true; btn.textContent = '제출 중...';
+    fetch('/satisfaction/submit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(j.success){
+          document.getElementById('formArea').style.display = 'none';
+          document.getElementById('doneArea').style.display = 'block';
+          window.scrollTo(0,0);
+        } else {
+          btn.disabled = false; btn.textContent = '제출하기';
+          showErr(j.message || '제출에 실패했습니다. 다시 시도해 주세요.');
+        }
+      })
+      .catch(function(){
+        btn.disabled = false; btn.textContent = '제출하기';
+        showErr('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
+      });
+  });
+})();
+</script>
+</body>
+</html>
+"""
+
+@app.route("/satisfaction")
+def satisfaction():
+    return render_template_string(
+        SATISFACTION_HTML,
+        orgs=SAT_ORGS, regions=SAT_REGIONS,
+        questions=SAT_QUESTIONS, q5_title=SAT_Q5_TITLE
+    )
+
+@app.route("/satisfaction/submit", methods=["POST"])
+def satisfaction_submit():
+    d = request.get_json(silent=True) or {}
+    org = str(d.get("org", "")).strip()
+    region = str(d.get("region", "")).strip()
+    if org not in SAT_ORGS or region not in SAT_REGIONS:
+        return jsonify({"success": False, "message": "소속 기관/근무 지역을 확인해 주세요."})
+
+    row = {"org": org, "region": region}
+    for q in SAT_QUESTIONS:
+        v = str(d.get(q["key"], "")).strip()
+        if v not in q["options"]:
+            return jsonify({"success": False, "message": "모든 문항에 응답해 주세요."})
+        row[q["key"]] = v
+    row["q5"] = str(d.get("q5", "")).strip()[:1000]
+
+    consent = bool(d.get("consent"))
+    contact = ""
+    if consent:
+        digits = re.sub(r"\D", "", str(d.get("contact", "")))
+        if not re.fullmatch(r"01\d{8,9}", digits):
+            return jsonify({"success": False, "message": "연락처를 정확히 입력해 주세요."})
+        contact = digits[:3] + "-" + digits[3:-4] + "-" + digits[-4:]
+    row["consent"] = consent
+    row["contact"] = contact if consent else None
+
+    if os.getenv("RENDER") is None:
+        return jsonify({"success": True})   # 로컬 테스트: 저장 생략
+    try:
+        res = requests.post(
+            f"{SUPABASE_URL}/rest/v1/survey_responses",
+            headers=SUPABASE_HEADERS, json=row, timeout=8
+        )
+        if not res.ok:
+            return jsonify({"success": False, "message": "저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."})
+    except Exception:
+        return jsonify({"success": False, "message": "저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."})
+    return jsonify({"success": True})
+
+
+def _sat_load(org="", region=""):
+    q = "survey_responses?select=*&order=id.desc"
+    rows = fetch_all_rows(q)
+    out = []
+    for r in rows:
+        if org and r.get("org") != org:
+            continue
+        if region and r.get("region") != region:
+            continue
+        r["created_kst"] = _kst_datetime_str(r.get("created_at", ""))
+        out.append(r)
+    return out
+
+def _sat_stats(rows):
+    total = len(rows)
+    result = []
+    for q in SAT_QUESTIONS:
+        items = []
+        for opt in q["options"]:
+            c = sum(1 for r in rows if r.get(q["key"]) == opt)
+            items.append({"label": opt, "count": c, "pct": round(c * 100 / total, 1) if total else 0})
+        result.append({"title": q["title"], "items": items})
+    return result
+
+SATISFACTION_ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>만족도 설문 통계</title>
+<style>
+*{ box-sizing:border-box; }
+body{ margin:0; background:#e8ecf4; font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif; color:#111827; padding:16px; }
+.container{ max-width:980px; margin:0 auto; }
+.top-bar{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.top-right{ display:flex; gap:8px; flex-wrap:wrap; }
+.btn{ display:inline-block; border:0; background:#4b6edc; color:#fff; font-size:13px; font-weight:700; padding:9px 14px; border-radius:10px; text-decoration:none; cursor:pointer; font-family:inherit; }
+.btn.gray{ background:#6b7280; }
+.btn.light{ background:#e0e7ff; color:#3730a3; }
+.card{ background:#fff; border-radius:16px; padding:18px; margin-bottom:14px; box-shadow:0 6px 18px rgba(0,0,0,.06); }
+h2{ font-size:16px; margin:0 0 12px; }
+.sum{ display:flex; gap:10px; flex-wrap:wrap; }
+.sum div{ flex:1; min-width:110px; background:#f3f4f6; border-radius:12px; padding:12px; text-align:center; }
+.sum b{ display:block; font-size:22px; margin-top:4px; }
+.sum span{ font-size:12px; color:#6b7280; }
+.filter{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+select{ padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; font-family:inherit; }
+.q-title{ font-size:14px; font-weight:800; margin-bottom:10px; }
+.bar-row{ display:grid; grid-template-columns:110px 1fr 80px; gap:8px; align-items:center; font-size:13px; margin-bottom:6px; }
+.bar-bg{ background:#eef2ff; border-radius:6px; height:16px; overflow:hidden; }
+.bar-fill{ background:#4b6edc; height:100%; }
+.bar-num{ text-align:right; color:#374151; }
+.tbl-wrap{ overflow-x:auto; }
+table{ width:100%; border-collapse:collapse; font-size:13px; min-width:640px; }
+th,td{ padding:8px 6px; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:top; }
+th{ background:#f9fafb; font-weight:800; }
+tr.row{ cursor:pointer; }
+tr.row:hover{ background:#f8faff; }
+.ellipsis{ max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.actions{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1000; align-items:center; justify-content:center; padding:16px; }
+.modal.open{ display:flex; }
+.modal-box{ background:#fff; border-radius:16px; width:100%; max-width:520px; max-height:90vh; overflow:auto; padding:20px; }
+.modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-weight:800; }
+.m-sec{ margin-bottom:12px; }
+.m-q{ font-size:12px; color:#6b7280; margin-bottom:3px; }
+.m-a{ font-size:14px; font-weight:700; white-space:pre-wrap; word-break:break-all; }
+.modal-nav{ display:flex; justify-content:space-between; margin-top:14px; gap:8px; }
+.empty{ text-align:center; color:#9ca3af; padding:24px 0; font-size:14px; }
+@media (max-width:520px){ .bar-row{ grid-template-columns:90px 1fr 64px; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <a href="/stats" class="btn gray">통계로</a>
+    <div class="top-right">
+      <a href="/stats/satisfaction/export?org={{ f_org }}&region={{ f_region }}" class="btn">전체 엑셀</a>
+      <button type="button" class="btn light" onclick="exportSelected()">선택 엑셀</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>만족도 설문 요약</h2>
+    <div class="sum">
+      <div><span>총 응답</span><b>{{ total }}</b></div>
+      {% for k, v in org_counts %}<div><span>{{ k }}</span><b>{{ v }}</b></div>{% endfor %}
+      <div><span>연락처 제공</span><b>{{ contact_cnt }}</b></div>
+    </div>
+    <div class="sum" style="margin-top:10px;">
+      {% for k, v in region_counts %}<div><span>{{ k }}</span><b>{{ v }}</b></div>{% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <form class="filter" method="get">
+      <span style="font-size:13px;font-weight:700;">필터</span>
+      <select name="org" onchange="this.form.submit()">
+        <option value="">소속 전체</option>
+        {% for o in orgs %}<option value="{{ o }}" {% if o == f_org %}selected{% endif %}>{{ o }}</option>{% endfor %}
+      </select>
+      <select name="region" onchange="this.form.submit()">
+        <option value="">지역 전체</option>
+        {% for r in regions %}<option value="{{ r }}" {% if r == f_region %}selected{% endif %}>{{ r }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+
+  {% for s in stats %}
+  <div class="card">
+    <div class="q-title">{{ loop.index }}. {{ s.title }}</div>
+    {% for it in s['items'] %}
+    <div class="bar-row">
+      <div>{{ it.label }}</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:{{ it.pct }}%"></div></div>
+      <div class="bar-num">{{ it.count }}명 ({{ it.pct }}%)</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <div class="card">
+    <h2>응답 목록</h2>
+    <div class="actions">
+      <button type="button" class="btn light" onclick="toggleAll(true)">전체 선택</button>
+      <button type="button" class="btn light" onclick="toggleAll(false)">선택 해제</button>
+      <button type="button" class="btn" onclick="openViewer()">선택 설문지 보기</button>
+    </div>
+    {% if rows %}
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>번호</th><th>제출일시</th><th>소속</th><th>지역</th><th>연락처</th><th>기타 의견</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+        <tr class="row" onclick="openOne({{ loop.index0 }}, event)">
+          <td><input type="checkbox" class="chk" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation()"></td>
+          <td>{{ r.id }}</td>
+          <td>{{ r.created_kst }}</td>
+          <td>{{ r.org }}</td>
+          <td>{{ r.region }}</td>
+          <td>{{ r.contact or '-' }}</td>
+          <td><div class="ellipsis">{{ r.q5 or '-' }}</div></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">아직 응답이 없습니다.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="modal" id="viewer" onclick="if(event.target===this)closeViewer()">
+  <div class="modal-box">
+    <div class="modal-head"><span id="vCount"></span><button type="button" class="btn gray" onclick="closeViewer()">닫기</button></div>
+    <div id="vBody"></div>
+    <div class="modal-nav">
+      <button type="button" class="btn light" onclick="step(-1)">← 이전</button>
+      <button type="button" class="btn" onclick="step(1)">다음 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ROWS = {{ rows|tojson }};
+var QS = {{ qtitles|tojson }};
+var list = [], pos = 0;
+
+function checkedIdx(){
+  return Array.prototype.map.call(document.querySelectorAll('.chk:checked'), function(c){ return parseInt(c.dataset.idx,10); });
+}
+function toggleAll(on){ document.querySelectorAll('.chk').forEach(function(c){ c.checked = on; }); }
+
+function esc(s){ var d = document.createElement('div'); d.textContent = (s==null?'':s); return d.innerHTML; }
+function sec(q, a){ return '<div class="m-sec"><div class="m-q">'+esc(q)+'</div><div class="m-a">'+(a? esc(a) : '-')+'</div></div>'; }
+
+function render(){
+  var r = ROWS[list[pos]];
+  document.getElementById('vCount').textContent = '설문지 #'+r.id+'  ('+(pos+1)+' / '+list.length+')';
+  var h = sec('제출일시', r.created_kst) + sec('소속 기관', r.org) + sec('근무 지역', r.region)
+        + sec('연락처', r.contact ? r.contact : (r.consent ? '-' : '미동의'));
+  ['q1','q2','q3','q4'].forEach(function(k,i){ h += sec((i+1)+'. '+QS[i], r[k]); });
+  h += sec('5. 기타 의견', r.q5);
+  document.getElementById('vBody').innerHTML = h;
+}
+function openViewer(){
+  list = checkedIdx();
+  if(!list.length){ alert('보려는 설문지를 먼저 체크해 주세요.'); return; }
+  pos = 0; render(); document.getElementById('viewer').classList.add('open');
+}
+function openOne(i, e){
+  if(e && e.target.tagName === 'INPUT') return;
+  list = [i]; pos = 0; render(); document.getElementById('viewer').classList.add('open');
+}
+function closeViewer(){ document.getElementById('viewer').classList.remove('open'); }
+function step(d){ var n = pos + d; if(n < 0 || n >= list.length) return; pos = n; render(); }
+document.addEventListener('keydown', function(e){
+  if(!document.getElementById('viewer').classList.contains('open')) return;
+  if(e.key === 'ArrowLeft') step(-1);
+  else if(e.key === 'ArrowRight') step(1);
+  else if(e.key === 'Escape') closeViewer();
+});
+function exportSelected(){
+  var idx = checkedIdx();
+  if(!idx.length){ alert('엑셀로 받을 설문지를 먼저 체크해 주세요.'); return; }
+  var ids = idx.map(function(i){ return ROWS[i].id; }).join(',');
+  location.href = '/stats/satisfaction/export?ids=' + ids;
+}
+</script>
+</body>
+</html>
+"""
+
+@app.route("/stats/satisfaction")
+def satisfaction_admin():
+    f_org = request.args.get("org", "").strip()
+    f_region = request.args.get("region", "").strip()
+    rows = _sat_load(f_org, f_region)
+    return render_template_string(
+        SATISFACTION_ADMIN_HTML,
+        rows=rows, total=len(rows),
+        stats=_sat_stats(rows),
+        org_counts=[(o, sum(1 for r in rows if r.get("org") == o)) for o in SAT_ORGS],
+        region_counts=[(g, sum(1 for r in rows if r.get("region") == g)) for g in SAT_REGIONS],
+        contact_cnt=sum(1 for r in rows if r.get("contact")),
+        orgs=SAT_ORGS, regions=SAT_REGIONS, f_org=f_org, f_region=f_region,
+        qtitles=[q["title"] for q in SAT_QUESTIONS],
+    )
+
+@app.route("/stats/satisfaction/export")
+def satisfaction_export():
+    f_org = request.args.get("org", "").strip()
+    f_region = request.args.get("region", "").strip()
+    rows = _sat_load(f_org, f_region)
+    ids = request.args.get("ids", "").strip()
+    if ids:
+        want = {i for i in ids.split(",") if i.strip().isdigit()}
+        rows = [r for r in rows if str(r.get("id")) in want]
+    rows = sorted(rows, key=lambda r: r.get("id", 0))
+
+    cols = ["번호", "제출일시", "소속기관", "근무지역", "연락처 동의", "연락처"]
+    cols += [f"{i+1}. {q['title']}" for i, q in enumerate(SAT_QUESTIONS)]
+    cols += [f"5. {SAT_Q5_TITLE}"]
+    data = []
+    for r in rows:
+        data.append([
+            r.get("id"), r.get("created_kst"), r.get("org"), r.get("region"),
+            "동의" if r.get("consent") else "미동의", r.get("contact") or "",
+            r.get("q1"), r.get("q2"), r.get("q3"), r.get("q4"), r.get("q5") or "",
+        ])
+    df = pd.DataFrame(data, columns=cols)
+
+    stat_rows = []
+    total = len(rows)
+    for i, q in enumerate(SAT_QUESTIONS):
+        for opt in q["options"]:
+            c = sum(1 for r in rows if r.get(q["key"]) == opt)
+            stat_rows.append([f"{i+1}. {q['title']}", opt, c, round(c * 100 / total, 1) if total else 0])
+    sdf = pd.DataFrame(stat_rows, columns=["문항", "응답", "인원", "비율(%)"])
+
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        df.to_excel(w, sheet_name="응답(설문지별)", index=False)
+        sdf.to_excel(w, sheet_name="문항별 통계", index=False)
+        for ws in w.book.worksheets:
+            for col in ws.columns:
+                width = max(len(str(c.value)) if c.value is not None else 0 for c in col)
+                ws.column_dimensions[col[0].column_letter].width = min(max(width * 1.6, 10), 50)
+    buf.seek(0)
+    return send_file(
+        buf, as_attachment=True, download_name="케어내비_만족도설문.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 @app.route("/app-version.json")
 def app_version():
     return {
@@ -15300,255 +15795,6 @@ def app_version():
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어내비 새 버전이 있습니다. 업데이트해 주세요."
     }
-
-
-# =========================
-# 케어내비 만족도 설문 — 기존 조사서식(/survey)과 무관
-# 설문에 IP, 접속시각, User-Agent, 페이지뷰 등 접속기록을 저장하지 않음.
-# =========================
-import secrets as _sat_secrets
-import csv as _sat_csv
-from io import StringIO as _sat_StringIO
-
-_SAT_CHOICES = ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"]
-_SAT_REGIONS = ["전남광주통합특별시", "전북특별자치도", "제주특별자치도"]
-_SAT_QUESTIONS = [
-    ("q1", "케어내비를 얼마나 자주 이용하십니까?", ["거의 매일", "주 1~2회", "월 1~2회", "처음 이용"]),
-    ("q2", "케어내비가 필요한 복지서비스를 찾는 데 도움이 되었습니까?", _SAT_CHOICES),
-    ("q3", "케어내비 사용으로 업무 시간이 단축되었다고 생각하십니까?", _SAT_CHOICES),
-    ("q4", "기존 방식과 비교해 서비스 검색이 편리해졌습니까?", _SAT_CHOICES),
-]
-
-def _sat_db(method, table, *, params=None, payload=None):
-    # 반드시 서버의 service_role 인증키 사용. 브라우저에 노출하지 않음.
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    if not key:
-        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY 환경변수가 설정되지 않았습니다")
-    headers = {"apikey": key, "Authorization": "Bearer " + key,
-               "Content-Type": "application/json", "Prefer": "return=representation"}
-    resp = requests.request(method, f"{SUPABASE_URL}/rest/v1/{table}",
-                            headers=headers, params=params, json=payload, timeout=12)
-    resp.raise_for_status()
-    if not resp.content:
-        return []
-    return resp.json()
-
-def _sat_config():
-    rows = _sat_db("GET", "satisfaction_settings", params={"id": "eq.1", "select": "*"})
-    if not rows:
-        raise RuntimeError("설문 설정 테이블이 없습니다. 제공된 SQL을 실행해 주세요")
-    return rows[0]
-
-def _sat_active(cfg):
-    today = datetime.datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
-    return (bool(cfg.get("enabled")) and
-            (not cfg.get("start_date") or today >= cfg["start_date"]) and
-            (not cfg.get("end_date") or today <= cfg["end_date"]))
-
-_SAT_CSS = """
-*{box-sizing:border-box}body{margin:0;background:#e8ecf4;font-family:'Pretendard',sans-serif;color:#111827}
-.container{max-width:860px;margin:auto;padding:30px 20px 40px}.top-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px}
-.home-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:34px;padding:0 15px;border-radius:8px;background:#fff;border:1px solid #e5e7eb;color:#6b7280;text-decoration:none;font-size:13px;font-weight:600;box-shadow:0 2px 6px rgba(15,23,42,.08)}
-.home-button:hover{background:#f3f4f6;color:#374151}.card{background:#fff;border-radius:16px;padding:25px 24px;margin-bottom:18px;box-shadow:0 8px 24px rgba(15,23,42,.08)}
-h1{font-size:23px;margin:0 0 10px;font-weight:800;letter-spacing:-.5px}h2{font-size:17px;margin:0 0 18px;font-weight:800}.muted{font-size:13px;color:#6b7280;line-height:1.7}.section-caption{font-size:12px;color:#2563eb;font-weight:800;margin-bottom:9px}
-.question{padding:20px 0;border-bottom:1px solid #f1f5f9}.question:last-child{border-bottom:0;padding-bottom:0}.question:first-of-type{padding-top:4px}
-.question-label{font-size:15px;font-weight:700;line-height:1.6;margin-bottom:12px;display:block}.required{color:#dc2626}
-.options{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px}.option{position:relative;display:block;cursor:pointer}.option input{position:absolute;opacity:0;width:1px;height:1px}.option span{display:flex;align-items:center;justify-content:center;min-height:43px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:10px;font-size:13px;font-weight:600;padding:9px;text-align:center;transition:all .12s}.option input:checked+span{border-color:#2563eb;background:#eff6ff;color:#1d4ed8}.option input:focus-visible+span{outline:2px solid #2563eb;outline-offset:2px}
-input[type=text],input[type=tel],input[type=date],textarea{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;font:inherit;font-size:14px;margin-top:6px;background:#fff;color:#111827}
-textarea{resize:vertical;min-height:100px}input:focus,textarea:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
-.primary-button{width:100%;height:48px;border:0;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,.25)}.primary-button:disabled{opacity:.55;cursor:default}
-button:active,.home-button:active{transform:scale(.92)}.consent{display:flex;gap:10px;align-items:flex-start;color:#374151;font-size:13px;line-height:1.6;cursor:pointer}.consent input{width:18px;height:18px;accent-color:#2563eb;flex:none}
-.note{background:#f8fafc;padding:12px 14px;border-radius:10px;font-size:12px;line-height:1.7;color:#64748b}.error{color:#b91c1c;font-size:13px;margin:12px 0}.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px}.stat{background:#f8fafc;padding:18px;border-radius:12px}.stat strong{display:block;font-size:25px;color:#2563eb}.stat small{font-size:12px;color:#64748b}.bar-item{margin:13px 0}.bar-head{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:5px}.bar-track{background:#e5e7eb;border-radius:10px;height:9px;overflow:hidden}.bar-fill{background:#3b82f6;height:100%;border-radius:10px}.setting-row{display:flex;gap:12px;flex-wrap:wrap}.setting-row>label{flex:1;min-width:130px;font-size:13px;font-weight:700}.button-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.button-row .primary-button{width:auto;padding:0 25px}.comments{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px 0;border-bottom:1px solid #f1f5f9;font-size:14px}.qr-img{width:190px;height:190px;display:block;margin:16px auto}.link-text{overflow-wrap:anywhere;font-size:13px;color:#2563eb}
-@media(max-width:600px){.container{padding:18px 14px 28px}.card{padding:22px 17px}.options{grid-template-columns:repeat(2,minmax(0,1fr))}h1{font-size:21px}}
-"""
-
-_SAT_FORM_HTML = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>케어내비 설문조사</title><style>{{ css|safe }}</style></head><body><main class="container"><div class="top-bar"><a class="home-button" href="/home">홈으로</a></div>
-<section class="card"><div class="section-caption">케어내비</div><h1>설문조사</h1><p class="muted">서비스 개선을 위한 이용 만족도 조사입니다. 응답 결과는 서비스 개선을 위한 통계 분석에 활용됩니다.</p></section>
-{% if not ready %}<section class="card"><h2>설문조사가 종료되었습니다</h2><p class="muted">현재 참여 가능한 설문조사가 없습니다.</p></section>
-{% elif done %}<section class="card"><h2>설문 참여가 완료되었습니다</h2><p class="muted">소중한 의견 감사합니다.</p>{% if contact_failed %}<p class="error">단, 경품 연락처 저장에는 실패했습니다. 관리자에게 별도로 문의해 주세요.</p>{% endif %}</section>
-{% else %}<form method="post" id="sat-form"><input type="hidden" name="form_token" value="{{ token }}"><input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
-<section class="card"><h2>응답자 기본정보</h2><div class="question"><span class="question-label">1. 소속 기관 <span class="required">*</span></span><div class="options">{% for c in ['공단','지자체'] %}<label class="option"><input type="radio" name="organization" value="{{ c }}" required><span>{{ c }}</span></label>{% endfor %}</div></div>
-<div class="question"><span class="question-label">2. 근무 지역 <span class="required">*</span></span><div class="options">{% for c in regions %}<label class="option"><input type="radio" name="region" value="{{ c }}" required><span>{{ c }}</span></label>{% endfor %}</div></div>
-<div class="question"><span class="question-label">3. 연락처 (경품 지급용 · 선택)</span><div class="note">연락처는 경품 지급 목적으로만 수집하며, 만족도 응답과 별도 데이터로 관리합니다. 동의하지 않아도 설문에 참여할 수 있습니다.</div><label class="consent" style="margin:16px 0 10px"><input type="checkbox" id="prize-consent" name="prize_consent" value="yes"><span>경품 지급을 위한 연락처 수집·이용에 동의합니다. (선택)</span></label><input type="tel" id="prize-contact" name="prize_contact" placeholder="연락처를 입력해 주세요" autocomplete="off" maxlength="30" disabled></div></section>
-<section class="card"><h2>이용 만족도</h2>{% for key, title, options in questions %}<div class="question"><span class="question-label">{{ loop.index }}. {{ title }} <span class="required">*</span></span><div class="options">{% for c in options %}<label class="option"><input type="radio" name="{{ key }}" value="{{ c }}" required><span>{{ c }}</span></label>{% endfor %}</div></div>{% endfor %}
-<div class="question"><label class="question-label" for="sat-comment">5. 기타 의견 (선택)</label><textarea name="comment" id="sat-comment" maxlength="2000" placeholder="케어내비에 대한 개선 의견이나 건의사항을 자유롭게 작성해 주세요."></textarea></div></section>
-<section class="card">{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}<button class="primary-button" type="submit" id="sat-submit">설문 제출하기</button></section></form>{% endif %}</main>
-<script>const c=document.getElementById('prize-consent'),t=document.getElementById('prize-contact');if(c&&t){c.addEventListener('change',()=>{t.disabled=!c.checked;t.required=c.checked;if(!c.checked)t.value='';});}const f=document.getElementById('sat-form');if(f){f.addEventListener('submit',()=>{const b=document.getElementById('sat-submit');if(b&&f.checkValidity()){b.disabled=true;b.textContent='제출 중...';}});}</script></body></html>"""
-
-_SAT_ADMIN_HTML = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>케어내비 설문 통계</title><style>{{ css|safe }}</style></head><body><main class="container"><div class="top-bar"><a href="/stats" class="home-button">통계로</a><a href="/home" class="home-button">홈으로</a></div><section class="card"><h1>설문 통계</h1><p class="muted">케어내비 만족도 설문 결과</p></section>
-<section class="card"><h2>설문 운영 설정</h2><form method="post"><input type="hidden" name="form_token" value="{{ admin_token }}"><label class="consent"><input type="checkbox" name="enabled" value="yes" {% if cfg.enabled %}checked{% endif %}><span>설문조사 운영</span></label><div class="setting-row"><label>시작일 (선택)<input type="date" name="start_date" value="{{ cfg.start_date or '' }}"></label><label>종료일 (선택)<input type="date" name="end_date" value="{{ cfg.end_date or '' }}"></label></div><p class="muted">날짜를 비우면 해당 기간에 제한이 없습니다. 종료일 다음 날부터 응답이 차단됩니다.</p><div class="button-row"><button type="submit" class="primary-button">설정 저장</button></div>{% if message %}<p class="muted">{{ message }}</p>{% endif %}</form></section>
-<section class="card"><h2>QR 및 설문 링크</h2><img class="qr-img" src="/satisfaction/qr.png" alt="설문 링크 QR코드"><a class="link-text" href="{{ survey_url }}" target="_blank" rel="noopener">{{ survey_url }}</a><p class="muted">로그인 없이 참여할 수 있습니다. 설문 운영 기간 외에는 종료 안내가 표시됩니다.</p><div class="button-row"><a href="/satisfaction/qr.png" download="carenavi_satisfaction_qr.png" class="home-button">QR 저장</a><button type="button" class="home-button" onclick="navigator.clipboard.writeText({{ survey_url|tojson }}).then(()=>alert('링크가 복사되었습니다.'))">링크 복사</button></div></section>
-<section class="card"><h2>응답 요약</h2><div class="stats-grid"><div class="stat"><strong>{{ total }}</strong><small>총 응답수</small></div><div class="stat"><strong>{{ avg if avg is not none else '-' }}</strong><small>문항 2~4 평균 / 5점</small></div><div class="stat"><strong>{{ comments|length }}</strong><small>기타 의견</small></div></div><p class="muted">응답자 기본정보와 만족도 문항은 분포별로 집계합니다.</p><div class="button-row"><a href="/admin/satisfaction/export" class="home-button">응답 엑셀받기</a><a href="/admin/satisfaction/contacts" class="home-button">경품 연락처 별도 받기</a></div></section>
-{% for title, items in charts %}<section class="card"><h2>{{ title }}</h2>{% for name, count, percent in items %}<div class="bar-item"><div class="bar-head"><span>{{ name }}</span><strong>{{ count }}명 ({{ percent }}%)</strong></div><div class="bar-track"><div class="bar-fill" style="width:{{ percent }}%"></div></div></div>{% endfor %}</section>{% endfor %}
-<section class="card"><h2>기타 의견</h2>{% if comments %}{% for comment in comments %}<div class="comments">{{ comment }}</div>{% endfor %}{% else %}<p class="muted">등록된 의견이 없습니다.</p>{% endif %}</section></main></body></html>"""
-
-def _sat_admin_required():
-    return bool(session.get("is_admin"))
-
-@app.route("/satisfaction", methods=["GET", "POST"])
-def satisfaction_form():
-    # 익명 설문은 별도 처리하며 기존 로그인 상태와 무관함.
-    try:
-        cfg = _sat_config()
-    except Exception:
-        app.logger.exception("satisfaction configuration unavailable")
-        return render_template_string(_SAT_FORM_HTML, css=_SAT_CSS, ready=False, done=False), 503
-    if not _sat_active(cfg):
-        return render_template_string(_SAT_FORM_HTML, css=_SAT_CSS, ready=False, done=False)
-    if request.method == "GET":
-        token = _sat_secrets.token_urlsafe(24)
-        session["sat_form_token"] = token
-        return render_template_string(_SAT_FORM_HTML, css=_SAT_CSS, ready=True, done=False,
-                                      token=token, regions=_SAT_REGIONS, questions=_SAT_QUESTIONS, error="")
-    error = ""
-    token = session.get("sat_form_token")
-    if not token or not _sat_secrets.compare_digest(str(request.form.get("form_token", "")), str(token)):
-        error = "설문 화면을 새로 열고 다시 제출해 주세요."
-    elif request.form.get("website"):
-        error = "제출할 수 없습니다."
-    organization = request.form.get("organization", "")
-    region = request.form.get("region", "")
-    answers = {key: request.form.get(key, "") for key, _, _ in _SAT_QUESTIONS}
-    if not error and (organization not in ("공단", "지자체") or region not in _SAT_REGIONS or
-        any(answers[key] not in options for key, _, options in _SAT_QUESTIONS)):
-        error = "필수 항목을 모두 선택해 주세요."
-    comment = request.form.get("comment", "").strip()
-    if len(comment) > 2000:
-        error = "기타 의견은 2000자 이내로 입력해 주세요."
-    consent = request.form.get("prize_consent") == "yes"
-    contact = request.form.get("prize_contact", "").strip()
-    if consent and (not contact or len(contact) > 30 or not re.fullmatch(r"[0-9+() -]{7,30}", contact)):
-        error = "경품 연락처를 확인해 주세요."
-    if error:
-        return render_template_string(_SAT_FORM_HTML, css=_SAT_CSS, ready=True, done=False,
-                                      token=token, regions=_SAT_REGIONS, questions=_SAT_QUESTIONS, error=error), 400
-    try:
-        _sat_db("POST", "satisfaction_responses", payload={"organization": organization,
-                "region": region, **answers, "comment": comment})
-        # 연락처는 만족도 응답과 연결하는 식별자를 전혀 만들지 않음.
-        contact_failed = False
-        if consent:
-            try:
-                _sat_db("POST", "satisfaction_prize_contacts", payload={"contact": contact})
-            except Exception:
-                app.logger.exception("satisfaction prize contact storage failed")
-                contact_failed = True
-                # 응답은 이미 저장되었으므로 중복 제출을 유도하지 않음.
-        session.pop("sat_form_token", None)
-        return render_template_string(_SAT_FORM_HTML, css=_SAT_CSS, ready=True, done=True, contact_failed=contact_failed)
-    except Exception:
-        app.logger.exception("satisfaction submission failed")
-        return render_template_string(_SAT_FORM_HTML, css=_SAT_CSS, ready=True, done=False,
-                                      token=token, regions=_SAT_REGIONS, questions=_SAT_QUESTIONS,
-                                      error="저장 중 오류가 발생했습니다. 잠시 후 다시 제출해 주세요."), 503
-
-@app.route("/satisfaction/qr.png")
-def satisfaction_qr():
-    import qrcode
-    url = request.url_root.rstrip("/") + url_for("satisfaction_form")
-    img = qrcode.make(url)
-    output = BytesIO()
-    img.save(output, format="PNG")
-    output.seek(0)
-    return send_file(output, mimetype="image/png", download_name="carenavi_satisfaction_qr.png")
-
-@app.route("/admin/satisfaction", methods=["GET", "POST"])
-def satisfaction_admin():
-    if not _sat_admin_required():
-        return redirect(url_for("admin_login"))
-    try:
-        cfg = _sat_config()
-        msg = ""
-        if request.method == "POST":
-            token = session.get("sat_admin_token", "")
-            if not token or not _sat_secrets.compare_digest(str(request.form.get("form_token", "")), str(token)):
-                return "요청이 유효하지 않습니다.", 400
-            start = request.form.get("start_date", "").strip() or None
-            end = request.form.get("end_date", "").strip() or None
-            try:
-                for date in (start, end):
-                    if date:
-                        datetime.date.fromisoformat(date)
-                if start and end and start > end:
-                    return "종료일은 시작일보다 빠를 수 없습니다.", 400
-            except ValueError:
-                return "날짜 입력이 올바르지 않습니다.", 400
-            _sat_db("PATCH", "satisfaction_settings", params={"id": "eq.1"}, payload={
-                "enabled": request.form.get("enabled") == "yes", "start_date": start, "end_date": end})
-            cfg = _sat_config()
-            msg = "설문 설정이 저장되었습니다."
-        responses = fetch_satisfaction_rows()
-    except Exception:
-        app.logger.exception("satisfaction admin load failed")
-        return "설문 DB를 확인해 주세요. SQL 적용 또는 서버 환경변수 설정이 필요합니다.", 503
-    token = _sat_secrets.token_urlsafe(24)
-    session["sat_admin_token"] = token
-    total = len(responses)
-    fields = [("소속 기관", "organization", ["공단", "지자체"]),
-              ("근무 지역", "region", _SAT_REGIONS)] + [(title, key, options) for key, title, options in _SAT_QUESTIONS]
-    charts = []
-    for title, key, options in fields:
-        charts.append((title, [(opt, sum(r.get(key) == opt for r in responses),
-                                round(100 * sum(r.get(key) == opt for r in responses) / total, 1) if total else 0)
-                               for opt in options]))
-    scores = {"매우 그렇다":5,"그렇다":4,"보통이다":3,"그렇지 않다":2,"전혀 그렇지 않다":1}
-    values = [scores[r[key]] for r in responses for key in ("q2", "q3", "q4") if r.get(key) in scores]
-    avg = round(sum(values)/len(values), 2) if values else None
-    comments = [r["comment"] for r in responses if r.get("comment")]
-    return render_template_string(_SAT_ADMIN_HTML, css=_SAT_CSS, cfg=cfg, charts=charts,
-                                  total=total, avg=avg, comments=comments, admin_token=token,
-                                  message=msg, survey_url=request.url_root.rstrip("/") + url_for("satisfaction_form"))
-
-def fetch_satisfaction_rows():
-    rows = []
-    offset = 0
-    while True:
-        batch = _sat_db("GET", "satisfaction_responses", params={
-            "select":"organization,region,q1,q2,q3,q4,comment", "limit":1000,"offset":offset})
-        if not isinstance(batch, list):
-            raise RuntimeError("Invalid satisfaction result")
-        rows.extend(batch)
-        if len(batch) < 1000:
-            break
-        offset += 1000
-    return rows
-
-def _sat_csv_download(rows, fields, filename):
-    output = _sat_StringIO()
-    output.write('\ufeff')
-    writer = _sat_csv.writer(output)
-    writer.writerow([label for key, label in fields])
-    for r in rows:
-        # CSV 수식 주입 방지
-        writer.writerow([("'" + str(r.get(key, "")) if str(r.get(key, "")).lstrip().startswith(("=", "+", "-", "@"))
-                          else r.get(key, "")) for key, label in fields])
-    return Response(output.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f"attachment; filename={filename}",
-                             "Cache-Control": "no-store"})
-
-@app.route("/admin/satisfaction/export")
-def satisfaction_export():
-    if not _sat_admin_required():
-        return redirect(url_for("admin_login"))
-    return _sat_csv_download(fetch_satisfaction_rows(),
-        [("organization","소속 기관"),("region","근무 지역"),("q1","이용 빈도"),
-         ("q2","복지서비스 검색 도움"),("q3","업무 시간 단축"),
-         ("q4","기존 방식 대비 편리성"),("comment","기타 의견")], "carenavi_satisfaction.csv")
-
-@app.route("/admin/satisfaction/contacts")
-def satisfaction_contacts_export():
-    if not _sat_admin_required():
-        return redirect(url_for("admin_login"))
-    rows = []
-    offset = 0
-    while True:
-        batch = _sat_db("GET", "satisfaction_prize_contacts", params={"select":"contact", "limit":1000, "offset":offset})
-        rows.extend(batch)
-        if len(batch) < 1000:
-            break
-        offset += 1000
-    # 경품 연락처는 만족도 응답 파일과 결합하지 않고 별도 제공.
-    return _sat_csv_download(rows, [("contact","경품 연락처")], "carenavi_prize_contacts.csv")
 
 if __name__ == "__main__":
     app.run()
