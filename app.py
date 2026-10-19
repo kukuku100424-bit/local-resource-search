@@ -2356,11 +2356,27 @@ def _pill_imprint_score(photo_prints, pill_prints):
     return score
 
 
-def search_pills(imprints, color="", shape="", capsule=None, limit=5):
-    """각인(필수) + 색·모양(보조)으로 후보를 점수순으로 반환"""
+def _pill_back_match(b, prints):
+    """뒷면 사진 각인 b가 후보 알약 각인과 맞는 정도 (앞면보다 엄격: 완전 일치 또는 거의 같을 때만)"""
+    import difflib
+    best = 0.0
+    for d in prints:
+        if b == d:
+            return 1.0
+        if len(b) >= 2 and len(d) >= 2:
+            r = difflib.SequenceMatcher(None, b, d).ratio()
+            if r >= 0.8:
+                best = max(best, r)
+    return best
+
+
+def search_pills(imprints, color="", shape="", capsule=None, limit=5, back_prints=None):
+    """각인(필수) + 색·모양(보조)으로 후보를 점수순으로 반환
+    back_prints: 여러 알을 찍었을 때 뒷면 사진에서 읽은 각인들 → 후보의 각인과 맞으면 가산점"""
     photo_prints = [p for p in (_pill_norm(x) for x in (imprints or [])) if p]
     if not photo_prints:
         return []
+    back_norm = [p for p in (_pill_norm(x) for x in (back_prints or [])) if p]
     results = []
     for row in load_pills():
         s_imp = _pill_imprint_score(photo_prints, row["_prints"])
@@ -2373,6 +2389,11 @@ def search_pills(imprints, color="", shape="", capsule=None, limit=5):
             score += 10
         if capsule is not None and capsule == row["_capsule"]:
             score += 5
+        if back_norm:
+            others = [x for x in row["_prints"] if x not in photo_prints] or row["_prints"]
+            s_back = max(_pill_back_match(b, others) for b in back_norm)
+            if s_back:
+                score += 20 * s_back
         if score >= 40:
             results.append((score, row))
     results.sort(key=lambda x: -x[0])
@@ -2389,22 +2410,35 @@ def search_pills(imprints, color="", shape="", capsule=None, limit=5):
     return out
 
 
+PILL_MAX = 10          # 한 번에 처리하는 최대 알약 수
+PILL_RECOMMEND = 5     # 권장 알약 수 (넘으면 안내)
+
+
 def _pill_features_from_images(images):
-    """GPT로 알약 사진의 '보이는 특징'만 읽음 (약 이름 추정 금지). images: [(mimetype, bytes)]"""
+    """GPT로 알약 사진의 '보이는 특징'만 읽음 (약 이름 추정 금지).
+    images: [(label, mimetype, bytes)]  label = "front" | "back"
+    한 사진에 알약이 여러 개일 수 있음 → 알약마다 각인·색·모양을 따로 읽음"""
     import base64
     client = OpenAI()
+    labels = [lb for lb, _, _ in images]
+    if labels == ["front", "back"]:
+        desc = ("첫 번째 사진은 알약들의 앞면, 두 번째 사진은 같은 알약들을 그 자리에서 뒤집어 찍은 뒷면이다. "
+                "뒤집으면서 위치가 조금 바뀌었을 수 있다.\n")
+    else:
+        desc = "사진은 알약들을 한쪽 면만 찍은 것이다.\n"
     content = [{"type": "input_text", "text": (
         "사진 속 알약의 겉모습만 읽어서 JSON으로만 답해. 약 이름은 절대 추측하지 마.\n"
-        "사진은 같은 알약의 앞면(첫 번째)과 뒷면(두 번째, 있을 경우)이다.\n"
-        "각 사진마다 imprint(알약에 새겨지거나 인쇄된 글자·숫자를 보이는 그대로, 로고나 그림이면 빈 문자열, "
-        "분할선으로 나뉜 글자는 이어서), color, shape, score_line(분할선 유무)을 적어.\n"
+        + desc +
+        f"사진마다 보이는 알약을 왼쪽 위부터 오른쪽 아래 순서로 하나씩 모두 적어 (최대 {PILL_MAX}개).\n"
+        "알약마다 imprint(알약에 새겨지거나 인쇄된 글자·숫자를 보이는 그대로, 로고나 그림이면 빈 문자열, "
+        "분할선으로 나뉜 글자는 이어서), color, shape, form을 적어.\n"
         f"color는 다음 중 하나: {', '.join(PILL_COLORS)}\n"
         f"shape는 다음 중 하나: {', '.join(PILL_SHAPES)}\n"
         "form은 '정제', '캡슐', '모름' 중 하나.\n"
-        "알약이 아니거나 글자를 전혀 읽을 수 없으면 readable을 false로.\n"
-        '형식: {"sides":[{"imprint":"","color":"","shape":"","score_line":false}],"form":"정제","readable":true}'
+        "photos 배열은 사진 순서대로 하나씩, 각 사진의 pills 배열에 알약을 넣어.\n"
+        '형식: {"photos":[{"pills":[{"imprint":"","color":"","shape":"","form":"정제"}]}],"total":1}'
     )}]
-    for mime, data in images:
+    for _, mime, data in images:
         b64 = base64.b64encode(data).decode("utf-8")
         content.append({"type": "input_image", "image_url": f"data:{mime};base64,{b64}", "detail": "high"})
 
@@ -2414,10 +2448,89 @@ def _pill_features_from_images(images):
         add_token_usage(getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
     text = res.output_text or ""
     try:
-        return json.loads(text)
+        data = json.loads(text)
     except Exception:
         m = re.search(r"\{.*\}", text, re.DOTALL)
-        return json.loads(m.group()) if m else {"sides": [], "readable": False}
+        data = json.loads(m.group()) if m else {"photos": []}
+
+    out = {}
+    photos = data.get("photos") or []
+    for i, lb in enumerate(labels):
+        pills = (photos[i].get("pills") if i < len(photos) and isinstance(photos[i], dict) else None) or []
+        clean = []
+        for p in pills[:PILL_MAX]:
+            if not isinstance(p, dict):
+                continue
+            form = p.get("form", "모름")
+            clean.append({
+                "imprint": str(p.get("imprint", "") or "").strip(),
+                "color": p.get("color") if p.get("color") in PILL_COLORS else "",
+                "shape": p.get("shape") if p.get("shape") in PILL_SHAPES else "",
+                "capsule": True if form == "캡슐" else (False if form == "정제" else None),
+            })
+        out[lb] = clean
+    return out
+
+
+def _pill_group(no, imprints, color, shape, capsule=None, back_prints=None):
+    """알약 1개 결과 묶음 만들기"""
+    feats = {"imprint": " / ".join(imprints), "color": color, "shape": shape}
+    if not imprints:
+        return {"no": no, "features": feats, "candidates": [],
+                "message": "각인(글자)을 읽지 못했습니다. 이 알약은 글자가 보이도록 가까이 따로 찍거나, 아래에 각인을 직접 입력해 주세요."}
+    cands = search_pills(imprints, color, shape, capsule, back_prints=back_prints)
+    return {"no": no, "features": feats, "candidates": cands,
+            "message": "" if cands else "일치하는 알약을 찾지 못했습니다. 인식된 각인을 직접 고쳐서 다시 찾아보세요."}
+
+
+def _pill_build_groups(front, back):
+    """앞면·뒷면 사진에서 읽은 알약들로 결과 묶음 만들기
+    - 알약 1개: 앞·뒤 각인을 함께 대조 (기존 방식과 동일)
+    - 여러 개: 앞면 알약마다 찾고, 뒷면 사진의 각인과 맞는 후보에 가산점
+      (뒤집으며 위치가 바뀌어도 되도록 앞·뒤 짝을 억지로 맞추지 않음)
+      뒷면에만 각인이 보이는 알약은 따로 묶음으로 추가"""
+    if not front and back:
+        front, back = back, []
+    if len(front) <= 1 and len(back) <= 1:
+        sides = front + back
+        imprints = [s["imprint"] for s in sides if s["imprint"]]
+        color = next((s["color"] for s in sides if s["color"]), "")
+        shape = next((s["shape"] for s in sides if s["shape"]), "")
+        capsule = next((s["capsule"] for s in sides if s["capsule"] is not None), None)
+        return [_pill_group(1, imprints, color, shape, capsule)]
+
+    back_prints = [s["imprint"] for s in back if s["imprint"]]
+    slots, used_back = [], set()          # 앞면 사진 순서(왼쪽 위부터) 그대로 유지
+    for p in front:
+        if not p["imprint"]:
+            slots.append(p)                # 앞면 민무늬 → 뒷면 각인으로 채울 자리
+            continue
+        g = _pill_group(0, [p["imprint"]], p["color"], p["shape"], p["capsule"], back_prints)
+        # 1등 후보의 각인과 맞는 뒷면 각인은 '설명됨' 처리
+        if g["candidates"]:
+            top = g["candidates"][0]
+            top_prints = [x for x in (_pill_norm(top.get("print_front")), _pill_norm(top.get("print_back"))) if x]
+            for i, bp in enumerate(back_prints):
+                if _pill_back_match(_pill_norm(bp), top_prints):
+                    used_back.add(i)
+        slots.append(g)
+
+    # 아직 설명되지 않은 뒷면 각인 → 앞면 민무늬 자리에 차례로 채우고, 남으면 뒤에 추가
+    rest = [b for i, b in enumerate([s for s in back if s["imprint"]]) if i not in used_back]
+    groups = []
+    for s in slots:
+        if "features" in s:
+            groups.append(s)
+        elif rest:
+            b = rest.pop(0)
+            groups.append(_pill_group(0, [b["imprint"]], b["color"] or s["color"], b["shape"] or s["shape"], b["capsule"]))
+        else:
+            groups.append(_pill_group(0, [], s["color"], s["shape"]))
+    for b in rest:
+        groups.append(_pill_group(0, [b["imprint"]], b["color"], b["shape"], b["capsule"]))
+    for i, g in enumerate(groups):
+        g["no"] = i + 1
+    return groups
 
 
 def _pill_throttle():
@@ -2449,7 +2562,7 @@ def pill_identify():
         data = f.read()
         if len(data) > 8 * 1024 * 1024:
             return jsonify({"ok": False, "message": "이미지 용량은 8MB 이하만 가능합니다."})
-        images.append((f.mimetype, data))
+        images.append((key, f.mimetype, data))
     if not images:
         return jsonify({"ok": False, "message": "알약 사진을 찍어주세요."})
 
@@ -2459,26 +2572,24 @@ def pill_identify():
         app.logger.exception(e)
         return jsonify({"ok": False, "message": "사진 분석 중 오류가 발생했습니다. 다시 시도해 주세요."})
 
-    sides = feat.get("sides") or []
-    imprints = [str(s.get("imprint", "")).strip() for s in sides if str(s.get("imprint", "")).strip()]
-    color = next((s.get("color") for s in sides if s.get("color") in PILL_COLORS), "")
-    shape = next((s.get("shape") for s in sides if s.get("shape") in PILL_SHAPES), "")
-    form = feat.get("form", "모름")
-    capsule = True if form == "캡슐" else (False if form == "정제" else None)
-
-    features = {"imprint": " / ".join(imprints), "color": color, "shape": shape}
-    if not imprints:
-        return jsonify({"ok": True, "features": features, "candidates": [],
-                        "message": "알약의 각인(글자)을 읽지 못했습니다. 글자가 보이도록 가까이, 밝은 곳에서 다시 찍어주세요."})
-    cands = search_pills(imprints, color, shape, capsule)
-    msg = "" if cands else "일치하는 알약을 찾지 못했습니다. 인식된 각인을 직접 고쳐서 다시 찾아보세요."
-    return jsonify({"ok": True, "features": features, "candidates": cands, "message": msg})
+    front, back = feat.get("front", []), feat.get("back", [])
+    if not front and not back:
+        return jsonify({"ok": True, "groups": [], "message": "사진에서 알약을 찾지 못했습니다. 알약이 잘 보이도록 밝은 곳에서 다시 찍어주세요."})
+    groups = _pill_build_groups(front, back)
+    count = max(len(front), len(back))
+    msg = ""
+    if count > PILL_RECOMMEND:
+        msg = (f"알약이 {count}개로 많아 정확도가 떨어질 수 있습니다. "
+               f"{PILL_RECOMMEND}알 이하로 나눠 찍으면 더 정확합니다.")
+        if count >= PILL_MAX:
+            msg += f" (한 번에 최대 {PILL_MAX}알까지 확인합니다)"
+    return jsonify({"ok": True, "groups": groups, "message": msg})
 
 
 @app.route("/pill/search", methods=["POST"])
 @login_required
 def pill_search():
-    """인식된 정보를 사용자가 고쳐서 다시 찾기 (AI 호출 없음)"""
+    """인식된 정보를 사용자가 고쳐서 다시 찾기 (알약 1개 단위, AI 호출 없음)"""
     d = request.get_json(silent=True) or {}
     imprints = [x.strip() for x in str(d.get("imprint", "")).split("/") if x.strip()]
     color = d.get("color") if d.get("color") in PILL_COLORS else ""
@@ -2604,6 +2715,10 @@ PILL_HTML = """
 .pill-feat-row input, .pill-feat-row select{ width:100%; height:36px; margin:0; padding:0 8px; border:1px solid #c7d7ff; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; box-sizing:border-box; }
 .pill-re{ width:100% !important; height:34px !important; margin:8px 0 0 !important; padding:0 !important; border:1px solid #93c5fd !important; border-radius:8px !important; background:#fff !important; color:#1d4ed8 !important; font-size:13px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
 .pill-list{ margin-top:12px; display:flex; flex-direction:column; gap:10px; }
+.pill-group + .pill-group{ margin-top:18px; padding-top:14px; border-top:2px dashed #e5e7eb; }
+.pill-group-title{ font-size:15px; font-weight:800; color:#111827; }
+.pill-group .pill-feat{ display:block; }
+.pill-group .pill-msg{ display:block; }
 .pill-card{ display:flex; gap:12px; padding:10px; border:1px solid #e5e7eb; border-radius:12px; }
 .pill-card img{ flex:none; width:96px; height:54px; object-fit:contain; border-radius:6px; background:#f9fafb; }
 .pill-info{ flex:1; min-width:0; }
@@ -2646,28 +2761,17 @@ PILL_HTML = """
       <div class="pill-shots">
         <div class="pill-shot" id="pillShotFront" data-side="front" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="front">
-          <span>📷 앞면</span><small>각인이 보이게</small>
+          <span>📷 앞면</span><small>알약 1~5알</small>
         </div>
         <div class="pill-shot" id="pillShotBack" data-side="back" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="back">
-          <span>📷 뒷면</span><small>선택 · 있으면 더 정확</small>
+          <span>📷 뒷면</span><small>선택 · 그 자리에서 뒤집어서</small>
         </div>
       </div>
-      <p class="pill-tip"><span>※</span><span>알약에 새겨진 글자(각인)가 선명하게 보이도록 가까이, 밝은 곳에서 찍어주세요. 사진은 저장되지 않습니다.</span></p>
+      <p class="pill-tip"><span>※</span><span>알약은 한 알도, 여러 알(최대 5알)도 됩니다. 여러 알이면 서로 떨어뜨려 놓고, 각인(글자)이 선명하게 보이도록 밝은 곳에서 찍어주세요. 사진은 저장되지 않습니다.</span></p>
       <button type="button" class="pill-go" id="pillGo">확인하기</button>
 
       <div class="pill-msg" id="pillMsg"></div>
-
-      <div class="pill-feat" id="pillFeat">
-        <div class="pill-feat-title">AI가 사진에서 읽은 정보</div>
-        <div class="pill-feat-help">사진 속 알약과 글자가 다르면 직접 고친 뒤 아래 버튼을 눌러주세요.</div>
-        <div class="pill-feat-row">
-          <input type="text" id="pillImprint" placeholder="각인 글자 (앞 / 뒤)">
-          <select id="pillColor"><option value="">색 전체</option></select>
-          <select id="pillShape"><option value="">모양 전체</option></select>
-        </div>
-        <button type="button" class="pill-re" id="pillRe">고친 정보로 다시 검색</button>
-      </div>
 
       <div class="pill-list" id="pillList"></div>
     </div>
@@ -2695,14 +2799,13 @@ PILL_HTML = """
   var surveyMode = false;
   var goBtn = document.getElementById("pillGo");
   var msg = document.getElementById("pillMsg");
-  var feat = document.getElementById("pillFeat");
   var list = document.getElementById("pillList");
-  var inImp = document.getElementById("pillImprint");
-  var inColor = document.getElementById("pillColor");
-  var inShape = document.getElementById("pillShape");
 
-  COLORS.forEach(function(c){ var o=document.createElement("option"); o.value=c; o.textContent=c; inColor.appendChild(o); });
-  SHAPES.forEach(function(s){ var o=document.createElement("option"); o.value=s; o.textContent=s; inShape.appendChild(o); });
+  function opts(arr, all, sel){
+    return '<option value="">' + all + '</option>' + arr.map(function(v){
+      return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + '</option>';
+    }).join("");
+  }
 
   /* 큰 사진은 휴대폰에서 줄여서 전송 (각인 판독에 충분한 1600px) */
   function shrink(file){
@@ -2778,8 +2881,9 @@ PILL_HTML = """
 
   function esc(s){ var d=document.createElement("div"); d.textContent = (s==null?"":s); return d.innerHTML; }
 
-  function render(cands){
-    list.innerHTML = "";
+  /* 후보 카드 목록 */
+  function renderCards(box, cands){
+    box.innerHTML = "";
     (cands || []).forEach(function(c){
       var card = document.createElement("div");
       card.className = "pill-card";
@@ -2804,19 +2908,60 @@ PILL_HTML = """
         });
         card.querySelector(".pill-actions").appendChild(b);
       }
-      list.appendChild(card);
+      box.appendChild(card);
     });
+  }
+
+  /* 알약 1개 묶음: (여러 알이면 'N번 알약') → AI가 읽은 정보(수정 가능) → 안내 → 후보 */
+  function renderGroup(g, multi){
+    var f = g.features || {};
+    var el = document.createElement("div");
+    el.className = "pill-group";
+    el.innerHTML =
+      (multi ? '<div class="pill-group-title">' + g.no + '번 알약</div>' : '') +
+      '<div class="pill-feat"' + (multi ? ' style="margin-top:8px"' : '') + '>' +
+        '<div class="pill-feat-title">AI가 사진에서 읽은 정보</div>' +
+        (multi ? '<div style="height:6px"></div>' : '<div class="pill-feat-help">사진 속 알약과 글자가 다르면 직접 고친 뒤 아래 버튼을 눌러주세요.</div>') +
+        '<div class="pill-feat-row">' +
+          '<input type="text" class="g-imp" placeholder="각인 글자 (앞 / 뒤)" value="' + esc(f.imprint || "") + '">' +
+          '<select class="g-color">' + opts(COLORS, "색 전체", f.color) + '</select>' +
+          '<select class="g-shape">' + opts(SHAPES, "모양 전체", f.shape) + '</select>' +
+        '</div>' +
+        '<button type="button" class="pill-re">고친 정보로 다시 검색</button>' +
+      '</div>' +
+      '<div class="pill-msg g-msg" style="display:none"></div>' +
+      '<div class="pill-list g-list"></div>';
+    var gmsg = el.querySelector(".g-msg"), glist = el.querySelector(".g-list");
+    function setGMsg(t){ gmsg.textContent = t || ""; gmsg.style.display = t ? "block" : "none"; }
+    setGMsg(g.message);
+    renderCards(glist, g.candidates);
+    el.querySelector(".pill-re").addEventListener("click", function(){
+      setGMsg(""); glist.innerHTML = "";
+      fetch("/pill/search", {
+        method:"POST", credentials:"same-origin",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ imprint: el.querySelector(".g-imp").value, color: el.querySelector(".g-color").value, shape: el.querySelector(".g-shape").value })
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(!d || !d.ok){ setGMsg((d && d.message) || "오류가 발생했습니다."); return; }
+        renderCards(glist, d.candidates);
+        setGMsg(d.message || "");
+      }).catch(function(){ setGMsg("연결 오류가 발생했습니다."); });
+    });
+    return el;
   }
 
   function handle(data){
     if(!data || !data.ok){ showMsg((data && data.message) || "오류가 발생했습니다."); return; }
-    if(data.features){
-      inImp.value = data.features.imprint || "";
-      inColor.value = data.features.color || "";
-      inShape.value = data.features.shape || "";
-      feat.style.display = "block";
+    list.innerHTML = "";
+    var groups = data.groups || [];
+    if(groups.length > 1){
+      var note = document.createElement("div");
+      note.className = "pill-feat-help";
+      note.style.margin = "0 0 8px";
+      note.textContent = "사진 속 알약 " + groups.length + "개를 왼쪽 위부터 차례로 번호를 붙였습니다. 글자가 다르면 해당 알약의 정보를 고친 뒤 다시 검색해 주세요.";
+      list.appendChild(note);
     }
-    render(data.candidates);
+    groups.forEach(function(g){ list.appendChild(renderGroup(g, groups.length > 1)); });
     showMsg(data.message || "");
     scrollToResult();
   }
@@ -2825,7 +2970,7 @@ PILL_HTML = """
   function scrollToResult(){
     if(!window.matchMedia("(max-width:767px)").matches) return;
     var body = modal.querySelector(".pill-body");
-    var target = (msg.style.display === "block") ? msg : (feat.style.display === "block" ? feat : list);
+    var target = (msg.style.display === "block") ? msg : list;
     if(!body || !target) return;
     setTimeout(function(){
       var top = target.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 8;
@@ -2848,16 +2993,6 @@ PILL_HTML = """
       .finally(function(){ stopLoading(); goBtn.disabled = false; goBtn.textContent = "확인하기"; });
   });
 
-  document.getElementById("pillRe").addEventListener("click", function(){
-    showMsg(""); list.innerHTML = "";
-    fetch("/pill/search", {
-      method:"POST", credentials:"same-origin",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ imprint: inImp.value, color: inColor.value, shape: inShape.value })
-    }).then(function(r){ return r.json(); }).then(handle)
-      .catch(function(){ showMsg("연결 오류가 발생했습니다."); });
-  });
-
   /* survey=true 이면 치매약 후보에 '예 선택' 버튼 표시 (사전조사 화면) */
   window.openPill = function(survey, restored){
     surveyMode = !!survey;
@@ -2869,7 +3004,7 @@ PILL_HTML = """
       var im = b.querySelector("img"); if(im) im.remove();
       var inp = b.querySelector("input"); if(inp) inp.value = "";
     });
-    showMsg(""); list.innerHTML = ""; feat.style.display = "none";
+    showMsg(""); list.innerHTML = "";
     modal.classList.add("show");
     document.body.style.overflow = "hidden";
     /* 휴대폰 뒤로가기를 누르면 이전 화면(로그인)이 아니라 팝업만 닫히도록 기록 하나 추가 */
