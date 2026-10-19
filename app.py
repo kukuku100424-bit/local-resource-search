@@ -2370,7 +2370,7 @@ def _pill_back_match(b, prints):
     return best
 
 
-def search_pills(imprints, color="", shape="", capsule=None, limit=5, back_prints=None):
+def search_pills(imprints, color="", shape="", capsule=None, limit=3, back_prints=None):
     """각인(필수) + 색·모양(보조)으로 후보를 점수순으로 반환
     back_prints: 여러 알을 찍었을 때 뒷면 사진에서 읽은 각인들 → 후보의 각인과 맞으면 가산점"""
     photo_prints = [p for p in (_pill_norm(x) for x in (imprints or [])) if p]
@@ -2430,6 +2430,7 @@ def _pill_features_from_images(images):
         "사진 속 알약의 겉모습만 읽어서 JSON으로만 답해. 약 이름은 절대 추측하지 마.\n"
         + desc +
         f"사진마다 보이는 알약을 왼쪽 위부터 오른쪽 아래 순서로 하나씩 모두 적어 (최대 {PILL_MAX}개).\n"
+        "알약 1개는 반드시 1개로만 적어. 한 알약의 글자가 분할선 등으로 나뉘어 있어도 별도 알약으로 나누지 말고, 같은 알약을 두 번 적지 마.\n"
         "알약마다 imprint(알약에 새겨지거나 인쇄된 글자·숫자를 보이는 그대로, 로고나 그림이면 빈 문자열, "
         "분할선으로 나뉜 글자는 이어서), color, shape, form을 적어.\n"
         f"color는 다음 중 하나: {', '.join(PILL_COLORS)}\n"
@@ -2526,7 +2527,11 @@ def _pill_build_groups(front, back):
             groups.append(_pill_group(0, [b["imprint"]], b["color"] or s["color"], b["shape"] or s["shape"], b["capsule"]))
         else:
             groups.append(_pill_group(0, [], s["color"], s["shape"]))
+    # 남은 뒷면 각인은 '앞면 사진에서 빠진 알약'일 때만 추가 (총 개수가 사진 속 알약 수를 넘지 않게)
+    total = max(len(front), len(back))
     for b in rest:
+        if len(groups) >= total:
+            break
         groups.append(_pill_group(0, [b["imprint"]], b["color"], b["shape"], b["capsule"]))
     for i, g in enumerate(groups):
         g["no"] = i + 1
