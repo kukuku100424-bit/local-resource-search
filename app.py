@@ -1944,6 +1944,302 @@ MIDDLE_CATEGORY_OPTIONS = sorted_unique_values("중분류")
 MANAGER_OPTIONS = sorted_unique_values("관리주체")
 
 # =========================
+# 공단자원 연관검색어 + 돌봄온 팝업 (사례검색 화면 전용)
+# - dolbomon_resources.xlsx 를 읽어 사례검색 입력창 아래 연관검색어로 표시
+# - 이미지는 static/dolbomon/ 폴더에 저장, 엑셀 '돌봄온파일' 열에 파일명 기입 (여러 장은 쉼표 구분)
+# - 엑셀 수정 시 파일 수정시각을 확인해 자동 재로드 (서버 재시작 불필요)
+# =========================
+DOLBOMON_FILE = "dolbomon_resources.xlsx"
+_DOLBOMON_CACHE = {"mtime": None, "items": []}
+
+def load_dolbomon_items():
+    try:
+        mtime = os.path.getmtime(DOLBOMON_FILE)
+    except OSError:
+        return []
+    if _DOLBOMON_CACHE["mtime"] == mtime:
+        return _DOLBOMON_CACHE["items"]
+    try:
+        ddf = pd.read_excel(DOLBOMON_FILE, sheet_name=0, dtype=str).fillna("")
+    except Exception as e:
+        app.logger.exception(e)
+        return _DOLBOMON_CACHE["items"]
+    ddf.columns = [str(c).replace(" ", "").strip() for c in ddf.columns]
+
+    def _split(v):
+        return [x.strip() for x in re.split(r"[,，]", str(v or "")) if x.strip()]
+
+    def _expand_images(v):
+        """돌봄온파일 열 해석
+        - 확장자 생략 시 .png 자동 추가     예) 가족휴가제1 → 가족휴가제1.png
+        - 물결(~)로 번호 범위 지정          예) 가족휴가제1~3 → 가족휴가제1.png, 가족휴가제2.png, 가족휴가제3.png
+        - 쉼표로 여러 개 나열도 그대로 가능  예) 가족휴가제1, 안내.jpg"""
+        out = []
+        for tok in _split(v):
+            m = re.match(r"^(.*?)(\d+)\s*~\s*(\d+)(.*)$", tok)
+            if m and int(m.group(2)) <= int(m.group(3)) and int(m.group(3)) - int(m.group(2)) < 50:
+                prefix, a, b, suffix = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4).strip()
+                names = [f"{prefix}{n}{suffix}" for n in range(a, b + 1)]
+            else:
+                names = [tok]
+            for nm in names:
+                if "." not in nm.rsplit("/", 1)[-1]:
+                    nm += ".png"
+                out.append(nm)
+        return out
+
+    # 자원 엑셀(service_resources.xlsx)에 실제 기관이 있는지 확인용
+    # → 기관찾기와 같은 조건(대분류·중분류 일치 + 프로그램명 포함)으로 1건이라도 있으면 True
+    def _has_org(main, middle, kw):
+        if not kw:
+            return False
+        try:
+            sub = df
+            if main and "대분류" in sub.columns:
+                sub = sub[sub["대분류"].fillna("").astype(str).str.strip() == main]
+            if middle and "중분류" in sub.columns:
+                sub = sub[sub["중분류"].fillna("").astype(str).str.strip() == middle]
+            if "관리주체" in sub.columns:  # 기관찾기로 넘길 때 관리주체=공단으로 넘기므로 같은 조건으로 확인
+                sub = sub[sub["관리주체"].fillna("").astype(str).str.strip() == "공단"]
+            col = "프로그램명(사업명)"
+            if col not in sub.columns:
+                return False
+            return bool(sub[col].fillna("").astype(str)
+                        .str.contains(kw, case=False, na=False, regex=False).any())
+        except Exception:
+            return True  # 확인 실패 시 기존처럼 버튼 표시
+
+    items = []
+    for _, r in ddf.iterrows():
+        name = str(r.get("표시명", "")).strip()
+        if not name:
+            continue
+        if str(r.get("사용", "Y")).strip().upper() == "N":
+            continue
+        items.append({
+            "name": name,
+            "keywords": _split(r.get("매칭어", "")),
+            "main": str(r.get("대분류", "")).strip(),
+            "middle": str(r.get("중분류", "")).strip(),
+            # 기관찾기 '프로그램' 칸에 넣을 값 (예전 열 이름 '기관검색어'도 인식)
+            "kw": str(r.get("프로그램명", "") or r.get("기관검색어", "")).strip(),
+            "images": _expand_images(r.get("돌봄온파일", "")),
+        })
+        items[-1]["has_org"] = _has_org(items[-1]["main"], items[-1]["middle"], items[-1]["kw"])
+    _DOLBOMON_CACHE["mtime"] = mtime
+    _DOLBOMON_CACHE["items"] = items
+    return items
+
+@app.context_processor
+def inject_dolbomon_items():
+    # 사례검색(/desc)·기관찾기(/combo) 화면에서만 사용
+    if request.path not in ("/desc", "/combo"):
+        return {}
+    return {"dolbomon_items": load_dolbomon_items(), "dbo_viewer": DBO_VIEWER_HTML}
+
+# 돌봄온 이미지 팝업 + 통합돌봄ON 선택창 (사례검색·기관찾기 공용)
+# - 템플릿에서 {{ dbo_viewer|safe }} 로 삽입. 자원 목록은 각 페이지에서 dolbomon_items 로 전달
+DBO_VIEWER_HTML = """
+<style>
+.dbo-modal, .dbo-picker{ display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); align-items:center; justify-content:center; padding:16px; }
+.dbo-picker{ z-index:100000; }
+.dbo-modal{ z-index:100001; }
+.dbo-modal.show, .dbo-picker.show{ display:flex; }
+.dbo-box{ width:100%; max-width:560px; max-height:90vh; background:#fff; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25); font-family:inherit; }
+.dbo-head{ display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid #e5e7eb; }
+.dbo-title{ flex:1; min-width:0; font-size:15px; font-weight:800; color:#111827; word-break:keep-all; text-align:left; }
+.dbo-search-btn{ flex:none; display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 12px; border-radius:999px; background:#93c5fd; color:#1e40af; font-size:13px; font-weight:700; text-decoration:none; white-space:nowrap; box-shadow:0 2px 6px rgba(37,99,235,0.3); }
+.dbo-search-btn:hover{ background:#7fb6fb; }
+.dbo-search-btn.disabled{ background:#e5e7eb; color:#9ca3af; box-shadow:none; cursor:default; pointer-events:none; }
+.dbo-close{ flex:none; width:34px !important; height:34px !important; margin:0 !important; padding:0 !important; border:none !important; border-radius:999px !important; background:#f3f4f6 !important; color:#374151 !important; font-size:20px !important; line-height:1 !important; box-shadow:none !important; cursor:pointer; }
+.dbo-body{ flex:1; overflow:auto; background:#f9fafb; padding:8px; }
+.dbo-body img{ display:block; width:100%; height:auto; border-radius:8px; }
+.dbo-empty{ padding:40px 10px; text-align:center; color:#9ca3af; font-size:13px; }
+.dbo-nav{ display:none; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border-top:1px solid #e5e7eb; }
+.dbo-nav.show{ display:flex; }
+.dbo-nav-btn{ width:auto !important; min-width:72px; height:36px !important; margin:0 !important; padding:0 16px !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:14px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.dbo-nav-btn:disabled{ background:#cbd5e1 !important; cursor:not-allowed; }
+.dbo-page{ font-size:13px; font-weight:700; color:#6b7280; }
+.dbo-pick-body{ flex:1; overflow:auto; padding:14px; }
+.dbo-pick-label{ font-size:12px; font-weight:800; color:#6b7280; margin:4px 0 8px; }
+.dbo-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.dbo-chips:empty{ display:none; }
+.dbo-picker .dbo-head{ padding:14px 16px; }
+.dbo-picker .dbo-pick-body{ padding:16px 16px 2px; }
+.dbo-picker .dbo-foot{ padding:8px 16px; }
+.dbo-chip{ padding:7px 13px; border:1px solid #d1d5db; border-radius:999px; background:#f9fafb; color:#374151; font-size:13px; font-weight:600; cursor:pointer; user-select:none; }
+.dbo-chip.active{ background:#2563eb; border-color:#2563eb; color:#fff; }
+.dbo-item{ display:flex; align-items:center; gap:6px; padding:11px 10px; border-bottom:1px solid #f1f5f9; font-size:14px; font-weight:700; color:#1e3a8a; cursor:pointer; word-break:keep-all; }
+.dbo-item:hover{ background:#eef2ff; }
+.dbo-sub{ margin-top:3px; font-size:12px; font-weight:500; color:#6b7280; line-height:1.4; word-break:keep-all; }
+.dbo-foot{ flex:none; padding:8px 14px; border-top:1px solid #f1f5f9; text-align:right; font-size:11px; color:#9ca3af; }
+.dbo-foot a{ color:#6b7280; text-decoration:none; }
+.dbo-foot a:hover{ color:#2563eb; text-decoration:underline; }
+.dbo-search-input{ display:block; width:100%; box-sizing:border-box; height:42px; margin:0 0 14px; padding:0 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; font-family:inherit; color:#111827; background:#fff; outline:none; }
+.dbo-search-input:focus{ border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.10); }
+/* PC: 이미지 한 장이 스크롤 없이 화면 안에 다 보이도록 */
+@media (min-width:768px){
+  /* 팝업 폭을 이미지 폭에 맞춤 (세로로 긴 이미지일 때 양옆 여백 제거) */
+  .dbo-modal{ padding:8px; }
+  .dbo-modal .dbo-box{ width:auto; min-width:380px; max-width:94vw; max-height:97vh; }
+  .dbo-modal .dbo-head{ padding:8px 12px; }
+  .dbo-modal .dbo-nav{ padding:6px 12px; }
+  .dbo-modal .dbo-nav-btn{ height:32px !important; }
+  .dbo-modal .dbo-foot{ padding:4px 12px; }
+  .dbo-body{ display:flex; align-items:center; justify-content:center; overflow:auto; min-height:0; padding:4px; }
+  /* 97vh에서 상단(제목)·하단(이전/다음, 출처) 높이를 뺀 만큼만 이미지 높이 허용 */
+  .dbo-body img{ width:auto; max-width:100%; max-height:calc(97vh - 160px); object-fit:contain; cursor:zoom-in; }
+  /* 이미지 클릭 시 크게 보기 (PC 전용): 폭을 넓히고 세로 스크롤 */
+  .dbo-modal.zoom .dbo-box{ width:min(1000px, 94vw); }
+  .dbo-modal.zoom .dbo-body{ display:block; }
+  .dbo-modal.zoom .dbo-body img{ width:100%; max-height:none; cursor:zoom-out; }
+}
+</style>
+
+<div id="dboModal" class="dbo-modal">
+  <div class="dbo-box">
+    <div class="dbo-head">
+      <div class="dbo-title" id="dboTitle"></div>
+      <a href="#" class="dbo-search-btn" id="dboSearchBtn">기관검색</a>
+      <button type="button" class="dbo-close" onclick="closeDbo()" aria-label="닫기">×</button>
+    </div>
+    <div class="dbo-body" id="dboBody"></div>
+    <div class="dbo-nav" id="dboNav">
+      <button type="button" class="dbo-nav-btn" id="dboPrev">◀ 이전</button>
+      <span class="dbo-page" id="dboPage"></span>
+      <button type="button" class="dbo-nav-btn" id="dboNext">다음 ▶</button>
+    </div>
+    <div class="dbo-foot">자료 출처: <a href="https://care1234.my.canva.site/2026v1" target="_blank" rel="noopener noreferrer">통합돌봄ON ↗</a></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById("dboModal");
+  var body = document.getElementById("dboBody");
+  var nav = document.getElementById("dboNav");
+  var page = document.getElementById("dboPage");
+  var prevBtn = document.getElementById("dboPrev");
+  var nextBtn = document.getElementById("dboNext");
+  if(!modal) return;
+  var cur = null, idx = 0;
+
+  /* 현재 화면에서 선택된 지역 (사례검색·기관찾기 모두 select name=sido/sigungu) */
+  function regionVal(name){
+    var el = document.querySelector('select[name="' + name + '"]');
+    return el ? el.value : "";
+  }
+
+  function syncBodyScroll(){
+    var anyOpen = document.querySelector(".dbo-modal.show, .dbo-picker.show");
+    document.body.style.overflow = anyOpen ? "hidden" : "";
+  }
+  window.dboSyncScroll = syncBodyScroll;
+
+  function showImg(){
+    var imgs = (cur && cur.images) || [];
+    body.innerHTML = "";
+    if(!imgs.length){
+      body.innerHTML = '<div class="dbo-empty">등록된 이미지가 없습니다.</div>';
+    }else{
+      var im = document.createElement("img");
+      im.alt = cur.name + " " + (idx + 1);
+      im.onerror = function(){ body.innerHTML = '<div class="dbo-empty">이미지를 불러올 수 없습니다.</div>'; };
+      im.src = "/static/dolbomon/" + encodeURIComponent(imgs[idx]);
+      /* PC: 클릭하면 크게 보기 ↔ 한 화면에 맞추기 (모바일은 두 손가락 확대 사용) */
+      im.addEventListener("click", function(e){
+        if(!window.matchMedia("(min-width:768px)").matches) return;
+        var rect = im.getBoundingClientRect();
+        var ratio = rect.height ? (e.clientY - rect.top) / rect.height : 0;  /* 클릭한 세로 위치 (0~1) */
+        var zoomIn = !modal.classList.contains("zoom");
+        modal.classList.toggle("zoom");
+        if(!zoomIn){ body.scrollTop = 0; return; }
+        /* 확대 후 클릭했던 지점이 화면 가운데 오도록 스크롤 */
+        requestAnimationFrame(function(){
+          var imgTop = im.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+          body.scrollTop = Math.max(0, imgTop + ratio * im.offsetHeight - body.clientHeight / 2);
+        });
+      });
+      if(window.matchMedia("(min-width:768px)").matches) im.title = "클릭하면 크게 / 작게 보기";
+      body.appendChild(im);
+    }
+    body.scrollTop = 0;
+    if(imgs.length > 1){
+      nav.classList.add("show");
+      page.textContent = (idx + 1) + " / " + imgs.length;
+      prevBtn.disabled = (idx === 0);
+      nextBtn.disabled = (idx === imgs.length - 1);
+    }else{
+      nav.classList.remove("show");
+    }
+  }
+
+  function step(d){
+    var imgs = (cur && cur.images) || [];
+    var n = idx + d;
+    if(n < 0 || n >= imgs.length) return;
+    idx = n;
+    showImg();
+  }
+
+  /* 기관검색: 검색은 실행하지 않고 기관찾기 화면에 값만 채워서 이동 */
+  window.openDbo = function(it){
+    cur = it; idx = 0;
+    modal.classList.remove("zoom");
+    document.getElementById("dboTitle").textContent = it.name;
+    var params = new URLSearchParams({
+      sido: regionVal("sido"),
+      sigungu: regionVal("sigungu"),
+      main_category: it.main || "",
+      middle_category: it.middle || "",
+      manager: "공단",   /* 돌봄온 자원은 모두 공단자원 */
+      program_kw: it.kw || ""
+    });
+    var sBtn = document.getElementById("dboSearchBtn");
+    if(it.has_org === false){
+      /* 자원 엑셀에 등록된 기관이 없는 사업: 버튼 비활성화 */
+      sBtn.removeAttribute("href");
+      sBtn.classList.add("disabled");
+      sBtn.textContent = "등록된 기관 없음";
+    }else{
+      sBtn.href = "/combo?" + params.toString();
+      sBtn.classList.remove("disabled");
+      sBtn.textContent = "기관검색";
+    }
+    showImg();
+    modal.classList.add("show");
+    syncBodyScroll();
+  };
+
+  window.closeDbo = function(){
+    modal.classList.remove("show");
+    syncBodyScroll();
+  };
+
+  prevBtn.addEventListener("click", function(){ step(-1); });
+  nextBtn.addEventListener("click", function(){ step(1); });
+  modal.addEventListener("click", function(e){ if(e.target === modal) window.closeDbo(); });
+  document.addEventListener("keydown", function(e){
+    if(!modal.classList.contains("show")) return;
+    if(e.key === "Escape") window.closeDbo();
+    else if(e.key === "ArrowLeft") step(-1);
+    else if(e.key === "ArrowRight") step(1);
+  });
+
+  /* 모바일 좌우 스와이프 */
+  var sx = null;
+  body.addEventListener("touchstart", function(e){ sx = e.touches[0].clientX; }, {passive:true});
+  body.addEventListener("touchend", function(e){
+    if(sx === null) return;
+    var dx = e.changedTouches[0].clientX - sx;
+    sx = null;
+    if(Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
+  }, {passive:true});
+})();
+</script>
+"""
+
+# =========================
 # HOME
 # =========================
 HOME_HTML = """
@@ -2859,7 +3155,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   {% if notices %}<span class="notice-dot"></span>{% endif %}
 </button>
 <button type="button" class="home-help-btn" onclick="openGuide()" aria-label="사용설명서">?</button>
-<h1>NHIS-G <span>케어내비</span></h1>
+<h1>리부트-G <span>케어내비</span></h1>
 <p>통합돌봄 자원 검색 및 안내 서비스</p>
 </div>
 
@@ -6507,7 +6803,7 @@ def combo():
                 filtered["프로그램명(사업명)"]
                 .fillna("")
                 .astype(str)
-                .str.contains(program_kw, case=False, na=False)
+                .str.contains(program_kw, case=False, na=False, regex=False)
             ]
 
         if org_kw and "서비스제공기관명" in filtered.columns:
@@ -6515,7 +6811,7 @@ def combo():
                 filtered["서비스제공기관명"]
                 .fillna("")
                 .astype(str)
-                .str.contains(org_kw, case=False, na=False)
+                .str.contains(org_kw, case=False, na=False, regex=False)
             ]
 
         
@@ -6723,7 +7019,12 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   <div class="form-card">
     <div class="form-title" style="display:flex;align-items:center;justify-content:space-between;">
       <span>통합돌봄 서비스 기관 찾기</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+      {% if dolbomon_items %}
+      <button type="button" onclick="openDboPicker()" style="height:28px;padding:0 11px;border-radius:999px;border:none;background:#93c5fd;color:#1e40af;font-size:13px;font-weight:700;letter-spacing:0.2px;cursor:pointer;display:inline-flex;align-items:center;flex-shrink:0;box-shadow:0 2px 6px rgba(37,99,235,0.3);white-space:nowrap;" aria-label="통합돌봄ON">통합돌봄ON</button>
+      {% endif %}
       <button type="button" onclick="openComboInfo()" style="width:28px;height:28px;border-radius:50%;border:none;background:#93c5fd;color:#1e40af;font-size:15px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(37,99,235,0.3);flex-shrink:0;margin-right:4px;" aria-label="안내">!</button>
+      </div>
     </div>
 
     <form method="post">
@@ -7245,6 +7546,155 @@ function comboGuideStart() {
 // 가이드 투어 제거: 자동 실행하지 않음
 </script>
 
+{% if dolbomon_items %}
+<!-- ===== 통합돌봄ON 선택창 (분류 선택 또는 이름 검색 → 돌봄온 팝업) ===== -->
+<div id="dboPicker" class="dbo-picker">
+  <div class="dbo-box">
+    <div class="dbo-head">
+      <div style="flex:1;min-width:0;">
+        <div class="dbo-title">통합돌봄ON</div>
+        <div class="dbo-sub">서비스 분류를 선택하거나 공단자원 이름으로 검색하세요.</div>
+      </div>
+      <button type="button" class="dbo-close" onclick="closeDboPicker()" aria-label="닫기">×</button>
+    </div>
+    <div class="dbo-pick-body">
+      <input type="text" id="dboPickSearch" class="dbo-search-input" placeholder="공단자원 이름 검색 (예: 가족휴가제)" autocomplete="off">
+      <div id="dboCatArea">
+        <div class="dbo-pick-label">대분류</div>
+        <div class="dbo-chips" id="dboMainChips"></div>
+        <div class="dbo-pick-label" id="dboMidLabel" style="display:none;">중분류</div>
+        <div class="dbo-chips" id="dboMidChips"></div>
+      </div>
+      <div class="dbo-pick-label" id="dboListLabel" style="display:none;">자원</div>
+      <div id="dboPickList"></div>
+    </div>
+    <div class="dbo-foot">자료 출처: <a href="https://care1234.my.canva.site/2026v1" target="_blank" rel="noopener noreferrer">통합돌봄ON ↗</a></div>
+  </div>
+</div>
+
+{{ dbo_viewer|safe }}
+
+<script>
+(function(){
+  var ITEMS = {{ dolbomon_items|tojson }};
+  var picker = document.getElementById("dboPicker");
+  var searchInput = document.getElementById("dboPickSearch");
+  var catArea = document.getElementById("dboCatArea");
+  var mainBox = document.getElementById("dboMainChips");
+  var midBox = document.getElementById("dboMidChips");
+  var midLabel = document.getElementById("dboMidLabel");
+  var listLabel = document.getElementById("dboListLabel");
+  var listBox = document.getElementById("dboPickList");
+  if(!picker || !ITEMS || !ITEMS.length) return;
+
+  /* ── 검색 로직: 사례검색 연관검색어와 동일 ── */
+  function norm(s){
+    return Array.from(String(s || "")).filter(function(c){ return c.trim(); }).join("").toLowerCase();
+  }
+  function baseName(s){
+    return String(s || "").split("(")[0].split("（")[0];
+  }
+  ITEMS.forEach(function(it){
+    it._keys = [norm(baseName(it.name))].concat((it.keywords || []).map(norm))
+      .filter(function(k){ return k.length >= 2; });
+  });
+
+  function uniq(arr){
+    var out = [];
+    arr.forEach(function(v){ if(v && out.indexOf(v) === -1) out.push(v); });
+    return out;
+  }
+  function chip(label, onClick){
+    var c = document.createElement("div");
+    c.className = "dbo-chip";
+    c.setAttribute("role", "button");
+    c.textContent = label;
+    c.addEventListener("click", function(){
+      Array.prototype.forEach.call(c.parentNode.children, function(x){ x.classList.remove("active"); });
+      c.classList.add("active");
+      onClick();
+    });
+    return c;
+  }
+  function renderItems(items, label){
+    listBox.innerHTML = "";
+    listLabel.textContent = label;
+    listLabel.style.display = "";
+    if(!items.length){
+      listBox.innerHTML = '<div class="dbo-empty" style="padding:20px 10px;">검색 결과가 없습니다.</div>';
+      return;
+    }
+    items.forEach(function(it){
+      var d = document.createElement("div");
+      d.className = "dbo-item";
+      d.setAttribute("role", "button");
+      d.textContent = "🔍 " + it.name;
+      d.addEventListener("click", function(){ if(window.openDbo) window.openDbo(it); });
+      listBox.appendChild(d);
+    });
+  }
+
+  function showMids(main){
+    midBox.innerHTML = "";
+    listBox.innerHTML = "";
+    listLabel.style.display = "none";
+    uniq(ITEMS.filter(function(it){ return it.main === main; }).map(function(it){ return it.middle; }))
+      .forEach(function(mid){
+        midBox.appendChild(chip(mid, function(){
+          renderItems(ITEMS.filter(function(it){ return it.main === main && it.middle === mid; }), "자원");
+        }));
+      });
+    midLabel.style.display = "";
+  }
+
+  function resetCategories(){
+    mainBox.innerHTML = "";
+    midBox.innerHTML = "";
+    listBox.innerHTML = "";
+    midLabel.style.display = "none";
+    listLabel.style.display = "none";
+    uniq(ITEMS.map(function(it){ return it.main; }))
+      .forEach(function(main){ mainBox.appendChild(chip(main, function(){ showMids(main); })); });
+  }
+
+  /* 검색어 2~20자: 부분 일치. 검색 중에는 분류 선택 영역을 숨김 */
+  function onSearch(){
+    var q = norm(searchInput.value);
+    if(q.length < 2){
+      catArea.style.display = "";
+      resetCategories();
+      return;
+    }
+    catArea.style.display = "none";
+    var hits = q.length > 20 ? [] : ITEMS.filter(function(it){
+      return it._keys.some(function(k){ return k.indexOf(q) !== -1 || q.indexOf(k) !== -1; });
+    });
+    renderItems(hits, "검색 결과");
+  }
+  searchInput.addEventListener("input", onSearch);
+
+  window.openDboPicker = function(){
+    searchInput.value = "";
+    catArea.style.display = "";
+    resetCategories();
+    picker.classList.add("show");
+    if(window.dboSyncScroll) window.dboSyncScroll();
+  };
+  window.closeDboPicker = function(){
+    picker.classList.remove("show");
+    if(window.dboSyncScroll) window.dboSyncScroll();
+  };
+  picker.addEventListener("click", function(e){ if(e.target === picker) window.closeDboPicker(); });
+  document.addEventListener("keydown", function(e){
+    if(e.key !== "Escape" || !picker.classList.contains("show")) return;
+    var viewer = document.getElementById("dboModal");
+    if(viewer && viewer.classList.contains("show")) return;  /* 이미지 팝업이 열려 있으면 그것만 닫힘 */
+    window.closeDboPicker();
+  });
+})();
+</script>
+{% endif %}
+
 </body>
 </html>
 """
@@ -7339,75 +7789,14 @@ def build_grouped_service_results(service_results):
 
     return grouped_service_results
 
-# =========================
-# 장기요양 가족휴가제 특수 카드 (사례검색 최상단 별도 블록)
-# - 일반 결과(service_results)와 완전히 분리된 별도 블록으로 렌더한다.
-# - 트리거: '가족휴가제' 직접 언급, 또는 (치매/인지저하/배회/1·2등급) + (가족 부재·휴식 맥락)이 동시에 있을 때
-#   ※ '장기요양등급'은 트리거에서 제외(치매 없고 3~4등급은 대상 아님)
-# - 기관검색으로 넘길 때: 대분류=요양, 중분류(단기보호/방문요양) 그대로 + 프로그램명 '가족휴가제' 자동입력
-# 키워드는 현장 표현에 맞게 자유롭게 추가/수정하세요.
-# =========================
-FAMILY_LEAVE_TARGET_KW = ["치매", "인지저하", "배회", "1등급", "2등급"]
-FAMILY_LEAVE_CONTEXT_KW = [
-    "가족휴가", "보호자", "여행", "경조사", "입원", "출장",
-    "며칠", "잠깐맡", "돌봄부담", "쉬고싶", "자리비움", "부재",
-]
-
-def _family_leave_triggered(query):
-    q = (query or "").replace(" ", "")
-    if "가족휴가제" in q:
-        return True
-    has_target = any(k in q for k in FAMILY_LEAVE_TARGET_KW)
-    has_context = any(k in q for k in FAMILY_LEAVE_CONTEXT_KW)
-    return has_target and has_context
-
-def build_family_leave_cards(query, selected_sido, selected_sigungu):
-    """장기요양 가족휴가제 특수 카드 목록. 트리거 미충족 시 빈 리스트.
-    선택 지역에 실제 해당 자원이 있는 중분류(단기보호/방문요양)만 카드로 만든다."""
-    if not _family_leave_triggered(query):
-        return []
-
-    prog_col = "프로그램명(사업명)"
-    if prog_col not in df.columns or "중분류" not in df.columns or "대분류" not in df.columns:
-        return []
-
-    fam = df[
-        df[prog_col].fillna("").astype(str).str.contains("가족휴가", na=False)
-        & (df["대분류"].fillna("").astype(str).str.strip() == "요양")
-    ]
-
-    if selected_sido and "시도" in fam.columns:
-        fam = fam[fam["시도"].fillna("").astype(str).apply(normalize_sido) == selected_sido]
-    if selected_sigungu and "시군구" in fam.columns:
-        fam = fam[fam["시군구"].fillna("").astype(str).apply(normalize_sigungu) == selected_sigungu]
-
-    available_mids = set(fam["중분류"].fillna("").astype(str).str.strip())
-
-    cards = []
-    for mid in ["방문요양", "단기보호"]:
-        if mid in available_mids:
-            cards.append({
-                "대분류": "요양",
-                "중분류": mid,
-                "설명": "보호자의 휴식·부재 시 이용할 수 있는 대체 돌봄 서비스입니다.",
-            })
-    return cards
-
-
-def apply_common_decline_filter(query, service_results, family_leave_cards,
-                                declined_keys=None, declined_special_cards=None):
-    """AI 1회 판별값을 일반 추천/별도 카드에 공통 적용 (추가 AI 호출 없음)."""
+def apply_common_decline_filter(service_results, declined_keys=None):
+    """AI 1회 판별값(명시적으로 거부한 서비스)을 추천 결과에 적용 (추가 AI 호출 없음)."""
     declined_keys = declined_keys or set()
-    declined_special_cards = set(declined_special_cards or [])
-    services = [item for item in service_results if (
+    return [item for item in service_results if (
         str(item.get("대분류", "")).strip(),
         str(item.get("중분류", "")).strip(),
         str(item.get("서비스내용", "")).strip()
     ) not in declined_keys]
-    # 특수 카드는 일반 서비스 인덱스가 없으므로 카드 ID로 판별한다.
-    hide_family = "family_leave" in declined_special_cards
-    cards = [] if hide_family else list(family_leave_cards)
-    return services, cards
 
 @app.route("/desc", methods=["GET","POST"])
 def desc():
@@ -7417,9 +7806,7 @@ def desc():
     cond_display = None
     count = 0
     service_results = []
-    family_cards = []
     declined_keys = set()
-    declined_special_cards = set()
     warning_msg = ""
     action = (request.values.get("action", "") or "").strip()
 
@@ -7495,11 +7882,9 @@ def desc():
 
             if time.time() - cached["time"] < 600:
                 service_results = cached["results"]
-                service_results, family_cards = apply_common_decline_filter(
-                    query, service_results,
-                    build_family_leave_cards(query, selected_sido, selected_sigungu),
+                service_results = apply_common_decline_filter(
+                    service_results,
                     set(tuple(k) for k in cached.get("declined_keys", [])),
-                    cached.get("declined_special_cards", []),
                 )
                 count = len(service_results)
                 warning_msg = cached["warning"]
@@ -7513,7 +7898,6 @@ def desc():
                     count=count,
                     service_results=service_results,
                                  grouped_service_results=build_grouped_service_results(service_results),
-                    family_leave_cards=family_cards,
                     warning_msg=warning_msg,
                     selected_sido=selected_sido,
                     selected_sigungu=selected_sigungu,
@@ -7837,15 +8221,12 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
 - 거부한 서비스와 독립적인 다른 서비스는 제외하지 않는다. 방문목욕 거부만으로 목욕의자·안전손잡이를 제외하지 않는다.
 - 'declined_indices'는 아래 서비스 목록에서 명시적으로 거부한 서비스의 index만 담는다. 같은 중분류 전체를 명시적으로 거부했다면 그 중분류에 속하는 index를 모두 담는다. 애매하면 넣지 않는다.
 - 'results'에는 declined_indices의 서비스를 추천하지 않는다.
-- 가족휴가제처럼 일반 서비스 목록과 별도로 표시되는 카드도 사용자 원문에서 명시적으로 거부하면 'declined_special_cards'에 "family_leave"를 담는다. 치매/보호자 부재로 카드가 자동 생성될 상황도 포함한다.
-- 가족휴가제에 대한 거부가 아닌 다른 서비스의 거부는 "family_leave"에 넣지 않는다.
 
 설명문, 코드블록, 마크다운 없이 JSON만 출력한다.
 
 출력 형식:
 {{
   "declined_indices": [],
-  "declined_special_cards": [],
   "results": [
     {{
       "index": 12,
@@ -7904,13 +8285,6 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                 declined_keys.add((str(row.get("대분류", "")).strip(),
                                    str(row.get("중분류", "")).strip(),
                                    str(row.get("서비스내용", "")).strip()))
-
-            declined_special_cards = set()
-            if isinstance(parsed.get("declined_special_cards"), list):
-                declined_special_cards = {
-                    v for v in parsed["declined_special_cards"]
-                    if isinstance(v, str) and v == "family_leave"
-                }
 
             raw_results = parsed.get("results", [])[:50]
 
@@ -8427,19 +8801,14 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
                 warning_msg = "검색 결과가 없습니다.\n어르신의 건강상태, 생활불편, 돌봄 필요 상황 등을 구체적으로 입력해 주세요."
                 count = 0
 
-        # 검색 경로와 별도 특수 카드 모두 동일한 AI 거부 판별을 사용한다.
-        service_results, family_cards = apply_common_decline_filter(
-            query, service_results,
-            build_family_leave_cards(query, selected_sido, selected_sigungu),
-            declined_keys, declined_special_cards,
-        )
+        # AI가 판별한 명시적 거부 서비스를 최종 결과에 적용한다.
+        service_results = apply_common_decline_filter(service_results, declined_keys)
         count = len(service_results)
         DESC_CACHE[cache_key] = {
             "results": service_results,
             "warning": warning_msg,
             "time": time.time(),
             "declined_keys": [list(k) for k in declined_keys],
-            "declined_special_cards": sorted(declined_special_cards),
         }
         trim_desc_cache()
 
@@ -8459,7 +8828,6 @@ direct_need=false 조건 (아래는 절대 true로 처리하지 않는다):
         count=count,
         service_results=service_results,
              grouped_service_results=build_grouped_service_results(service_results),
-        family_leave_cards=family_cards if do_search else [],
         warning_msg=warning_msg,
         selected_sido=selected_sido,
         selected_sigungu=selected_sigungu,
@@ -10700,6 +11068,19 @@ body.privacy-modal-open{
   border-left:2.5px solid #94a3b8 !important;
 }
 
+/* ===== 공단자원 연관검색어 (팝업 스타일은 DBO_VIEWER_HTML 에 있음) ===== */
+.dbo-suggest{ display:none; margin-top:8px; background:#eef4ff; border:1px solid #c7d7ff; border-radius:12px; padding:10px 12px 12px; }
+.dbo-suggest.show{ display:block; animation:dboSuggestIn .15s ease; }
+@keyframes dboSuggestIn{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+.dbo-suggest-label{ font-size:12.5px; font-weight:700; color:#1e3a8a; margin-bottom:8px; }
+#dboSuggestList{ display:flex; flex-wrap:wrap; gap:6px; }
+.dbo-suggest-item{ display:inline-flex; align-items:center; padding:7px 12px; border-radius:999px; background:#fff; border:1px solid #93c5fd; font-size:13px; font-weight:700; color:#1d4ed8; cursor:pointer; line-height:1.3; word-break:keep-all; transition:background .12s, color .12s; }
+.dbo-suggest-item:hover{ background:#2563eb; border-color:#2563eb; color:#fff; }
+@media (max-width:480px){
+  .dbo-suggest-label{ font-size:12px; }
+  .dbo-suggest-item{ font-size:12.5px; padding:6px 10px; }
+}
+
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
 button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
@@ -10880,6 +11261,11 @@ transition:0.2s;
 </button>
 </div>
 
+<div class="dbo-suggest" id="dboSuggest">
+  <div class="dbo-suggest-label">💡 이런 공단자원을 찾으시나요?</div>
+  <div id="dboSuggestList"></div>
+</div>
+
 <div class="voice-inline" id="voiceOverlay">
   <div class="voice-inline-box">
     <div class="voice-wave-wrap">
@@ -10905,7 +11291,7 @@ transition:0.2s;
 </div>
 
 <div id="searchResultSection">
-{% if warning_msg and not (family_leave_cards|default([]) and count == 0) %}
+{% if warning_msg %}
 <div class="warning-box">
   <span class="warning-icon">⚠️</span>
   <span class="warning-text">{{ warning_msg }}</span>
@@ -10975,34 +11361,10 @@ transition:0.2s;
 </div>
 {% endmacro %}
 
-{% macro render_family_card(c) %}
-<div class="result-card grouped-result-card" style="border:2px solid #EF9F27;">
-  <div style="padding:14px 14px 0;">
-    <span style="display:inline-flex;align-items:center;gap:5px;background:#FAEEDA;color:#854F0B;font-size:12px;font-weight:700;padding:4px 11px;border-radius:8px;">★ 장기요양 가족휴가제</span>
-  </div>
-  <div class="group-card-top">
-    <div class="group-title-area">
-      <div class="group-title-meta">대분류 · 중분류</div>
-      <div class="group-title-grid">
-        <div class="group-title-col"><div class="group-title-value main-val">{{c['대분류']}}</div></div>
-        <div class="group-title-arrow">›</div>
-        <div class="group-title-col"><div class="group-title-value">{{c['중분류']}}</div></div>
-      </div>
-    </div>
-    <a
-      href="/combo?sido={{selected_sido|urlencode}}&sigungu={{selected_sigungu|urlencode}}&main_category={{c['대분류']|urlencode}}&middle_category={{c['중분류']|urlencode}}&program_kw={{'가족휴가제'|urlencode}}&from_desc=1"
-      class="group-search-btn"
-      onclick="return openComboGuideModal(this.href)"
-    >기관검색</a>
-  </div>
-  <div style="padding:12px 14px 14px;font-size:13px;color:#4b5563;line-height:1.6;">{{c['설명']}}</div>
-</div>
-{% endmacro %}
-
 {% set direct_groups = grouped_service_results|default([])|selectattr('direct_need')|list %}
 {% set normal_groups = grouped_service_results|default([])|rejectattr('direct_need')|list %}
 
-{% if service_results or family_leave_cards|default([]) %}
+{% if service_results %}
 <div class="result" id="resultArea">
 
 {% if count > 0 %}
@@ -11029,13 +11391,6 @@ transition:0.2s;
 </div>
 {% endif %}
 
-{% if family_leave_cards|default([]) %}
-<div id="familyLeaveArea" style="{% if direct_groups %}margin-top:14px;{% endif %}">
-{% for c in family_leave_cards %}
-{{ render_family_card(c) }}
-{% endfor %}
-</div>
-{% endif %}
 
 {% for group in normal_groups %}
 {{ render_group_card(group) }}
@@ -11843,6 +12198,57 @@ window.addEventListener("load", function(){
   showPrivacyModal();
 });
 
+</script>
+
+<!-- ===== 돌봄온 팝업 (공단자원 연관검색어 클릭 시) ===== -->
+{{ dbo_viewer|safe }}
+
+<script>
+(function(){
+  var ITEMS = {{ dolbomon_items|default([])|tojson }};
+  var input = document.getElementById("queryInput");
+  var box = document.getElementById("dboSuggest");
+  var list = document.getElementById("dboSuggestList");
+  if(!ITEMS || !ITEMS.length || !input || !box || !list || !window.openDbo) return;
+
+  /* 공백 제거 + 소문자 (띄어쓰기 무시 매칭) */
+  function norm(s){
+    return Array.from(String(s || "")).filter(function(c){ return c.trim(); }).join("").toLowerCase();
+  }
+  /* 표시명의 괄호 부분은 비교에서 제외 — 예: "가족휴가제(단기보호)" → "가족휴가제" */
+  function baseName(s){
+    return String(s || "").split("(")[0].split("（")[0];
+  }
+  ITEMS.forEach(function(it){
+    it._keys = [norm(baseName(it.name))].concat((it.keywords || []).map(norm))
+      .filter(function(k){ return k.length >= 2; });
+  });
+
+  /* 연관검색어: 입력이 짧을 때(공백 제외 2~20자)만 부분 일치로 표시
+     - 20자 초과(사례 작성 중)면 표시하지 않음. 기준을 바꾸려면 아래 숫자 20만 수정 */
+  function renderSuggest(){
+    var q = norm(input.value);
+    list.innerHTML = "";
+    if(q.length < 2 || q.length > 20){ box.classList.remove("show"); return; }
+    var hits = ITEMS.filter(function(it){
+      return it._keys.some(function(k){ return k.indexOf(q) !== -1 || q.indexOf(k) !== -1; });
+    }).slice(0, 8);
+    if(!hits.length){ box.classList.remove("show"); return; }
+    hits.forEach(function(it){
+      var d = document.createElement("div");
+      d.className = "dbo-suggest-item";
+      d.setAttribute("role", "button");
+      d.tabIndex = 0;
+      d.textContent = it.name;
+      d.addEventListener("click", function(){ window.openDbo(it); });
+      d.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); window.openDbo(it); } });
+      list.appendChild(d);
+    });
+    box.classList.add("show");
+  }
+  input.addEventListener("input", renderSuggest);
+  renderSuggest();
+})();
 </script>
 
   <div class="tip-notice">
