@@ -2077,6 +2077,20 @@ DBO_VIEWER_HTML = """
 .dbo-foot a:hover{ color:#2563eb; text-decoration:underline; }
 .dbo-search-input{ display:block; width:100%; box-sizing:border-box; height:42px; margin:0 0 14px; padding:0 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; font-family:inherit; color:#111827; background:#fff; outline:none; }
 .dbo-search-input:focus{ border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.10); }
+/* 모바일: 팝업 전체를 조금 작게 + 주소창 높이를 뺀 실제 화면(dvh) 기준으로 맞춤 */
+@media (max-width:767px){
+  .dbo-modal{ padding:12px; }
+  .dbo-modal .dbo-box{ width:92vw; max-width:440px; max-height:82vh; max-height:82dvh; border-radius:14px; }
+  .dbo-modal .dbo-head{ padding:8px 10px; gap:6px; }
+  .dbo-modal .dbo-title{ font-size:14px; }
+  .dbo-modal .dbo-search-btn{ height:28px; padding:0 10px; font-size:12px; }
+  .dbo-modal .dbo-close{ width:28px !important; height:28px !important; font-size:17px !important; }
+  .dbo-modal .dbo-body{ padding:6px; }
+  .dbo-modal .dbo-nav{ padding:6px 10px; }
+  .dbo-modal .dbo-nav-btn{ min-width:64px; height:32px !important; padding:0 12px !important; font-size:13px !important; }
+  .dbo-modal .dbo-page{ font-size:12px; }
+  .dbo-modal .dbo-foot{ padding:4px 10px; font-size:10.5px; }
+}
 /* PC: 이미지 한 장이 스크롤 없이 화면 안에 다 보이도록 */
 @media (min-width:768px){
   /* 팝업 폭을 이미지 폭에 맞춤 (세로로 긴 이미지일 때 양옆 여백 제거) */
