@@ -2042,7 +2042,7 @@ def inject_dolbomon_items():
         return {}
     ctx = {"dolbomon_items": load_dolbomon_items(), "dbo_viewer": DBO_VIEWER_HTML}
     if request.path == "/desc":
-        ctx["cam_html"] = CAM_HTML
+        ctx["cam_return"] = CAM_RETURN_HTML
     return ctx
 
 # 돌봄온 이미지 팝업 + 통합돌봄ON 선택창 (사례검색·기관찾기 공용)
@@ -2490,229 +2490,57 @@ def pill_search():
                     "message": "" if cands else "일치하는 알약을 찾지 못했습니다."})
 
 
-# 화면 안 카메라 (알약 확인·사례검색 공용)
-# - 휴대폰 카메라 앱으로 넘어가면 일부 기기가 페이지를 새로고침해 사진이 사라지므로, 브라우저 안에서 촬영
-# - 사용: window.openCam({ guide:"circle"|"rect", hint:"안내문", onPhoto:function(blob){}, onFallback:function(){},
-#                          closeup:true })
-#   · 카메라를 쓸 수 없으면(권한 거부·미지원) onFallback 호출 → 기존 파일 선택/카메라 앱 방식으로 진행
-#   · closeup(알약용): 2배 줌, 연속 자동초점, 화면 터치 초점, 플래시 버튼, 원 안쪽만 잘라서 전달
-#     (줌·초점·플래시는 지원하는 휴대폰에서만 동작. 미지원이면 그냥 넘어감)
-# - 지원 기기는 ImageCapture(사진 촬영)로 고해상도, 아니면 영상 화면을 최대 해상도로 캡처
-CAM_HTML = """
-<style>
-.cam-ov{ display:none; position:fixed; inset:0; z-index:100004; background:#000; font-family:inherit; }
-.cam-ov.show{ display:block; }
-.cam-ov video{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-.cam-guide{ position:absolute; left:50%; top:45%; transform:translate(-50%,-50%); border:3px dashed rgba(255,255,255,0.9); box-shadow:0 0 0 9999px rgba(0,0,0,0.35); pointer-events:none; }
-.cam-guide.circle{ width:min(62vw, 300px); height:min(62vw, 300px); border-radius:50%; }
-.cam-guide.rect{ width:min(86vw, 520px); height:min(62vh, 640px); border-radius:12px; }
-.cam-hint{ position:absolute; left:16px; right:16px; top:calc(16px + env(safe-area-inset-top)); padding:10px 12px; border-radius:10px; background:rgba(0,0,0,0.55); color:#fff; font-size:13px; line-height:1.45; text-align:center; word-break:keep-all; }
-.cam-tools{ position:absolute; left:0; right:0; bottom:calc(122px + env(safe-area-inset-bottom)); display:flex; justify-content:center; gap:12px; pointer-events:none; }
-.cam-tool{ display:none; pointer-events:auto; min-width:64px !important; height:36px !important; margin:0 !important; padding:0 14px !important; border:1px solid rgba(255,255,255,0.7) !important; border-radius:999px !important; background:rgba(0,0,0,0.45) !important; color:#fff !important; font-size:13px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
-.cam-tool.on{ background:#fde047 !important; color:#111 !important; border-color:#fde047 !important; }
-.cam-focus{ position:absolute; width:64px; height:64px; margin:-32px 0 0 -32px; border:2px solid #fde047; border-radius:50%; pointer-events:none; opacity:0; transition:opacity .25s, transform .25s; transform:scale(1.3); }
-.cam-focus.show{ opacity:1; transform:scale(1); }
-.cam-bar{ position:absolute; left:0; right:0; bottom:0; padding:18px 24px calc(22px + env(safe-area-inset-bottom)); display:flex; align-items:center; justify-content:space-between; background:linear-gradient(transparent, rgba(0,0,0,0.6)); }
-.cam-side{ width:72px !important; height:40px !important; margin:0 !important; padding:0 !important; border:1px solid rgba(255,255,255,0.7) !important; border-radius:999px !important; background:rgba(0,0,0,0.3) !important; color:#fff !important; font-size:14px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
-.cam-shot{ width:72px !important; height:72px !important; min-width:0 !important; margin:0 !important; padding:0 !important; border:5px solid #fff !important; border-radius:50% !important; background:rgba(255,255,255,0.35) !important; box-shadow:0 0 0 3px rgba(0,0,0,0.25) !important; cursor:pointer; }
-.cam-shot:active{ background:#fff !important; }
-.cam-shot:disabled{ opacity:0.5; }
-</style>
-
-<div id="camOv" class="cam-ov">
-  <video id="camVideo" playsinline autoplay muted></video>
-  <div class="cam-guide circle" id="camGuide"></div>
-  <div class="cam-focus" id="camFocus"></div>
-  <div class="cam-hint" id="camHint"></div>
-  <div class="cam-tools">
-    <button type="button" class="cam-tool" id="camZoom">2배</button>
-    <button type="button" class="cam-tool" id="camTorch">플래시</button>
-  </div>
-  <div class="cam-bar">
-    <button type="button" class="cam-side" id="camAlbum">앨범</button>
-    <button type="button" class="cam-shot" id="camShot" aria-label="촬영"></button>
-    <button type="button" class="cam-side" id="camCancel">취소</button>
-  </div>
-  <input type="file" accept="image/*" id="camAlbumInput" style="display:none">
-</div>
-
+# 카메라 앱 복귀 처리 (알약 확인·사례검색 공용)
+# - 휴대폰은 카메라 앱을 쓰는 동안 메모리가 부족하면 이 화면을 강제로 새로 엽니다(사진도 사라짐).
+# - 카메라를 열기 직전 표시를 남겨 두고, 새로 열린 경우 원래 화면·팝업으로 되돌린 뒤 안내합니다.
+# - 이 기기에서 한 번이라도 새로 열렸으면 이후에는 '카메라/앨범 선택' 방식으로 열어 앨범 사진도 고를 수 있게 합니다.
+CAM_RETURN_HTML = """
 <script>
 (function(){
-  if(window.openCam) return;
-  var ov = document.getElementById("camOv");
-  var video = document.getElementById("camVideo");
-  var guide = document.getElementById("camGuide");
-  var hint = document.getElementById("camHint");
-  var shotBtn = document.getElementById("camShot");
-  var albumInput = document.getElementById("camAlbumInput");
-  var zoomBtn = document.getElementById("camZoom");
-  var torchBtn = document.getElementById("camTorch");
-  var focusRing = document.getElementById("camFocus");
-  if(!ov) return;
-  var stream = null, opts = null, caps = {}, zoomOn = false, torchOn = false;
-
-  function track(){ return stream ? stream.getVideoTracks()[0] : null; }
-  function apply(c){
-    var t = track();
-    if(!t || !t.applyConstraints) return Promise.resolve();
-    return t.applyConstraints({ advanced:[c] }).catch(function(){});
+  if(window.camPending) return;
+  var KEY = "cam_pending", LIMIT = 5*60*1000;
+  function read(){
+    try{
+      var p = JSON.parse(localStorage.getItem(KEY) || "null");
+      if(p && Date.now() - p.t < LIMIT) return p;
+      localStorage.removeItem(KEY);
+    }catch(e){}
+    return null;
   }
-
-  function close(){
-    if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
-    video.srcObject = null;
-    ov.classList.remove("show");
-    shotBtn.disabled = false;
-    zoomBtn.style.display = "none"; torchBtn.style.display = "none";
-    zoomOn = false; torchOn = false;
-    zoomBtn.classList.remove("on"); torchBtn.classList.remove("on");
-  }
-  window.closeCam = close;
-
-  function done(blob){
-    var cb = opts && opts.onPhoto;
-    close();
-    if(blob && cb) cb(blob);
-  }
-
-  /* 화면에 보이는 가이드(원) 영역을 사진 좌표로 바꿔 잘라냄 (여유 1.3배).
-     사진과 미리보기의 방향이 다르거나 계산이 이상하면 원본 그대로 */
-  function cropToGuide(blob, vw, vh){
-    return new Promise(function(resolve){
-      if(!(opts && opts.closeup) || typeof createImageBitmap !== "function" || !vw || !vh){ resolve(blob); return; }
-      createImageBitmap(blob).then(function(bmp){
-        var iw = bmp.width, ih = bmp.height;
-        if((iw > ih) !== (vw > vh)){ if(bmp.close) bmp.close(); resolve(blob); return; }
-        /* 사진 안에서 미리보기 영상과 같은 비율인 가운데 영역 */
-        var va = vw / vh, ia = iw / ih, sx0 = 0, sy0 = 0, sw = iw, sh = ih;
-        if(ia > va){ sw = ih * va; sx0 = (iw - sw) / 2; } else { sh = iw / va; sy0 = (ih - sh) / 2; }
-        /* 화면(object-fit:cover)에 실제로 보이는 영상 부분 */
-        var ew = ov.clientWidth, eh = ov.clientHeight;
-        var s = Math.max(ew / vw, eh / vh);
-        var visW = ew / s, visH = eh / s, visX = (vw - visW) / 2, visY = (vh - visH) / 2;
-        var g = guide.getBoundingClientRect(), o = ov.getBoundingClientRect();
-        var m = 1.3;
-        var gcx = g.left - o.left + g.width / 2, gcy = g.top - o.top + g.height / 2;
-        var gw = g.width * m, gh = g.height * m;
-        /* 화면 좌표 → 영상 좌표 → 사진 좌표 */
-        var k = sw / vw;
-        var cx = sx0 + (visX + gcx / s) * k, cy = sy0 + (visY + gcy / s) * k;
-        var cw = gw / s * k, ch = gh / s * k;
-        var x = Math.max(0, cx - cw / 2), y = Math.max(0, cy - ch / 2);
-        cw = Math.min(iw - x, cw); ch = Math.min(ih - y, ch);
-        if(cw < 300 || ch < 300){ if(bmp.close) bmp.close(); resolve(blob); return; }
-        var sc = Math.min(1, 1600 / Math.max(cw, ch));
-        var c = document.createElement("canvas");
-        c.width = Math.round(cw * sc); c.height = Math.round(ch * sc);
-        c.getContext("2d").drawImage(bmp, x, y, cw, ch, 0, 0, c.width, c.height);
-        if(bmp.close) bmp.close();
-        c.toBlob(function(b){ resolve(b && b.size ? b : blob); }, "image/jpeg", 0.92);
-      }).catch(function(){ resolve(blob); });
-    });
-  }
-
-  /* 영상 화면을 그대로 캡처 (ImageCapture 미지원 시) */
-  function grabFrame(){
-    var w = video.videoWidth, h = video.videoHeight;
-    if(!w || !h){ done(null); return; }
-    var c = document.createElement("canvas");
-    c.width = w; c.height = h;
-    c.getContext("2d").drawImage(video, 0, 0, w, h);
-    c.toBlob(function(b){
-      if(!b){ done(null); return; }
-      cropToGuide(b, w, h).then(done);
-    }, "image/jpeg", 0.92);
-  }
-
-  /* 알약용: 2배 줌·연속 초점·플래시 (지원하는 기기만) */
-  function setupCloseup(){
-    var t = track();
-    caps = (t && t.getCapabilities) ? (t.getCapabilities() || {}) : {};
-    var fm = caps.focusMode || [];
-    if(fm.indexOf("continuous") !== -1) apply({ focusMode:"continuous" });
-    if(caps.zoom && caps.zoom.max >= 1.5){
-      zoomBtn.style.display = "inline-block";
-      setZoom(true);
-    }
-    if(caps.torch){ torchBtn.style.display = "inline-block"; }
-  }
-  function setZoom(on){
-    if(!caps.zoom) return;
-    zoomOn = on;
-    var z = on ? Math.min(2, caps.zoom.max) : Math.max(1, caps.zoom.min || 1);
-    apply({ zoom: z });
-    zoomBtn.classList.toggle("on", on);
-    zoomBtn.textContent = on ? "2배 줌" : "1배";
-  }
-  zoomBtn.addEventListener("click", function(){ setZoom(!zoomOn); });
-  torchBtn.addEventListener("click", function(){
-    torchOn = !torchOn;
-    apply({ torch: torchOn });
-    torchBtn.classList.toggle("on", torchOn);
-  });
-
-  /* 화면을 누르면 그 위치에 초점 (지원 기기만, 버튼 영역 제외) */
-  video.addEventListener("click", function(e){
-    if(!(opts && opts.closeup) || !stream) return;
-    var r = ov.getBoundingClientRect();
-    var px = e.clientX - r.left, py = e.clientY - r.top;
-    focusRing.style.left = px + "px"; focusRing.style.top = py + "px";
-    focusRing.classList.add("show");
-    setTimeout(function(){ focusRing.classList.remove("show"); }, 700);
-    var fm = caps.focusMode || [];
-    var c = { pointsOfInterest:[{ x: px / r.width, y: py / r.height }] };
-    if(fm.indexOf("single-shot") !== -1) c.focusMode = "single-shot";
-    else if(fm.indexOf("continuous") !== -1) c.focusMode = "continuous";
-    apply(c).then(function(){
-      /* 잠시 뒤 다시 연속 초점으로 */
-      if(c.focusMode === "single-shot" && fm.indexOf("continuous") !== -1){
-        setTimeout(function(){ if(stream) apply({ focusMode:"continuous" }); }, 3000);
+  window.camPending = {
+    /* 카메라 열기 직전 호출 */
+    set: function(kind, extra){
+      try{ localStorage.setItem(KEY, JSON.stringify({ kind: kind, path: location.pathname, t: Date.now(), extra: extra || null })); }catch(e){}
+    },
+    clear: function(){ try{ localStorage.removeItem(KEY); }catch(e){} },
+    /* 새로 열린 화면에서 해당 종류의 표시가 있으면 꺼내고 지움 */
+    take: function(kind){
+      var p = read();
+      if(p && p.kind === kind && p.path === location.pathname){
+        try{
+          localStorage.removeItem(KEY);
+          localStorage.setItem("cam_reloaded", "1");
+        }catch(e){}
+        return p;
       }
-    });
-  });
-
-  window.openCam = function(o){
-    opts = o || {};
-    guide.className = "cam-guide " + (opts.guide === "rect" ? "rect" : "circle");
-    hint.textContent = opts.hint || "";
-    function fallback(){ if(opts.onFallback) opts.onFallback(); }
-    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ fallback(); return; }
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } },
-      audio: false
-    }).then(function(s){
-      stream = s;
-      video.srcObject = s;
-      ov.classList.add("show");
-      var p = video.play(); if(p && p.catch) p.catch(function(){});
-      if(opts.closeup) setupCloseup();
-    }).catch(function(){ fallback(); });
+      return null;
+    },
+    /* 이 기기에서 새로고침이 일어난 적이 있는지 */
+    reloadedBefore: function(){ try{ return localStorage.getItem("cam_reloaded") === "1"; }catch(e){ return false; } }
   };
-
-  shotBtn.addEventListener("click", function(){
-    if(!stream) return;
-    shotBtn.disabled = true;
-    var t = track();
-    var vw = video.videoWidth, vh = video.videoHeight;
-    /* 지원 기기: 사진 촬영 모드로 카메라 앱과 비슷한 고해상도 */
-    if(window.ImageCapture && t){
-      try{
-        new ImageCapture(t).takePhoto()
-          .then(function(b){ return cropToGuide(b, vw, vh); })
-          .then(function(b){ done(b); })
-          .catch(grabFrame);
-        return;
-      }catch(e){}
-    }
-    grabFrame();
+  /* 카메라 앱에서 정상적으로 돌아오면 표시를 지움 */
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "visible"){ setTimeout(window.camPending.clear, 2000); }
   });
-  document.getElementById("camCancel").addEventListener("click", close);
-  document.getElementById("camAlbum").addEventListener("click", function(){ albumInput.click(); });
-  albumInput.addEventListener("change", function(){
-    var f = albumInput.files && albumInput.files[0];
-    albumInput.value = "";
-    if(f) done(f);
-  });
+  /* 다른 화면으로 정상 이동하면 지움 (휴대폰이 강제로 새로 열 때는 발생하지 않음) */
+  var redirecting = false;
+  window.addEventListener("pagehide", function(){ if(!redirecting) window.camPending.clear(); });
+  /* 메인화면으로 새로 열렸으면 원래 화면으로 이동 */
+  var p = read();
+  if(p && location.pathname === "/home" && p.path !== "/home"){
+    redirecting = true;
+    location.replace(p.path);
+  }
 })();
 </script>
 """
@@ -2878,31 +2706,21 @@ PILL_HTML = """
   Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot input"), function(inp){
     inp.addEventListener("click", function(e){ e.stopPropagation(); });
     inp.addEventListener("change", function(){
+      if(window.camPending) window.camPending.clear();
       setFile(inp.getAttribute("data-side"), inp.files && inp.files[0]);
     });
   });
 
-  /* 화면 안 카메라 (CAM_HTML 공용). 쓸 수 없으면 기존 카메라 앱/파일 선택으로 자동 전환 */
-  function fallbackPicker(side){
+  /* 휴대폰 기본 카메라 앱으로 촬영. 열기 직전 표시를 남겨 화면이 새로 열려도 팝업을 복원 */
+  function openPicker(side){
     var inp = modal.querySelector('.pill-shot[data-side="' + side + '"] input');
-    if(inp) inp.click();
+    if(!inp) return;
+    if(window.camPending) window.camPending.set("pill", { mode: surveyMode ? "survey" : "home" });
+    inp.click();
   }
-  function stopCam(){ if(window.closeCam) window.closeCam(); }
-
-  function startCam(side){
-    if(!window.openCam){ fallbackPicker(side); return; }
-    window.openCam({
-      guide: "circle",
-      closeup: true,
-      hint: "휴대폰을 한 뼘(15cm)쯤 떨어뜨려 알약을 원 안에 두세요. 흐리면 화면을 눌러 초점을 맞춘 뒤 촬영하세요",
-      onPhoto: function(b){ setFile(side, b); },
-      onFallback: function(){ fallbackPicker(side); }
-    });
-  }
-
   Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
-    box.addEventListener("click", function(){ startCam(box.getAttribute("data-side")); });
-    box.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); startCam(box.getAttribute("data-side")); } });
+    box.addEventListener("click", function(){ openPicker(box.getAttribute("data-side")); });
+    box.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openPicker(box.getAttribute("data-side")); } });
   });
 
   function showMsg(t){ msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; }
@@ -3013,7 +2831,6 @@ PILL_HTML = """
   /* survey=true 이면 치매약 후보에 '예 선택' 버튼 표시 (사전조사 화면) */
   window.openPill = function(survey, restored){
     surveyMode = !!survey;
-    try{ sessionStorage.setItem("pill_open", JSON.stringify({ mode: surveyMode ? "survey" : "home", path: location.pathname, t: Date.now() })); }catch(e){}
     if(!restored){
       try{ if(navigator.sendBeacon){ navigator.sendBeacon("/pv/pill"); } else { fetch("/pv/pill", {method:"POST"}); } }catch(e){}
     }
@@ -3027,30 +2844,30 @@ PILL_HTML = """
     document.body.style.overflow = "hidden";
   };
   window.closePill = function(){
-    stopCam();
-    try{ sessionStorage.removeItem("pill_open"); }catch(e){}
+    if(window.camPending) window.camPending.clear();
     modal.classList.remove("show");
     document.body.style.overflow = "";
   };
   modal.addEventListener("click", function(e){ if(e.target === modal) window.closePill(); });
 
-  /* 휴대폰은 카메라 앱을 여는 동안 메모리가 부족하면 이 화면을 새로고침해 버립니다.
-     그 경우 팝업이 닫힌 채 메인화면이 보이므로, 팝업을 다시 열고 안내합니다. */
-  try{
-    var saved = JSON.parse(sessionStorage.getItem("pill_open") || "null");
-    sessionStorage.removeItem("pill_open");
-    /* 같은 화면에서 5분 안에 다시 로드된 경우만 복원 */
-    if(saved && saved.path === location.pathname && Date.now() - saved.t < 5*60*1000){
-      window.openPill(saved.mode === "survey", true);
-      showMsg("사진을 찍는 동안 화면이 새로 고쳐져 사진이 지워졌습니다. 번거로우시겠지만 다시 한 번 찍어주세요.");
-    }
-  }catch(e){}
-  /* 다른 화면으로 정상 이동할 때는 복원 표시를 지움 (카메라 앱 전환 때는 pagehide가 발생하지 않음) */
-  window.addEventListener("pagehide", function(){ try{ sessionStorage.removeItem("pill_open"); }catch(e){} });
+  /* 이 기기에서 카메라 앱 사용 중 화면이 새로 열린 적이 있으면 '카메라/앨범 선택' 방식으로 열기
+     (기본 카메라로 먼저 찍어 두고 앨범에서 고를 수 있게) */
+  function useChooser(){
+    Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot input"), function(inp){ inp.removeAttribute("capture"); });
+  }
+  if(window.camPending && window.camPending.reloadedBefore()) useChooser();
+
+  /* 카메라 앱을 쓰는 동안 휴대폰이 화면을 새로 열었으면 팝업을 다시 열고 안내 */
+  var back = window.camPending && window.camPending.take("pill");
+  if(back){
+    useChooser();
+    window.openPill(back.extra && back.extra.mode === "survey", true);
+    showMsg("사진을 찍는 동안 휴대폰이 화면을 새로 열어 사진이 전달되지 않았습니다. 다시 찍어주시고, 같은 문제가 반복되면 휴대폰 카메라로 먼저 찍은 뒤 앨범(갤러리)에서 선택해 주세요.");
+  }
 })();
 </script>
 """
-PILL_HTML = CAM_HTML + PILL_HTML  # 화면 안 카메라 공용 코드 포함
+PILL_HTML = CAM_RETURN_HTML + PILL_HTML  # 카메라 앱 복귀 처리 포함
 
 # =========================
 # HOME
@@ -12109,6 +11926,7 @@ transition:0.2s;
 
 </button>
 
+{{ cam_return|default('')|safe }}
 <input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none;">
 
 <button type="button" onclick="openImage()" id="imgBtn">
@@ -12818,17 +12636,11 @@ function startVoiceInput(event){
   }
 }
 
-/* 사진 인식: 화면 안 카메라로 촬영 (카메라 앱으로 넘어가 화면이 새로고침되는 문제 방지)
-   카메라를 쓸 수 없으면 기존 카메라 앱/파일 선택으로 자동 전환 */
+/* 사진 인식: 휴대폰 기본 카메라 앱으로 촬영.
+   열기 직전 표시를 남겨 두어, 카메라 앱 사용 중 화면이 새로 열리면 안내 (CAM_RETURN_HTML) */
 function openImage(){
-  function fallback(){ document.getElementById("imgInput").click(); }
-  if(!window.openCam){ fallback(); return; }
-  window.openCam({
-    guide: "rect",
-    hint: "서류를 사각형 안에 맞추고 글자가 선명하게 보이면 촬영하세요",
-    onPhoto: function(blob){ handleOcrFile(blob); },
-    onFallback: fallback
-  });
+  if(window.camPending) window.camPending.set("desc");
+  document.getElementById("imgInput").click();
 }
 
 /* 카메라 원본 사진이 클 때 모바일/서버 메모리 부담을 줄이기 위해 OCR 전송본만 축소·압축 */
@@ -12879,8 +12691,23 @@ async function prepareOcrImage(file){
 document.getElementById("imgInput").addEventListener("change", function(){
   const file = this.files[0];
   this.value = "";
+  if(window.camPending) window.camPending.clear();
   if(file) handleOcrFile(file);
 });
+
+/* 카메라 앱을 쓰는 동안 휴대폰이 화면을 새로 열었으면 안내.
+   이 기기에서 한 번이라도 그랬으면 이후 '카메라/앨범 선택' 방식으로 열기 */
+(function(){
+  if(!window.camPending) return;
+  var inp = document.getElementById("imgInput");
+  if(window.camPending.reloadedBefore() && inp) inp.removeAttribute("capture");
+  if(window.camPending.take("desc")){
+    if(inp) inp.removeAttribute("capture");
+    setTimeout(function(){
+      alert("사진을 찍는 동안 휴대폰이 화면을 새로 열어 사진이 전달되지 않았습니다.\\n다시 찍어주시고, 같은 문제가 반복되면 휴대폰 카메라로 먼저 찍은 뒤 앨범(갤러리)에서 선택해 주세요.");
+    }, 300);
+  }
+})();
 
 async function handleOcrFile(file){
   if(!file) return;
@@ -13072,7 +12899,6 @@ window.addEventListener("load", function(){
 </script>
 
 <!-- ===== 돌봄온 팝업 (공단자원 연관검색어 클릭 시) ===== -->
-{{ cam_html|default('')|safe }}
 {{ dbo_viewer|safe }}
 
 <script>
