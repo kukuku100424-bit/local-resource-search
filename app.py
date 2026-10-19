@@ -2420,6 +2420,63 @@ def _pill_features_from_images(images):
         return json.loads(m.group()) if m else {"sides": [], "readable": False}
 
 
+def _pill_locate_boxes(images):
+    """알약이 사진 어디에 있는지만 대략 찾음 (저해상도·저비용). 결과는 사진 대비 비율 [왼, 위, 오른, 아래] 또는 None
+    → 휴대폰에서 원본 해상도로 알약 주변만 잘라 다시 보내 각인 판독 정확도를 높임"""
+    import base64
+    client = OpenAI()
+    content = [{"type": "input_text", "text": (
+        "각 사진에서 알약이 있는 영역을 찾아 JSON으로만 답해. 알약이 여러 개면 모두 포함하는 하나의 영역으로.\n"
+        "좌표는 사진 전체 너비·높이 대비 비율(0~1)로 [왼쪽, 위, 오른쪽, 아래]. 알약이 없으면 null.\n"
+        '형식: {"boxes":[[0.1,0.2,0.3,0.4]]}  (사진 순서대로)'
+    )}]
+    for mime, data in images:
+        b64 = base64.b64encode(data).decode("utf-8")
+        content.append({"type": "input_image", "image_url": f"data:{mime};base64,{b64}", "detail": "low"})
+    res = client.responses.create(model="gpt-4.1-mini", input=[{"role": "user", "content": content}], temperature=0)
+    usage = getattr(res, "usage", None)
+    if usage:
+        add_token_usage(getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
+    text = res.output_text or ""
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    data = json.loads(m.group()) if m else {}
+    out = []
+    for b in (data.get("boxes") or [])[:len(images)]:
+        try:
+            x0, y0, x1, y1 = [min(1.0, max(0.0, float(v))) for v in b]
+            out.append([x0, y0, x1, y1] if x1 > x0 and y1 > y0 else None)
+        except Exception:
+            out.append(None)
+    while len(out) < len(images):
+        out.append(None)
+    return out
+
+
+@app.route("/pill/locate", methods=["POST"])
+@login_required
+def pill_locate():
+    """알약 위치 찾기 (실패해도 됨: 휴대폰은 원래 사진 그대로 보냄)"""
+    if not os.getenv("OPENAI_API_KEY"):
+        return jsonify({"ok": False})
+    images = []
+    for key in ("front", "back"):
+        f = request.files.get(key)
+        if not f:
+            continue
+        data = f.read()
+        if not (f.mimetype or "").startswith("image/") or len(data) > 2 * 1024 * 1024:
+            return jsonify({"ok": False})
+        images.append((key, f.mimetype, data))
+    if not images:
+        return jsonify({"ok": False})
+    try:
+        boxes = _pill_locate_boxes([(m, d) for _, m, d in images])
+    except Exception as e:
+        app.logger.exception(e)
+        return jsonify({"ok": False})
+    return jsonify({"ok": True, "boxes": {k: b for (k, _, _), b in zip(images, boxes)}})
+
+
 def _pill_throttle():
     """연속 호출 방지 (토큰 비용 보호): 같은 세션 5초 이내 재요청 차단"""
     now = time.time()
@@ -2592,13 +2649,28 @@ PILL_HTML = """
 .pill-shot input{ display:none; }
 .pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; }
-/* 앞면/뒷면 누르면 나오는 '카메라 / 앨범' 선택창 */
-.pill-src{ display:none; position:fixed; inset:0; z-index:100005; background:rgba(15,23,42,0.45); align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
+/* 앞면/뒷면 누르면 나오는 '카메라 / 앨범' 선택창 (모바일: 아래에서 올라오는 시트, PC: 가운데 카드) */
+.pill-src{ display:none; position:fixed; inset:0; z-index:100005; background:rgba(15,23,42,0.35); align-items:flex-end; justify-content:center; }
 .pill-src.show{ display:flex; }
-.pill-src-box{ width:100%; max-width:300px; background:#fff; border-radius:16px; padding:18px 16px 14px; box-sizing:border-box; box-shadow:0 12px 32px rgba(0,0,0,0.2); }
-.pill-src-title{ margin:0 0 12px; font-size:15px; font-weight:800; color:#111827; text-align:center; }
-.pill-src-btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100% !important; height:48px !important; margin:0 0 8px !important; padding:0 !important; border:1px solid #c7d7ff !important; border-radius:12px !important; background:#eef4ff !important; color:#1d4ed8 !important; font-size:15px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
-.pill-src-cancel{ width:100% !important; height:40px !important; margin:2px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#f3f4f6 !important; color:#4b5563 !important; font-size:14px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.pill-src-box{ width:100%; max-width:480px; background:#fff; border-radius:22px 22px 0 0; padding:10px 18px calc(16px + env(safe-area-inset-bottom)); box-sizing:border-box; box-shadow:0 -8px 30px rgba(15,23,42,0.18); animation:pillSrcUp .22s ease-out; }
+@keyframes pillSrcUp{ from{ transform:translateY(40px); opacity:0; } to{ transform:none; opacity:1; } }
+.pill-src-handle{ width:38px; height:4px; margin:0 auto 14px; border-radius:999px; background:#e5e7eb; }
+.pill-src-title{ margin:0; font-size:17px; font-weight:800; color:#111827; letter-spacing:-0.3px; }
+.pill-src-sub{ margin:4px 0 16px; font-size:13px; color:#6b7280; line-height:1.45; word-break:keep-all; }
+.pill-src-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.pill-src-btn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100% !important; height:118px !important; margin:0 !important; padding:0 !important; border:1px solid #e5e7eb !important; border-radius:16px !important; background:#fff !important; color:#111827 !important; font-family:inherit; box-shadow:none !important; cursor:pointer; transition:background .15s, border-color .15s; -webkit-tap-highlight-color:transparent; }
+.pill-src-btn:active, .pill-src-btn:hover{ background:#f8fbff !important; border-color:#93c5fd !important; }
+.pill-src-ico{ display:flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:50%; background:#eff6ff; color:#2563eb; }
+.pill-src-btn[data-src="album"] .pill-src-ico{ background:#ecfdf5; color:#059669; }
+.pill-src-ico svg{ width:24px; height:24px; }
+.pill-src-label{ font-size:15px; font-weight:700; line-height:1.2; }
+.pill-src-hint{ margin-top:-4px; font-size:11.5px; font-weight:500; color:#9ca3af; }
+.pill-src-cancel{ display:block; width:100% !important; height:46px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:12px !important; background:#f3f4f6 !important; color:#4b5563 !important; font-size:15px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+@media (min-width:768px){
+  .pill-src{ align-items:center; }
+  .pill-src-box{ max-width:380px; border-radius:20px; padding:22px 20px 18px; box-shadow:0 16px 40px rgba(15,23,42,0.22); }
+  .pill-src-handle{ display:none; }
+}
 .pill-tip{ display:flex; gap:4px; margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; }
 .pill-tip span:first-child{ flex:none; }  /* ※ 뒤로 줄바꿈된 글이 윗줄 첫 글자에 맞춰짐 */
 .pill-go{ display:block; width:100% !important; height:44px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:15px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
@@ -2685,10 +2757,22 @@ PILL_HTML = """
 </div>
 
 <div id="pillSrc" class="pill-src">
-  <div class="pill-src-box">
+  <div class="pill-src-box" role="dialog" aria-modal="true" aria-labelledby="pillSrcTitle">
+    <div class="pill-src-handle"></div>
     <p class="pill-src-title" id="pillSrcTitle">앞면 사진</p>
-    <button type="button" class="pill-src-btn" data-src="camera">📷 카메라로 촬영</button>
-    <button type="button" class="pill-src-btn" data-src="album">🖼️ 앨범에서 선택</button>
+    <p class="pill-src-sub">각인(글자)이 선명하게 보이는 사진이 좋아요</p>
+    <div class="pill-src-grid">
+      <button type="button" class="pill-src-btn" data-src="camera">
+        <span class="pill-src-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+        <span class="pill-src-label">카메라</span>
+        <span class="pill-src-hint">지금 촬영하기</span>
+      </button>
+      <button type="button" class="pill-src-btn" data-src="album">
+        <span class="pill-src-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-4.5-4.5L5 21"/></svg></span>
+        <span class="pill-src-label">앨범</span>
+        <span class="pill-src-hint">찍어둔 사진 고르기</span>
+      </button>
+    </div>
     <button type="button" class="pill-src-cancel" id="pillSrcCancel">취소</button>
   </div>
 </div>
@@ -2734,6 +2818,60 @@ PILL_HTML = """
         if(bmp.close) bmp.close();
         c.toBlob(function(b){ resolve(b && b.size ? b : file); }, "image/jpeg", 0.85);
       }).catch(function(){ resolve(file); });
+    });
+  }
+
+  /* 알약 위치 찾기용 작은 사진 (768px) */
+  function small(file){
+    return new Promise(function(resolve){
+      if(!file || typeof createImageBitmap !== "function"){ resolve(null); return; }
+      createImageBitmap(file).then(function(bmp){
+        var scale = Math.min(1, 768 / Math.max(bmp.width, bmp.height));
+        var c = document.createElement("canvas");
+        c.width = Math.round(bmp.width*scale); c.height = Math.round(bmp.height*scale);
+        c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+        if(bmp.close) bmp.close();
+        c.toBlob(function(b){ resolve(b && b.size ? b : null); }, "image/jpeg", 0.8);
+      }).catch(function(){ resolve(null); });
+    });
+  }
+
+  /* 원본 해상도에서 알약 주변만 잘라냄 (사진 속 알약이 작을 때 각인이 크게 보이도록).
+     위치를 못 찾았거나 이미 알약이 크게 찍힌 사진이면 기존처럼 전체 사진 */
+  function cropToPill(file, box){
+    if(!file || !box || typeof createImageBitmap !== "function") return shrink(file);
+    return createImageBitmap(file).then(function(bmp){
+      var W = bmp.width, H = bmp.height;
+      var bw = (box[2] - box[0]) * W, bh = (box[3] - box[1]) * H;
+      var cx = (box[0] + box[2]) / 2 * W, cy = (box[1] + box[3]) / 2 * H;
+      /* 위치가 대략적이라 넉넉하게 (1.8배, 최소 짧은 변의 30%) */
+      var minSide = Math.min(W, H) * 0.3;
+      var w = Math.min(W, Math.max(bw * 1.8, minSide)), h = Math.min(H, Math.max(bh * 1.8, minSide));
+      if(w * h > W * H * 0.5){ if(bmp.close) bmp.close(); return shrink(file); }
+      var x = Math.min(Math.max(0, cx - w / 2), W - w), y = Math.min(Math.max(0, cy - h / 2), H - h);
+      var sc = Math.min(1, 1600 / Math.max(w, h));
+      var c = document.createElement("canvas");
+      c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+      c.getContext("2d").drawImage(bmp, x, y, w, h, 0, 0, c.width, c.height);
+      if(bmp.close) bmp.close();
+      return new Promise(function(resolve){
+        c.toBlob(function(b){ resolve(b && b.size ? b : file); }, "image/jpeg", 0.92);
+      });
+    }).catch(function(){ return shrink(file); });
+  }
+
+  /* 1) 작은 사진으로 알약 위치 찾기 → 2) 원본에서 그 부분만 잘라 판독용으로 보냄 (실패하면 전체 사진) */
+  function preparePhotos(){
+    return Promise.all([small(files.front), small(files.back)]).then(function(sm){
+      if(!sm[0] && !sm[1]) return null;
+      var fd = new FormData();
+      if(sm[0]) fd.append("front", sm[0], "front.jpg");
+      if(sm[1]) fd.append("back", sm[1], "back.jpg");
+      return fetch("/pill/locate", { method:"POST", body:fd, credentials:"same-origin" })
+        .then(function(r){ return r.json(); }).catch(function(){ return null; });
+    }).catch(function(){ return null; }).then(function(loc){
+      var boxes = (loc && loc.ok && loc.boxes) || {};
+      return Promise.all([cropToPill(files.front, boxes.front), cropToPill(files.back, boxes.back)]);
     });
   }
 
@@ -2874,7 +3012,7 @@ PILL_HTML = """
     goBtn.disabled = true; goBtn.textContent = "확인 중...";
     showMsg(""); list.innerHTML = "";
     startLoading();
-    Promise.all([shrink(files.front), shrink(files.back)]).then(function(arr){
+    preparePhotos().then(function(arr){
       var fd = new FormData();
       if(arr[0]) fd.append("front", arr[0], "front.jpg");
       if(arr[1]) fd.append("back", arr[1], "back.jpg");
