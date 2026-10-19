@@ -3443,10 +3443,6 @@ body.app-mode .container{
   font-size:13px;
 }
 
-/* 모바일에서만 줄바꿈 (통합돌봄 / 사업 안내) */
-.m-only-br{ display:none; }
-@media (max-width:480px){ .m-only-br{ display:inline; } }
-
 /* 알약 확인 카드 아이콘 (다른 카드의 26px 아이콘과 크기 맞춤) */
 .pill-home-ico{
   display:block;
@@ -3742,7 +3738,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 <img src="/static/pdf_icon.png">
 
-<div>통합돌봄 <br class="m-only-br">사업 안내</div>
+<div>사업 안내</div>
 
 </a>
 
