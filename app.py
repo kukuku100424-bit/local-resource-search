@@ -2493,8 +2493,28 @@ def pill_search():
 # 카메라 앱 복귀 처리 (알약 확인·사례검색 공용)
 # - 휴대폰은 카메라 앱을 쓰는 동안 메모리가 부족하면 이 화면을 강제로 새로 엽니다(사진도 사라짐).
 # - 카메라를 열기 직전 표시를 남겨 두고, 새로 열린 경우 원래 화면·팝업으로 되돌린 뒤 안내합니다.
-# - 이 기기에서 한 번이라도 새로 열렸으면 이후에는 '카메라/앨범 선택' 방식으로 열어 앨범 사진도 고를 수 있게 합니다.
+# - 안내창의 '다시 촬영' 버튼으로 카메라 앱을 바로 다시 엽니다.
 CAM_RETURN_HTML = """
+<style>
+#camRetry{ display:none; position:fixed; inset:0; z-index:100010; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
+#camRetry .cr-box{ width:100%; max-width:320px; background:#fff; border-radius:16px; padding:22px 18px 16px; box-sizing:border-box; text-align:center; box-shadow:0 12px 32px rgba(0,0,0,0.2); }
+#camRetry .cr-t{ font-size:16px; font-weight:800; color:#111827; margin:0 0 8px; }
+#camRetry .cr-s{ font-size:14px; color:#4b5563; line-height:1.55; margin:0 0 16px; word-break:keep-all; }
+#camRetry .cr-btns{ display:flex; gap:8px; }
+#camRetry button{ flex:1; height:44px !important; margin:0 !important; border-radius:10px !important; font-size:15px !important; font-weight:700 !important; cursor:pointer; box-shadow:none !important; }
+#camRetryClose{ background:#f3f4f6 !important; color:#374151 !important; border:1px solid #e5e7eb !important; }
+#camRetryGo{ background:#2563eb !important; color:#fff !important; border:none !important; }
+</style>
+<div id="camRetry">
+  <div class="cr-box">
+    <p class="cr-t">📷 사진이 전달되지 않았어요</p>
+    <p class="cr-s">사진을 찍는 동안 휴대폰이 화면을 새로 열었습니다.<br>다시 촬영해 주세요.</p>
+    <div class="cr-btns">
+      <button type="button" id="camRetryClose">닫기</button>
+      <button type="button" id="camRetryGo">다시 촬영</button>
+    </div>
+  </div>
+</div>
 <script>
 (function(){
   if(window.camPending) return;
@@ -2517,16 +2537,26 @@ CAM_RETURN_HTML = """
     take: function(kind){
       var p = read();
       if(p && p.kind === kind && p.path === location.pathname){
-        try{
-          localStorage.removeItem(KEY);
-          localStorage.setItem("cam_reloaded", "1");
-        }catch(e){}
+        try{ localStorage.removeItem(KEY); }catch(e){}
         return p;
       }
       return null;
     },
-    /* 이 기기에서 새로고침이 일어난 적이 있는지 */
-    reloadedBefore: function(){ try{ return localStorage.getItem("cam_reloaded") === "1"; }catch(e){ return false; } }
+    /* 촬영 실패 안내창: '다시 촬영'을 누르면 카메라 앱을 다시 엶
+       (휴대폰은 사용자가 버튼을 눌러야만 카메라를 열 수 있어 자동으로는 못 엶) */
+    notice: function(onRetry){
+      var box = document.getElementById("camRetry");
+      if(!box) return;
+      function show(){
+        /* 다른 안내창(개인정보 동의 등)이 떠 있으면 닫힌 뒤에 표시 */
+        var pm = document.getElementById("privacyModal");
+        if(pm && getComputedStyle(pm).display !== "none"){ setTimeout(show, 300); return; }
+        box.style.display = "flex";
+      }
+      document.getElementById("camRetryGo").onclick = function(){ box.style.display = "none"; if(onRetry) onRetry(); };
+      document.getElementById("camRetryClose").onclick = function(){ box.style.display = "none"; };
+      show();
+    }
   };
   /* 카메라 앱에서 정상적으로 돌아오면 표시를 지움 */
   document.addEventListener("visibilitychange", function(){
@@ -2715,7 +2745,7 @@ PILL_HTML = """
   function openPicker(side){
     var inp = modal.querySelector('.pill-shot[data-side="' + side + '"] input');
     if(!inp) return;
-    if(window.camPending) window.camPending.set("pill", { mode: surveyMode ? "survey" : "home" });
+    if(window.camPending) window.camPending.set("pill", { mode: surveyMode ? "survey" : "home", side: side });
     inp.click();
   }
   Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
@@ -2842,27 +2872,37 @@ PILL_HTML = """
     showMsg(""); list.innerHTML = ""; feat.style.display = "none";
     modal.classList.add("show");
     document.body.style.overflow = "hidden";
+    /* 휴대폰 뒤로가기를 누르면 이전 화면(로그인)이 아니라 팝업만 닫히도록 기록 하나 추가 */
+    if(!historyPushed){
+      try{
+        /* 화면이 새로 열려 복원된 경우 이미 기록이 있으면 재사용 */
+        if(!(history.state && history.state.pillModal)) history.pushState({ pillModal: true }, "");
+        historyPushed = true;
+      }catch(e){}
+    }
   };
-  window.closePill = function(){
+  var historyPushed = false;
+  function hidePill(){
     if(window.camPending) window.camPending.clear();
     modal.classList.remove("show");
     document.body.style.overflow = "";
+  }
+  window.closePill = function(){
+    hidePill();
+    /* X·바깥 클릭으로 닫으면 추가한 기록도 정리 */
+    if(historyPushed){ historyPushed = false; try{ history.back(); }catch(e){} }
   };
+  /* 뒤로가기 → 팝업 닫기 (메인화면 유지) */
+  window.addEventListener("popstate", function(){
+    if(historyPushed){ historyPushed = false; hidePill(); }
+  });
   modal.addEventListener("click", function(e){ if(e.target === modal) window.closePill(); });
 
-  /* 이 기기에서 카메라 앱 사용 중 화면이 새로 열린 적이 있으면 '카메라/앨범 선택' 방식으로 열기
-     (기본 카메라로 먼저 찍어 두고 앨범에서 고를 수 있게) */
-  function useChooser(){
-    Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot input"), function(inp){ inp.removeAttribute("capture"); });
-  }
-  if(window.camPending && window.camPending.reloadedBefore()) useChooser();
-
-  /* 카메라 앱을 쓰는 동안 휴대폰이 화면을 새로 열었으면 팝업을 다시 열고 안내 */
+  /* 카메라 앱을 쓰는 동안 휴대폰이 화면을 새로 열었으면 팝업을 다시 열고 '다시 촬영' 안내 */
   var back = window.camPending && window.camPending.take("pill");
   if(back){
-    useChooser();
     window.openPill(back.extra && back.extra.mode === "survey", true);
-    showMsg("사진을 찍는 동안 휴대폰이 화면을 새로 열어 사진이 전달되지 않았습니다. 다시 찍어주시고, 같은 문제가 반복되면 휴대폰 카메라로 먼저 찍은 뒤 앨범(갤러리)에서 선택해 주세요.");
+    window.camPending.notice(function(){ openPicker((back.extra && back.extra.side) || "front"); });
   }
 })();
 </script>
@@ -12695,17 +12735,11 @@ document.getElementById("imgInput").addEventListener("change", function(){
   if(file) handleOcrFile(file);
 });
 
-/* 카메라 앱을 쓰는 동안 휴대폰이 화면을 새로 열었으면 안내.
-   이 기기에서 한 번이라도 그랬으면 이후 '카메라/앨범 선택' 방식으로 열기 */
+/* 카메라 앱을 쓰는 동안 휴대폰이 화면을 새로 열었으면 '다시 촬영' 안내 */
 (function(){
   if(!window.camPending) return;
-  var inp = document.getElementById("imgInput");
-  if(window.camPending.reloadedBefore() && inp) inp.removeAttribute("capture");
   if(window.camPending.take("desc")){
-    if(inp) inp.removeAttribute("capture");
-    setTimeout(function(){
-      alert("사진을 찍는 동안 휴대폰이 화면을 새로 열어 사진이 전달되지 않았습니다.\\n다시 찍어주시고, 같은 문제가 반복되면 휴대폰 카메라로 먼저 찍은 뒤 앨범(갤러리)에서 선택해 주세요.");
-    }, 300);
+    setTimeout(function(){ window.camPending.notice(openImage); }, 300);
   }
 })();
 
