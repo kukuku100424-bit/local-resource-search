@@ -2815,6 +2815,7 @@ PILL_HTML = """
 .pill-shot input{ display:none; }
 .pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; }
+.pill-shot.drag{ background:#eff6ff; border-color:#2563eb; border-style:solid; }
 .pill-tip{ display:flex; gap:4px; margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; }
 .pill-tip span:first-child{ flex:none; }  /* ※ 뒤로 줄바꿈된 글이 윗줄 첫 글자에 맞춰짐 */
 .pill-go{ display:block; width:100% !important; height:44px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:15px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
@@ -2864,7 +2865,7 @@ PILL_HTML = """
     <div class="pill-head">
       <div>
         <div class="pill-title">💊 알약 확인</div>
-        <div class="pill-sub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
+        <div class="pill-sub" id="pillSub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
       </div>
       <button type="button" class="pill-x" onclick="closePill()" aria-label="닫기">×</button>
     </div>
@@ -2872,14 +2873,14 @@ PILL_HTML = """
       <div class="pill-shots">
         <div class="pill-shot" id="pillShotFront" data-side="front" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="front">
-          <span>📷 앞면</span><small>알약 1~5알</small>
+          <span class="ps-t">📷 앞면</span><small class="ps-s">알약 1~5알</small>
         </div>
         <div class="pill-shot" id="pillShotBack" data-side="back" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="back">
-          <span>📷 뒷면</span><small>선택 · 놓인 자리 그대로 뒤집어서</small>
+          <span class="ps-t">📷 뒷면</span><small class="ps-s">선택 · 놓인 자리 그대로 뒤집어서</small>
         </div>
       </div>
-      <p class="pill-tip"><span>※</span><span>한 알도, 여러 알(최대 5알)도 됩니다. 여러 알이면 서로 떨어뜨려 놓고 찍은 뒤, 뒷면은 놓인 자리 그대로 하나씩 뒤집어 찍어주세요. 사진은 저장되지 않습니다.</span></p>
+      <p class="pill-tip"><span>※</span><span id="pillTipText">한 알도, 여러 알(최대 5알)도 됩니다. 여러 알이면 서로 떨어뜨려 놓고 찍은 뒤, 뒷면은 놓인 자리 그대로 하나씩 뒤집어 찍어주세요. 사진은 저장되지 않습니다.</span></p>
       <button type="button" class="pill-go" id="pillGo">확인하기</button>
 
       <div class="pill-msg" id="pillMsg"></div>
@@ -3015,8 +3016,29 @@ PILL_HTML = """
   function openPicker(side){
     var inp = modal.querySelector('.pill-shot[data-side="' + side + '"] input');
     if(!inp) return;
-    if(window.camPending) window.camPending.set("pill", { mode: surveyMode ? "survey" : "home", side: side });
+    if(!IS_PC && window.camPending) window.camPending.set("pill", { mode: surveyMode ? "survey" : "home", side: side });
     inp.click();
+  }
+
+  /* PC(터치 없는 기기): 카메라 대신 '사진 불러오기' (파일 선택 + 끌어다 놓기). 모바일은 그대로 */
+  var IS_PC = !(window.matchMedia && window.matchMedia("(pointer:coarse)").matches);
+  if(IS_PC){
+    document.getElementById("pillSub").textContent = "알약의 앞·뒷면 사진을 불러오면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.";
+    document.getElementById("pillTipText").textContent = "알약 각인(글자)이 선명하게 보이는 사진을 불러와 주세요. 한 알도, 여러 알(최대 5알)도 됩니다. 사진은 저장되지 않습니다.";
+    var PC_LABEL = { front: ["🖼️ 앞면 사진 불러오기", "클릭 또는 끌어다 놓기"], back: ["🖼️ 뒷면 사진 불러오기", "선택 · 클릭 또는 끌어다 놓기"] };
+    Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
+      var side = box.getAttribute("data-side");
+      var inp = box.querySelector("input"); if(inp) inp.removeAttribute("capture");
+      box.querySelector(".ps-t").textContent = PC_LABEL[side][0];
+      box.querySelector(".ps-s").textContent = PC_LABEL[side][1];
+      box.addEventListener("dragover", function(e){ e.preventDefault(); box.classList.add("drag"); });
+      box.addEventListener("dragleave", function(){ box.classList.remove("drag"); });
+      box.addEventListener("drop", function(e){
+        e.preventDefault(); box.classList.remove("drag");
+        var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if(f && (f.type || "").indexOf("image/") === 0) setFile(side, f);
+      });
+    });
   }
 
   Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
