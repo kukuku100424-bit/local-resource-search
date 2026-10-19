@@ -2032,6 +2032,9 @@ def load_dolbomon_items():
 
 @app.context_processor
 def inject_dolbomon_items():
+    # 알약 확인 팝업: 홈(/home)·지자체 조사서식(/survey)
+    if request.path in ("/home", "/survey"):
+        return {"pill_html": PILL_HTML}
     # 사례검색(/desc)·기관찾기(/combo) 화면에서만 사용
     if request.path not in ("/desc", "/combo"):
         return {}
@@ -2249,6 +2252,459 @@ DBO_VIEWER_HTML = """
     sx = null;
     if(Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
   }, {passive:true});
+})();
+</script>
+"""
+
+
+# =========================
+# 알약 확인 (식약처 의약품 낱알식별 정보 대조)
+# - pills.csv : 식약처 낱알식별 API 전체 목록에서 필요한 열만 추린 파일 (app.py 옆에 둠)
+# - 사진 → GPT는 약 이름을 맞히지 않고 '각인·색·모양'만 읽음 → 서버가 pills.csv 와 점수 비교
+# - 결과는 참고용 후보. 사진은 저장하지 않음
+# =========================
+PILL_FILE = "pills.csv"
+_PILL_CACHE = {"mtime": None, "rows": []}
+PILL_DEMENTIA_KW = ["도네페질", "리바스티그민", "갈란타민", "메만틴", "아리셉트", "엑셀론", "레미닐", "에빅사"]
+PILL_COLORS = ["하양", "노랑", "주황", "분홍", "빨강", "갈색", "연두", "초록", "청록", "파랑", "남색", "자주", "보라", "회색", "검정", "투명"]
+PILL_SHAPES = ["원형", "타원형", "장방형", "반원형", "삼각형", "사각형", "마름모형", "오각형", "육각형", "팔각형", "기타"]
+
+
+def _pill_norm(s):
+    """각인 비교용 정규화: 대문자, '분할선'·'마크' 등 설명어 제거, 글자·숫자만 남김"""
+    s = str(s or "").upper()
+    for w in ("분할선", "마크", "각인", "없음"):
+        s = s.replace(w, "")
+    return re.sub(r"[^0-9A-Z가-힣]", "", s)
+
+
+def load_pills():
+    try:
+        mtime = os.path.getmtime(PILL_FILE)
+    except OSError:
+        return []
+    if _PILL_CACHE["mtime"] == mtime:
+        return _PILL_CACHE["rows"]
+    try:
+        pdf = pd.read_csv(PILL_FILE, dtype=str).fillna("")
+    except Exception as e:
+        app.logger.exception(e)
+        return _PILL_CACHE["rows"]
+    rows = []
+    for r in pdf.to_dict("records"):
+        name = r.get("ITEM_NAME", "")
+        prints = [p for p in (_pill_norm(r.get("PRINT_FRONT")), _pill_norm(r.get("PRINT_BACK"))) if p]
+        colors = set()
+        for c in (r.get("COLOR_CLASS1", ""), r.get("COLOR_CLASS2", "")):
+            for x in str(c).split(","):
+                x = x.strip()
+                if x and x != "옅은":
+                    colors.add(x)
+        rows.append({
+            "seq": r.get("ITEM_SEQ", ""),
+            "name": name,
+            "company": r.get("ENTP_NAME", ""),
+            "cls": r.get("CLASS_NAME", ""),
+            "etc_otc": r.get("ETC_OTC_NAME", ""),
+            "form": r.get("FORM_CODE_NAME", ""),
+            "shape": r.get("DRUG_SHAPE", ""),
+            "color": r.get("COLOR_CLASS1", ""),
+            "print_front": r.get("PRINT_FRONT", ""),
+            "print_back": r.get("PRINT_BACK", ""),
+            "image": r.get("ITEM_IMAGE", ""),
+            "_prints": prints,
+            "_colors": colors,
+            "_capsule": "캡슐" in r.get("FORM_CODE_NAME", ""),
+            "dementia": any(k in name for k in PILL_DEMENTIA_KW),
+        })
+    _PILL_CACHE["mtime"] = mtime
+    _PILL_CACHE["rows"] = rows
+    return rows
+
+
+def _pill_imprint_score(photo_prints, pill_prints):
+    """사진에서 읽은 각인들과 알약 각인(앞/뒤)의 일치도 0~1"""
+    import difflib
+    if not photo_prints or not pill_prints:
+        return 0.0
+    total = 0.0
+    for p in photo_prints:
+        best = 0.0
+        for d in pill_prints:
+            if p == d:
+                best = 1.0
+                break
+            if len(p) >= 2 and len(d) >= 2 and (p in d or d in p):
+                best = max(best, 0.7)
+                continue
+            sm = difflib.SequenceMatcher(None, p, d)
+            if sm.real_quick_ratio() >= 0.6 and sm.quick_ratio() >= 0.6:
+                r = sm.ratio()
+                if r >= 0.6:
+                    best = max(best, r * 0.6)
+        total += best
+    score = total / len(photo_prints)
+    # 사진의 앞·뒤 각인 수와 알약의 각인 수가 같으면 약간 가산
+    if len(photo_prints) == len(pill_prints) and score >= 0.7:
+        score = min(1.0, score + 0.05)
+    return score
+
+
+def search_pills(imprints, color="", shape="", capsule=None, limit=5):
+    """각인(필수) + 색·모양(보조)으로 후보를 점수순으로 반환"""
+    photo_prints = [p for p in (_pill_norm(x) for x in (imprints or [])) if p]
+    if not photo_prints:
+        return []
+    results = []
+    for row in load_pills():
+        s_imp = _pill_imprint_score(photo_prints, row["_prints"])
+        if s_imp <= 0:
+            continue
+        score = s_imp * 70
+        if color and color in row["_colors"]:
+            score += 15
+        if shape and shape == row["shape"]:
+            score += 10
+        if capsule is not None and capsule == row["_capsule"]:
+            score += 5
+        if score >= 40:
+            results.append((score, row))
+    results.sort(key=lambda x: -x[0])
+    # 1등보다 확연히 낮은 후보(20점 이상 차이)는 혼동을 줄이기 위해 제외
+    if results:
+        cut = max(40, results[0][0] - 20)
+        results = [x for x in results if x[0] >= cut]
+    out = []
+    for score, row in results[:limit]:
+        item = {k: v for k, v in row.items() if not k.startswith("_")}
+        item["score"] = round(score)
+        item["detail_url"] = "https://nedrug.mfds.go.kr/pbp/CCBBB01/getItemDetail?itemSeq=" + row["seq"]
+        out.append(item)
+    return out
+
+
+def _pill_features_from_images(images):
+    """GPT로 알약 사진의 '보이는 특징'만 읽음 (약 이름 추정 금지). images: [(mimetype, bytes)]"""
+    import base64
+    client = OpenAI()
+    content = [{"type": "input_text", "text": (
+        "사진 속 알약의 겉모습만 읽어서 JSON으로만 답해. 약 이름은 절대 추측하지 마.\n"
+        "사진은 같은 알약의 앞면(첫 번째)과 뒷면(두 번째, 있을 경우)이다.\n"
+        "각 사진마다 imprint(알약에 새겨지거나 인쇄된 글자·숫자를 보이는 그대로, 로고나 그림이면 빈 문자열, "
+        "분할선으로 나뉜 글자는 이어서), color, shape, score_line(분할선 유무)을 적어.\n"
+        f"color는 다음 중 하나: {', '.join(PILL_COLORS)}\n"
+        f"shape는 다음 중 하나: {', '.join(PILL_SHAPES)}\n"
+        "form은 '정제', '캡슐', '모름' 중 하나.\n"
+        "알약이 아니거나 글자를 전혀 읽을 수 없으면 readable을 false로.\n"
+        '형식: {"sides":[{"imprint":"","color":"","shape":"","score_line":false}],"form":"정제","readable":true}'
+    )}]
+    for mime, data in images:
+        b64 = base64.b64encode(data).decode("utf-8")
+        content.append({"type": "input_image", "image_url": f"data:{mime};base64,{b64}", "detail": "high"})
+
+    res = client.responses.create(model="gpt-4.1-mini", input=[{"role": "user", "content": content}], temperature=0)
+    usage = getattr(res, "usage", None)
+    if usage:
+        add_token_usage(getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
+    text = res.output_text or ""
+    try:
+        return json.loads(text)
+    except Exception:
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        return json.loads(m.group()) if m else {"sides": [], "readable": False}
+
+
+def _pill_throttle():
+    """연속 호출 방지 (토큰 비용 보호): 같은 세션 5초 이내 재요청 차단"""
+    now = time.time()
+    if now - float(session.get("pill_last_time", 0) or 0) < 5:
+        return True
+    session["pill_last_time"] = now
+    return False
+
+
+@app.route("/pill/identify", methods=["POST"])
+@login_required
+def pill_identify():
+    if not load_pills():
+        return jsonify({"ok": False, "message": "알약 데이터(pills.csv)가 없습니다. 관리자에게 문의하세요."})
+    if not os.getenv("OPENAI_API_KEY"):
+        return jsonify({"ok": False, "message": "AI 설정이 되어 있지 않습니다. 관리자에게 문의하세요."})
+    if _pill_throttle():
+        return jsonify({"ok": False, "message": "요청이 너무 빠릅니다. 잠시 후 다시 시도해 주세요."})
+
+    images = []
+    for key in ("front", "back"):
+        f = request.files.get(key)
+        if not f:
+            continue
+        if not (f.mimetype or "").startswith("image/"):
+            return jsonify({"ok": False, "message": "이미지 파일만 올릴 수 있습니다."})
+        data = f.read()
+        if len(data) > 8 * 1024 * 1024:
+            return jsonify({"ok": False, "message": "이미지 용량은 8MB 이하만 가능합니다."})
+        images.append((f.mimetype, data))
+    if not images:
+        return jsonify({"ok": False, "message": "알약 사진을 찍어주세요."})
+
+    try:
+        feat = _pill_features_from_images(images)
+    except Exception as e:
+        app.logger.exception(e)
+        return jsonify({"ok": False, "message": "사진 분석 중 오류가 발생했습니다. 다시 시도해 주세요."})
+
+    sides = feat.get("sides") or []
+    imprints = [str(s.get("imprint", "")).strip() for s in sides if str(s.get("imprint", "")).strip()]
+    color = next((s.get("color") for s in sides if s.get("color") in PILL_COLORS), "")
+    shape = next((s.get("shape") for s in sides if s.get("shape") in PILL_SHAPES), "")
+    form = feat.get("form", "모름")
+    capsule = True if form == "캡슐" else (False if form == "정제" else None)
+
+    features = {"imprint": " / ".join(imprints), "color": color, "shape": shape}
+    if not imprints:
+        return jsonify({"ok": True, "features": features, "candidates": [],
+                        "message": "알약의 각인(글자)을 읽지 못했습니다. 글자가 보이도록 가까이, 밝은 곳에서 다시 찍어주세요."})
+    cands = search_pills(imprints, color, shape, capsule)
+    msg = "" if cands else "일치하는 알약을 찾지 못했습니다. 인식된 각인을 직접 고쳐서 다시 찾아보세요."
+    return jsonify({"ok": True, "features": features, "candidates": cands, "message": msg})
+
+
+@app.route("/pill/search", methods=["POST"])
+@login_required
+def pill_search():
+    """인식된 정보를 사용자가 고쳐서 다시 찾기 (AI 호출 없음)"""
+    d = request.get_json(silent=True) or {}
+    imprints = [x.strip() for x in str(d.get("imprint", "")).split("/") if x.strip()]
+    color = d.get("color") if d.get("color") in PILL_COLORS else ""
+    shape = d.get("shape") if d.get("shape") in PILL_SHAPES else ""
+    if not imprints:
+        return jsonify({"ok": True, "candidates": [], "message": "각인(알약에 새겨진 글자)을 입력해 주세요."})
+    cands = search_pills(imprints, color, shape)
+    return jsonify({"ok": True, "candidates": cands,
+                    "message": "" if cands else "일치하는 알약을 찾지 못했습니다."})
+
+
+# 알약 확인 팝업 (홈·사전조사 공용). 템플릿에서 {{ pill_html|safe }} 로 삽입
+PILL_HTML = """
+<style>
+.pill-modal{ display:none; position:fixed; inset:0; z-index:100002; background:rgba(15,23,42,0.6); align-items:center; justify-content:center; padding:12px; font-family:inherit; }
+.pill-modal.show{ display:flex; }
+.pill-box{ width:100%; max-width:520px; max-height:92vh; max-height:92dvh; background:#fff; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25); text-align:left; color:#111827; }
+.pill-head{ display:flex; align-items:flex-start; gap:8px; padding:14px 16px; border-bottom:1px solid #e5e7eb; }
+.pill-title{ font-size:16px; font-weight:800; }
+.pill-sub{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; }
+.pill-x{ flex:none; margin-left:auto; width:32px !important; height:32px !important; min-width:0 !important; padding:0 !important; margin-top:0 !important; border:none !important; border-radius:999px !important; background:#f3f4f6 !important; color:#374151 !important; font-size:19px !important; line-height:1 !important; box-shadow:none !important; cursor:pointer; }
+.pill-body{ flex:1; overflow:auto; padding:14px 16px; min-height:0; }
+.pill-shots{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.pill-shot{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; height:120px; border:1.5px dashed #93c5fd; border-radius:12px; background:#f8fbff; color:#1d4ed8; font-size:13px; font-weight:700; cursor:pointer; overflow:hidden; text-align:center; }
+.pill-shot input{ display:none; }
+.pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; }
+.pill-tip{ margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; }
+.pill-go{ display:block; width:100% !important; height:44px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:15px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
+.pill-go:disabled{ background:#93c5fd !important; cursor:wait; }
+.pill-msg{ display:none; margin-top:12px; padding:10px 12px; border-radius:10px; background:#fff7ed; border:1px solid #fdba74; color:#9a3412; font-size:13px; line-height:1.55; word-break:keep-all; }
+.pill-feat{ display:none; margin-top:14px; padding:10px 12px; border-radius:12px; background:#eef4ff; border:1px solid #c7d7ff; }
+.pill-feat-title{ font-size:12px; font-weight:800; color:#1e3a8a; margin-bottom:8px; }
+.pill-feat-row{ display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:6px; }
+.pill-feat-row input, .pill-feat-row select{ width:100%; height:36px; margin:0; padding:0 8px; border:1px solid #c7d7ff; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; box-sizing:border-box; }
+.pill-re{ width:100% !important; height:34px !important; margin:8px 0 0 !important; padding:0 !important; border:1px solid #93c5fd !important; border-radius:8px !important; background:#fff !important; color:#1d4ed8 !important; font-size:13px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.pill-list{ margin-top:12px; display:flex; flex-direction:column; gap:10px; }
+.pill-card{ display:flex; gap:12px; padding:10px; border:1px solid #e5e7eb; border-radius:12px; }
+.pill-card img{ flex:none; width:96px; height:54px; object-fit:contain; border-radius:6px; background:#f9fafb; }
+.pill-info{ flex:1; min-width:0; }
+.pill-name{ font-size:14px; font-weight:800; line-height:1.35; word-break:keep-all; }
+.pill-meta{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; }
+.pill-badge{ display:inline-block; margin-right:4px; padding:1px 7px; border-radius:6px; background:#ede9fe; color:#6d28d9; font-size:11px; font-weight:800; vertical-align:1px; }
+.pill-actions{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.pill-link{ font-size:12px; font-weight:700; color:#2563eb; text-decoration:none; }
+.pill-yes{ width:auto !important; height:26px !important; margin:0 !important; padding:0 10px !important; border:none !important; border-radius:999px !important; background:#7c3aed !important; color:#fff !important; font-size:12px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.pill-foot{ flex:none; padding:8px 16px; border-top:1px solid #f1f5f9; font-size:11px; color:#9ca3af; line-height:1.5; word-break:keep-all; }
+@media (max-width:480px){
+  .pill-shot{ height:100px; }
+  .pill-feat-row{ grid-template-columns:1fr 1fr; }
+  .pill-feat-row input{ grid-column:1 / -1; }
+  .pill-card img{ width:80px; height:46px; }
+}
+</style>
+
+<div id="pillModal" class="pill-modal">
+  <div class="pill-box">
+    <div class="pill-head">
+      <div>
+        <div class="pill-title">💊 알약 확인</div>
+        <div class="pill-sub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
+      </div>
+      <button type="button" class="pill-x" onclick="closePill()" aria-label="닫기">×</button>
+    </div>
+    <div class="pill-body">
+      <div class="pill-shots">
+        <label class="pill-shot" id="pillShotFront">
+          <input type="file" accept="image/*" capture="environment" data-side="front">
+          <span>📷 앞면</span><small>각인이 보이게</small>
+        </label>
+        <label class="pill-shot" id="pillShotBack">
+          <input type="file" accept="image/*" capture="environment" data-side="back">
+          <span>📷 뒷면</span><small>선택 · 있으면 더 정확</small>
+        </label>
+      </div>
+      <p class="pill-tip">※ 알약에 새겨진 글자(각인)가 선명하게 보이도록 가까이, 밝은 곳에서 찍어주세요. 사진은 저장되지 않습니다.</p>
+      <button type="button" class="pill-go" id="pillGo">확인하기</button>
+
+      <div class="pill-msg" id="pillMsg"></div>
+
+      <div class="pill-feat" id="pillFeat">
+        <div class="pill-feat-title">인식된 정보 · 틀리면 고쳐서 다시 찾기</div>
+        <div class="pill-feat-row">
+          <input type="text" id="pillImprint" placeholder="각인 (앞 / 뒤)">
+          <select id="pillColor"><option value="">색 전체</option></select>
+          <select id="pillShape"><option value="">모양 전체</option></select>
+        </div>
+        <button type="button" class="pill-re" id="pillRe">다시 찾기</button>
+      </div>
+
+      <div class="pill-list" id="pillList"></div>
+    </div>
+    <div class="pill-foot">참고용 후보입니다. 정확한 확인은 약사·의사에게 문의하세요. · 자료: 식품의약품안전처 의약품 낱알식별 정보</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var COLORS = ["하양","노랑","주황","분홍","빨강","갈색","연두","초록","청록","파랑","남색","자주","보라","회색","검정","투명"];
+  var SHAPES = ["원형","타원형","장방형","반원형","삼각형","사각형","마름모형","오각형","육각형","팔각형","기타"];
+  var modal = document.getElementById("pillModal");
+  if(!modal) return;
+  var files = { front:null, back:null };
+  var surveyMode = false;
+  var goBtn = document.getElementById("pillGo");
+  var msg = document.getElementById("pillMsg");
+  var feat = document.getElementById("pillFeat");
+  var list = document.getElementById("pillList");
+  var inImp = document.getElementById("pillImprint");
+  var inColor = document.getElementById("pillColor");
+  var inShape = document.getElementById("pillShape");
+
+  COLORS.forEach(function(c){ var o=document.createElement("option"); o.value=c; o.textContent=c; inColor.appendChild(o); });
+  SHAPES.forEach(function(s){ var o=document.createElement("option"); o.value=s; o.textContent=s; inShape.appendChild(o); });
+
+  /* 큰 사진은 휴대폰에서 줄여서 전송 (각인 판독에 충분한 1600px) */
+  function shrink(file){
+    return new Promise(function(resolve){
+      if(!file || typeof createImageBitmap !== "function" || file.size < 1.5*1024*1024){ resolve(file); return; }
+      createImageBitmap(file).then(function(bmp){
+        var scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+        var c = document.createElement("canvas");
+        c.width = Math.round(bmp.width*scale); c.height = Math.round(bmp.height*scale);
+        c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+        if(bmp.close) bmp.close();
+        c.toBlob(function(b){ resolve(b && b.size ? b : file); }, "image/jpeg", 0.85);
+      }).catch(function(){ resolve(file); });
+    });
+  }
+
+  Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot input"), function(inp){
+    inp.addEventListener("change", function(){
+      var f = inp.files && inp.files[0];
+      var side = inp.getAttribute("data-side");
+      files[side] = f || null;
+      var box = inp.parentNode;
+      var old = box.querySelector("img"); if(old) old.remove();
+      if(f){
+        var im = document.createElement("img");
+        im.src = URL.createObjectURL(f);
+        box.appendChild(im);
+      }
+    });
+  });
+
+  function showMsg(t){ msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; }
+
+  function esc(s){ var d=document.createElement("div"); d.textContent = (s==null?"":s); return d.innerHTML; }
+
+  function render(cands){
+    list.innerHTML = "";
+    (cands || []).forEach(function(c){
+      var card = document.createElement("div");
+      card.className = "pill-card";
+      var prints = [c.print_front, c.print_back].filter(function(x){ return x; }).join(" / ");
+      card.innerHTML =
+        (c.image ? '<img src="' + esc(c.image) + '" alt="" loading="lazy">' : '') +
+        '<div class="pill-info">' +
+          '<div class="pill-name">' + (c.dementia ? '<span class="pill-badge">치매약</span>' : '') + esc(c.name) + '</div>' +
+          '<div class="pill-meta">' + esc(c.company) + ' · ' + esc(c.etc_otc) + (c.cls ? ' · ' + esc(c.cls) : '') + '</div>' +
+          '<div class="pill-meta">각인 ' + esc(prints || "-") + ' · ' + esc(c.color) + ' · ' + esc(c.shape) + '</div>' +
+          '<div class="pill-actions">' +
+            '<a class="pill-link" href="' + esc(c.detail_url) + '" target="_blank" rel="noopener noreferrer">상세정보(효능·용법) ↗</a>' +
+          '</div>' +
+        '</div>';
+      if(surveyMode && c.dementia){
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "pill-yes"; b.textContent = "치매약 복용 '예' 선택";
+        b.addEventListener("click", function(){
+          var r = document.querySelector('input[name="dementia"][value="y"]');
+          window.closePill();
+          if(r){ r.checked = true; r.dispatchEvent(new Event("change", {bubbles:true})); }
+        });
+        card.querySelector(".pill-actions").appendChild(b);
+      }
+      list.appendChild(card);
+    });
+  }
+
+  function handle(data){
+    if(!data || !data.ok){ showMsg((data && data.message) || "오류가 발생했습니다."); return; }
+    if(data.features){
+      inImp.value = data.features.imprint || "";
+      inColor.value = data.features.color || "";
+      inShape.value = data.features.shape || "";
+      feat.style.display = "block";
+    }
+    render(data.candidates);
+    showMsg(data.message || "");
+  }
+
+  goBtn.addEventListener("click", function(){
+    if(!files.front && !files.back){ showMsg("알약 사진을 먼저 찍어주세요."); return; }
+    goBtn.disabled = true; goBtn.textContent = "확인 중...";
+    showMsg(""); list.innerHTML = "";
+    Promise.all([shrink(files.front), shrink(files.back)]).then(function(arr){
+      var fd = new FormData();
+      if(arr[0]) fd.append("front", arr[0], "front.jpg");
+      if(arr[1]) fd.append("back", arr[1], "back.jpg");
+      return fetch("/pill/identify", { method:"POST", body:fd, credentials:"same-origin" });
+    }).then(function(r){ return r.json(); }).then(handle)
+      .catch(function(){ showMsg("연결 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."); })
+      .finally(function(){ goBtn.disabled = false; goBtn.textContent = "확인하기"; });
+  });
+
+  document.getElementById("pillRe").addEventListener("click", function(){
+    showMsg(""); list.innerHTML = "";
+    fetch("/pill/search", {
+      method:"POST", credentials:"same-origin",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ imprint: inImp.value, color: inColor.value, shape: inShape.value })
+    }).then(function(r){ return r.json(); }).then(handle)
+      .catch(function(){ showMsg("연결 오류가 발생했습니다."); });
+  });
+
+  /* survey=true 이면 치매약 후보에 '예 선택' 버튼 표시 (사전조사 화면) */
+  window.openPill = function(survey){
+    surveyMode = !!survey;
+    files = { front:null, back:null };
+    Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(b){
+      var im = b.querySelector("img"); if(im) im.remove();
+      var inp = b.querySelector("input"); if(inp) inp.value = "";
+    });
+    showMsg(""); list.innerHTML = ""; feat.style.display = "none";
+    modal.classList.add("show");
+    document.body.style.overflow = "hidden";
+  };
+  window.closePill = function(){
+    modal.classList.remove("show");
+    document.body.style.overflow = "";
+  };
+  modal.addEventListener("click", function(e){ if(e.target === modal) window.closePill(); });
 })();
 </script>
 """
@@ -2931,6 +3387,20 @@ body.app-mode .container{
   font-size:13px;
 }
 
+/* 알약 확인 카드 아이콘 (다른 카드의 26px 아이콘과 크기 맞춤) */
+.pill-home-ico{
+  display:block;
+  font-size:22px;
+  line-height:26px;
+  height:26px;
+  margin-bottom:4px;
+}
+@media (max-width:480px){
+  .pill-home-ico{ font-size:17px; line-height:20px; height:20px; margin-bottom:2px; }
+  .bottom-row{ gap:8px !important; }
+  .bottom-row .bottom-card div{ font-size:12px; line-height:1.25; word-break:keep-all; }
+}
+
 /* 모바일 */
 @media (max-width:480px){
 
@@ -3213,6 +3683,14 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <img src="/static/pdf_icon.png">
 
 <div>통합돌봄 사업 안내</div>
+
+</a>
+
+<a href="#" class="bottom-card" onclick="if(window.openPill){openPill(false);} return false;">
+
+<span class="pill-home-ico">💊</span>
+
+<div>알약 확인</div>
 
 </a>
 
@@ -4230,6 +4708,7 @@ window.addEventListener('pageshow', function(e){
 </script>
 
 
+{{ pill_html|default('')|safe }}
 </body>
 </html>
 """
@@ -14353,6 +14832,10 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
             <label><input type="radio" name="dementia" value="y"> 예</label>
             <label><input type="radio" name="dementia" value="n"> 아니오</label>
           </div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px dashed #c7d2fe;text-align:center;font-size:12.5px;color:#4b5563;">
+            약 이름을 모르시나요?
+            <a href="#" onclick="if(window.openPill){openPill(true);} return false;" style="margin-left:4px;font-weight:800;color:#4338ca;text-decoration:none;white-space:nowrap;">📷 알약 사진으로 확인</a>
+          </div>
         </div>
         </div>
 
@@ -15691,6 +16174,7 @@ document.addEventListener('click', function(){
 
 // 가이드 투어 제거: 자동 실행하지 않음
 </script>
+{{ pill_html|default('')|safe }}
 </body>
 </html>
 """
