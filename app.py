@@ -2356,7 +2356,7 @@ def _pill_imprint_score(photo_prints, pill_prints):
     return score
 
 
-def search_pills(imprints, color="", shape="", capsule=None, limit=5):
+def search_pills(imprints, color="", shape="", capsule=None, limit=3):
     """각인(필수) + 색·모양(보조)으로 후보를 점수순으로 반환"""
     photo_prints = [p for p in (_pill_norm(x) for x in (imprints or [])) if p]
     if not photo_prints:
@@ -2592,6 +2592,13 @@ PILL_HTML = """
 .pill-shot input{ display:none; }
 .pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; }
+/* 앞면/뒷면 누르면 나오는 '카메라 / 앨범' 선택창 */
+.pill-src{ display:none; position:fixed; inset:0; z-index:100005; background:rgba(15,23,42,0.45); align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
+.pill-src.show{ display:flex; }
+.pill-src-box{ width:100%; max-width:300px; background:#fff; border-radius:16px; padding:18px 16px 14px; box-sizing:border-box; box-shadow:0 12px 32px rgba(0,0,0,0.2); }
+.pill-src-title{ margin:0 0 12px; font-size:15px; font-weight:800; color:#111827; text-align:center; }
+.pill-src-btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100% !important; height:48px !important; margin:0 0 8px !important; padding:0 !important; border:1px solid #c7d7ff !important; border-radius:12px !important; background:#eef4ff !important; color:#1d4ed8 !important; font-size:15px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.pill-src-cancel{ width:100% !important; height:40px !important; margin:2px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#f3f4f6 !important; color:#4b5563 !important; font-size:14px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
 .pill-tip{ display:flex; gap:4px; margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; }
 .pill-tip span:first-child{ flex:none; }  /* ※ 뒤로 줄바꿈된 글이 윗줄 첫 글자에 맞춰짐 */
 .pill-go{ display:block; width:100% !important; height:44px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:15px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
@@ -2645,11 +2652,13 @@ PILL_HTML = """
     <div class="pill-body">
       <div class="pill-shots">
         <div class="pill-shot" id="pillShotFront" data-side="front" role="button" tabindex="0">
-          <input type="file" accept="image/*" capture="environment" data-side="front">
+          <input type="file" accept="image/*" capture="environment" data-side="front" data-src="camera">
+          <input type="file" accept="image/*" data-side="front" data-src="album">
           <span>📷 앞면</span><small>각인이 보이게</small>
         </div>
         <div class="pill-shot" id="pillShotBack" data-side="back" role="button" tabindex="0">
-          <input type="file" accept="image/*" capture="environment" data-side="back">
+          <input type="file" accept="image/*" capture="environment" data-side="back" data-src="camera">
+          <input type="file" accept="image/*" data-side="back" data-src="album">
           <span>📷 뒷면</span><small>선택 · 있으면 더 정확</small>
         </div>
       </div>
@@ -2672,6 +2681,15 @@ PILL_HTML = """
       <div class="pill-list" id="pillList"></div>
     </div>
     <div class="pill-foot">참고용 후보입니다. 정확한 확인은 약사·의사에게 문의하세요.<br>자료: 식품의약품안전처 의약품 낱알식별 정보</div>
+  </div>
+</div>
+
+<div id="pillSrc" class="pill-src">
+  <div class="pill-src-box">
+    <p class="pill-src-title" id="pillSrcTitle">앞면 사진</p>
+    <button type="button" class="pill-src-btn" data-src="camera">📷 카메라로 촬영</button>
+    <button type="button" class="pill-src-btn" data-src="album">🖼️ 앨범에서 선택</button>
+    <button type="button" class="pill-src-cancel" id="pillSrcCancel">취소</button>
   </div>
 </div>
 
@@ -2741,16 +2759,34 @@ PILL_HTML = """
     });
   });
 
-  /* 휴대폰 기본 카메라 앱으로 촬영. 열기 직전 표시를 남겨 화면이 새로 열려도 팝업을 복원 */
-  function openPicker(side){
-    var inp = modal.querySelector('.pill-shot[data-side="' + side + '"] input');
+  /* 카메라(휴대폰 기본 카메라 앱) 또는 앨범 열기.
+     열기 직전 표시를 남겨 화면이 새로 열려도 팝업을 복원 */
+  function openPicker(side, srcType){
+    srcType = srcType || "camera";
+    var inp = modal.querySelector('.pill-shot[data-side="' + side + '"] input[data-src="' + srcType + '"]');
     if(!inp) return;
-    if(window.camPending) window.camPending.set("pill", { mode: surveyMode ? "survey" : "home", side: side });
+    if(window.camPending) window.camPending.set("pill", { mode: surveyMode ? "survey" : "home", side: side, src: srcType });
     inp.click();
   }
+
+  /* 앞면/뒷면을 누르면 '카메라로 촬영 / 앨범에서 선택' 선택창 */
+  var srcBox = document.getElementById("pillSrc");
+  var srcSide = "front";
+  function openSrc(side){
+    srcSide = side;
+    document.getElementById("pillSrcTitle").textContent = (side === "back" ? "뒷면" : "앞면") + " 사진";
+    srcBox.classList.add("show");
+  }
+  function closeSrc(){ srcBox.classList.remove("show"); }
+  Array.prototype.forEach.call(srcBox.querySelectorAll(".pill-src-btn"), function(btn){
+    btn.addEventListener("click", function(){ closeSrc(); openPicker(srcSide, btn.getAttribute("data-src")); });
+  });
+  document.getElementById("pillSrcCancel").addEventListener("click", closeSrc);
+  srcBox.addEventListener("click", function(e){ if(e.target === srcBox) closeSrc(); });
+
   Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
-    box.addEventListener("click", function(){ openPicker(box.getAttribute("data-side")); });
-    box.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openPicker(box.getAttribute("data-side")); } });
+    box.addEventListener("click", function(){ openSrc(box.getAttribute("data-side")); });
+    box.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openSrc(box.getAttribute("data-side")); } });
   });
 
   function showMsg(t){ msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; }
@@ -2772,7 +2808,7 @@ PILL_HTML = """
   function startLoading(){
     var i = 0; setLoad(0); loadBox.classList.add("show");
     clearInterval(loadTimer);
-    loadTimer = setInterval(function(){ if(i < LOAD_MSGS.length - 1){ i++; setLoad(i); } else { clearInterval(loadTimer); } }, 4500);  /* 사례검색과 동일 */
+    loadTimer = setInterval(function(){ if(i < LOAD_MSGS.length - 1){ i++; setLoad(i); } else { clearInterval(loadTimer); } }, 3500);
   }
   function stopLoading(){ clearInterval(loadTimer); loadBox.classList.remove("show"); }
 
@@ -2867,7 +2903,7 @@ PILL_HTML = """
     files = { front:null, back:null };
     Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(b){
       var im = b.querySelector("img"); if(im) im.remove();
-      var inp = b.querySelector("input"); if(inp) inp.value = "";
+      Array.prototype.forEach.call(b.querySelectorAll("input"), function(inp){ inp.value = ""; });
     });
     showMsg(""); list.innerHTML = ""; feat.style.display = "none";
     modal.classList.add("show");
@@ -2883,6 +2919,7 @@ PILL_HTML = """
   };
   var historyPushed = false;
   function hidePill(){
+    closeSrc();
     if(window.camPending) window.camPending.clear();
     modal.classList.remove("show");
     document.body.style.overflow = "";
@@ -2902,7 +2939,7 @@ PILL_HTML = """
   var back = window.camPending && window.camPending.take("pill");
   if(back){
     window.openPill(back.extra && back.extra.mode === "survey", true);
-    window.camPending.notice(function(){ openPicker((back.extra && back.extra.side) || "front"); });
+    window.camPending.notice(function(){ openPicker((back.extra && back.extra.side) || "front", back.extra && back.extra.src); });
   }
 })();
 </script>
