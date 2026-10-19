@@ -2519,6 +2519,17 @@ PILL_HTML = """
 .pill-actions{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 .pill-link{ font-size:12px; font-weight:700; color:#2563eb; text-decoration:none; }
 .pill-yes{ width:auto !important; height:26px !important; margin:0 !important; padding:0 10px !important; border:none !important; border-radius:999px !important; background:#7c3aed !important; color:#fff !important; font-size:12px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.pill-loading{ display:none; position:fixed; inset:0; z-index:100003; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; }
+.pill-loading.show{ display:flex; }
+.pill-loading-box{ width:86%; max-width:320px; background:#fff; border-radius:20px; padding:34px 24px 26px; text-align:center; display:flex; flex-direction:column; align-items:center; }
+.pill-spinner{ width:42px; height:42px; border:5px solid #eee; border-top-color:#2563eb; border-radius:50%; animation:pillSpin 1s linear infinite; }
+@keyframes pillSpin{ to{ transform:rotate(360deg); } }
+.pill-load-title{ margin:14px 0 0; font-size:15px; font-weight:700; line-height:1.35; color:#111827; }
+.pill-load-sub{ margin:8px 0 0; font-size:13px; line-height:1.5; color:#6b7280; word-break:keep-all; }
+.pill-steps{ display:flex; gap:6px; width:150px; margin:16px auto 0; }
+.pill-step{ flex:1; height:6px; border-radius:999px; background:#e5e7eb; transition:background .3s; }
+.pill-step.on{ background:#2563eb; }
+.pill-load-ci{ width:132px; margin-top:28px; opacity:0.82; display:block; }
 .pill-foot{ flex:none; padding:8px 16px; border-top:1px solid #f1f5f9; font-size:11px; color:#9ca3af; line-height:1.5; word-break:keep-all; }
 @media (max-width:480px){
   .pill-shot{ height:100px; }
@@ -2565,7 +2576,17 @@ PILL_HTML = """
 
       <div class="pill-list" id="pillList"></div>
     </div>
-    <div class="pill-foot">참고용 후보입니다. 정확한 확인은 약사·의사에게 문의하세요. · 자료: 식품의약품안전처 의약품 낱알식별 정보</div>
+    <div class="pill-foot">참고용 후보입니다. 정확한 확인은 약사·의사에게 문의하세요.<br>자료: 식품의약품안전처 의약품 낱알식별 정보</div>
+  </div>
+</div>
+
+<div id="pillLoading" class="pill-loading">
+  <div class="pill-loading-box">
+    <div class="pill-spinner"></div>
+    <p class="pill-load-title" id="pillLoadTitle"></p>
+    <p class="pill-load-sub" id="pillLoadSub"></p>
+    <div class="pill-steps"><div class="pill-step"></div><div class="pill-step"></div><div class="pill-step"></div><div class="pill-step"></div></div>
+    <img src="/static/ci.png" class="pill-load-ci" alt="" onerror="this.style.display='none'">
   </div>
 </div>
 
@@ -2620,6 +2641,27 @@ PILL_HTML = """
 
   function showMsg(t){ msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; }
 
+  /* 확인 중 로딩창 (사례검색과 같은 방식) */
+  var LOAD_MSGS = [
+    ["AI가 알약 사진을 살펴보고 있습니다", "사진 속 알약의 모양과 색을 확인하고 있습니다."],
+    ["각인(글자)을 읽고 있습니다", "알약에 새겨진 글자와 숫자를 확인하고 있습니다."],
+    ["식약처 낱알정보와 비교 중입니다", "등록된 알약 2만 5천여 개와 특징을 대조하고 있습니다."],
+    ["후보 약을 정리하고 있습니다", "일치도가 높은 순서로 정리하고 있습니다."]
+  ];
+  var loadBox = document.getElementById("pillLoading");
+  var loadTimer = null;
+  function setLoad(i){
+    document.getElementById("pillLoadTitle").textContent = LOAD_MSGS[i][0];
+    document.getElementById("pillLoadSub").textContent = LOAD_MSGS[i][1];
+    Array.prototype.forEach.call(loadBox.querySelectorAll(".pill-step"), function(st, k){ st.classList.toggle("on", k <= i); });
+  }
+  function startLoading(){
+    var i = 0; setLoad(0); loadBox.classList.add("show");
+    clearInterval(loadTimer);
+    loadTimer = setInterval(function(){ if(i < LOAD_MSGS.length - 1){ i++; setLoad(i); } else { clearInterval(loadTimer); } }, 2500);
+  }
+  function stopLoading(){ clearInterval(loadTimer); loadBox.classList.remove("show"); }
+
   function esc(s){ var d=document.createElement("div"); d.textContent = (s==null?"":s); return d.innerHTML; }
 
   function render(cands){
@@ -2662,12 +2704,26 @@ PILL_HTML = """
     }
     render(data.candidates);
     showMsg(data.message || "");
+    scrollToResult();
+  }
+
+  /* 모바일: 결과가 나오면 결과 위치로 자동 스크롤 (인식 정보 → 후보 목록 순) */
+  function scrollToResult(){
+    if(!window.matchMedia("(max-width:767px)").matches) return;
+    var body = modal.querySelector(".pill-body");
+    var target = (msg.style.display === "block") ? msg : (feat.style.display === "block" ? feat : list);
+    if(!body || !target) return;
+    setTimeout(function(){
+      var top = target.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 8;
+      body.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }, 60);
   }
 
   goBtn.addEventListener("click", function(){
     if(!files.front && !files.back){ showMsg("알약 사진을 먼저 찍어주세요."); return; }
     goBtn.disabled = true; goBtn.textContent = "확인 중...";
     showMsg(""); list.innerHTML = "";
+    startLoading();
     Promise.all([shrink(files.front), shrink(files.back)]).then(function(arr){
       var fd = new FormData();
       if(arr[0]) fd.append("front", arr[0], "front.jpg");
@@ -2675,7 +2731,7 @@ PILL_HTML = """
       return fetch("/pill/identify", { method:"POST", body:fd, credentials:"same-origin" });
     }).then(function(r){ return r.json(); }).then(handle)
       .catch(function(){ showMsg("연결 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."); })
-      .finally(function(){ goBtn.disabled = false; goBtn.textContent = "확인하기"; });
+      .finally(function(){ stopLoading(); goBtn.disabled = false; goBtn.textContent = "확인하기"; });
   });
 
   document.getElementById("pillRe").addEventListener("click", function(){
@@ -3387,6 +3443,10 @@ body.app-mode .container{
   font-size:13px;
 }
 
+/* 모바일에서만 줄바꿈 (통합돌봄 / 사업 안내) */
+.m-only-br{ display:none; }
+@media (max-width:480px){ .m-only-br{ display:inline; } }
+
 /* 알약 확인 카드 아이콘 (다른 카드의 26px 아이콘과 크기 맞춤) */
 .pill-home-ico{
   display:block;
@@ -3682,7 +3742,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 <img src="/static/pdf_icon.png">
 
-<div>통합돌봄 사업 안내</div>
+<div>통합돌봄 <br class="m-only-br">사업 안내</div>
 
 </a>
 
