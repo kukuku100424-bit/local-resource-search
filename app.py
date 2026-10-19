@@ -413,6 +413,8 @@ _PV_TRACK = {
     "/guide": "사업안내",
     "/nhis25": "건강보험25시",
     "/manual": "사용설명서",
+    "/pill": "알약확인",
+    "/dolbomon": "돌봄온",
 }
 
 def _pv_insert(path):
@@ -1088,7 +1090,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="box">
   <div class="simple-logo">관리자 인증</div>
   <div class="logo-line"></div>
-  <div class="sub-title">통계 페이지 접근을 위해 관리자 암호를 입력하세요.</div>
+  <div class="sub-title">관리자 페이지 접근을 위해 관리자 암호를 입력하세요.</div>
 
   {% if error %}
     <div class="error-msg">❌ {{error}}</div>
@@ -1096,7 +1098,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
   <form method="post" class="form-area">
     <input type="password" name="password" placeholder="관리자 암호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
-    <button type="submit">통계 페이지로 이동</button>
+    <button type="submit">관리자 페이지로 이동</button>
   </form>
 
   <a href="/login" class="back-link">로그인 페이지로 돌아가기</a>
@@ -2038,7 +2040,10 @@ def inject_dolbomon_items():
     # 사례검색(/desc)·기관찾기(/combo) 화면에서만 사용
     if request.path not in ("/desc", "/combo"):
         return {}
-    return {"dolbomon_items": load_dolbomon_items(), "dbo_viewer": DBO_VIEWER_HTML}
+    ctx = {"dolbomon_items": load_dolbomon_items(), "dbo_viewer": DBO_VIEWER_HTML}
+    if request.path == "/desc":
+        ctx["cam_html"] = CAM_HTML
+    return ctx
 
 # 돌봄온 이미지 팝업 + 통합돌봄ON 선택창 (사례검색·기관찾기 공용)
 # - 템플릿에서 {{ dbo_viewer|safe }} 로 삽입. 자원 목록은 각 페이지에서 dolbomon_items 로 전달
@@ -2201,6 +2206,7 @@ DBO_VIEWER_HTML = """
 
   /* 기관검색: 검색은 실행하지 않고 기관찾기 화면에 값만 채워서 이동 */
   window.openDbo = function(it){
+    try{ if(navigator.sendBeacon){ navigator.sendBeacon("/pv/dbo"); } else { fetch("/pv/dbo", {method:"POST"}); } }catch(e){}
     cur = it; idx = 0;
     modal.classList.remove("zoom");
     document.getElementById("dboTitle").textContent = it.name;
@@ -2484,6 +2490,117 @@ def pill_search():
                     "message": "" if cands else "일치하는 알약을 찾지 못했습니다."})
 
 
+# 화면 안 카메라 (알약 확인·사례검색 공용)
+# - 휴대폰 카메라 앱으로 넘어가면 일부 기기가 페이지를 새로고침해 사진이 사라지므로, 브라우저 안에서 촬영
+# - 사용: window.openCam({ guide:"circle"|"rect", hint:"안내문", onPhoto:function(blob){}, onFallback:function(){} })
+#   · 카메라를 쓸 수 없으면(권한 거부·미지원) onFallback 호출 → 기존 파일 선택/카메라 앱 방식으로 진행
+# - 지원 기기는 ImageCapture(사진 촬영)로 고해상도, 아니면 영상 화면을 최대 해상도로 캡처
+CAM_HTML = """
+<style>
+.cam-ov{ display:none; position:fixed; inset:0; z-index:100004; background:#000; font-family:inherit; }
+.cam-ov.show{ display:block; }
+.cam-ov video{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.cam-guide{ position:absolute; left:50%; top:45%; transform:translate(-50%,-50%); border:3px dashed rgba(255,255,255,0.9); box-shadow:0 0 0 9999px rgba(0,0,0,0.35); pointer-events:none; }
+.cam-guide.circle{ width:min(62vw, 300px); height:min(62vw, 300px); border-radius:50%; }
+.cam-guide.rect{ width:min(86vw, 520px); height:min(62vh, 640px); border-radius:12px; }
+.cam-hint{ position:absolute; left:16px; right:16px; top:calc(16px + env(safe-area-inset-top)); padding:10px 12px; border-radius:10px; background:rgba(0,0,0,0.55); color:#fff; font-size:13px; line-height:1.45; text-align:center; word-break:keep-all; }
+.cam-bar{ position:absolute; left:0; right:0; bottom:0; padding:18px 24px calc(22px + env(safe-area-inset-bottom)); display:flex; align-items:center; justify-content:space-between; background:linear-gradient(transparent, rgba(0,0,0,0.6)); }
+.cam-side{ width:72px !important; height:40px !important; margin:0 !important; padding:0 !important; border:1px solid rgba(255,255,255,0.7) !important; border-radius:999px !important; background:rgba(0,0,0,0.3) !important; color:#fff !important; font-size:14px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.cam-shot{ width:72px !important; height:72px !important; min-width:0 !important; margin:0 !important; padding:0 !important; border:5px solid #fff !important; border-radius:50% !important; background:rgba(255,255,255,0.35) !important; box-shadow:0 0 0 3px rgba(0,0,0,0.25) !important; cursor:pointer; }
+.cam-shot:active{ background:#fff !important; }
+.cam-shot:disabled{ opacity:0.5; }
+</style>
+
+<div id="camOv" class="cam-ov">
+  <video id="camVideo" playsinline autoplay muted></video>
+  <div class="cam-guide circle" id="camGuide"></div>
+  <div class="cam-hint" id="camHint"></div>
+  <div class="cam-bar">
+    <button type="button" class="cam-side" id="camAlbum">앨범</button>
+    <button type="button" class="cam-shot" id="camShot" aria-label="촬영"></button>
+    <button type="button" class="cam-side" id="camCancel">취소</button>
+  </div>
+  <input type="file" accept="image/*" id="camAlbumInput" style="display:none">
+</div>
+
+<script>
+(function(){
+  if(window.openCam) return;
+  var ov = document.getElementById("camOv");
+  var video = document.getElementById("camVideo");
+  var guide = document.getElementById("camGuide");
+  var hint = document.getElementById("camHint");
+  var shotBtn = document.getElementById("camShot");
+  var albumInput = document.getElementById("camAlbumInput");
+  if(!ov) return;
+  var stream = null, opts = null;
+
+  function close(){
+    if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    video.srcObject = null;
+    ov.classList.remove("show");
+    shotBtn.disabled = false;
+  }
+  window.closeCam = close;
+
+  function done(blob){
+    var cb = opts && opts.onPhoto;
+    close();
+    if(blob && cb) cb(blob);
+  }
+
+  /* 영상 화면을 그대로 캡처 (ImageCapture 미지원 시) */
+  function grabFrame(){
+    var w = video.videoWidth, h = video.videoHeight;
+    if(!w || !h){ done(null); return; }
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d").drawImage(video, 0, 0, w, h);
+    c.toBlob(function(b){ done(b); }, "image/jpeg", 0.92);
+  }
+
+  window.openCam = function(o){
+    opts = o || {};
+    guide.className = "cam-guide " + (opts.guide === "rect" ? "rect" : "circle");
+    hint.textContent = opts.hint || "";
+    function fallback(){ if(opts.onFallback) opts.onFallback(); }
+    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ fallback(); return; }
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } },
+      audio: false
+    }).then(function(s){
+      stream = s;
+      video.srcObject = s;
+      ov.classList.add("show");
+      var p = video.play(); if(p && p.catch) p.catch(function(){});
+    }).catch(function(){ fallback(); });
+  };
+
+  shotBtn.addEventListener("click", function(){
+    if(!stream) return;
+    shotBtn.disabled = true;
+    var track = stream.getVideoTracks()[0];
+    /* 지원 기기: 사진 촬영 모드로 카메라 앱과 비슷한 고해상도 */
+    if(window.ImageCapture && track){
+      try{
+        new ImageCapture(track).takePhoto().then(function(b){ done(b); }).catch(grabFrame);
+        return;
+      }catch(e){}
+    }
+    grabFrame();
+  });
+  document.getElementById("camCancel").addEventListener("click", close);
+  document.getElementById("camAlbum").addEventListener("click", function(){ albumInput.click(); });
+  albumInput.addEventListener("change", function(){
+    var f = albumInput.files && albumInput.files[0];
+    albumInput.value = "";
+    if(f) done(f);
+  });
+})();
+</script>
+"""
+
+
 # 알약 확인 팝업 (홈·사전조사 공용). 템플릿에서 {{ pill_html|safe }} 로 삽입
 PILL_HTML = """
 <style>
@@ -2500,12 +2617,14 @@ PILL_HTML = """
 .pill-shot input{ display:none; }
 .pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; }
-.pill-tip{ margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; }
+.pill-tip{ display:flex; gap:4px; margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; }
+.pill-tip span:first-child{ flex:none; }  /* ※ 뒤로 줄바꿈된 글이 윗줄 첫 글자에 맞춰짐 */
 .pill-go{ display:block; width:100% !important; height:44px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:15px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
 .pill-go:disabled{ background:#93c5fd !important; cursor:wait; }
 .pill-msg{ display:none; margin-top:12px; padding:10px 12px; border-radius:10px; background:#fff7ed; border:1px solid #fdba74; color:#9a3412; font-size:13px; line-height:1.55; word-break:keep-all; }
 .pill-feat{ display:none; margin-top:14px; padding:10px 12px; border-radius:12px; background:#eef4ff; border:1px solid #c7d7ff; }
-.pill-feat-title{ font-size:12px; font-weight:800; color:#1e3a8a; margin-bottom:8px; }
+.pill-feat-title{ font-size:12.5px; font-weight:800; color:#1e3a8a; }
+.pill-feat-help{ margin:3px 0 8px; font-size:11.5px; color:#4b5563; line-height:1.45; word-break:keep-all; }
 .pill-feat-row{ display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:6px; }
 .pill-feat-row input, .pill-feat-row select{ width:100%; height:36px; margin:0; padding:0 8px; border:1px solid #c7d7ff; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; box-sizing:border-box; }
 .pill-re{ width:100% !important; height:34px !important; margin:8px 0 0 !important; padding:0 !important; border:1px solid #93c5fd !important; border-radius:8px !important; background:#fff !important; color:#1d4ed8 !important; font-size:13px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
@@ -2521,7 +2640,7 @@ PILL_HTML = """
 .pill-yes{ width:auto !important; height:26px !important; margin:0 !important; padding:0 10px !important; border:none !important; border-radius:999px !important; background:#7c3aed !important; color:#fff !important; font-size:12px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
 .pill-loading{ display:none; position:fixed; inset:0; z-index:100003; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; }
 .pill-loading.show{ display:flex; }
-.pill-loading-box{ width:86%; max-width:320px; background:#fff; border-radius:20px; padding:34px 24px 26px; text-align:center; display:flex; flex-direction:column; align-items:center; }
+.pill-loading-box{ box-sizing:border-box; width:86%; max-width:320px; background:#fff; border-radius:20px; padding:34px 24px 26px; text-align:center; display:flex; flex-direction:column; align-items:center; }
 .pill-spinner{ width:42px; height:42px; border:5px solid #eee; border-top-color:#2563eb; border-radius:50%; animation:pillSpin 1s linear infinite; }
 @keyframes pillSpin{ to{ transform:rotate(360deg); } }
 .pill-load-title{ margin:14px 0 0; font-size:15px; font-weight:700; line-height:1.35; color:#111827; }
@@ -2550,28 +2669,29 @@ PILL_HTML = """
     </div>
     <div class="pill-body">
       <div class="pill-shots">
-        <label class="pill-shot" id="pillShotFront">
+        <div class="pill-shot" id="pillShotFront" data-side="front" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="front">
           <span>📷 앞면</span><small>각인이 보이게</small>
-        </label>
-        <label class="pill-shot" id="pillShotBack">
+        </div>
+        <div class="pill-shot" id="pillShotBack" data-side="back" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="back">
           <span>📷 뒷면</span><small>선택 · 있으면 더 정확</small>
-        </label>
+        </div>
       </div>
-      <p class="pill-tip">※ 알약에 새겨진 글자(각인)가 선명하게 보이도록 가까이, 밝은 곳에서 찍어주세요. 사진은 저장되지 않습니다.</p>
+      <p class="pill-tip"><span>※</span><span>알약에 새겨진 글자(각인)가 선명하게 보이도록 가까이, 밝은 곳에서 찍어주세요. 사진은 저장되지 않습니다.</span></p>
       <button type="button" class="pill-go" id="pillGo">확인하기</button>
 
       <div class="pill-msg" id="pillMsg"></div>
 
       <div class="pill-feat" id="pillFeat">
-        <div class="pill-feat-title">인식된 정보 · 틀리면 고쳐서 다시 찾기</div>
+        <div class="pill-feat-title">AI가 사진에서 읽은 정보</div>
+        <div class="pill-feat-help">사진 속 알약과 글자가 다르면 직접 고친 뒤 아래 버튼을 눌러주세요.</div>
         <div class="pill-feat-row">
-          <input type="text" id="pillImprint" placeholder="각인 (앞 / 뒤)">
+          <input type="text" id="pillImprint" placeholder="각인 글자 (앞 / 뒤)">
           <select id="pillColor"><option value="">색 전체</option></select>
           <select id="pillShape"><option value="">모양 전체</option></select>
         </div>
-        <button type="button" class="pill-re" id="pillRe">다시 찾기</button>
+        <button type="button" class="pill-re" id="pillRe">고친 정보로 다시 검색</button>
       </div>
 
       <div class="pill-list" id="pillList"></div>
@@ -2624,29 +2744,57 @@ PILL_HTML = """
     });
   }
 
+  /* 찍은 사진을 앞면/뒷면 칸에 넣고 미리보기 */
+  function setFile(side, f){
+    files[side] = f || null;
+    var box = modal.querySelector('.pill-shot[data-side="' + side + '"]');
+    if(!box) return;
+    var old = box.querySelector("img"); if(old) old.remove();
+    if(f){
+      var im = document.createElement("img");
+      im.src = URL.createObjectURL(f);
+      box.appendChild(im);
+    }
+  }
+
+  /* (예비) 휴대폰 카메라 앱 / 파일 선택 */
   Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot input"), function(inp){
+    inp.addEventListener("click", function(e){ e.stopPropagation(); });
     inp.addEventListener("change", function(){
-      var f = inp.files && inp.files[0];
-      var side = inp.getAttribute("data-side");
-      files[side] = f || null;
-      var box = inp.parentNode;
-      var old = box.querySelector("img"); if(old) old.remove();
-      if(f){
-        var im = document.createElement("img");
-        im.src = URL.createObjectURL(f);
-        box.appendChild(im);
-      }
+      setFile(inp.getAttribute("data-side"), inp.files && inp.files[0]);
     });
+  });
+
+  /* 화면 안 카메라 (CAM_HTML 공용). 쓸 수 없으면 기존 카메라 앱/파일 선택으로 자동 전환 */
+  function fallbackPicker(side){
+    var inp = modal.querySelector('.pill-shot[data-side="' + side + '"] input');
+    if(inp) inp.click();
+  }
+  function stopCam(){ if(window.closeCam) window.closeCam(); }
+
+  function startCam(side){
+    if(!window.openCam){ fallbackPicker(side); return; }
+    window.openCam({
+      guide: "circle",
+      hint: "알약을 원 안에 두고 각인(글자)이 선명하게 보이면 촬영하세요",
+      onPhoto: function(b){ setFile(side, b); },
+      onFallback: function(){ fallbackPicker(side); }
+    });
+  }
+
+  Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
+    box.addEventListener("click", function(){ startCam(box.getAttribute("data-side")); });
+    box.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); startCam(box.getAttribute("data-side")); } });
   });
 
   function showMsg(t){ msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; }
 
   /* 확인 중 로딩창 (사례검색과 같은 방식) */
   var LOAD_MSGS = [
-    ["AI가 알약 사진을 살펴보고 있습니다", "사진 속 알약의 모양과 색을 확인하고 있습니다."],
-    ["각인(글자)을 읽고 있습니다", "알약에 새겨진 글자와 숫자를 확인하고 있습니다."],
-    ["식약처 낱알정보와 비교 중입니다", "등록된 알약 2만 5천여 개와 특징을 대조하고 있습니다."],
-    ["후보 약을 정리하고 있습니다", "일치도가 높은 순서로 정리하고 있습니다."]
+    ["AI가 알약을 분석 중입니다", "사진 속 알약의 모양과 색을 확인하고 있습니다."],
+    ["각인을 읽고 있습니다", "알약에 새겨진 글자를 확인하고 있습니다."],
+    ["식약처 정보와 비교 중입니다", "등록된 알약 정보와 대조하고 있습니다."],
+    ["결과를 정리하고 있습니다", "비슷한 순서로 후보를 정리하고 있습니다."]
   ];
   var loadBox = document.getElementById("pillLoading");
   var loadTimer = null;
@@ -2658,7 +2806,7 @@ PILL_HTML = """
   function startLoading(){
     var i = 0; setLoad(0); loadBox.classList.add("show");
     clearInterval(loadTimer);
-    loadTimer = setInterval(function(){ if(i < LOAD_MSGS.length - 1){ i++; setLoad(i); } else { clearInterval(loadTimer); } }, 2500);
+    loadTimer = setInterval(function(){ if(i < LOAD_MSGS.length - 1){ i++; setLoad(i); } else { clearInterval(loadTimer); } }, 4500);  /* 사례검색과 동일 */
   }
   function stopLoading(){ clearInterval(loadTimer); loadBox.classList.remove("show"); }
 
@@ -2745,8 +2893,12 @@ PILL_HTML = """
   });
 
   /* survey=true 이면 치매약 후보에 '예 선택' 버튼 표시 (사전조사 화면) */
-  window.openPill = function(survey){
+  window.openPill = function(survey, restored){
     surveyMode = !!survey;
+    try{ sessionStorage.setItem("pill_open", JSON.stringify({ mode: surveyMode ? "survey" : "home", path: location.pathname, t: Date.now() })); }catch(e){}
+    if(!restored){
+      try{ if(navigator.sendBeacon){ navigator.sendBeacon("/pv/pill"); } else { fetch("/pv/pill", {method:"POST"}); } }catch(e){}
+    }
     files = { front:null, back:null };
     Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(b){
       var im = b.querySelector("img"); if(im) im.remove();
@@ -2757,13 +2909,30 @@ PILL_HTML = """
     document.body.style.overflow = "hidden";
   };
   window.closePill = function(){
+    stopCam();
+    try{ sessionStorage.removeItem("pill_open"); }catch(e){}
     modal.classList.remove("show");
     document.body.style.overflow = "";
   };
   modal.addEventListener("click", function(e){ if(e.target === modal) window.closePill(); });
+
+  /* 휴대폰은 카메라 앱을 여는 동안 메모리가 부족하면 이 화면을 새로고침해 버립니다.
+     그 경우 팝업이 닫힌 채 메인화면이 보이므로, 팝업을 다시 열고 안내합니다. */
+  try{
+    var saved = JSON.parse(sessionStorage.getItem("pill_open") || "null");
+    sessionStorage.removeItem("pill_open");
+    /* 같은 화면에서 5분 안에 다시 로드된 경우만 복원 */
+    if(saved && saved.path === location.pathname && Date.now() - saved.t < 5*60*1000){
+      window.openPill(saved.mode === "survey", true);
+      showMsg("사진을 찍는 동안 화면이 새로 고쳐져 사진이 지워졌습니다. 번거로우시겠지만 다시 한 번 찍어주세요.");
+    }
+  }catch(e){}
+  /* 다른 화면으로 정상 이동할 때는 복원 표시를 지움 (카메라 앱 전환 때는 pagehide가 발생하지 않음) */
+  window.addEventListener("pagehide", function(){ try{ sessionStorage.removeItem("pill_open"); }catch(e){} });
 })();
 </script>
 """
+PILL_HTML = CAM_HTML + PILL_HTML  # 화면 안 카메라 공용 코드 포함
 
 # =========================
 # HOME
@@ -4823,7 +4992,7 @@ STATS_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>통계 페이지</title>
+<title>관리자 페이지</title>
 <style>
 body{
   margin:0;
@@ -6732,7 +6901,7 @@ PRIVACY_HTML = """
 <body>
 <div class="wrap">
   <h1>개인정보 처리방침</h1>
-  <div class="updated">시행일: 2026년 6월 14일</div>
+  <div class="updated">시행일: 2026년 10월 20일</div>
 
   <p>케어내비(이하 "서비스")는 「개인정보 보호법」을 준수하며, 이용자의 개인정보를 다음과 같이 처리합니다.</p>
 
@@ -6747,6 +6916,7 @@ PRIVACY_HTML = """
     <tr><td>의견보내기</td><td>작성자, 회신연락처, 제목·문의내용</td><td>오류제보·의견 접수 및 회신</td><td>접수일로부터 1년</td></tr>
     <tr><td>사례별 AI 추천</td><td>이용자가 입력한 사례 내용</td><td>통합돌봄 서비스 추천 결과 생성</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
     <tr><td>이미지 OCR</td><td>이용자가 업로드한 이미지 및 이미지에서 추출된 텍스트</td><td>사진 속 사례 내용 추출</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
+    <tr><td>알약 확인</td><td>이용자가 촬영한 알약 사진 및 사진에서 인식된 각인·색·모양 정보</td><td>알약 특징 인식 및 식약처 낱알식별 정보와 대조</td><td>서버 DB에 저장하지 않음. 처리 과정에서 일시 이용</td></tr>
     <tr><td>조사서식 작성·PDF 발송</td><td>이용자가 입력한 조사 내용, 수신 이메일 주소, 생성된 PDF</td><td>조사서식 PDF 생성 및 이메일 발송</td><td>서버 DB에 저장하지 않음. 메일 발송 과정에서 일시 이용</td></tr>
   </table>
   </div>
@@ -6779,8 +6949,8 @@ PRIVACY_HTML = """
     <tr>
       <td>OpenAI</td>
       <td>미국 등</td>
-      <td>사용자가 입력한 사례 내용, OCR 이미지</td>
-      <td>AI 추천 결과 생성 및 이미지 텍스트 추출</td>
+      <td>사용자가 입력한 사례 내용, OCR 이미지, 알약 사진</td>
+      <td>AI 추천 결과 생성, 이미지 텍스트 추출 및 알약 특징 인식</td>
       <td>OpenAI API 정책 및 계약 조건에 따름</td>
     </tr>
     <tr>
@@ -6796,7 +6966,7 @@ PRIVACY_HTML = """
   <h2>4. 보유 및 이용기간</h2>
   <ul>
     <li>의견보내기 접수 내용 및 회신연락처: 접수일로부터 1년</li>
-    <li>AI 추천 입력 내용, OCR 이미지, 조사서식 PDF: 서버 DB에 저장하지 않고 요청 처리 과정에서만 일시 이용</li>
+    <li>AI 추천 입력 내용, OCR 이미지, 알약 사진, 조사서식 PDF: 서버 DB에 저장하지 않고 요청 처리 과정에서만 일시 이용</li>
     <li>운영 통계: 개인을 식별할 수 없는 집계 정보로 보관</li>
   </ul>
 
@@ -7224,6 +7394,26 @@ def pv_guide():
     if os.getenv("RENDER") is not None and (session.get("logged_in") or session.get("is_admin")):
         try:
             _pv_threading.Thread(target=_pv_insert, args=("/manual",), daemon=True).start()
+        except Exception:
+            pass
+    return ("", 204)
+
+@app.route("/pv/dbo", methods=["GET", "POST"])
+def pv_dbo():
+    # 돌봄온 이미지 팝업(openDbo)을 열 때마다 호출 → 어떤 자원이든 1회로 적재 ("돌봄온")
+    if os.getenv("RENDER") is not None and (session.get("logged_in") or session.get("is_admin")):
+        try:
+            _pv_threading.Thread(target=_pv_insert, args=("/dolbomon",), daemon=True).start()
+        except Exception:
+            pass
+    return ("", 204)
+
+@app.route("/pv/pill", methods=["GET", "POST"])
+def pv_pill():
+    # 알약 확인 팝업(openPill)을 열 때 호출 → 페이지뷰로 적재 ("알약확인")
+    if os.getenv("RENDER") is not None and (session.get("logged_in") or session.get("is_admin")):
+        try:
+            _pv_threading.Thread(target=_pv_insert, args=("/pill",), daemon=True).start()
         except Exception:
             pass
     return ("", 204)
@@ -12510,8 +12700,17 @@ function startVoiceInput(event){
   }
 }
 
+/* 사진 인식: 화면 안 카메라로 촬영 (카메라 앱으로 넘어가 화면이 새로고침되는 문제 방지)
+   카메라를 쓸 수 없으면 기존 카메라 앱/파일 선택으로 자동 전환 */
 function openImage(){
-  document.getElementById("imgInput").click();
+  function fallback(){ document.getElementById("imgInput").click(); }
+  if(!window.openCam){ fallback(); return; }
+  window.openCam({
+    guide: "rect",
+    hint: "서류를 사각형 안에 맞추고 글자가 선명하게 보이면 촬영하세요",
+    onPhoto: function(blob){ handleOcrFile(blob); },
+    onFallback: fallback
+  });
 }
 
 /* 카메라 원본 사진이 클 때 모바일/서버 메모리 부담을 줄이기 위해 OCR 전송본만 축소·압축 */
@@ -12559,14 +12758,19 @@ async function prepareOcrImage(file){
   }
 }
 
-document.getElementById("imgInput").addEventListener("change", async function(){
+document.getElementById("imgInput").addEventListener("change", function(){
   const file = this.files[0];
+  this.value = "";
+  if(file) handleOcrFile(file);
+});
+
+async function handleOcrFile(file){
   if(!file) return;
 
   const uploadImage = await prepareOcrImage(file);
 
   const formData = new FormData();
-  formData.append("image", uploadImage, uploadImage === file ? file.name : "camera_ocr.jpg");
+  formData.append("image", uploadImage, (uploadImage === file && file.name) ? file.name : "camera_ocr.jpg");
   formData.append("ocr_privacy_confirmed", "yes");
 
   if(loading){
@@ -12617,7 +12821,7 @@ document.getElementById("imgInput").addEventListener("change", async function(){
 
     alert("이미지 인식 실패");
   }
-});
+}
 
 if(searchForm){
   searchForm.addEventListener("submit", function(e){
@@ -12750,6 +12954,7 @@ window.addEventListener("load", function(){
 </script>
 
 <!-- ===== 돌봄온 팝업 (공단자원 연관검색어 클릭 시) ===== -->
+{{ cam_html|default('')|safe }}
 {{ dbo_viewer|safe }}
 
 <script>
