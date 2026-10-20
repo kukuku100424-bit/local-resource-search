@@ -148,45 +148,6 @@ def _survey_set_on(on):
         except Exception:
             pass
 
-# =========================
-# 알약 확인 ON/OFF (메인화면 '알약 확인' 버튼 + 사전조사 '알약 사진으로 확인' 링크)
-# - maintenance_mode 테이블의 id=3 행을 재사용 (is_on=True 이면 노출). 행이 없으면 기본 ON
-# - 관리자 페이지 '요약 통계' 오른쪽 스위치로 변경
-# =========================
-_PILL_ON_CACHE = {"on": True, "ts": 0}
-
-def _pill_is_on():
-    now = _maint_time.time()
-    if now - _PILL_ON_CACHE["ts"] < _SURVEY_TTL:
-        return _PILL_ON_CACHE["on"]
-    if os.getenv("RENDER") is not None:
-        try:
-            res = requests.get(
-                f"{SUPABASE_URL}/rest/v1/maintenance_mode?select=is_on&id=eq.3",
-                headers=SUPABASE_HEADERS, timeout=3
-            )
-            rows = res.json() if res.ok else []
-            if rows:
-                _PILL_ON_CACHE["on"] = bool(rows[0].get("is_on"))
-        except Exception:
-            pass
-    _PILL_ON_CACHE["ts"] = now
-    return _PILL_ON_CACHE["on"]
-
-def _pill_set_on(on):
-    _PILL_ON_CACHE["on"] = bool(on)
-    _PILL_ON_CACHE["ts"] = _maint_time.time()
-    if os.getenv("RENDER") is not None:
-        try:
-            requests.post(
-                f"{SUPABASE_URL}/rest/v1/maintenance_mode?on_conflict=id",
-                headers={**SUPABASE_HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"},
-                json={"id": 3, "is_on": bool(on), "message": "pill", "resume_at": ""},
-                timeout=5
-            )
-        except Exception:
-            pass
-
 # === GPT 토큰 단가/환율 (변동 시 여기만 수정) ===
 GPT_PRICE_INPUT_USD = 0.40    # 입력 100만 토큰당 USD (gpt-4.1-mini)
 GPT_PRICE_OUTPUT_USD = 1.60   # 출력 100만 토큰당 USD (gpt-4.1-mini)
@@ -2075,8 +2036,7 @@ def load_dolbomon_items():
 def inject_dolbomon_items():
     # 알약 확인 팝업: 홈(/home)·지자체 조사서식(/survey)
     if request.path in ("/home", "/survey"):
-        on = _pill_is_on()
-        return {"pill_html": PILL_HTML if on else "", "pill_on": on}
+        return {"pill_html": PILL_HTML}
     # 사례검색(/desc)·기관찾기(/combo) 화면에서만 사용
     if request.path not in ("/desc", "/combo"):
         return {}
@@ -2655,8 +2615,6 @@ def _pill_throttle():
 @app.route("/pill/identify", methods=["POST"])
 @login_required
 def pill_identify():
-    if not _pill_is_on():
-        return jsonify({"ok": False, "message": "알약 확인 기능이 현재 꺼져 있습니다."})
     if not load_pills():
         return jsonify({"ok": False, "message": "알약 데이터(pills.csv)가 없습니다. 관리자에게 문의하세요."})
     if not os.getenv("OPENAI_API_KEY"):
@@ -2702,8 +2660,6 @@ def pill_identify():
 @login_required
 def pill_search():
     """인식된 정보를 사용자가 고쳐서 다시 찾기 / 직접 입력 검색 (AI 호출 없음)"""
-    if not _pill_is_on():
-        return jsonify({"ok": False, "message": "알약 확인 기능이 현재 꺼져 있습니다."})
     d = request.get_json(silent=True) or {}
     imprints = [x.strip() for x in str(d.get("imprint", "")).split("/") if x.strip()]
     color = d.get("color") if d.get("color") in PILL_COLORS else ""
@@ -2872,7 +2828,7 @@ PILL_HTML = """
   <div class="pill-box">
     <div class="pill-head">
       <div>
-        <div class="pill-title">💊 알약 확인</div>
+        <div class="pill-title"><svg viewBox="0 0 24 24" style="width:1.15em;height:1.15em;vertical-align:-0.2em;margin-right:2px" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#60a5fa"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#ffffff"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="#2563eb" stroke-width="1.4"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg> 알약 확인</div>
         <div class="pill-sub" id="pillSub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
       </div>
       <div class="pill-head-btns">
@@ -3976,21 +3932,22 @@ body.app-mode .container{
   font-size:13px;
 }
 
-{% if pill_on %}
 /* 알약 확인 카드 아이콘 (다른 카드의 26px 아이콘과 크기 맞춤) */
 .pill-home-ico{
   display:block;
+  width:26px;
+  margin-left:auto;
+  margin-right:auto;
   font-size:22px;
   line-height:26px;
   height:26px;
   margin-bottom:4px;
 }
 @media (max-width:480px){
-  .pill-home-ico{ font-size:17px; line-height:20px; height:20px; margin-bottom:2px; }
+  .pill-home-ico{ font-size:17px; line-height:20px; height:20px; width:20px; margin-bottom:2px; }
   .bottom-row{ gap:8px !important; }
   .bottom-row .bottom-card div{ font-size:12px; line-height:1.25; word-break:keep-all; }
 }
-{% endif %}
 
 /* 모바일 */
 @media (max-width:480px){
@@ -4273,19 +4230,17 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 <img src="/static/pdf_icon.png">
 
-{% if pill_on %}<div>사업 안내</div>{% else %}<div>통합돌봄 사업 안내</div>{% endif %}
+<div>사업 안내</div>
 
 </a>
 
-{% if pill_on %}
 <a href="#" class="bottom-card" onclick="if(window.openPill){openPill(false);} return false;">
 
-<span class="pill-home-ico">💊</span>
+<span class="pill-home-ico"><svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#60a5fa"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#ffffff"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="#2563eb" stroke-width="1.4"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg></span>
 
-<div>알약 확인</div>
+<div>복용약 검색</div>
 
 </a>
-{% endif %}
 
 <a href="/nhis25" class="bottom-card">
 
@@ -5713,18 +5668,6 @@ h2{
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
 button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
-/* 알약 확인 ON/OFF 스위치 (요약 통계 오른쪽) */
-.sum-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
-.sum-head h2{ margin:0; }
-.pill-toggle{ display:flex; align-items:center; gap:8px; flex:none; }
-.pill-toggle-label{ font-size:13px; font-weight:700; color:#374151; }
-.pill-toggle .sw{ position:relative; width:48px; height:28px; border:0; border-radius:999px; background:#cbd5e1; cursor:pointer; padding:0; transition:background .2s; flex:none; }
-.pill-toggle .sw::after{ content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .2s; }
-.pill-toggle .sw.on{ background:#22c55e; }
-.pill-toggle .sw.on::after{ transform:translateX(20px); }
-.pill-toggle .ctrl-state{ font-size:12px; font-weight:800; padding:3px 9px; border-radius:999px; min-width:28px; text-align:center; }
-.pill-toggle .ctrl-state.on{ background:#dcfce7; color:#166534; }
-.pill-toggle .ctrl-state.off{ background:#fee2e2; color:#991b1b; }
 </style>
 </head>
 <body>
@@ -5743,14 +5686,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   </div>
 
   <div class="card">
-    <div class="sum-head">
-      <h2>요약 통계</h2>
-      <div class="pill-toggle">
-        <span class="pill-toggle-label">알약 확인</span>
-        <button type="button" id="pillSwitch" class="sw {{ 'on' if pill_on else '' }}" role="switch" aria-checked="{{ 'true' if pill_on else 'false' }}" aria-label="알약 확인 기능 켜기/끄기" onclick="pillToggle(!this.classList.contains('on'))"></button>
-        <span class="ctrl-state {{ 'on' if pill_on else 'off' }}" id="pillState">{{ 'ON' if pill_on else 'OFF' }}</span>
-      </div>
-    </div>
+    <h2>요약 통계</h2>
     <div class="summary-row">
       <div class="summary-box">
         <div class="summary-label">총 방문자수</div>
@@ -5981,22 +5917,6 @@ document.addEventListener("DOMContentLoaded", function(){
   setupPagination("visitTableBody", "visitPager", 10);
   setupPagination("regionTableBody", "regionPager", 10);
 });
-</script>
-<script>
-/* 알약 확인 ON/OFF: OFF면 메인화면 '알약 확인' 버튼과 사전조사 '알약 사진으로 확인' 링크가 사라짐 */
-function pillToggle(on){
-  var sw = document.getElementById('pillSwitch');
-  var st = document.getElementById('pillState');
-  function show(v){
-    if(sw){ sw.classList.toggle('on', v); sw.setAttribute('aria-checked', v ? 'true' : 'false'); }
-    if(st){ st.textContent = v ? 'ON' : 'OFF'; st.className = 'ctrl-state ' + (v ? 'on' : 'off'); }
-  }
-  show(on);
-  fetch('/stats/pill/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({on:on})})
-    .then(function(r){ return r.json(); })
-    .then(function(d){ if(!d || !d.success){ show(!on); alert('변경에 실패했습니다.'); } })
-    .catch(function(){ show(!on); alert('변경에 실패했습니다.'); });
-}
 </script>
 </body>
 </html>
@@ -6326,7 +6246,6 @@ def stats():
 
     return render_template_string(
         STATS_HTML,
-        pill_on=_pill_is_on(),
         total_count=total_count,
         today_count=today_count,
         daily_visits=daily_visits,
@@ -15500,12 +15419,10 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
             <label><input type="radio" name="dementia" value="y"> 예</label>
             <label><input type="radio" name="dementia" value="n"> 아니오</label>
           </div>
-          {% if pill_on %}
           <div style="margin-top:12px;padding-top:10px;border-top:1px dashed #c7d2fe;text-align:center;font-size:12.5px;color:#4b5563;">
             약 이름을 모르시나요?
             <a href="#" onclick="if(window.openPill){openPill(true);} return false;" style="margin-left:4px;font-weight:800;color:#4338ca;text-decoration:none;white-space:nowrap;">📷 알약 사진으로 확인</a>
           </div>
-          {% endif %}
         </div>
         </div>
 
@@ -17439,13 +17356,6 @@ def satisfaction_admin():
     )
 
 SAT_RESET_PASSWORD = "02401234"
-
-@app.route("/stats/pill/toggle", methods=["POST"])
-def pill_toggle():
-    """알약 확인 기능 ON/OFF (관리자 전용: /stats 경로는 관리자 로그인 필요)"""
-    d = request.get_json(silent=True) or {}
-    _pill_set_on(bool(d.get("on")))
-    return jsonify({"success": True})
 
 @app.route("/stats/satisfaction/toggle", methods=["POST"])
 def satisfaction_toggle():
