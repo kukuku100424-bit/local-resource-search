@@ -2828,7 +2828,7 @@ PILL_HTML = """
   <div class="pill-box">
     <div class="pill-head">
       <div>
-        <div class="pill-title"><svg viewBox="0 0 24 24" style="width:1.15em;height:1.15em;vertical-align:-0.2em;margin-right:2px" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#60a5fa"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#ffffff"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="#2563eb" stroke-width="1.4"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg> 알약 확인</div>
+        <div class="pill-title"><svg viewBox="0 0 24 24" style="width:1.15em;height:1.15em;vertical-align:-0.2em;margin-right:2px" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#3b82f6"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#fb923c"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="rgba(15,23,42,0.18)" stroke-width="1"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg> 알약 확인</div>
         <div class="pill-sub" id="pillSub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
       </div>
       <div class="pill-head-btns">
@@ -4236,7 +4236,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 <a href="#" class="bottom-card" onclick="if(window.openPill){openPill(false);} return false;">
 
-<span class="pill-home-ico"><svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#60a5fa"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#ffffff"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="#2563eb" stroke-width="1.4"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg></span>
+<span class="pill-home-ico"><svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#3b82f6"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#fb923c"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="rgba(15,23,42,0.18)" stroke-width="1"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg></span>
 
 <div>복용약 검색</div>
 
