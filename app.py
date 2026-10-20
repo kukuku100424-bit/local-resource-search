@@ -2254,19 +2254,8 @@ DBO_VIEWER_HTML = """
   document.addEventListener("keydown", function(e){
     if(!modal.classList.contains("show")) return;
     if(e.key === "Escape") window.closeDbo();
-    else if(e.key === "ArrowLeft") step(-1);
-    else if(e.key === "ArrowRight") step(1);
   });
-
-  /* 모바일 좌우 스와이프 */
-  var sx = null;
-  body.addEventListener("touchstart", function(e){ sx = e.touches[0].clientX; }, {passive:true});
-  body.addEventListener("touchend", function(e){
-    if(sx === null) return;
-    var dx = e.changedTouches[0].clientX - sx;
-    sx = null;
-    if(Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
-  }, {passive:true});
+  /* 페이지 넘김은 '이전 / 다음' 버튼으로만 (스와이프·방향키로 넘기지 않음. 위아래 밀기는 스크롤 전용) */
 })();
 </script>
 """
