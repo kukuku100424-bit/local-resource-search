@@ -2058,7 +2058,13 @@ DBO_VIEWER_HTML = """
 .dbo-title{ flex:1; min-width:0; font-size:15px; font-weight:800; color:#111827; word-break:keep-all; text-align:left; }
 .dbo-search-btn{ flex:none; display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 12px; border-radius:999px; background:#93c5fd; color:#1e40af; font-size:13px; font-weight:700; text-decoration:none; white-space:nowrap; box-shadow:0 2px 6px rgba(37,99,235,0.3); }
 .dbo-search-btn:hover{ background:#7fb6fb; }
-.dbo-search-btn.disabled{ background:#e5e7eb; color:#9ca3af; box-shadow:none; cursor:default; pointer-events:none; }
+.dbo-search-btn.disabled{ background:#e5e7eb; color:#9ca3af; box-shadow:none; cursor:default; pointer-events:none; animation:none; }
+/* 기관검색 강조: 손가락이 좌우로 움직이며 버튼을 가리키고, 버튼은 은은하게 빛남 */
+.dbo-hand{ flex:none; font-size:18px; line-height:1; margin-right:-2px; animation:dboHand 1s ease-in-out infinite; }
+@keyframes dboHand{ 0%,100%{ transform:translateX(-4px); } 50%{ transform:translateX(3px); } }
+.dbo-search-btn:not(.disabled){ animation:dboGlow 1.6s ease-in-out infinite; }
+@keyframes dboGlow{ 0%,100%{ box-shadow:0 2px 6px rgba(37,99,235,0.3), 0 0 0 0 rgba(59,130,246,0.45); } 50%{ box-shadow:0 2px 6px rgba(37,99,235,0.3), 0 0 0 6px rgba(59,130,246,0); } }
+@media (prefers-reduced-motion: reduce){ .dbo-hand, .dbo-search-btn{ animation:none !important; } }
 .dbo-close{ flex:none; width:34px !important; height:34px !important; margin:0 !important; padding:0 !important; border:none !important; border-radius:999px !important; background:#f3f4f6 !important; color:#374151 !important; font-size:20px !important; line-height:1 !important; box-shadow:none !important; cursor:pointer; }
 .dbo-body{ flex:1; overflow:auto; background:#f9fafb; padding:8px; }
 .dbo-body img{ display:block; width:100%; height:auto; border-radius:8px; }
@@ -2122,6 +2128,7 @@ DBO_VIEWER_HTML = """
   <div class="dbo-box">
     <div class="dbo-head">
       <div class="dbo-title" id="dboTitle"></div>
+      <span class="dbo-hand" id="dboHand" aria-hidden="true">👉</span>
       <a href="#" class="dbo-search-btn" id="dboSearchBtn">기관검색</a>
       <button type="button" class="dbo-close" onclick="closeDbo()" aria-label="닫기">×</button>
     </div>
@@ -2224,7 +2231,9 @@ DBO_VIEWER_HTML = """
       sBtn.removeAttribute("href");
       sBtn.classList.add("disabled");
       sBtn.textContent = "등록된 기관 없음";
+      document.getElementById("dboHand").style.display = "none";
     }else{
+      document.getElementById("dboHand").style.display = "";
       sBtn.href = "/combo?" + params.toString();
       sBtn.classList.remove("disabled");
       sBtn.textContent = "기관검색";
