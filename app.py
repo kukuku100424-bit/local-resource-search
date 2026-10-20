@@ -2900,7 +2900,7 @@ PILL_HTML = """
         </div>
         <div class="pill-shot" id="pillShotBack" data-side="back" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="back">
-          <span class="ps-t">📷 뒷면</span><small class="ps-s">선택 · 놓인 자리 그대로 뒤집어서</small>
+          <span class="ps-t">📷 뒷면</span><small class="ps-s">(선택) 놓인 자리 그대로 뒤집어서</small>
         </div>
       </div>
       <p class="pill-tip"><span>※</span><span id="pillTipText">한 알도, 여러 알(최대 5알)도 됩니다. 여러 알이면 서로 떨어뜨려 놓고 찍은 뒤, 뒷면은 놓인 자리 그대로 하나씩 뒤집어 찍어주세요. 사진은 저장되지 않습니다.</span></p>
