@@ -2909,8 +2909,8 @@ PILL_HTML = """
 .pill-card{ display:flex; gap:12px; padding:10px; border:1px solid #e5e7eb; border-radius:12px; }
 .pill-card img{ flex:none; width:112px; height:62px; object-fit:contain; border-radius:6px; background:#f9fafb; }
 .pill-info{ flex:1; min-width:0; }
-.pill-name{ font-size:14px; font-weight:800; line-height:1.35; word-break:keep-all; }
-.pill-meta{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; }
+.pill-name{ font-size:14px; font-weight:800; line-height:1.35; word-break:keep-all; overflow-wrap:anywhere; }
+.pill-meta{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; overflow-wrap:anywhere; }
 .pill-conf{ display:inline-block; margin-right:4px; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:800; vertical-align:1px; }
 .pill-conf.high{ background:#dcfce7; color:#15803d; }
 .pill-conf.mid{ background:#dbeafe; color:#1d4ed8; }
@@ -3371,7 +3371,7 @@ PILL_HTML = """
       card.innerHTML =
         (c.image ? '<img src="' + esc(c.image) + '" alt="" loading="lazy">' : '') +
         '<div class="pill-info">' +
-          '<div class="pill-name">' + (c.conf ? '<span class="pill-conf ' + esc(c.conf) + '">' + esc(c.conf_label) + '</span>' : '') + (c.dementia ? '<span class="pill-badge">치매약</span>' : '') + esc(c.name) + '</div>' +
+          '<div class="pill-name">' + (c.conf ? '<span class="pill-conf ' + esc(c.conf) + '">' + esc(c.conf_label) + '</span>' : '') + (c.dementia ? '<span class="pill-badge">치매약</span>' : '') + esc(c.name).replace(/\\(/g, '<wbr>(') + '</div>' +
           '<div class="pill-meta">' + (c.care && c.care.kind && !c.dementia ? '<span class="pill-kind">' + esc(c.care.kind) + '</span>' : '') + esc(c.company) + ' · ' + esc(c.etc_otc) + (c.cls ? ' · ' + esc(c.cls) : '') + '</div>' +
           '<div class="pill-meta">각인 ' + esc(prints || "-") + ' · ' + esc(c.color) + ' · ' + esc(c.shape) + '</div>' +
           '<div class="pill-actions">' +
@@ -3393,8 +3393,8 @@ PILL_HTML = """
   }
 
   /* ===== 돌봄 요약: 확인된 약 종류 → 검토해 볼 돌봄 → 사례검색으로 연결 =====
-     - '거의 확실' 후보가 있으면 자동 선택, 후보가 모두 같은 종류면 고르지 않아도 됨
-     - 후보끼리 종류가 다를 때만 '이 약이 맞아요' 버튼으로 고름 */
+     - 한 알이든 여러 알이든, 후보 수·확신도와 관계없이 알약마다 반드시 하나를 직접 고름
+       (실물과 같은 약인지 사람이 확인하는 단계) */
   var careState = [], careBoxRef = null;
   var SIGNAL_TEXT = {
     "낙상 주의": "낙상 위험이 있음",
@@ -3409,21 +3409,17 @@ PILL_HTML = """
     var c = st.cands;
     if(!c.length) return { status:"none" };
     if(st.sel !== null && c[st.sel]) return { status:"sel", care:c[st.sel].care };
-    var kinds = uniqList(c.map(function(x){ return x.care && x.care.kind; }));
-    if(kinds.length === 1) return { status:"same", care:c[0].care };
     return { status:"pick" };
   }
   function setupChoice(gi, glist, cands){
     var st = careState[gi];
     st.cands = cands; st.sel = null;
-    cands.forEach(function(c, i){ if(c.conf === "high") st.sel = i; });
     var old = glist.parentNode && glist.parentNode.querySelector(".pill-pick-help");
     if(old) old.remove();
-    var kinds = uniqList(cands.map(function(x){ return x.care && x.care.kind; }));
-    if(kinds.length < 2) return;   /* 후보가 모두 같은 종류: 고를 필요 없음 */
+    if(!cands.length) return;
     var help = document.createElement("div");
     help.className = "pill-pick-help";
-    help.textContent = "후보마다 약 종류가 달라요. 실물과 같은 약을 골라 주세요.";
+    help.textContent = "실물과 같은 약을 하나 골라 주세요.";
     glist.parentNode.insertBefore(help, glist);
     var cards = glist.querySelectorAll(".pill-card");
     function paint(){
