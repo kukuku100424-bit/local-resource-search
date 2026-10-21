@@ -2778,6 +2778,8 @@ PILL_HTML = """
 .pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; padding:0 6px; word-break:keep-all; }
 .pill-shot.drag{ background:#eff6ff; border-color:#2563eb; border-style:solid; }
+.pill-gal{ position:absolute; right:6px; bottom:6px; z-index:2; width:34px !important; height:34px !important; min-width:0 !important; margin:0 !important; padding:0 !important; border:1px solid #c7d7ff !important; border-radius:10px !important; background:rgba(255,255,255,0.95) !important; color:#1d4ed8 !important; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(15,23,42,0.15) !important; cursor:pointer; }
+.pill-gal svg{ width:20px; height:20px; display:block; }
 .pill-tip{ display:flex; gap:4px; margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; }
 .pill-tip span:first-child{ flex:none; }  /* ※ 뒤로 줄바꿈된 글이 윗줄 첫 글자에 맞춰짐 */
 .pill-go{ display:block; width:100% !important; height:44px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:15px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
@@ -2850,11 +2852,15 @@ PILL_HTML = """
       <div class="pill-shots">
         <div class="pill-shot" id="pillShotFront" data-side="front" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="front">
+          <input type="file" accept="image/*" class="pill-gal-input" data-side="front">
           <span class="ps-t">📷 앞면</span><small class="ps-s">알약 1~5알</small>
+          <button type="button" class="pill-gal" data-side="front" aria-label="갤러리에서 앞면 사진 선택"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-8 8"/></svg></button>
         </div>
         <div class="pill-shot" id="pillShotBack" data-side="back" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="back">
+          <input type="file" accept="image/*" class="pill-gal-input" data-side="back">
           <span class="ps-t">📷 뒷면</span><small class="ps-s">(선택) 놓인 자리 그대로 뒤집어서</small>
+          <button type="button" class="pill-gal" data-side="back" aria-label="갤러리에서 뒷면 사진 선택"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-8 8"/></svg></button>
         </div>
       </div>
       <p class="pill-tip"><span>※</span><span id="pillTipText">한 알도, 여러 알(최대 5알)도 됩니다. 여러 알이면 서로 떨어뜨려 놓고 찍은 뒤, 뒷면은 놓인 자리 그대로 하나씩 뒤집어 찍어주세요. 사진은 저장되지 않습니다.</span></p>
@@ -3038,7 +3044,9 @@ PILL_HTML = """
   }
 
   /* PC(터치 없는 기기): 카메라 대신 '사진 불러오기' (파일 선택 + 끌어다 놓기). 모바일은 그대로 */
-  var IS_PC = !(window.matchMedia && window.matchMedia("(pointer:coarse)").matches);
+  /* PC/모바일 판단: 메인화면과 동일하게 User-Agent 기준 (Android·iPhone·iPad·iPod·케어내비 앱 = 모바일) */
+  var PILL_UA = navigator.userAgent || "";
+  var IS_PC = !(/Android|iPhone|iPad|iPod/i.test(PILL_UA) || PILL_UA.indexOf("CareNaviApp") !== -1);
   if(IS_PC){
     document.getElementById("pillSub").textContent = "알약의 앞·뒷면 사진을 불러오면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.";
     document.getElementById("pillTipText").textContent = "알약 각인(글자)이 선명하게 보이는 사진을 불러와 주세요. 한 알도, 여러 알(최대 5알)도 됩니다. 사진은 저장되지 않습니다.";
@@ -3046,6 +3054,7 @@ PILL_HTML = """
     Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
       var side = box.getAttribute("data-side");
       var inp = box.querySelector("input"); if(inp) inp.removeAttribute("capture");
+      var gal = box.querySelector(".pill-gal"); if(gal) gal.style.display = "none";
       box.querySelector(".ps-t").textContent = PC_LABEL[side][0];
       box.querySelector(".ps-s").textContent = PC_LABEL[side][1];
       box.addEventListener("dragover", function(e){ e.preventDefault(); box.classList.add("drag"); });
@@ -3061,6 +3070,16 @@ PILL_HTML = """
   Array.prototype.forEach.call(modal.querySelectorAll(".pill-shot"), function(box){
     box.addEventListener("click", function(){ openPicker(box.getAttribute("data-side")); });
     box.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openPicker(box.getAttribute("data-side")); } });
+  });
+
+  /* 모바일: 우측 하단 액자 버튼 → 갤러리에서 사진 선택 (칸 클릭=카메라와 분리) */
+  Array.prototype.forEach.call(modal.querySelectorAll(".pill-gal"), function(btn){
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      var inp = modal.querySelector('.pill-gal-input[data-side="' + btn.getAttribute("data-side") + '"]');
+      if(inp) inp.click();
+    });
+    btn.addEventListener("keydown", function(e){ e.stopPropagation(); });
   });
 
   function showMsg(t){ msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; }
