@@ -6982,7 +6982,6 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
     {% if can_delete %}
     <div class="notice">
-      잘못 보내셨나요?<br>
       브라우저를 닫기 전까지 <b>내가 보낸 의견</b>에서 삭제할 수 있습니다.
     </div>
     {% endif %}
@@ -7516,7 +7515,8 @@ def board_mine():
         alive = {int(p["id"]) for p in posts}
         session["my_board_ids"] = [i for i in ids if i in alive]
     return render_template_string(
-        BOARD_MINE_HTML, posts=posts, msg=request.args.get("msg", "")
+        BOARD_MINE_HTML, posts=posts, msg=request.args.get("msg", ""),
+        deleted=(request.args.get("deleted") == "1")
     )
 
 @app.route("/board/mine/delete/<int:post_id>", methods=["POST"])
@@ -7536,7 +7536,7 @@ def board_mine_delete(post_id):
             app.logger.exception(e)
             return redirect(url_for("board_mine", msg="삭제 중 오류가 발생했습니다."))
     session["my_board_ids"] = [i for i in mine if i != post_id]
-    return redirect(url_for("board_mine", msg="의견이 삭제되었습니다."))
+    return redirect(url_for("board_mine", msg="의견이 삭제되었습니다.", deleted=1))
 
 BOARD_MINE_HTML = """
 <!DOCTYPE html>
@@ -7546,67 +7546,194 @@ BOARD_MINE_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내가 보낸 의견</title>
 <style>
-body{ margin:0; background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; }
-.container{ max-width:640px; margin:0 auto; padding:24px 16px 40px 16px; }
-.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-.home-button{
-  display:inline-flex !important; align-items:center !important; justify-content:center !important;
-  height:34px !important; padding:0 15px !important; border-radius:8px !important;
-  background:#ffffff !important; border:1px solid #e5e7eb !important; color:#6b7280 !important;
-  text-decoration:none !important; font-size:13px !important; font-weight:600 !important;
-  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  min-height:100vh;
+  min-height:100dvh;
+  background:#e8ecf4;
+  font-family:'Pretendard',sans-serif;
+  color:#111827;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px 16px;
 }
-h2{ margin:0 0 6px 0; font-size:22px; }
-.desc{ margin:0 0 16px 0; font-size:13px; color:#6b7280; line-height:1.6; word-break:keep-all; }
-.msg{ margin-bottom:12px; padding:12px 14px; border-radius:12px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:14px; font-weight:700; }
-.post{ background:#fff; border-radius:16px; padding:16px 18px; margin-bottom:10px; box-shadow:0 10px 26px rgba(15,23,42,0.10); }
-.post-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-.post-title{ font-size:16px; font-weight:800; word-break:keep-all; }
-.post-meta{ font-size:12px; color:#6b7280; margin-top:4px; }
-.post-content{ margin-top:10px; font-size:14px; line-height:1.6; color:#374151; white-space:pre-wrap; word-break:break-word;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.del-btn{ flex:none; height:32px; padding:0 12px; border:none; border-radius:999px; background:#fee2e2; color:#b91c1c; font-size:13px; font-weight:800; cursor:pointer; }
-.empty{ background:#fff; border-radius:16px; padding:24px; text-align:center; color:#6b7280; font-size:14px; line-height:1.7; word-break:keep-all; }
+.card{
+  width:100%;
+  max-width:420px;
+  background:#fff;
+  border-radius:22px;
+  padding:36px 24px 26px;
+  text-align:center;
+  box-shadow:0 16px 38px rgba(15,23,42,0.12);
+}
+.icon{
+  width:64px;
+  height:64px;
+  margin:0 auto 18px;
+  border-radius:50%;
+  background:#eff6ff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.icon.gray{ background:#f3f4f6; }
+.icon svg{ width:30px; height:30px; }
+.title{
+  font-size:21px;
+  font-weight:800;
+  letter-spacing:-0.4px;
+  margin:0 0 8px;
+}
+.sub{
+  font-size:14px;
+  color:#6b7280;
+  line-height:1.6;
+  margin:0;
+  word-break:keep-all;
+}
+.msg{
+  margin:18px 0 0;
+  padding:12px 14px;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.5;
+  word-break:keep-all;
+}
+.msg.ok{ background:#eff6ff; color:#1d4ed8; }
+.msg.err{ background:#fef2f2; color:#b91c1c; }
+.list{
+  margin:22px 0 0;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  text-align:left;
+}
+.post{
+  padding:14px 16px;
+  border-radius:14px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+}
+.post-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.post-title{
+  font-size:15px;
+  font-weight:800;
+  line-height:1.4;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
+.post-meta{ font-size:12px; color:#9ca3af; margin-top:3px; }
+.post-content{
+  margin-top:8px;
+  font-size:13px;
+  color:#4b5563;
+  line-height:1.6;
+  white-space:pre-wrap;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.post form{ margin:0; flex:none; }
+.del-btn{
+  height:30px;
+  padding:0 12px;
+  border:none;
+  border-radius:999px;
+  background:#fee2e2;
+  color:#b91c1c;
+  font-size:12.5px;
+  font-weight:800;
+  font-family:inherit;
+  cursor:pointer;
+}
+.btns{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:22px;
+}
+.btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:48px;
+  border-radius:12px;
+  font-size:15px;
+  font-weight:700;
+  text-decoration:none;
+}
+.btn-primary{
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#fff;
+  box-shadow:0 6px 16px rgba(37,99,235,0.25);
+}
+.btn-secondary{
+  background:#fff;
+  border:1px solid #e5e7eb;
+  color:#6b7280;
+}
 
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
-button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.96) !important; }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="top-bar">
-    <a href="/home" class="home-button">⌂ 홈으로</a>
-    <a href="/board/write" class="home-button">의견보내기</a>
-  </div>
-
-  <h2>내가 보낸 의견</h2>
-  <p class="desc">지금 사용 중인 브라우저에서 보낸 의견만 표시됩니다. 삭제하면 즉시 영구 삭제되며 복구할 수 없습니다.</p>
-
-  {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
-
-  {% if posts %}
-    {% for p in posts %}
-    <div class="post">
-      <div class="post-head">
-        <div>
-          <div class="post-title">{{ p["title"] }}</div>
-          <div class="post-meta">{{ p["created_at"] | kst }}</div>
-        </div>
-        <form method="post" action="/board/mine/delete/{{ p['id'] }}" onsubmit="return confirm('이 의견을 삭제할까요? 복구할 수 없습니다.');">
-          <button type="submit" class="del-btn">삭제</button>
-        </form>
+  <div class="card">
+    {% if deleted and not posts %}
+      <div class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
       </div>
-      <div class="post-content">{{ p["content"] }}</div>
+      <h1 class="title">의견을 삭제했습니다</h1>
+      <p class="sub">보내신 의견이 완전히 삭제되었습니다.<br>삭제된 내용은 복구할 수 없습니다.</p>
+    {% elif posts %}
+      <div class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>
+      </div>
+      <h1 class="title">내가 보낸 의견</h1>
+      <p class="sub">이 브라우저에서 보낸 의견만 표시됩니다.<br>삭제하면 바로 영구 삭제됩니다.</p>
+      {% if msg %}<div class="msg {{ 'ok' if deleted else 'err' }}">{{ msg }}</div>{% endif %}
+      <div class="list">
+        {% for p in posts %}
+        <div class="post">
+          <div class="post-head">
+            <div>
+              <div class="post-title">{{ p["title"] }}</div>
+              <div class="post-meta">{{ p["created_at"] | kst }}</div>
+            </div>
+            <form method="post" action="/board/mine/delete/{{ p['id'] }}" onsubmit="return confirm('이 의견을 삭제할까요?\n삭제하면 복구할 수 없습니다.');">
+              <button type="submit" class="del-btn">삭제</button>
+            </form>
+          </div>
+          <div class="post-content">{{ p["content"] }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="icon gray">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>
+      </div>
+      <h1 class="title">삭제할 의견이 없습니다</h1>
+      <p class="sub">이 브라우저에서 보낸 의견만 삭제할 수 있습니다.<br>브라우저를 닫았거나 다른 기기에서 보낸 의견은 표시되지 않습니다.</p>
+      {% if msg %}<div class="msg err">{{ msg }}</div>{% endif %}
+    {% endif %}
+
+    <div class="btns">
+      <a href="/home" class="btn btn-primary">홈으로</a>
+      <a href="/board/write" class="btn btn-secondary">의견보내기</a>
     </div>
-    {% endfor %}
-  {% else %}
-    <div class="empty">
-      삭제할 수 있는 의견이 없습니다.<br>
-      <span style="font-size:12px;">브라우저를 닫았거나 다른 기기에서 보낸 의견은 여기서 삭제할 수 없습니다.</span>
-    </div>
-  {% endif %}
-</div>
+  </div>
 </body>
 </html>
 """
