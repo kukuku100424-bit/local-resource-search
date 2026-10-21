@@ -2272,6 +2272,19 @@ _PILL_CACHE = {"mtime": None, "rows": []}
 PILL_DEMENTIA_KW = ["도네페질", "리바스티그민", "갈란타민", "메만틴", "아리셉트", "엑셀론", "레미닐", "에빅사"]
 PILL_COLORS = ["하양", "노랑", "주황", "분홍", "빨강", "갈색", "연두", "초록", "청록", "파랑", "남색", "자주", "보라", "회색", "검정", "투명"]
 PILL_SHAPES = ["원형", "타원형", "장방형", "반원형", "삼각형", "사각형", "마름모형", "오각형", "육각형", "팔각형", "기타"]
+PILL_FORMS = ["정제", "경질캡슐", "연질캡슐"]
+
+
+def _pill_form_kind(form_name):
+    """식약처 제형명(FORM_CODE_NAME) → 정제 / 경질캡슐 / 연질캡슐 (그 외는 빈 값)"""
+    f = str(form_name or "")
+    if "연질" in f:
+        return "연질캡슐"
+    if "캡슐" in f:
+        return "경질캡슐"
+    if "정" in f:
+        return "정제"
+    return ""
 
 
 def _pill_norm(s):
@@ -2319,6 +2332,7 @@ def load_pills():
             "_prints": prints,
             "_colors": colors,
             "_capsule": "캡슐" in r.get("FORM_CODE_NAME", ""),
+            "_kind": _pill_form_kind(r.get("FORM_CODE_NAME", "")),
             "dementia": any(k in name for k in PILL_DEMENTIA_KW),
         })
     _PILL_CACHE["mtime"] = mtime
@@ -2354,13 +2368,16 @@ def _pill_imprint_score(photo_prints, pill_prints):
     return score
 
 
-def search_pills(imprints, color="", shape="", capsule=None, limit=3):
-    """각인(필수) + 색·모양(보조)으로 후보를 점수순으로 반환"""
+def search_pills(imprints, color="", shape="", capsule=None, limit=3, form=""):
+    """각인(필수) + 색·모양(보조)으로 후보를 점수순으로 반환
+    form: 사용자가 고른 제형(정제/경질캡슐/연질캡슐). 고르면 해당 제형만, 빈 값이면 전체"""
     photo_prints = [p for p in (_pill_norm(x) for x in (imprints or [])) if p]
     if not photo_prints:
         return []
     results = []
     for row in load_pills():
+        if form and row["_kind"] != form:
+            continue
         s_imp = _pill_imprint_score(photo_prints, row["_prints"])
         if s_imp <= 0:
             continue
@@ -2520,7 +2537,9 @@ def _pill_pair_by_position(front, back):
 
 def _pill_group(no, imprints, color, shape, capsule=None):
     """알약 1개 결과 묶음 만들기"""
-    feats = {"imprint": " / ".join(imprints), "color": color, "shape": shape}
+    # AI가 '정제'로 읽은 경우만 제형을 미리 채움 (캡슐은 경질/연질 구분이 어려워 '전체'로 둠)
+    feats = {"imprint": " / ".join(imprints), "color": color, "shape": shape,
+             "form": "정제" if capsule is False else ""}
     if not imprints:
         return {"no": no, "features": feats, "candidates": [],
                 "message": "각인(글자)을 읽지 못했습니다. 이 알약은 글자가 보이도록 가까이 따로 찍거나, 위에 각인을 직접 입력해 주세요."}
@@ -2662,9 +2681,10 @@ def pill_search():
     imprints = [x.strip() for x in str(d.get("imprint", "")).split("/") if x.strip()]
     color = d.get("color") if d.get("color") in PILL_COLORS else ""
     shape = d.get("shape") if d.get("shape") in PILL_SHAPES else ""
+    form = d.get("form") if d.get("form") in PILL_FORMS else ""
     if not imprints:
         return jsonify({"ok": True, "candidates": [], "message": "각인(알약에 새겨진 글자)을 입력해 주세요."})
-    cands = search_pills(imprints, color, shape)
+    cands = search_pills(imprints, color, shape, form=form)
     return jsonify({"ok": True, "candidates": cands,
                     "message": "" if cands else "일치하는 알약을 찾지 못했습니다."})
 
@@ -2773,7 +2793,7 @@ PILL_HTML = """
 .pill-feat.pill-manual{ display:none; margin-top:0; }
 .pill-manual .pill-go{ margin-top:10px !important; }
 .pill-shots{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.pill-shot{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; height:120px; border:1.5px dashed #93c5fd; border-radius:12px; background:#f8fbff; color:#1d4ed8; font-size:13px; font-weight:700; cursor:pointer; overflow:hidden; text-align:center; }
+.pill-shot{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; height:120px; padding:6px 8px 34px; box-sizing:border-box; border:1.5px dashed #93c5fd; border-radius:12px; background:#f8fbff; color:#1d4ed8; font-size:13px; font-weight:700; cursor:pointer; overflow:hidden; text-align:center; }
 .pill-shot input{ display:none; }
 .pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; padding:0 6px; word-break:keep-all; }
@@ -2788,7 +2808,31 @@ PILL_HTML = """
 .pill-feat{ display:none; margin-top:14px; padding:10px 12px; border-radius:12px; background:#eef4ff; border:1px solid #c7d7ff; }
 .pill-feat-title{ font-size:12.5px; font-weight:800; color:#1e3a8a; }
 .pill-feat-help{ margin:3px 0 8px; font-size:11.5px; color:#4b5563; line-height:1.45; word-break:keep-all; }
-.pill-feat-row{ display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:6px; }
+.pill-feat-row{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.pill-feat-row input{ grid-column:1 / -1; }
+/* 앞면·뒷면 글자 두 칸 */
+.pill-imp2{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
+.pill-imp2 label{ display:flex; flex-direction:column; gap:3px; min-width:0; font-size:11.5px; font-weight:700; color:#1e3a8a; }
+.pill-imp2 input{ width:100%; height:38px; margin:0; padding:0 10px; border:1px solid #c7d7ff; border-radius:8px; font-size:14px; font-family:inherit; background:#fff; box-sizing:border-box; }
+.pill-imp2 input:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.10); }
+.pill-imp2 input.err, .pill-imp2 input.err:focus{ border-color:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,0.15); }
+/* 상단 찾기 방식 탭 */
+.pill-tabs{ flex-basis:100%; display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:12px; padding:4px; background:#f1f5f9; border-radius:12px; }
+.pill-tab{ display:flex !important; align-items:center; justify-content:center; gap:6px; width:auto !important; height:40px !important; margin:0 !important; padding:0 6px !important; border:none !important; border-radius:9px !important; background:transparent !important; color:#64748b !important; font-size:14px !important; font-weight:700 !important; font-family:inherit; box-shadow:none !important; cursor:pointer; white-space:nowrap; }
+.pill-tab svg{ width:18px; height:18px; flex:none; }
+.pill-tab.on{ background:#fff !important; color:#1d4ed8 !important; box-shadow:0 1px 4px rgba(15,23,42,0.12) !important; }
+/* 모양 선택: 모양 그림이 보이는 선택창 (원래 select는 숨겨 두고 값만 사용) */
+.ps-wrap{ position:relative; min-width:0; }
+.ps-btn{ width:100% !important; height:36px !important; margin:0 !important; padding:0 8px !important; display:flex !important; align-items:center; gap:5px; border:1px solid #c7d7ff !important; border-radius:8px !important; background:#fff !important; color:#111827 !important; font-size:13px !important; font-weight:400 !important; font-family:inherit; box-shadow:none !important; cursor:pointer; text-align:left; }
+.ps-btn svg{ flex:none; width:22px; height:16px; }
+.ps-btn .ps-name{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ps-btn .ps-caret{ flex:none; color:#6b7280; font-size:10px; }
+.ps-pop{ display:none; position:fixed; z-index:100005; width:252px; max-width:calc(100vw - 24px); padding:6px; background:#fff; border:1px solid #c7d7ff; border-radius:12px; box-shadow:0 10px 26px rgba(15,23,42,0.18); grid-template-columns:repeat(4, 1fr); gap:4px; }
+.ps-pop.open{ display:grid; }
+.ps-opt{ display:flex !important; flex-direction:column; align-items:center; justify-content:center; gap:3px; width:auto !important; height:auto !important; margin:0 !important; padding:6px 2px !important; border:1px solid transparent !important; border-radius:8px !important; background:#fff !important; color:#374151 !important; font-size:11px !important; font-weight:600 !important; font-family:inherit; box-shadow:none !important; cursor:pointer; white-space:nowrap; }
+.ps-opt svg{ width:30px; height:22px; }
+.ps-opt:hover{ background:#f5f8ff !important; }
+.ps-opt.sel{ background:#eef4ff !important; border-color:#93c5fd !important; color:#1d4ed8 !important; }
 .pill-feat-row input, .pill-feat-row select{ width:100%; height:36px; margin:0; padding:0 8px; border:1px solid #c7d7ff; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; box-sizing:border-box; }
 .pill-re{ width:100% !important; height:34px !important; margin:8px 0 0 !important; padding:0 !important; border:1px solid #93c5fd !important; border-radius:8px !important; background:#fff !important; color:#1d4ed8 !important; font-size:13px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
 .pill-list{ margin-top:12px; display:flex; flex-direction:column; gap:10px; }
@@ -2817,9 +2861,10 @@ PILL_HTML = """
 .pill-load-ci{ width:132px; margin-top:28px; opacity:0.82; display:block; }
 .pill-foot{ flex:none; padding:8px 16px; border-top:1px solid #f1f5f9; font-size:11px; color:#9ca3af; line-height:1.5; word-break:keep-all; }
 @media (max-width:480px){
-  .pill-shot{ height:100px; }
-  .pill-feat-row{ grid-template-columns:1fr 1fr; }
-  .pill-feat-row input{ grid-column:1 / -1; }
+  .pill-shot{ height:118px; }
+  .pill-feat-row{ gap:5px; }
+  .ps-btn{ padding:0 6px !important; gap:4px; font-size:12.5px !important; }
+  .ps-btn .ps-caret{ display:none; }
   .pill-card img{ width:80px; height:46px; }
 }
 </style>
@@ -2831,20 +2876,27 @@ PILL_HTML = """
         <div class="pill-title"><svg viewBox="0 0 24 24" style="width:1.15em;height:1.15em;vertical-align:-0.2em;margin-right:2px" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#3b82f6"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#fb923c"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="rgba(15,23,42,0.18)" stroke-width="1"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg> 알약 확인</div>
       </div>
       <div class="pill-head-btns">
-        <button type="button" class="pill-mode" id="pillModeBtn">직접 입력</button>
         <button type="button" class="pill-x" onclick="closePill()" aria-label="닫기">×</button>
       </div>
       <div class="pill-sub" id="pillSub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
+      <div class="pill-tabs" role="tablist">
+        <button type="button" class="pill-tab on" data-m="photo" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> 사진으로 찾기</button>
+        <button type="button" class="pill-tab" data-m="text" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 16h4"/></svg> 알약정보로 찾기</button>
+      </div>
     </div>
     <div class="pill-body">
       <!-- 직접 입력: 사진 없이 각인 글자로 바로 검색 -->
       <div class="pill-feat pill-manual" id="pillManualPane">
-        <div class="pill-feat-title">각인 글자로 찾기</div>
-        <div class="pill-feat-help">알약에 새겨진 글자를 입력하세요. 앞·뒤 글자가 다르면 / 로 나눠 주세요. (예: CT / 60)</div>
+        <div class="pill-feat-title">알약 정보 입력</div>
+        <div class="pill-feat-help">알약에 새겨진 글자(각인)를 입력하세요. 한쪽 면에만 있으면 그 칸만 쓰면 됩니다. 색·모양·제형은 모르면 '전체'로 두세요.</div>
+        <div class="pill-imp2">
+          <label>앞면 글자<input type="text" id="pmImpF" placeholder="예: CT" autocomplete="off"></label>
+          <label>뒷면 글자<input type="text" id="pmImpB" placeholder="(없으면 비움)" autocomplete="off"></label>
+        </div>
         <div class="pill-feat-row">
-          <input type="text" id="pmImp" placeholder="각인 글자 (예: CT / 60)" autocomplete="off">
           <select id="pmColor"></select>
           <select id="pmShape"></select>
+          <select id="pmForm"></select>
         </div>
         <button type="button" class="pill-go" id="pmGo">검색</button>
       </div>
@@ -2859,12 +2911,12 @@ PILL_HTML = """
         <div class="pill-shot" id="pillShotBack" data-side="back" role="button" tabindex="0">
           <input type="file" accept="image/*" capture="environment" data-side="back">
           <input type="file" accept="image/*" class="pill-gal-input" data-side="back">
-          <span class="ps-t">📷 뒷면</span><small class="ps-s">(선택) 놓인 자리 그대로 뒤집어서</small>
+          <span class="ps-t">📷 뒷면</span><small class="ps-s">(선택) 놓은 자리 그대로 뒤집어서 촬영</small>
           <button type="button" class="pill-gal" data-side="back" aria-label="갤러리에서 뒷면 사진 선택"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-8 8"/></svg></button>
         </div>
       </div>
       <p class="pill-tip"><span>※</span><span id="pillTipText">한 알도, 여러 알(최대 5알)도 됩니다. 여러 알이면 서로 떨어뜨려 놓고 찍은 뒤, 뒷면은 놓인 자리 그대로 하나씩 뒤집어 찍어주세요. 사진은 저장되지 않습니다.</span></p>
-      <button type="button" class="pill-go" id="pillGo">확인하기</button>
+      <button type="button" class="pill-go" id="pillGo">검색</button>
       </div>
 
       <div class="pill-msg" id="pillMsg"></div>
@@ -2889,6 +2941,7 @@ PILL_HTML = """
 (function(){
   var COLORS = ["하양","노랑","주황","분홍","빨강","갈색","연두","초록","청록","파랑","남색","자주","보라","회색","검정","투명"];
   var SHAPES = ["원형","타원형","장방형","반원형","삼각형","사각형","마름모형","오각형","육각형","팔각형","기타"];
+  var FORMS = ["정제","경질캡슐","연질캡슐"];
   var modal = document.getElementById("pillModal");
   if(!modal) return;
   var files = { front:null, back:null };
@@ -2900,29 +2953,46 @@ PILL_HTML = """
   /* ── 직접 입력 모드: 사진 없이 각인·색·모양으로 바로 검색 ── */
   var manualPane = document.getElementById("pillManualPane");
   var photoPane = document.getElementById("pillPhotoPane");
-  var modeBtn = document.getElementById("pillModeBtn");
+  var tabs = modal.querySelectorAll(".pill-tab");
+  /* 각인을 비우고 검색하면 앞면 칸에 빨간 테두리 + 커서 이동, 글자를 입력하면 테두리 해제 */
+  function markImpEmpty(inp){
+    if(!inp) return;
+    inp.classList.add("err");
+    try{ inp.focus(); inp.scrollIntoView({ block:"center", behavior:"smooth" }); }catch(e){}
+  }
+  modal.addEventListener("input", function(e){
+    var t = e.target;
+    if(!t || !t.closest || !t.closest(".pill-imp2")) return;
+    Array.prototype.forEach.call(t.closest(".pill-imp2").querySelectorAll("input.err"), function(x){ x.classList.remove("err"); });
+  });
+  function joinImp(a, b){ return [a, b].map(function(x){ return String(x || "").trim(); }).filter(function(x){ return x; }).join(" / "); }
   var subEl = document.getElementById("pillSub");
   var photoSub = null;
   function setManual(on){
     if(photoSub === null) photoSub = subEl.textContent;   /* PC/모바일 문구 그대로 보관 */
     manualPane.style.display = on ? "block" : "none";
     photoPane.style.display = on ? "none" : "";
-    modeBtn.textContent = on ? "사진으로" : "직접 입력";
-    subEl.textContent = on ? "알약에 새겨진 글자(각인)를 입력하면 식약처 낱알식별 정보에서 찾아드립니다." : photoSub;
+    Array.prototype.forEach.call(tabs, function(t){ t.classList.toggle("on", (t.getAttribute("data-m") === "text") === on); });
+    subEl.textContent = on ? "알약의 글자(각인)·색·모양·제형을 입력하면 식약처 낱알식별 정보에서 찾아드립니다." : photoSub;
     showMsg(""); list.innerHTML = "";
-    if(on){ setTimeout(function(){ try{ document.getElementById("pmImp").focus(); }catch(e){} }, 50); }
+    if(on){ setTimeout(function(){ try{ document.getElementById("pmImpF").focus(); }catch(e){} }, 50); }
   }
-  modeBtn.addEventListener("click", function(){ setManual(manualPane.style.display !== "block"); });
+  Array.prototype.forEach.call(tabs, function(t){
+    t.addEventListener("click", function(){
+      var wantText = t.getAttribute("data-m") === "text";
+      if(wantText !== (manualPane.style.display === "block")) setManual(wantText);
+    });
+  });
   function manualSearch(){
-    var imp = document.getElementById("pmImp").value;
-    if(!imp.trim()){ showMsg("각인(알약에 새겨진 글자)을 입력해 주세요."); return; }
+    var imp = joinImp(document.getElementById("pmImpF").value, document.getElementById("pmImpB").value);
+    if(!imp.trim()){ showMsg("각인(알약에 새겨진 글자)을 입력해 주세요."); markImpEmpty(document.getElementById("pmImpF")); return; }
     showMsg(""); list.innerHTML = "";
     var btn = document.getElementById("pmGo");
     btn.disabled = true; btn.textContent = "검색 중...";
     fetch("/pill/search", {
       method:"POST", credentials:"same-origin",
       headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ imprint: imp, color: document.getElementById("pmColor").value, shape: document.getElementById("pmShape").value })
+      body: JSON.stringify({ imprint: imp, color: document.getElementById("pmColor").value, shape: document.getElementById("pmShape").value, form: document.getElementById("pmForm").value })
     }).then(function(r){ return r.json(); }).then(function(d){
       if(!d || !d.ok){ showMsg((d && d.message) || "오류가 발생했습니다."); return; }
       renderCards(list, d.candidates);
@@ -2932,15 +3002,116 @@ PILL_HTML = """
       .finally(function(){ btn.disabled = false; btn.textContent = "검색"; });
   }
   document.getElementById("pmGo").addEventListener("click", manualSearch);
-  document.getElementById("pmImp").addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); manualSearch(); } });
+  ["pmImpF", "pmImpB"].forEach(function(id){
+    document.getElementById(id).addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); manualSearch(); } });
+  });
 
   function opts(arr, all, sel){
     return '<option value="">' + all + '</option>' + arr.map(function(v){
       return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + '</option>';
     }).join("");
   }
+  /* 모양 그림 (알약 모양을 눈으로 고를 수 있게) */
+  var SHAPE_ICON = {
+    "": '<circle cx="12" cy="12" r="8" stroke-dasharray="3 2.5"/>',
+    "원형": '<circle cx="12" cy="12" r="8"/>',
+    "타원형": '<ellipse cx="12" cy="12" rx="10" ry="6.5"/>',
+    "장방형": '<rect x="2" y="7" width="20" height="10" rx="3"/>',
+    "반원형": '<path d="M3 16 A9 9 0 0 1 21 16 Z"/>',
+    "삼각형": '<polygon points="12,4 21,19 3,19"/>',
+    "사각형": '<rect x="5" y="5" width="14" height="14" rx="2"/>',
+    "마름모형": '<polygon points="12,3 21,12 12,21 3,12"/>',
+    "오각형": '<polygon points="12,3 21,10 17.5,20 6.5,20 3,10"/>',
+    "육각형": '<polygon points="7,4 17,4 22,12 17,20 7,20 2,12"/>',
+    "팔각형": '<polygon points="8.5,3 15.5,3 21,8.5 21,15.5 15.5,21 8.5,21 3,15.5 3,8.5"/>',
+    "기타": '<path d="M6 8 Q12 2 18 8 Q22 14 15 18 Q8 22 5 15 Z"/>'
+  };
+  function shapeSvg(v){
+    var on = !!v;
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="' + (on ? '#dbeafe' : 'none') + '" stroke="' + (on ? '#2563eb' : '#9ca3af') + '" stroke-width="1.6" stroke-linejoin="round">' + (SHAPE_ICON[v] || SHAPE_ICON["기타"]) + '</svg>';
+  }
+  /* 색 견본 */
+  var COLOR_HEX = {
+    "하양":"#ffffff", "노랑":"#facc15", "주황":"#fb923c", "분홍":"#f9a8d4", "빨강":"#ef4444", "갈색":"#92400e",
+    "연두":"#a3e635", "초록":"#16a34a", "청록":"#14b8a6", "파랑":"#3b82f6", "남색":"#1e3a8a", "자주":"#a21caf",
+    "보라":"#8b5cf6", "회색":"#9ca3af", "검정":"#111827"
+  };
+  function colorSvg(v){
+    if(!v) return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-dasharray="3 2.5"/></svg>';
+    if(v === "투명") return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="rgba(219,234,254,0.45)" stroke="#93c5fd" stroke-width="1.6"/><path d="M8.5 9.5 A4.5 4.5 0 0 1 12 7.5" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/></svg>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="' + (COLOR_HEX[v] || "#e5e7eb") + '" stroke="rgba(15,23,42,0.25)" stroke-width="1.2"/></svg>';
+  }
+  /* 제형 그림: 정제(분할선 있는 알약) / 경질캡슐(두 색 캡슐) / 연질캡슐(말랑한 반투명 캡슐) */
+  function formSvg(v){
+    if(v === "정제") return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="#f8fafc" stroke="#64748b" stroke-width="1.6"/><line x1="12" y1="5" x2="12" y2="19" stroke="#94a3b8" stroke-width="1.4"/></svg>';
+    if(v === "경질캡슐") return '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-35 12 12)"><path d="M7 8h5v8H7a4 4 0 0 1 0-8z" fill="#3b82f6"/><path d="M12 8h5a4 4 0 0 1 0 8h-5z" fill="#f8fafc"/><rect x="3" y="8" width="18" height="8" rx="4" fill="none" stroke="#475569" stroke-width="1.2"/></g></svg>';
+    if(v === "연질캡슐") return '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="9.5" ry="6" fill="#fbbf24" fill-opacity="0.85" stroke="#d97706" stroke-width="1.2" transform="rotate(-25 12 12)"/><ellipse cx="9" cy="10" rx="3" ry="1.3" fill="#ffffff" fill-opacity="0.75" transform="rotate(-25 9 10)"/></svg>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-dasharray="3 2.5"/></svg>';
+  }
+  function enhanceShape(sel){ enhancePicker(sel, SHAPES, shapeSvg, "모양 전체"); }
+  function enhanceForm(sel){ enhancePicker(sel, FORMS, formSvg, "제형 전체"); }
+  function enhanceColor(sel){ enhancePicker(sel, COLORS, colorSvg, "색 전체"); }
+
+  /* select 를 그림 선택창으로 바꿈. select 는 숨긴 채 값만 보관하므로 기존 검색 코드는 그대로 동작 */
+  function enhancePicker(sel, LIST, iconFn, allLabel){
+    if(!sel || sel.getAttribute("data-ps")) return;
+    sel.setAttribute("data-ps", "1");
+    sel.style.display = "none";
+    var wrap = document.createElement("div");
+    wrap.className = "ps-wrap";
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    var btn = document.createElement("button");
+    btn.type = "button"; btn.className = "ps-btn";
+    var pop = document.createElement("div");
+    pop.className = "ps-pop";
+    wrap.appendChild(btn); wrap.appendChild(pop);
+    function label(v){ return v || allLabel; }
+    function update(){
+      btn.innerHTML = iconFn(sel.value) + '<span class="ps-name">' + label(sel.value) + '</span><span class="ps-caret">▼</span>';
+      Array.prototype.forEach.call(pop.children, function(o){ o.classList.toggle("sel", o.getAttribute("data-v") === sel.value); });
+    }
+    [""].concat(LIST).forEach(function(v){
+      var o = document.createElement("button");
+      o.type = "button"; o.className = "ps-opt"; o.setAttribute("data-v", v);
+      o.innerHTML = iconFn(v) + '<span>' + (v || "전체") + '</span>';
+      o.addEventListener("click", function(e){
+        e.stopPropagation();
+        sel.value = v;
+        sel.dispatchEvent(new Event("change", { bubbles:true }));
+        pop.classList.remove("open");
+        update();
+      });
+      pop.appendChild(o);
+    });
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      var willOpen = !pop.classList.contains("open");
+      Array.prototype.forEach.call(modal.querySelectorAll(".ps-pop.open"), function(x){ x.classList.remove("open"); });
+      if(!willOpen) return;
+      pop.classList.add("open");
+      /* 팝업 안쪽 스크롤 영역에 잘리지 않도록 화면 기준으로 위치 계산 (아래 공간이 부족하면 위로) */
+      var r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+      var left = Math.max(12, Math.min(r.right - w, window.innerWidth - w - 12));
+      var top = (r.bottom + 4 + h <= window.innerHeight - 8) ? r.bottom + 4 : Math.max(8, r.top - 4 - h);
+      pop.style.left = left + "px"; pop.style.top = top + "px";
+    });
+    update();
+  }
+  /* 바깥을 누르거나 스크롤하면 모양 선택창 닫기 */
+  function closeShapePops(){
+    Array.prototype.forEach.call(modal.querySelectorAll(".ps-pop.open"), function(x){ x.classList.remove("open"); });
+  }
+  document.addEventListener("click", closeShapePops);
+  modal.querySelector(".pill-body").addEventListener("scroll", closeShapePops);
+  window.addEventListener("resize", closeShapePops);
+
   document.getElementById("pmColor").innerHTML = opts(COLORS, "색 전체", "");
   document.getElementById("pmShape").innerHTML = opts(SHAPES, "모양 전체", "");
+  enhanceColor(document.getElementById("pmColor"));
+  enhanceShape(document.getElementById("pmShape"));
+  document.getElementById("pmForm").innerHTML = opts(FORMS, "제형 전체", "");
+  enhanceForm(document.getElementById("pmForm"));
 
   /* 큰 사진은 휴대폰에서 줄여서 전송 (각인 판독에 충분한 1600px) */
   function shrink(file){
@@ -3141,6 +3312,7 @@ PILL_HTML = """
   /* 알약 1개 묶음: (여러 알이면 'N번 알약') → AI가 읽은 정보(수정 가능) → 안내 → 후보 */
   function renderGroup(g, multi){
     var f = g.features || {};
+    var impParts = String(f.imprint || "").split("/").map(function(x){ return x.trim(); }).filter(function(x){ return x; });
     var el = document.createElement("div");
     el.className = "pill-group";
     el.innerHTML =
@@ -3148,25 +3320,37 @@ PILL_HTML = """
       '<div class="pill-feat"' + (multi ? ' style="margin-top:8px"' : '') + '>' +
         '<div class="pill-feat-title">AI가 사진에서 읽은 정보</div>' +
         (multi ? '<div style="height:6px"></div>' : '<div class="pill-feat-help">사진 속 알약과 글자가 다르면 직접 고친 뒤 아래 버튼을 눌러주세요.</div>') +
+        '<div class="pill-imp2">' +
+          '<label>앞면 글자<input type="text" class="g-impF" value="' + esc(impParts[0] || "") + '"></label>' +
+          '<label>뒷면 글자<input type="text" class="g-impB" placeholder="(없으면 비움)" value="' + esc(impParts.slice(1).join(" ")) + '"></label>' +
+        '</div>' +
         '<div class="pill-feat-row">' +
-          '<input type="text" class="g-imp" placeholder="각인 글자 (앞 / 뒤)" value="' + esc(f.imprint || "") + '">' +
           '<select class="g-color">' + opts(COLORS, "색 전체", f.color) + '</select>' +
           '<select class="g-shape">' + opts(SHAPES, "모양 전체", f.shape) + '</select>' +
+          '<select class="g-form">' + opts(FORMS, "제형 전체", f.form) + '</select>' +
         '</div>' +
-        '<button type="button" class="pill-re">고친 정보로 다시 검색</button>' +
+        '<button type="button" class="pill-re">다시 검색</button>' +
       '</div>' +
       '<div class="pill-msg g-msg" style="display:none"></div>' +
       '<div class="pill-list g-list"></div>';
+    enhanceColor(el.querySelector(".g-color"));
+    enhanceShape(el.querySelector(".g-shape"));
+    enhanceForm(el.querySelector(".g-form"));
     var gmsg = el.querySelector(".g-msg"), glist = el.querySelector(".g-list");
     function setGMsg(t){ gmsg.textContent = t || ""; gmsg.style.display = t ? "block" : "none"; }
     setGMsg(g.message);
     renderCards(glist, g.candidates);
     el.querySelector(".pill-re").addEventListener("click", function(){
       setGMsg(""); glist.innerHTML = "";
+      if(!joinImp(el.querySelector(".g-impF").value, el.querySelector(".g-impB").value)){
+        setGMsg("각인(알약에 새겨진 글자)을 입력해 주세요.");
+        markImpEmpty(el.querySelector(".g-impF"));
+        return;
+      }
       fetch("/pill/search", {
         method:"POST", credentials:"same-origin",
         headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ imprint: el.querySelector(".g-imp").value, color: el.querySelector(".g-color").value, shape: el.querySelector(".g-shape").value })
+        body: JSON.stringify({ imprint: joinImp(el.querySelector(".g-impF").value, el.querySelector(".g-impB").value), color: el.querySelector(".g-color").value, shape: el.querySelector(".g-shape").value, form: el.querySelector(".g-form").value })
       }).then(function(r){ return r.json(); }).then(function(d){
         if(!d || !d.ok){ setGMsg((d && d.message) || "오류가 발생했습니다."); return; }
         renderCards(glist, d.candidates);
@@ -3206,7 +3390,7 @@ PILL_HTML = """
 
   goBtn.addEventListener("click", function(){
     if(!files.front && !files.back){ showMsg("알약 사진을 먼저 찍어주세요."); return; }
-    goBtn.disabled = true; goBtn.textContent = "확인 중...";
+    goBtn.disabled = true; goBtn.textContent = "검색 중...";
     showMsg(""); list.innerHTML = "";
     startLoading();
     preparePhotos().then(function(arr){
@@ -3216,7 +3400,7 @@ PILL_HTML = """
       return fetch("/pill/identify", { method:"POST", body:fd, credentials:"same-origin" });
     }).then(function(r){ return r.json(); }).then(handle)
       .catch(function(){ showMsg("연결 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."); })
-      .finally(function(){ stopLoading(); goBtn.disabled = false; goBtn.textContent = "확인하기"; });
+      .finally(function(){ stopLoading(); goBtn.disabled = false; goBtn.textContent = "검색"; });
   });
 
   /* survey=true 이면 치매약 후보에 '예 선택' 버튼 표시 (사전조사 화면) */
@@ -3231,7 +3415,8 @@ PILL_HTML = """
       Array.prototype.forEach.call(b.querySelectorAll("input"), function(inp){ inp.value = ""; });
     });
     setManual(false);
-    document.getElementById("pmImp").value = "";
+    document.getElementById("pmImpF").value = "";
+    document.getElementById("pmImpB").value = "";
     modal.classList.add("show");
     document.body.style.overflow = "hidden";
     /* 휴대폰 뒤로가기를 누르면 이전 화면(로그인)이 아니라 팝업만 닫히도록 기록 하나 추가 */
