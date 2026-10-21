@@ -6861,7 +6861,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <div style="font-size:12px;color:#9ca3af;margin-top:2px;margin-bottom:4px;">회신이 필요한 경우만 작성해주세요</div>
       <input type="text" name="reply_contact" placeholder="이메일 또는 전화번호">
 
-      <button type="submit">등록하기</button>
+      <button type="submit">의견보내기</button>
       <div style="text-align:center;margin-top:14px;">
         <a href="/board/mine" style="font-size:12px;color:#9ca3af;text-decoration:underline;margin-right:12px;">내가 보낸 의견</a>
         <a href="/privacy" style="font-size:12px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
@@ -6879,74 +6879,121 @@ BOARD_SUCCESS_HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>등록 완료</title>
+<title>의견 전송 완료</title>
 <style>
+*{ box-sizing:border-box; }
 body{
   margin:0;
+  min-height:100vh;
+  min-height:100dvh;
   background:#e8ecf4;
   font-family:'Pretendard',sans-serif;
   color:#111827;
-}
-.container{
-  max-width:640px;
-  margin:0 auto;
-  padding:24px 16px 40px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px 16px;
 }
 .card{
+  width:100%;
+  max-width:420px;
   background:#fff;
-  border-radius:18px;
-  padding:24px;
-  box-shadow:0 10px 26px rgba(15,23,42,0.10);
+  border-radius:22px;
+  padding:36px 24px 26px;
+  text-align:center;
+  box-shadow:0 16px 38px rgba(15,23,42,0.12);
 }
-.success{
-  padding:18px;
+.check{
+  width:64px;
+  height:64px;
+  margin:0 auto 18px;
+  border-radius:50%;
   background:#eff6ff;
-  border:1px solid #bfdbfe;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.check svg{ width:32px; height:32px; }
+.title{
+  font-size:21px;
+  font-weight:800;
+  letter-spacing:-0.4px;
+  margin:0 0 8px;
+}
+.sub{
+  font-size:14px;
+  color:#6b7280;
+  line-height:1.6;
+  margin:0;
+  word-break:keep-all;
+}
+.notice{
+  margin:22px 0 0;
+  padding:14px 16px;
   border-radius:14px;
-  color:#1d4ed8;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  font-size:13px;
+  color:#4b5563;
+  line-height:1.6;
+  text-align:left;
+  word-break:keep-all;
+}
+.notice b{ color:#111827; }
+.btns{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:22px;
+}
+.btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:48px;
+  border-radius:12px;
   font-size:15px;
   font-weight:700;
-  line-height:1.6;
+  text-decoration:none;
 }
-.home-button{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  gap:5px !important;
-  height:34px !important;
-  padding:0 15px !important;
-  margin-top:16px;
-  border-radius:8px !important;
-  background:#ffffff !important;
-  border:1px solid #e5e7eb !important;
-  color:#6b7280 !important;
-  text-decoration:none !important;
-  font-size:13px !important;
-  font-weight:600 !important;
-  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
-  transition:all .15s !important;
+.btn-primary{
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#fff;
+  box-shadow:0 6px 16px rgba(37,99,235,0.25);
+}
+.btn-secondary{
+  background:#fff;
+  border:1px solid #e5e7eb;
+  color:#6b7280;
 }
 
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
-button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.96) !important; }
 </style>
 </head>
 <body>
-<div class="container">
   <div class="card">
-    <div class="success">
-      의견이 등록되었습니다.<br>
-      남겨주신 내용은 관리자만 확인할 수 있습니다.
+    <div class="check">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
     </div>
+    <h1 class="title">의견을 보냈습니다</h1>
+    <p class="sub">보내주신 내용은 관리자만 확인합니다.<br>소중한 의견 감사합니다.</p>
+
     {% if can_delete %}
-    <div style="margin-top:12px;font-size:12.5px;color:#6b7280;line-height:1.6;word-break:keep-all;">
-      잘못 보내셨다면 브라우저를 닫기 전에 <a href="/board/mine" style="color:#dc2626;font-weight:700;">내가 보낸 의견</a>에서 삭제할 수 있습니다.
+    <div class="notice">
+      잘못 보내셨나요?<br>
+      브라우저를 닫기 전까지 <b>내가 보낸 의견</b>에서 삭제할 수 있습니다.
     </div>
     {% endif %}
-    <a href="/home" class="home-button">⌂ 홈으로</a>
+
+    <div class="btns">
+      <a href="/home" class="btn btn-primary">홈으로</a>
+      {% if can_delete %}
+      <a href="/board/mine" class="btn btn-secondary">내가 보낸 의견</a>
+      {% endif %}
+    </div>
   </div>
-</div>
 </body>
 </html>
 """
