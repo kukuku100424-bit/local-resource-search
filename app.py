@@ -2340,8 +2340,19 @@ def load_pills():
     return rows
 
 
+# 사진에서 자주 헷갈리는 글자 → 같은 대표 글자로 바꿔 비교 (정확히 같은 글자보다는 낮게 인정)
+_PILL_CONFUSE = str.maketrans({"O": "0", "Q": "0", "I": "1", "L": "1", "B": "8",
+                               "S": "5", "Z": "2", "T": "7", "G": "6"})
+
+
+def _pill_canon(s):
+    return s.translate(_PILL_CONFUSE)
+
+
 def _pill_imprint_score(photo_prints, pill_prints):
-    """사진에서 읽은 각인들과 알약 각인(앞/뒤)의 일치도 0~1"""
+    """사진에서 읽은 각인들과 알약 각인(앞/뒤)의 일치도 0~1
+    - 정확히 같음 1.0 / 헷갈리는 글자만 다름(0↔O, 1↔I·L, 8↔B, 5↔S, 2↔Z, 7↔T, 6↔G) 0.8
+    - 한쪽이 다른 쪽에 포함 0.7 / 그 외 비슷한 정도에 따라 최대 0.6"""
     import difflib
     if not photo_prints or not pill_prints:
         return 0.0
@@ -2352,10 +2363,17 @@ def _pill_imprint_score(photo_prints, pill_prints):
             if p == d:
                 best = 1.0
                 break
+            cp, cd = _pill_canon(p), _pill_canon(d)
+            if cp == cd:
+                best = max(best, 0.8)
+                continue
             if len(p) >= 2 and len(d) >= 2 and (p in d or d in p):
                 best = max(best, 0.7)
                 continue
-            sm = difflib.SequenceMatcher(None, p, d)
+            if len(cp) >= 2 and len(cd) >= 2 and (cp in cd or cd in cp):
+                best = max(best, 0.65)
+                continue
+            sm = difflib.SequenceMatcher(None, cp, cd)
             if sm.real_quick_ratio() >= 0.6 and sm.quick_ratio() >= 0.6:
                 r = sm.ratio()
                 if r >= 0.6:
@@ -2366,6 +2384,39 @@ def _pill_imprint_score(photo_prints, pill_prints):
     if len(photo_prints) == len(pill_prints) and score >= 0.7:
         score = min(1.0, score + 0.05)
     return score
+
+
+# 식약처 약 분류명(CLASS_NAME) → 쉬운 이름, 돌봄 관점에서 검토할 신호
+# - 의학적 판단이 아니라 '검토해 볼 돌봄'을 안내하기 위한 참고용 표. 분류명이 바뀌면 여기만 고치면 됨
+PILL_CARE_MAP = {
+    "최면진정제": ("수면제", ["낙상 주의"]),
+    "정신신경용제": ("신경정신과 약", ["낙상 주의"]),
+    "항전간제": ("뇌전증약", ["낙상 주의"]),
+    "골격근이완제": ("근육이완제", ["낙상 주의"]),
+    "항히스타민제": ("알레르기약", ["낙상 주의"]),
+    "혈압강하제": ("혈압약", ["어지럼 주의"]),
+    "이뇨제": ("이뇨제", ["야간 화장실 낙상 주의"]),
+    "당뇨병용제": ("당뇨약", ["식사·영양 관리"]),
+    "혈액응고저지제": ("항응고제", ["넘어짐 시 출혈 주의"]),
+    "동맥경화용제": ("고지혈증약", []),
+    "부정맥용제": ("심장약", []),
+    "관상혈관확장제": ("심장약", []),
+    "해열.진통.소염제": ("진통소염제", []),
+    "소화성궤양용제": ("위장약", []),
+    "진해거담제": ("기침·가래약", []),
+}
+
+
+def _pill_care(cls, dementia=False):
+    """약 1개의 쉬운 이름과 돌봄 신호. 치매약은 이름으로 판별(분류명이 '기타의 중추신경용약' 등으로 흩어져 있음)"""
+    if dementia:
+        return {"kind": "치매약", "signals": ["인지 지원"]}
+    cls = str(cls or "").strip()
+    for key, (kind, signals) in PILL_CARE_MAP.items():
+        if key in cls:
+            return {"kind": kind, "signals": list(signals)}
+    kind = re.sub(r"^\[\d+\]\s*", "", cls).replace("기타의 ", "").strip() or "기타 약"
+    return {"kind": kind, "signals": []}
 
 
 def search_pills(imprints, color="", shape="", capsule=None, limit=3, form=""):
@@ -2396,22 +2447,23 @@ def search_pills(imprints, color="", shape="", capsule=None, limit=3, form=""):
         cut = max(40, results[0][0] - 20)
         results = [x for x in results if x[0] >= cut]
     # 확신도: 입력한 단서(각인·색·모양·제형)로 받을 수 있는 최고점 대비 비율
-    #   거의 확실(90%↑, 단 1등이 하나일 때만) / 유력(70%↑) / 참고
+    #   거의 확실(90%↑, 단 1등이 2등보다 3점 이상 앞설 때만) / 유력(70%↑) / 참고
     max_score = 70 + (15 if color else 0) + (10 if shape else 0) + (5 if capsule is not None else 0)
     top = results[:limit]
-    n_high = sum(1 for sc, _ in top if sc / max_score >= 0.9)
+    lead_ok = len(top) == 1 or (len(top) > 1 and top[0][0] - top[1][0] >= 3)
     out = []
     for score, row in top:
         item = {k: v for k, v in row.items() if not k.startswith("_")}
         item["score"] = round(score)
         ratio = score / max_score
-        if ratio >= 0.9 and n_high == 1:
+        if ratio >= 0.9 and lead_ok and row is top[0][1]:
             item["conf"], item["conf_label"] = "high", "거의 확실"
         elif ratio >= 0.7:
             item["conf"], item["conf_label"] = "mid", "유력"
         else:
             item["conf"], item["conf_label"] = "low", "참고"
         item["detail_url"] = "https://nedrug.mfds.go.kr/pbp/CCBBB01/getItemDetail?itemSeq=" + row["seq"]
+        item["care"] = _pill_care(row["cls"], row["dementia"])
         out.append(item)
     return out
 
@@ -2566,6 +2618,8 @@ def _pill_build_groups(front, back):
         front, back = back, []
     groups = []
     for fi, bi in _pill_pair_by_position(front, back):
+        if fi is None:
+            continue   # 뒷면에서만 보인 것(바닥 무늬 오인식 등)은 별도 알약으로 만들지 않음
         sides = ([front[fi]] if fi is not None else []) + ([back[bi]] if bi is not None else [])
         imprints = [s["imprint"] for s in sides if s["imprint"]]
         color = next((s["color"] for s in sides if s["color"]), "")
@@ -2675,13 +2729,14 @@ def pill_identify():
     if not front and not back:
         return jsonify({"ok": True, "groups": [], "message": "사진에서 알약을 찾지 못했습니다. 알약이 잘 보이도록 밝은 곳에서 다시 찍어주세요."})
     groups = _pill_build_groups(front, back)
-    count = max(len(front), len(back))
+    count = len(front) or len(back)
     msg = ""
     if count > PILL_RECOMMEND:
         msg = (f"알약이 {count}개로 많아 정확도가 떨어질 수 있습니다. "
                f"{PILL_RECOMMEND}알 이하로 나눠 찍으면 더 정확합니다.")
     if front and back and len(front) != len(back):
-        msg = (msg + " " if msg else "") + (f"앞면에서 {len(front)}개, 뒷면에서 {len(back)}개를 찾아 일부 알약은 한쪽 면만으로 찾았습니다.")
+        msg = (msg + " " if msg else "") + (f"앞면에서 {len(front)}개, 뒷면에서 {len(back)}개를 찾아 앞면 기준 {len(front)}개로 정리했습니다. "
+                                            "알약끼리 떨어뜨리고 무늬 없는 바닥에서 찍으면 더 정확합니다.")
     return jsonify({"ok": True, "groups": groups, "message": msg})
 
 
@@ -2852,7 +2907,7 @@ PILL_HTML = """
 .pill-group-title{ font-size:15px; font-weight:800; color:#111827; }
 .pill-group .pill-feat{ display:block; }
 .pill-card{ display:flex; gap:12px; padding:10px; border:1px solid #e5e7eb; border-radius:12px; }
-.pill-card img{ flex:none; width:96px; height:54px; object-fit:contain; border-radius:6px; background:#f9fafb; }
+.pill-card img{ flex:none; width:112px; height:62px; object-fit:contain; border-radius:6px; background:#f9fafb; }
 .pill-info{ flex:1; min-width:0; }
 .pill-name{ font-size:14px; font-weight:800; line-height:1.35; word-break:keep-all; }
 .pill-meta{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; }
@@ -2863,6 +2918,19 @@ PILL_HTML = """
 .pill-badge{ display:inline-block; margin-right:4px; padding:1px 7px; border-radius:6px; background:#ede9fe; color:#6d28d9; font-size:11px; font-weight:800; vertical-align:1px; }
 .pill-actions{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 .pill-link{ font-size:12px; font-weight:700; color:#2563eb; text-decoration:none; }
+.pill-kind{ display:inline-block; margin-right:4px; padding:0 6px; border-radius:5px; background:#fef3c7; color:#92400e; font-size:11px; font-weight:800; }
+.pill-card.picked{ border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,0.15); }
+.pill-pick{ width:auto !important; height:26px !important; margin:0 !important; padding:0 10px !important; border:1px solid #93c5fd !important; border-radius:999px !important; background:#fff !important; color:#1d4ed8 !important; font-size:12px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
+.pill-card.picked .pill-pick{ background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; }
+.pill-pick-help{ margin:8px 0 2px; font-size:12px; color:#92400e; font-weight:700; word-break:keep-all; }
+.pill-care{ margin-top:18px; padding:14px; border-radius:14px; background:#fffbeb; border:1px solid #fcd34d; }
+.pill-care-t{ font-size:14px; font-weight:800; color:#111827; }
+.pill-care-kinds{ margin-top:6px; font-size:13px; color:#374151; line-height:1.6; word-break:keep-all; }
+.pill-care-sub{ margin-top:12px; font-size:13px; font-weight:800; color:#92400e; }
+.pill-care-sig{ margin:4px 0 0; padding-left:18px; font-size:13px; color:#374151; line-height:1.6; }
+.pill-care-go{ display:block; width:100% !important; height:42px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#d97706 !important; color:#fff !important; font-size:14px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
+.pill-care-go:disabled{ background:#fcd34d !important; cursor:default; }
+.pill-care-note{ margin-top:8px; font-size:11px; color:#92400e; line-height:1.5; word-break:keep-all; }
 .pill-yes{ width:auto !important; height:26px !important; margin:0 !important; padding:0 10px !important; border:none !important; border-radius:999px !important; background:#7c3aed !important; color:#fff !important; font-size:12px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
 .pill-loading{ display:none; position:fixed; inset:0; z-index:100003; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; }
 .pill-loading.show{ display:flex; }
@@ -2881,7 +2949,7 @@ PILL_HTML = """
   .pill-feat-row{ gap:5px; }
   .ps-btn{ padding:0 6px !important; gap:4px; font-size:12.5px !important; }
   .ps-btn .ps-caret{ display:none; }
-  .pill-card img{ width:80px; height:46px; }
+  .pill-card img{ width:96px; height:54px; }
 }
 </style>
 
@@ -3304,7 +3372,7 @@ PILL_HTML = """
         (c.image ? '<img src="' + esc(c.image) + '" alt="" loading="lazy">' : '') +
         '<div class="pill-info">' +
           '<div class="pill-name">' + (c.conf ? '<span class="pill-conf ' + esc(c.conf) + '">' + esc(c.conf_label) + '</span>' : '') + (c.dementia ? '<span class="pill-badge">치매약</span>' : '') + esc(c.name) + '</div>' +
-          '<div class="pill-meta">' + esc(c.company) + ' · ' + esc(c.etc_otc) + (c.cls ? ' · ' + esc(c.cls) : '') + '</div>' +
+          '<div class="pill-meta">' + (c.care && c.care.kind && !c.dementia ? '<span class="pill-kind">' + esc(c.care.kind) + '</span>' : '') + esc(c.company) + ' · ' + esc(c.etc_otc) + (c.cls ? ' · ' + esc(c.cls) : '') + '</div>' +
           '<div class="pill-meta">각인 ' + esc(prints || "-") + ' · ' + esc(c.color) + ' · ' + esc(c.shape) + '</div>' +
           '<div class="pill-actions">' +
             '<a class="pill-link" href="' + esc(c.detail_url) + '" target="_blank" rel="noopener noreferrer">상세정보(효능·용법) ↗</a>' +
@@ -3324,8 +3392,94 @@ PILL_HTML = """
     });
   }
 
+  /* ===== 돌봄 요약: 확인된 약 종류 → 검토해 볼 돌봄 → 사례검색으로 연결 =====
+     - '거의 확실' 후보가 있으면 자동 선택, 후보가 모두 같은 종류면 고르지 않아도 됨
+     - 후보끼리 종류가 다를 때만 '이 약이 맞아요' 버튼으로 고름 */
+  var careState = [], careBoxRef = null;
+  var SIGNAL_TEXT = {
+    "낙상 주의": "낙상 위험이 있음",
+    "어지럼 주의": "일어설 때 어지럼으로 넘어질 위험이 있음",
+    "야간 화장실 낙상 주의": "밤에 화장실을 자주 가 낙상 위험이 있음",
+    "식사·영양 관리": "식사와 영양 관리가 필요함",
+    "넘어짐 시 출혈 주의": "넘어지면 출혈 위험이 커 낙상 예방이 필요함",
+    "인지 지원": "치매로 인지 지원이 필요함"
+  };
+  function uniqList(a){ var o = []; a.forEach(function(x){ if(x && o.indexOf(x) === -1) o.push(x); }); return o; }
+  function careOf(st){
+    var c = st.cands;
+    if(!c.length) return { status:"none" };
+    if(st.sel !== null && c[st.sel]) return { status:"sel", care:c[st.sel].care };
+    var kinds = uniqList(c.map(function(x){ return x.care && x.care.kind; }));
+    if(kinds.length === 1) return { status:"same", care:c[0].care };
+    return { status:"pick" };
+  }
+  function setupChoice(gi, glist, cands){
+    var st = careState[gi];
+    st.cands = cands; st.sel = null;
+    cands.forEach(function(c, i){ if(c.conf === "high") st.sel = i; });
+    var old = glist.parentNode && glist.parentNode.querySelector(".pill-pick-help");
+    if(old) old.remove();
+    var kinds = uniqList(cands.map(function(x){ return x.care && x.care.kind; }));
+    if(kinds.length < 2) return;   /* 후보가 모두 같은 종류: 고를 필요 없음 */
+    var help = document.createElement("div");
+    help.className = "pill-pick-help";
+    help.textContent = "후보마다 약 종류가 달라요. 실물과 같은 약을 골라 주세요.";
+    glist.parentNode.insertBefore(help, glist);
+    var cards = glist.querySelectorAll(".pill-card");
+    function paint(){
+      Array.prototype.forEach.call(cards, function(card, i){
+        card.classList.toggle("picked", st.sel === i);
+        var b = card.querySelector(".pill-pick");
+        if(b) b.textContent = (st.sel === i) ? "✓ 선택됨" : "이 약이 맞아요";
+      });
+    }
+    Array.prototype.forEach.call(cards, function(card, i){
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "pill-pick";
+      b.addEventListener("click", function(){
+        st.sel = (st.sel === i) ? null : i;
+        paint();
+        renderCare(careBoxRef);
+      });
+      card.querySelector(".pill-actions").appendChild(b);
+    });
+    paint();
+  }
+  function renderCare(box){
+    if(!box) return;
+    var kinds = [], sigMap = {}, pending = 0;
+    careState.forEach(function(st){
+      var r = careOf(st);
+      if(r.status === "pick"){ pending++; return; }
+      if(r.status === "none") return;
+      kinds.push(r.care.kind);
+      (r.care.signals || []).forEach(function(sg){
+        sigMap[sg] = sigMap[sg] || [];
+        if(sigMap[sg].indexOf(r.care.kind) === -1) sigMap[sg].push(r.care.kind);
+      });
+    });
+    var ukinds = uniqList(kinds), sigs = Object.keys(sigMap);
+    if(!ukinds.length && !pending){ box.style.display = "none"; return; }
+    box.style.display = "";
+    var h = '<div class="pill-care-t">💊 확인된 약 ' + kinds.length + '개</div>' +
+      '<div class="pill-care-kinds">' + (ukinds.length ? esc(ukinds.join(" · ")) : "-") +
+      (pending ? ' <span style="color:#92400e">(' + pending + '개는 아직 선택 안 됨)</span>' : '') + '</div>';
+    if(sigs.length){
+      h += '<div class="pill-care-sub">⚠️ 검토해 볼 돌봄</div><ul class="pill-care-sig">' +
+        sigs.map(function(sg){ return '<li>' + esc(sg) + ' (' + esc(sigMap[sg].join(", ")) + ')</li>'; }).join("") + '</ul>';
+    }
+    h += '<button type="button" class="pill-care-go"' + (ukinds.length ? '' : ' disabled') + '>이 내용으로 돌봄 서비스 찾기</button>' +
+      '<div class="pill-care-note">약 종류로 본 참고 사항이며 의학적 판단이 아닙니다. 약 이름은 넘기지 않고 종류만 사례검색에 입력됩니다.</div>';
+    box.innerHTML = h;
+    var go = box.querySelector(".pill-care-go");
+    if(go) go.addEventListener("click", function(){
+      var q = ukinds.join("·") + " 복용 중." + sigs.map(function(sg){ return " " + (SIGNAL_TEXT[sg] || sg) + "."; }).join("");
+      location.href = "/desc?query=" + encodeURIComponent(q);
+    });
+  }
+
   /* 알약 1개 묶음: (여러 알이면 'N번 알약') → AI가 읽은 정보(수정 가능) → 안내 → 후보 */
-  function renderGroup(g, multi){
+  function renderGroup(g, multi, onCands){
     var f = g.features || {};
     var impParts = String(f.imprint || "").split("/").map(function(x){ return x.trim(); }).filter(function(x){ return x; });
     var el = document.createElement("div");
@@ -3355,6 +3509,7 @@ PILL_HTML = """
     function setGMsg(t){ gmsg.textContent = t || ""; gmsg.style.display = t ? "block" : "none"; }
     setGMsg(g.message);
     renderCards(glist, g.candidates);
+    if(onCands) onCands(glist, g.candidates || []);
     el.querySelector(".pill-re").addEventListener("click", function(){
       setGMsg(""); glist.innerHTML = "";
       if(!joinImp(el.querySelector(".g-impF").value, el.querySelector(".g-impB").value)){
@@ -3369,6 +3524,7 @@ PILL_HTML = """
       }).then(function(r){ return r.json(); }).then(function(d){
         if(!d || !d.ok){ setGMsg((d && d.message) || "오류가 발생했습니다."); return; }
         renderCards(glist, d.candidates);
+        if(onCands) onCands(glist, d.candidates || []);
         setGMsg(d.message || "");
       }).catch(function(){ setGMsg("연결 오류가 발생했습니다."); });
     });
@@ -3386,7 +3542,18 @@ PILL_HTML = """
       note.textContent = "사진 속 알약 " + groups.length + "개를 찾았습니다. 앞면과 뒷면은 놓인 자리로 짝을 맞췄습니다. 글자가 다르면 해당 알약의 정보를 고친 뒤 다시 검색해 주세요.";
       list.appendChild(note);
     }
-    groups.forEach(function(g){ list.appendChild(renderGroup(g, groups.length > 1)); });
+    careState = [];
+    var careBox = careBoxRef = document.createElement("div");
+    careBox.className = "pill-care";
+    groups.forEach(function(g, gi){
+      careState[gi] = { cands: [], sel: null };
+      list.appendChild(renderGroup(g, groups.length > 1, function(glist, cands){
+        setupChoice(gi, glist, cands);
+        renderCare(careBox);
+      }));
+    });
+    list.appendChild(careBox);
+    renderCare(careBox);
     showMsg(data.message || "");
     scrollToResult();
   }
