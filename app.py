@@ -6863,6 +6863,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
       <button type="submit">등록하기</button>
       <div style="text-align:center;margin-top:14px;">
+        <a href="/board/mine" style="font-size:12px;color:#9ca3af;text-decoration:underline;margin-right:12px;">내가 보낸 의견</a>
         <a href="/privacy" style="font-size:12px;color:#9ca3af;text-decoration:underline;">개인정보 처리방침</a>
       </div>
     </form>
@@ -6938,6 +6939,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       의견이 등록되었습니다.<br>
       남겨주신 내용은 관리자만 확인할 수 있습니다.
     </div>
+    {% if can_delete %}
+    <div style="margin-top:12px;font-size:12.5px;color:#6b7280;line-height:1.6;word-break:keep-all;">
+      잘못 보내셨다면 브라우저를 닫기 전에 <a href="/board/mine" style="color:#dc2626;font-weight:700;">내가 보낸 의견</a>에서 삭제할 수 있습니다.
+    </div>
+    {% endif %}
     <a href="/home" class="home-button">⌂ 홈으로</a>
   </div>
 </div>
@@ -7296,6 +7302,7 @@ PRIVACY_HTML = """
 
   <h2>6. 정보주체의 권리</h2>
   <p>이용자는 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 아래 담당부서로 요청할 수 있습니다.</p>
+  <p>의견보내기로 등록한 글은 작성한 브라우저를 닫기 전까지 '내가 보낸 의견' 화면에서 직접 삭제할 수 있으며, 삭제 즉시 영구 삭제됩니다.</p>
 
   <h2>7. 안전성 확보조치</h2>
   <ul>
@@ -7334,22 +7341,32 @@ def board_write():
         org_type = (request.form.get("org_type", "") or "").strip()
         reply_contact = (request.form.get("reply_contact", "") or "").strip()
 
+        saved = False
         if title and content and org_type:
             if os.getenv("RENDER") is not None:
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/board_posts",
-                    headers=SUPABASE_HEADERS,
-                    json={
-                        "writer": writer,
-                        "title": title,
-                        "content": content,
-                        "org_type": org_type,
-                        "reply_contact": reply_contact
-                    },
-                    timeout=5
-                )
+                try:
+                    res = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/board_posts",
+                        headers={**SUPABASE_HEADERS, "Prefer": "return=representation"},
+                        json={
+                            "writer": writer,
+                            "title": title,
+                            "content": content,
+                            "org_type": org_type,
+                            "reply_contact": reply_contact
+                        },
+                        timeout=5
+                    )
+                    rows = res.json() if res.ok else []
+                    if rows and rows[0].get("id") is not None:
+                        # 이 브라우저 세션에서 작성한 글만 본인이 삭제할 수 있도록 id를 세션에 기록
+                        mine = [int(i) for i in session.get("my_board_ids", [])]
+                        session["my_board_ids"] = (mine + [int(rows[0]["id"])])[-20:]
+                        saved = True
+                except Exception as e:
+                    app.logger.exception(e)
 
-        return render_template_string(BOARD_SUCCESS_HTML)
+        return render_template_string(BOARD_SUCCESS_HTML, can_delete=saved)
 
     return render_template_string(BOARD_WRITE_HTML)
 
@@ -7427,6 +7444,125 @@ def board_delete(post_id):
         )
 
     return redirect(url_for("board_admin"))
+
+# =========================
+# 내가 보낸 의견 (작성자 본인 삭제)
+# - 같은 브라우저 세션에서 작성한 글만 목록에 보이고 삭제 가능
+# - 삭제 시 DB에서 즉시 영구 삭제 (회신연락처 포함)
+# =========================
+@app.route("/board/mine")
+def board_mine():
+    ids = [int(i) for i in session.get("my_board_ids", [])]
+    posts = []
+    if ids and os.getenv("RENDER") is not None:
+        try:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/board_posts?select=id,title,content,created_at"
+                f"&id=in.({','.join(map(str, ids))})&is_deleted=eq.false&order=created_at.desc",
+                headers=SUPABASE_HEADERS, timeout=5
+            )
+            posts = res.json() if res.ok else []
+        except Exception as e:
+            app.logger.exception(e)
+            posts = []
+        # 이미 지워진 글(관리자 삭제·1년 자동삭제)은 세션에서도 정리
+        alive = {int(p["id"]) for p in posts}
+        session["my_board_ids"] = [i for i in ids if i in alive]
+    return render_template_string(
+        BOARD_MINE_HTML, posts=posts, msg=request.args.get("msg", "")
+    )
+
+@app.route("/board/mine/delete/<int:post_id>", methods=["POST"])
+def board_mine_delete(post_id):
+    mine = [int(i) for i in session.get("my_board_ids", [])]
+    if post_id not in mine:
+        return redirect(url_for("board_mine", msg="삭제할 수 없는 글입니다."))
+    if os.getenv("RENDER") is not None:
+        try:
+            res = requests.delete(
+                f"{SUPABASE_URL}/rest/v1/board_posts?id=eq.{post_id}",
+                headers=SUPABASE_HEADERS, timeout=5
+            )
+            if not res.ok:
+                return redirect(url_for("board_mine", msg="삭제 중 오류가 발생했습니다."))
+        except Exception as e:
+            app.logger.exception(e)
+            return redirect(url_for("board_mine", msg="삭제 중 오류가 발생했습니다."))
+    session["my_board_ids"] = [i for i in mine if i != post_id]
+    return redirect(url_for("board_mine", msg="의견이 삭제되었습니다."))
+
+BOARD_MINE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>내가 보낸 의견</title>
+<style>
+body{ margin:0; background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; }
+.container{ max-width:640px; margin:0 auto; padding:24px 16px 40px 16px; }
+.top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.home-button{
+  display:inline-flex !important; align-items:center !important; justify-content:center !important;
+  height:34px !important; padding:0 15px !important; border-radius:8px !important;
+  background:#ffffff !important; border:1px solid #e5e7eb !important; color:#6b7280 !important;
+  text-decoration:none !important; font-size:13px !important; font-weight:600 !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.08) !important;
+}
+h2{ margin:0 0 6px 0; font-size:22px; }
+.desc{ margin:0 0 16px 0; font-size:13px; color:#6b7280; line-height:1.6; word-break:keep-all; }
+.msg{ margin-bottom:12px; padding:12px 14px; border-radius:12px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:14px; font-weight:700; }
+.post{ background:#fff; border-radius:16px; padding:16px 18px; margin-bottom:10px; box-shadow:0 10px 26px rgba(15,23,42,0.10); }
+.post-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.post-title{ font-size:16px; font-weight:800; word-break:keep-all; }
+.post-meta{ font-size:12px; color:#6b7280; margin-top:4px; }
+.post-content{ margin-top:10px; font-size:14px; line-height:1.6; color:#374151; white-space:pre-wrap; word-break:break-word;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.del-btn{ flex:none; height:32px; padding:0 12px; border:none; border-radius:999px; background:#fee2e2; color:#b91c1c; font-size:13px; font-weight:800; cursor:pointer; }
+.empty{ background:#fff; border-radius:16px; padding:24px; text-align:center; color:#6b7280; font-size:14px; line-height:1.7; word-break:keep-all; }
+
+/* === 버튼 누름 효과 B (디자인 전용) === */
+button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
+button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <a href="/home" class="home-button">⌂ 홈으로</a>
+    <a href="/board/write" class="home-button">의견보내기</a>
+  </div>
+
+  <h2>내가 보낸 의견</h2>
+  <p class="desc">지금 사용 중인 브라우저에서 보낸 의견만 표시됩니다. 삭제하면 즉시 영구 삭제되며 복구할 수 없습니다.</p>
+
+  {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+
+  {% if posts %}
+    {% for p in posts %}
+    <div class="post">
+      <div class="post-head">
+        <div>
+          <div class="post-title">{{ p["title"] }}</div>
+          <div class="post-meta">{{ p["created_at"] | kst }}</div>
+        </div>
+        <form method="post" action="/board/mine/delete/{{ p['id'] }}" onsubmit="return confirm('이 의견을 삭제할까요? 복구할 수 없습니다.');">
+          <button type="submit" class="del-btn">삭제</button>
+        </form>
+      </div>
+      <div class="post-content">{{ p["content"] }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">
+      삭제할 수 있는 의견이 없습니다.<br>
+      <span style="font-size:12px;">브라우저를 닫았거나 다른 기기에서 보낸 의견은 여기서 삭제할 수 없습니다.</span>
+    </div>
+  {% endif %}
+</div>
+</body>
+</html>
+"""
 
 # =========================
 # 공지사항 관리 (관리자 전용)
