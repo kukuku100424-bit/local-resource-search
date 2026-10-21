@@ -2975,7 +2975,6 @@ PILL_HTML = """
     Array.prototype.forEach.call(tabs, function(t){ t.classList.toggle("on", (t.getAttribute("data-m") === "text") === on); });
     subEl.textContent = on ? "알약의 글자(각인)·색·모양·제형을 입력하면 식약처 낱알식별 정보에서 찾아드립니다." : photoSub;
     showMsg(""); list.innerHTML = "";
-    if(on){ setTimeout(function(){ try{ document.getElementById("pmImpF").focus(); }catch(e){} }, 50); }
   }
   Array.prototype.forEach.call(tabs, function(t){
     t.addEventListener("click", function(){
