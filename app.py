@@ -2340,19 +2340,8 @@ def load_pills():
     return rows
 
 
-# 사진에서 자주 헷갈리는 글자 → 같은 대표 글자로 바꿔 비교 (정확히 같은 글자보다는 낮게 인정)
-_PILL_CONFUSE = str.maketrans({"O": "0", "Q": "0", "I": "1", "L": "1", "B": "8",
-                               "S": "5", "Z": "2", "T": "7", "G": "6"})
-
-
-def _pill_canon(s):
-    return s.translate(_PILL_CONFUSE)
-
-
 def _pill_imprint_score(photo_prints, pill_prints):
-    """사진에서 읽은 각인들과 알약 각인(앞/뒤)의 일치도 0~1
-    - 정확히 같음 1.0 / 헷갈리는 글자만 다름(0↔O, 1↔I·L, 8↔B, 5↔S, 2↔Z, 7↔T, 6↔G) 0.8
-    - 한쪽이 다른 쪽에 포함 0.7 / 그 외 비슷한 정도에 따라 최대 0.6"""
+    """사진에서 읽은 각인들과 알약 각인(앞/뒤)의 일치도 0~1"""
     import difflib
     if not photo_prints or not pill_prints:
         return 0.0
@@ -2363,17 +2352,10 @@ def _pill_imprint_score(photo_prints, pill_prints):
             if p == d:
                 best = 1.0
                 break
-            cp, cd = _pill_canon(p), _pill_canon(d)
-            if cp == cd:
-                best = max(best, 0.8)
-                continue
             if len(p) >= 2 and len(d) >= 2 and (p in d or d in p):
                 best = max(best, 0.7)
                 continue
-            if len(cp) >= 2 and len(cd) >= 2 and (cp in cd or cd in cp):
-                best = max(best, 0.65)
-                continue
-            sm = difflib.SequenceMatcher(None, cp, cd)
+            sm = difflib.SequenceMatcher(None, p, d)
             if sm.real_quick_ratio() >= 0.6 and sm.quick_ratio() >= 0.6:
                 r = sm.ratio()
                 if r >= 0.6:
@@ -2414,16 +2396,16 @@ def search_pills(imprints, color="", shape="", capsule=None, limit=3, form=""):
         cut = max(40, results[0][0] - 20)
         results = [x for x in results if x[0] >= cut]
     # 확신도: 입력한 단서(각인·색·모양·제형)로 받을 수 있는 최고점 대비 비율
-    #   거의 확실(90%↑, 단 1등이 2등보다 3점 이상 앞설 때만) / 유력(70%↑) / 참고
+    #   거의 확실(90%↑, 단 1등이 하나일 때만) / 유력(70%↑) / 참고
     max_score = 70 + (15 if color else 0) + (10 if shape else 0) + (5 if capsule is not None else 0)
     top = results[:limit]
-    lead_ok = len(top) == 1 or (len(top) > 1 and top[0][0] - top[1][0] >= 3)
+    n_high = sum(1 for sc, _ in top if sc / max_score >= 0.9)
     out = []
     for score, row in top:
         item = {k: v for k, v in row.items() if not k.startswith("_")}
         item["score"] = round(score)
         ratio = score / max_score
-        if ratio >= 0.9 and lead_ok and row is top[0][1]:
+        if ratio >= 0.9 and n_high == 1:
             item["conf"], item["conf_label"] = "high", "거의 확실"
         elif ratio >= 0.7:
             item["conf"], item["conf_label"] = "mid", "유력"
@@ -2435,34 +2417,6 @@ def search_pills(imprints, color="", shape="", capsule=None, limit=3, form=""):
 
 
 PILL_MAX = 10          # 한 번에 처리하는 최대 알약 수
-
-# 알약 확인에 쓰는 AI 모델 (Render 환경변수로 바꿀 수 있음, 코드 수정 불필요)
-# - PILL_MODEL     : 기본 gpt-6-luna. 예전 모델로 되돌리려면 gpt-4.1-mini (2027-01-14 OpenAI 종료 예정)
-# - PILL_REASONING : 추론 강도 none/low/medium. 보이는 글자를 읽는 작업이라 기본 none(가장 빠르고 저렴)
-# - PILL_DETAIL    : 사진 세부도 high/original. original은 작은 각인에 유리하지만 비용 증가
-PILL_MODEL = (os.getenv("PILL_MODEL") or "gpt-6-luna").strip()
-PILL_REASONING = (os.getenv("PILL_REASONING") or "none").strip()
-PILL_DETAIL = (os.getenv("PILL_DETAIL") or "high").strip()
-PILL_FALLBACK_MODEL = "gpt-4.1-mini"
-
-
-def _pill_ai(client, content):
-    """알약 AI 호출. gpt-4 계열은 temperature=0, 새 모델(추론형)은 추론 강도 지정.
-    새 모델 호출이 실패하면(모델명·설정 오류 등) 예전 모델로 한 번 더 시도해 서비스가 멈추지 않게 함"""
-    def call(model):
-        kw = {"model": model, "input": [{"role": "user", "content": content}]}
-        if model.startswith("gpt-4"):
-            kw["temperature"] = 0
-        else:
-            kw["reasoning"] = {"effort": PILL_REASONING}
-        return client.responses.create(**kw)
-    try:
-        return call(PILL_MODEL)
-    except Exception as e:
-        if PILL_MODEL == PILL_FALLBACK_MODEL:
-            raise
-        app.logger.error("[PILL_AI] %s 호출 실패, %s로 재시도: %s", PILL_MODEL, PILL_FALLBACK_MODEL, type(e).__name__)
-        return call(PILL_FALLBACK_MODEL)
 PILL_RECOMMEND = 5     # 권장 알약 수 (넘으면 안내)
 
 
@@ -2493,9 +2447,9 @@ def _pill_features_from_images(images):
     )}]
     for _, mime, data in images:
         b64 = base64.b64encode(data).decode("utf-8")
-        content.append({"type": "input_image", "image_url": f"data:{mime};base64,{b64}", "detail": PILL_DETAIL})
+        content.append({"type": "input_image", "image_url": f"data:{mime};base64,{b64}", "detail": "high"})
 
-    res = _pill_ai(client, content)
+    res = client.responses.create(model="gpt-4.1-mini", input=[{"role": "user", "content": content}], temperature=0)
     usage = getattr(res, "usage", None)
     if usage:
         add_token_usage(getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
@@ -2612,8 +2566,6 @@ def _pill_build_groups(front, back):
         front, back = back, []
     groups = []
     for fi, bi in _pill_pair_by_position(front, back):
-        if fi is None:
-            continue   # 뒷면에서만 보인 것(바닥 무늬 오인식 등)은 별도 알약으로 만들지 않음
         sides = ([front[fi]] if fi is not None else []) + ([back[bi]] if bi is not None else [])
         imprints = [s["imprint"] for s in sides if s["imprint"]]
         color = next((s["color"] for s in sides if s["color"]), "")
@@ -2636,7 +2588,7 @@ def _pill_locate_boxes(images):
     for mime, data in images:
         b64 = base64.b64encode(data).decode("utf-8")
         content.append({"type": "input_image", "image_url": f"data:{mime};base64,{b64}", "detail": "low"})
-    res = _pill_ai(client, content)
+    res = client.responses.create(model="gpt-4.1-mini", input=[{"role": "user", "content": content}], temperature=0)
     usage = getattr(res, "usage", None)
     if usage:
         add_token_usage(getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0))
@@ -2723,14 +2675,13 @@ def pill_identify():
     if not front and not back:
         return jsonify({"ok": True, "groups": [], "message": "사진에서 알약을 찾지 못했습니다. 알약이 잘 보이도록 밝은 곳에서 다시 찍어주세요."})
     groups = _pill_build_groups(front, back)
-    count = len(front) or len(back)
+    count = max(len(front), len(back))
     msg = ""
     if count > PILL_RECOMMEND:
         msg = (f"알약이 {count}개로 많아 정확도가 떨어질 수 있습니다. "
                f"{PILL_RECOMMEND}알 이하로 나눠 찍으면 더 정확합니다.")
     if front and back and len(front) != len(back):
-        msg = (msg + " " if msg else "") + (f"앞면에서 {len(front)}개, 뒷면에서 {len(back)}개를 찾아 앞면 기준 {len(front)}개로 정리했습니다. "
-                                            "알약끼리 떨어뜨리고 무늬 없는 바닥에서 찍으면 더 정확합니다.")
+        msg = (msg + " " if msg else "") + (f"앞면에서 {len(front)}개, 뒷면에서 {len(back)}개를 찾아 일부 알약은 한쪽 면만으로 찾았습니다.")
     return jsonify({"ok": True, "groups": groups, "message": msg})
 
 
@@ -2901,7 +2852,7 @@ PILL_HTML = """
 .pill-group-title{ font-size:15px; font-weight:800; color:#111827; }
 .pill-group .pill-feat{ display:block; }
 .pill-card{ display:flex; gap:12px; padding:10px; border:1px solid #e5e7eb; border-radius:12px; }
-.pill-card img{ flex:none; width:112px; height:62px; object-fit:contain; border-radius:6px; background:#f9fafb; }
+.pill-card img{ flex:none; width:96px; height:54px; object-fit:contain; border-radius:6px; background:#f9fafb; }
 .pill-info{ flex:1; min-width:0; }
 .pill-name{ font-size:14px; font-weight:800; line-height:1.35; word-break:keep-all; }
 .pill-meta{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; }
@@ -2930,7 +2881,7 @@ PILL_HTML = """
   .pill-feat-row{ gap:5px; }
   .ps-btn{ padding:0 6px !important; gap:4px; font-size:12.5px !important; }
   .ps-btn .ps-caret{ display:none; }
-  .pill-card img{ width:96px; height:54px; }
+  .pill-card img{ width:80px; height:46px; }
 }
 </style>
 
