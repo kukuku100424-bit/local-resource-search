@@ -2778,8 +2778,8 @@ PILL_HTML = """
 .pill-shot img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .pill-shot small{ font-size:11px; font-weight:500; color:#6b7280; margin-top:3px; padding:0 6px; word-break:keep-all; }
 .pill-shot.drag{ background:#eff6ff; border-color:#2563eb; border-style:solid; }
-.pill-gal{ position:absolute; right:4px; bottom:4px; z-index:2; width:26px !important; height:26px !important; min-width:0 !important; margin:0 !important; padding:0 !important; border:1px solid #c7d7ff !important; border-radius:7px !important; background:rgba(255,255,255,0.95) !important; color:#1d4ed8 !important; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(15,23,42,0.15) !important; cursor:pointer; }
-.pill-gal svg{ width:15px; height:15px; display:block; }
+.pill-gal{ position:absolute; right:5px; bottom:5px; z-index:2; width:30px !important; height:30px !important; min-width:0 !important; margin:0 !important; padding:0 !important; border:1px solid #c7d7ff !important; border-radius:8px !important; background:rgba(255,255,255,0.95) !important; color:#1d4ed8 !important; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(15,23,42,0.15) !important; cursor:pointer; }
+.pill-gal svg{ width:18px; height:18px; display:block; }
 .pill-tip{ display:flex; gap:4px; margin:10px 0 0; font-size:12px; color:#6b7280; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; }
 .pill-tip span:first-child{ flex:none; }  /* ※ 뒤로 줄바꿈된 글이 윗줄 첫 글자에 맞춰짐 */
 .pill-go{ display:block; width:100% !important; height:44px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#2563eb !important; color:#fff !important; font-size:15px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
