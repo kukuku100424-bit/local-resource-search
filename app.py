@@ -2761,15 +2761,15 @@ PILL_HTML = """
 .pill-modal{ display:none; position:fixed; inset:0; z-index:100002; background:rgba(15,23,42,0.6); align-items:center; justify-content:center; padding:12px; font-family:inherit; }
 .pill-modal.show{ display:flex; }
 .pill-box{ width:100%; max-width:520px; max-height:92vh; max-height:92dvh; background:#fff; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25); text-align:left; color:#111827; }
-.pill-head{ display:flex; align-items:flex-start; gap:8px; padding:14px 16px; border-bottom:1px solid #e5e7eb; }
+.pill-head{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; padding:14px 16px; border-bottom:1px solid #e5e7eb; }
 .pill-title{ font-size:16px; font-weight:800; }
-.pill-sub{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; }
-.pill-x{ flex:none; margin-left:auto; width:32px !important; height:32px !important; min-width:0 !important; padding:0 !important; margin-top:0 !important; border:none !important; border-radius:999px !important; background:#f3f4f6 !important; color:#374151 !important; font-size:19px !important; line-height:1 !important; box-shadow:none !important; cursor:pointer; }
+.pill-sub{ flex-basis:100%; margin-top:8px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; }
+.pill-x{ flex:none; margin-left:auto; width:28px !important; height:28px !important; min-width:0 !important; padding:0 !important; margin-top:0 !important; border:none !important; border-radius:999px !important; background:#f3f4f6 !important; color:#374151 !important; font-size:17px !important; line-height:1 !important; box-shadow:none !important; cursor:pointer; }
 .pill-body{ flex:1; overflow:auto; padding:14px 16px; min-height:0; }
 /* 오른쪽 위 '직접 입력 / 사진으로' 전환 버튼 */
-.pill-head-btns{ flex:none; margin-left:auto; display:flex; align-items:center; gap:6px; }
+.pill-head-btns{ flex:none; margin-left:auto; margin-top:-4px; display:flex; align-items:center; gap:5px; }
 .pill-head-btns .pill-x{ margin-left:0; }
-.pill-mode{ width:auto !important; height:32px !important; min-width:0 !important; margin:0 !important; padding:0 12px !important; border:1px solid #c7d7ff !important; border-radius:999px !important; background:#eef4ff !important; color:#1d4ed8 !important; font-size:13px !important; font-weight:700 !important; white-space:nowrap; box-shadow:none !important; cursor:pointer; }
+.pill-mode{ width:auto !important; height:28px !important; min-width:0 !important; margin:0 !important; padding:0 10px !important; border:1px solid #c7d7ff !important; border-radius:999px !important; background:#eef4ff !important; color:#1d4ed8 !important; font-size:12px !important; font-weight:700 !important; white-space:nowrap; box-shadow:none !important; cursor:pointer; }
 .pill-feat.pill-manual{ display:none; margin-top:0; }
 .pill-manual .pill-go{ margin-top:10px !important; }
 .pill-shots{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -2829,12 +2829,12 @@ PILL_HTML = """
     <div class="pill-head">
       <div>
         <div class="pill-title"><svg viewBox="0 0 24 24" style="width:1.15em;height:1.15em;vertical-align:-0.2em;margin-right:2px" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="M7 7h5v10H7a5 5 0 0 1 0-10z" fill="#3b82f6"/><path d="M12 7h5a5 5 0 0 1 0 10h-5z" fill="#fb923c"/><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="rgba(15,23,42,0.18)" stroke-width="1"/><path d="M4.8 10.6a2.4 2.4 0 0 1 2.2-1.6" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".8"/></g></svg> 알약 확인</div>
-        <div class="pill-sub" id="pillSub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
       </div>
       <div class="pill-head-btns">
         <button type="button" class="pill-mode" id="pillModeBtn">직접 입력</button>
         <button type="button" class="pill-x" onclick="closePill()" aria-label="닫기">×</button>
       </div>
+      <div class="pill-sub" id="pillSub">알약의 앞·뒷면을 찍으면 식약처 낱알식별 정보에서 비슷한 약을 찾아드립니다.</div>
     </div>
     <div class="pill-body">
       <!-- 직접 입력: 사진 없이 각인 글자로 바로 검색 -->
