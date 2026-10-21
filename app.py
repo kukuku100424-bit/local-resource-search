@@ -2456,12 +2456,13 @@ def _pill_features_from_images(images):
         "알약 1개는 반드시 1개로만 적어. 한 알약의 글자가 분할선 등으로 나뉘어 있어도 별도 알약으로 나누지 말고, 같은 알약을 두 번 적지 마.\n"
         "알약마다 imprint(알약에 새겨지거나 인쇄된 글자·숫자를 보이는 그대로, 로고나 그림이면 빈 문자열, "
         "분할선으로 나뉜 글자는 이어서), color, shape, form, 그리고 사진 안에서 알약 중심의 위치 x, y"
-        "(사진 너비·높이 대비 비율 0~1, 왼쪽 위가 0)와 알약의 가장 긴 길이 s(사진 너비 대비 비율 0~1)를 적어.\n"
+        "(사진 너비·높이 대비 비율 0~1, 왼쪽 위가 0)와 그 알약 하나만 딱 맞게 감싸는 상자 box [왼쪽, 위, 오른쪽, 아래](같은 비율)를 적어.\n"
+        "알약이 아닌 것(바닥 무늬, 돌·유리 조각, 부스러기, 반사광, 그림자)은 절대 알약으로 적지 마.\n"
         f"color는 다음 중 하나: {', '.join(PILL_COLORS)}\n"
         f"shape는 다음 중 하나: {', '.join(PILL_SHAPES)}\n"
         "form은 '정제', '캡슐', '모름' 중 하나.\n"
         "photos 배열은 사진 순서대로 하나씩, 각 사진의 pills 배열에 알약을 넣어.\n"
-        '형식: {"photos":[{"pills":[{"imprint":"","color":"","shape":"","form":"정제","x":0.5,"y":0.5,"s":0.2}]}]}'
+        '형식: {"photos":[{"pills":[{"imprint":"","color":"","shape":"","form":"정제","x":0.5,"y":0.5,"box":[0.4,0.4,0.6,0.6]}]}]}'
     )}]
     for _, mime, data in images:
         b64 = base64.b64encode(data).decode("utf-8")
@@ -2484,6 +2485,13 @@ def _pill_features_from_images(images):
         except Exception:
             return None
 
+    def _box(v):
+        try:
+            x0, y0, x1, y1 = [min(1.0, max(0.0, float(t))) for t in v]
+            return [x0, y0, x1, y1] if x1 > x0 and y1 > y0 else None
+        except Exception:
+            return None
+
     out = {}
     photos = data.get("photos") or []
     for i, lb in enumerate(labels):
@@ -2500,8 +2508,12 @@ def _pill_features_from_images(images):
                 "capsule": True if form == "캡슐" else (False if form == "정제" else None),
                 "x": _num(p.get("x")),
                 "y": _num(p.get("y")),
-                "s": _num(p.get("s")),
+                "box": _box(p.get("box")),
             })
+            # 상자가 있으면 중심점도 상자 기준으로 (앞·뒷면 짝 맞추기에 사용)
+            if clean[-1]["box"]:
+                b = clean[-1]["box"]
+                clean[-1]["x"], clean[-1]["y"] = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
         out[lb] = clean
     return out
 
@@ -2588,12 +2600,14 @@ def _pill_build_groups(front, back):
         f_label = "back"   # 뒷면 사진만 있는 경우: 위치는 뒷면 사진 기준
     groups = []
     for fi, bi in _pill_pair_by_position(front, back):
+        if fi is None:
+            continue   # 뒷면에서만 보인 것(바닥 무늬 오인식 등)은 별도 알약으로 만들지 않음
         sides = ([front[fi]] if fi is not None else []) + ([back[bi]] if bi is not None else [])
         pos = {}
         for lb, side in ((f_label, front[fi] if fi is not None else None),
                          (b_label, back[bi] if bi is not None else None)):
             if side and side.get("x") is not None and side.get("y") is not None:
-                pos[lb] = [side["x"], side["y"], side.get("s")]
+                pos[lb] = [side["x"], side["y"], side.get("box")]
         imprints = [s["imprint"] for s in sides if s["imprint"]]
         color = next((s["color"] for s in sides if s["color"]), "")
         shape = next((s["shape"] for s in sides if s["shape"]), "")
@@ -2702,13 +2716,14 @@ def pill_identify():
     if not front and not back:
         return jsonify({"ok": True, "groups": [], "message": "사진에서 알약을 찾지 못했습니다. 알약이 잘 보이도록 밝은 곳에서 다시 찍어주세요."})
     groups = _pill_build_groups(front, back)
-    count = max(len(front), len(back))
+    count = len(front) or len(back)
     msg = ""
     if count > PILL_RECOMMEND:
         msg = (f"알약이 {count}개로 많아 정확도가 떨어질 수 있습니다. "
                f"{PILL_RECOMMEND}알 이하로 나눠 찍으면 더 정확합니다.")
     if front and back and len(front) != len(back):
-        msg = (msg + " " if msg else "") + (f"앞면에서 {len(front)}개, 뒷면에서 {len(back)}개를 찾아 일부 알약은 한쪽 면만으로 찾았습니다.")
+        msg = (msg + " " if msg else "") + (f"앞면에서 {len(front)}개, 뒷면에서 {len(back)}개를 찾아 앞면 기준 {len(front)}개로 정리했습니다. "
+                                            "알약끼리 떨어뜨리고 무늬 없는 바닥에서 찍으면 더 정확합니다.")
     return jsonify({"ok": True, "groups": groups, "message": msg})
 
 
@@ -3004,10 +3019,16 @@ PILL_HTML = """
   /* 사진에서 알약 한 개 주변만 정사각형으로 잘라 화면용 그림 만들기 (p = [x, y, s] 비율) */
   function cropPill(bmp, p){
     var W = bmp.width, H = bmp.height, short = Math.min(W, H);
-    var side = p[2] ? p[2] * W * 1.6 : short * 0.35;
+    var cx = p[0] * W, cy = p[1] * H, side = short * 0.35;
+    var b = p[2];
+    if(b && b.length === 4){
+      /* 알약을 감싸는 상자 + 여유 35% (AI가 알려주는 위치가 대략적이라 넉넉하게) */
+      cx = (b[0] + b[2]) / 2 * W; cy = (b[1] + b[3]) / 2 * H;
+      side = Math.max((b[2] - b[0]) * W, (b[3] - b[1]) * H) * 1.35;
+    }
     side = Math.min(short, Math.max(side, short * 0.12));
-    var x = Math.min(Math.max(0, p[0] * W - side / 2), W - side);
-    var y = Math.min(Math.max(0, p[1] * H - side / 2), H - side);
+    var x = Math.min(Math.max(0, cx - side / 2), W - side);
+    var y = Math.min(Math.max(0, cy - side / 2), H - side);
     var c = document.createElement("canvas");
     c.width = 184; c.height = 184;
     c.getContext("2d").drawImage(bmp, x, y, side, side, 0, 0, 184, 184);
