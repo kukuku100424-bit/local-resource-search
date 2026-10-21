@@ -2456,13 +2456,12 @@ def _pill_features_from_images(images):
         "알약 1개는 반드시 1개로만 적어. 한 알약의 글자가 분할선 등으로 나뉘어 있어도 별도 알약으로 나누지 말고, 같은 알약을 두 번 적지 마.\n"
         "알약마다 imprint(알약에 새겨지거나 인쇄된 글자·숫자를 보이는 그대로, 로고나 그림이면 빈 문자열, "
         "분할선으로 나뉜 글자는 이어서), color, shape, form, 그리고 사진 안에서 알약 중심의 위치 x, y"
-        "(사진 너비·높이 대비 비율 0~1, 왼쪽 위가 0)와 그 알약 하나만 딱 맞게 감싸는 상자 box [왼쪽, 위, 오른쪽, 아래](같은 비율)를 적어.\n"
-        "알약이 아닌 것(바닥 무늬, 돌·유리 조각, 부스러기, 반사광, 그림자)은 절대 알약으로 적지 마.\n"
+        "(사진 너비·높이 대비 비율 0~1, 왼쪽 위가 0)를 적어.\n"
         f"color는 다음 중 하나: {', '.join(PILL_COLORS)}\n"
         f"shape는 다음 중 하나: {', '.join(PILL_SHAPES)}\n"
         "form은 '정제', '캡슐', '모름' 중 하나.\n"
         "photos 배열은 사진 순서대로 하나씩, 각 사진의 pills 배열에 알약을 넣어.\n"
-        '형식: {"photos":[{"pills":[{"imprint":"","color":"","shape":"","form":"정제","x":0.5,"y":0.5,"box":[0.4,0.4,0.6,0.6]}]}]}'
+        '형식: {"photos":[{"pills":[{"imprint":"","color":"","shape":"","form":"정제","x":0.5,"y":0.5}]}]}'
     )}]
     for _, mime, data in images:
         b64 = base64.b64encode(data).decode("utf-8")
@@ -2485,13 +2484,6 @@ def _pill_features_from_images(images):
         except Exception:
             return None
 
-    def _box(v):
-        try:
-            x0, y0, x1, y1 = [min(1.0, max(0.0, float(t))) for t in v]
-            return [x0, y0, x1, y1] if x1 > x0 and y1 > y0 else None
-        except Exception:
-            return None
-
     out = {}
     photos = data.get("photos") or []
     for i, lb in enumerate(labels):
@@ -2508,12 +2500,7 @@ def _pill_features_from_images(images):
                 "capsule": True if form == "캡슐" else (False if form == "정제" else None),
                 "x": _num(p.get("x")),
                 "y": _num(p.get("y")),
-                "box": _box(p.get("box")),
             })
-            # 상자가 있으면 중심점도 상자 기준으로 (앞·뒷면 짝 맞추기에 사용)
-            if clean[-1]["box"]:
-                b = clean[-1]["box"]
-                clean[-1]["x"], clean[-1]["y"] = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
         out[lb] = clean
     return out
 
