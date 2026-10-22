@@ -2937,7 +2937,7 @@ PILL_HTML = """
 .pill-care-go{ display:block; width:100% !important; height:42px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#d97706 !important; color:#fff !important; font-size:14px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
 .pill-care-meds{ display:block; width:100% !important; height:42px !important; margin:12px 0 0 !important; padding:0 !important; border:1.5px solid #d97706 !important; border-radius:10px !important; background:#fff !important; color:#b45309 !important; font-size:14px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
 .pill-care-meds:disabled{ border-color:#fcd34d !important; color:#d6b25a !important; cursor:default; }
-.pill-care-meds + .pill-care-go{ margin-top:8px !important; }
+.pill-care-go + .pill-care-meds{ margin-top:8px !important; }
 .pill-meds-flash{ background:#fef3c7 !important; border-color:#d97706 !important; box-shadow:0 0 0 3px rgba(217,119,6,0.25) !important; transition:background .3s, box-shadow .3s; }
 .pill-care-go:disabled{ background:#fcd34d !important; cursor:default; }
 .pill-care-note{ margin-top:8px; font-size:11px; color:#92400e; line-height:1.5; word-break:keep-all; }
@@ -3438,6 +3438,8 @@ PILL_HTML = """
     "넘어짐 시 출혈 주의": "넘어지면 출혈 위험이 커 낙상 예방이 필요함",
     "인지 지원": "치매로 인지 지원이 필요함"
   };
+  /* 약 이름에서 괄호 속 성분명 빼기: 세틸란캡슐200mg(아세틸시스테인) → 세틸란캡슐200mg */
+  function shortName(n){ var t = String(n || "").replace(/\\s*\\([^)]*\\)/g, "").trim(); return t || String(n || ""); }
   function uniqList(a){ var o = []; a.forEach(function(x){ if(x && o.indexOf(x) === -1) o.push(x); }); return o; }
   function careOf(st){
     var c = st.cands;
@@ -3499,36 +3501,27 @@ PILL_HTML = """
       h += '<div class="pill-care-sub">⚠️ 검토해 볼 돌봄</div><ul class="pill-care-sig">' +
         sigs.map(function(sg){ return '<li>' + esc(sg) + ' (' + esc(sigMap[sg].join(", ")) + ')</li>'; }).join("") + '</ul>';
     }
-    /* 지자체 조사서식(/survey)에서 열었을 때만: 고른 약 이름을 '복용약' 칸에 넣는 버튼 */
-    var medsInput = surveyMode ? document.querySelector('input[name="s_meds"]') : null;
-    var unames = uniqList(names);
-    if(medsInput){
-      h += '<button type="button" class="pill-care-meds"' + (unames.length ? '' : ' disabled') + '>조사서식 복용약에 넣기' + (unames.length ? ' (' + unames.length + '개)' : '') + '</button>';
+    /* 조사서식(/survey)에서 연 경우: 사례검색을 새 창으로 열어 작성 중인 서식이 지워지지 않게 함 */
+    var onSurvey = !!(surveyMode && document.querySelector('input[name="s_meds"]'));
+    /* 복용약 검색(홈)에서 연 경우만: 고른 약 이름(괄호 속 성분명 제외)을 자체조사 서식 '복용약' 칸으로 넘기는 버튼 */
+    var unames = uniqList(names.map(shortName));
+    h += '<button type="button" class="pill-care-go"' + (ukinds.length ? '' : ' disabled') + '>이 내용으로 돌봄 서비스 찾기</button>';
+    if(!surveyMode){
+      h += '<button type="button" class="pill-care-meds"' + (unames.length ? '' : ' disabled') + '>지자체 자체조사 서식 \\'복용약물\\'에 넣기</button>';
     }
-    h += '<button type="button" class="pill-care-go"' + (ukinds.length ? '' : ' disabled') + '>이 내용으로 돌봄 서비스 찾기</button>' +
-      '<div class="pill-care-note">약 종류로 본 참고 사항이며 의학적 판단이 아닙니다. 사례검색에는 약 이름 없이 종류만 입력됩니다.' +
-      (medsInput ? ' 사례검색은 작성 중인 조사서식이 지워지지 않도록 새 창으로 열립니다.' : '') + '</div>';
+    h += '<div class="pill-care-note">약 종류로 본 참고 사항이며 의학적 판단이 아닙니다. 사례검색에는 약 이름 없이 종류만 입력됩니다.' +
+      (onSurvey ? ' 사례검색은 작성 중인 조사서식이 지워지지 않도록 새 창으로 열립니다.' : '') + '</div>';
     box.innerHTML = h;
     var medsBtn = box.querySelector(".pill-care-meds");
     if(medsBtn) medsBtn.addEventListener("click", function(){
-      /* 이미 적힌 약은 그대로 두고, 없는 약만 뒤에 덧붙임 */
-      var cur = medsInput.value.split(/\\s*,\\s*/).filter(function(x){ return x; });
-      unames.forEach(function(n){ if(cur.indexOf(n) === -1) cur.push(n); });
-      medsInput.value = cur.join(", ");
-      medsInput.dispatchEvent(new Event("input", { bubbles:true }));
-      medsInput.dispatchEvent(new Event("change", { bubbles:true }));
-      window.closePill();
-      setTimeout(function(){
-        try{ medsInput.scrollIntoView({ block:"center", behavior:"smooth" }); }catch(e){}
-        medsInput.classList.add("pill-meds-flash");
-        setTimeout(function(){ medsInput.classList.remove("pill-meds-flash"); }, 2200);
-      }, 150);
+      /* 서버를 거치지 않고 주소 # 뒤에 담아 조사서식으로 이동 (# 뒤는 서버로 전송되지 않음) */
+      location.href = "/survey#pillmeds=" + encodeURIComponent(unames.join("\\n"));
     });
     var go = box.querySelector(".pill-care-go");
     if(go) go.addEventListener("click", function(){
       var q = ukinds.join("·") + " 복용 중." + sigs.map(function(sg){ return " " + (SIGNAL_TEXT[sg] || sg) + "."; }).join("");
       var url = "/desc?query=" + encodeURIComponent(q);
-      if(medsInput){ window.open(url, "_blank", "noopener"); } else { location.href = url; }
+      if(onSurvey){ window.open(url, "_blank", "noopener"); } else { location.href = url; }
     });
   }
 
@@ -3670,6 +3663,29 @@ PILL_HTML = """
     modal.classList.remove("show");
     document.body.style.overflow = "";
   }
+  /* 조사서식(/survey) 진입 시: 복용약 검색에서 넘긴 약 이름을 '복용약' 칸에 덧붙임 */
+  (function receiveMeds(){
+    var m = /[#&]pillmeds=([^&]*)/.exec(location.hash || "");
+    if(!m) return;
+    try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){}
+    var input = document.querySelector('input[name="s_meds"]');
+    if(!input) return;
+    /* '복용약' 칸은 자체조사 탭에 있으므로 그 탭으로 전환 */
+    if(typeof window.switchTab === "function"){ try{ window.switchTab("self"); }catch(e){} }
+    var add = [];
+    try{ add = decodeURIComponent(m[1]).split("\\n"); }catch(e){ return; }
+    var cur = input.value.split(/\\s*,\\s*/).filter(function(x){ return x; });
+    add.forEach(function(n){ n = n.trim(); if(n && cur.indexOf(n) === -1) cur.push(n); });
+    input.value = cur.join(", ");
+    input.dispatchEvent(new Event("input", { bubbles:true }));
+    input.dispatchEvent(new Event("change", { bubbles:true }));
+    setTimeout(function(){
+      try{ input.scrollIntoView({ block:"center", behavior:"smooth" }); }catch(e){}
+      input.classList.add("pill-meds-flash");
+      setTimeout(function(){ input.classList.remove("pill-meds-flash"); }, 2500);
+    }, 400);
+  })();
+
   window.closePill = function(){
     hidePill();
     /* X·바깥 클릭으로 닫으면 추가한 기록도 정리 */
