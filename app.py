@@ -3502,7 +3502,7 @@ PILL_HTML = """
         sigs.map(function(sg){ return '<li>' + esc(sg) + ' (' + esc(sigMap[sg].join(", ")) + ')</li>'; }).join("") + '</ul>';
     }
     /* 조사서식(/survey)에서 연 경우: 사례검색을 새 창으로 열어 작성 중인 서식이 지워지지 않게 함 */
-    var onSurvey = !!(surveyMode && document.querySelector('input[name="s_meds"]'));
+    var onSurvey = !!(surveyMode && document.querySelector('[name="s_meds"]'));
     /* 복용약 검색(홈)에서 연 경우만: 고른 약 이름(괄호 속 성분명 제외)을 자체조사 서식 '복용약' 칸으로 넘기는 버튼 */
     var unames = uniqList(names.map(shortName));
     h += '<button type="button" class="pill-care-go"' + (ukinds.length ? '' : ' disabled') + '>이 내용으로 돌봄 서비스 찾기</button>';
@@ -3668,7 +3668,7 @@ PILL_HTML = """
     var m = /[#&]pillmeds=([^&]*)/.exec(location.hash || "");
     if(!m) return;
     try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){}
-    var input = document.querySelector('input[name="s_meds"]');
+    var input = document.querySelector('[name="s_meds"]');
     if(!input) return;
     /* '복용약' 칸은 자체조사 탭에 있으므로 그 탭으로 전환 */
     if(typeof window.switchTab === "function"){ try{ window.switchTab("self"); }catch(e){} }
@@ -15871,6 +15871,8 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
 .radio-group,.check-group{ display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
 .radio-group label,.check-group label{ display:inline-flex; align-items:center; gap:3px; cursor:pointer; white-space:nowrap; font-size:12.5px; }
 .radio-group input,.check-group input{ width:auto; border:none; border-bottom:none; flex-shrink:0; }
+/* 주관식 칸 크게 보기: 내용이 칸보다 길 때 누르면 넓은 입력창이 위에 겹쳐 열림 */
+.fx-pop{ position:absolute; z-index:9000; box-sizing:border-box; margin:0; padding:8px 10px; border:1.5px solid #2563eb; border-radius:8px; background:#fff; color:#111827; font-family:inherit; font-size:14px; line-height:1.5; box-shadow:0 8px 24px rgba(15,23,42,0.18); resize:none; overflow:hidden; outline:none; word-break:keep-all; overflow-wrap:anywhere; }
 .etc-input{ display:inline-block; width:80px; border:none !important; border-bottom:1px solid #94a3b8 !important; padding:0 4px !important; font-size:12.5px; font-family:inherit; background:transparent; outline:none; vertical-align:middle; }
 .adl-table{ width:100%; border-collapse:collapse; margin-bottom:4px; }
 .adl-table th,.adl-table td{ border:1px solid #d1d5db; padding:6px 8px; text-align:center; font-size:12px; vertical-align:middle; }
@@ -15965,6 +15967,9 @@ body{ background:#e8ecf4; font-family:'Pretendard',sans-serif; color:#111827; fo
   flex:0 0 auto !important;
 }
   .etc-input{ width:56px !important; font-size:11px; }
+  /* 병명·복용약은 휴대폰에서 이름 아래 줄로 내려 칸 전체 폭으로 */
+  .etc-input.wide-input{ display:block; width:100% !important; box-sizing:border-box; margin:2px 0 6px; font-size:12.5px; }
+  .etc-input.wide-input + .th-internet-mo{ display:none !important; }
   .adl-table thead tr th:nth-child(2),.adl-table thead tr th:nth-child(3),.adl-table thead tr th:nth-child(4),.adl-table thead tr th:nth-child(6),.adl-table thead tr th:nth-child(7),.adl-table thead tr th:nth-child(8){ width:32px; word-break:break-all; }
   .adl-table tbody tr td:nth-child(5){ text-align:left; }
   .th-internet-pc{ display:none !important; }
@@ -16468,7 +16473,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
         </div></td></tr>
         <tr><td>3) 다른 사람이 병원에서 약을 처방받아준 적이 있습니까?</td><td><div class="radio-group"><label><input type="radio" name="s_prx" value="예"> &#9312; 예</label><label><input type="radio" name="s_prx" value="아니오"> &#9313; 아니오</label></div></td></tr>
         <tr><td>4) 기타 통증 및 불편 사항</td><td><div class="radio-group"><label><input type="radio" name="s_pain" value="없음"> &#9312; 없음</label><label><input type="radio" name="s_pain" value="다소있음"> &#9313; 다소 있음</label><label><input type="radio" name="s_pain" value="매우심함"> &#9314; 매우 심함</label></div></td></tr>
-        <tr><td>5) 병명 및 복용 중인 약 <span style="font-weight:400;font-size:11px;color:#6b7280;">(지자체 조사인 경우 생략 가능)</span></td><td>병명: <input type="text" name="s_disease" class="etc-input" style="width:180px"><span class="th-internet-mo"><br></span><span class="th-internet-pc">&nbsp;</span>복용약: <input type="text" name="s_meds" class="etc-input" style="width:180px"></td></tr>
+        <tr><td>5) 병명 및 복용 중인 약 <span style="font-weight:400;font-size:11px;color:#6b7280;">(지자체 조사인 경우 생략 가능)</span></td><td>병명: <input type="text" name="s_disease" class="etc-input wide-input" style="width:180px"><span class="th-internet-mo"><br></span><span class="th-internet-pc">&nbsp;</span>복용약: <input type="text" name="s_meds" class="etc-input wide-input" style="width:180px"></td></tr>
       </table>
 
       <div class="section-header">&#9632; 이동지원</div>
@@ -17298,6 +17303,56 @@ function showEmailStatus(msg, success) {
 
 /* 페이지 로드 시 상태 복원 */
 restoreSurveyState();
+/* 주관식 칸 크게 보기
+   - 사전·자체·연계조사의 한 줄 입력칸을 눌렀을 때, 적힌 내용이 칸보다 길면 넓은 여러 줄 입력창을 그 위에 띄움
+   - 여기서 고친 내용은 원래 칸에 바로 반영(저장·연동 로직 그대로 동작), 다른 곳을 누르면 닫히고 원래 크기로 돌아감 */
+(function(){
+  var pop = null, src = null;
+  function isTarget(el){
+    return el && el.tagName === "INPUT" && el.type === "text" && !el.disabled && !el.readOnly && el.closest && el.closest(".tab-panel");
+  }
+  function grow(){ pop.style.height = "auto"; pop.style.height = pop.scrollHeight + "px"; }
+  function close(){
+    if(!pop) return;
+    var p = pop, s = src;
+    pop = null; src = null;
+    p.remove();
+    s.dispatchEvent(new Event("change", { bubbles:true }));
+  }
+  function open(el){
+    var r = el.getBoundingClientRect();
+    var vw = document.documentElement.clientWidth;
+    var w = Math.min(vw - 24, Math.max(r.width, 300));
+    var left = Math.max(12, Math.min(r.left, vw - 12 - w));
+    pop = document.createElement("textarea");
+    pop.className = "fx-pop";
+    pop.rows = 1;
+    pop.value = el.value;
+    pop.style.width = w + "px";
+    pop.style.left = (left + window.pageXOffset) + "px";
+    pop.style.top = (r.top + window.pageYOffset - 6) + "px";
+    src = el;
+    document.body.appendChild(pop);
+    grow();
+    pop.addEventListener("input", function(){
+      if(!pop) return;
+      if(/[\\r\\n]/.test(pop.value)) pop.value = pop.value.replace(/[\\r\\n]+/g, " ");   /* 한 줄 칸이므로 줄바꿈은 공백으로 */
+      src.value = pop.value;
+      src.dispatchEvent(new Event("input", { bubbles:true }));
+      grow();
+    });
+    pop.addEventListener("keydown", function(e){ if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); pop.blur(); } });
+    pop.addEventListener("blur", close);
+    pop.focus();
+    try{ pop.setSelectionRange(pop.value.length, pop.value.length); }catch(e){}
+  }
+  document.addEventListener("focusin", function(e){
+    var el = e.target;
+    if(!isTarget(el) || pop) return;
+    if(el.scrollWidth <= el.clientWidth + 2) return;   /* 내용이 칸 안에 다 보이면 그대로 */
+    open(el);
+  });
+})();
 toggleHosp2sub();
 
 /* ── 은행 앱 스타일 가이드 (한 화면에 전체 표시) ── */
