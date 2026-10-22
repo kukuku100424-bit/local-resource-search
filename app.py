@@ -2907,7 +2907,13 @@ PILL_HTML = """
 .pill-group-title{ font-size:15px; font-weight:800; color:#111827; }
 .pill-group .pill-feat{ display:block; }
 .pill-card{ display:flex; gap:12px; padding:10px; border:1px solid #e5e7eb; border-radius:12px; }
-.pill-card img{ flex:none; width:112px; height:62px; object-fit:contain; border-radius:6px; background:#f9fafb; }
+.pill-card img{ flex:none; width:112px; height:62px; object-fit:contain; border-radius:6px; background:#f9fafb; cursor:zoom-in; }
+/* 식약처 사진 크게 보기 */
+.pill-zoom{ display:none; position:fixed; inset:0; z-index:100010; background:rgba(15,23,42,0.88); align-items:center; justify-content:center; flex-direction:column; padding:16px; box-sizing:border-box; cursor:zoom-out; }
+.pill-zoom.show{ display:flex; }
+.pill-zoom img{ max-width:100%; max-height:calc(100% - 60px); object-fit:contain; border-radius:10px; background:#fff; }
+.pill-zoom-cap{ margin-top:10px; max-width:100%; color:#fff; font-size:14px; font-weight:700; text-align:center; word-break:keep-all; overflow-wrap:anywhere; }
+.pill-zoom-x{ position:absolute; top:max(12px, env(safe-area-inset-top)); right:12px; width:40px !important; height:40px !important; min-width:0 !important; margin:0 !important; padding:0 !important; border:none !important; border-radius:999px !important; background:rgba(255,255,255,0.18) !important; color:#fff !important; font-size:22px !important; line-height:1 !important; box-shadow:none !important; cursor:pointer; }
 .pill-info{ flex:1; min-width:0; }
 .pill-name{ font-size:14px; font-weight:800; line-height:1.35; word-break:keep-all; overflow-wrap:anywhere; }
 .pill-meta{ margin-top:3px; font-size:12px; color:#6b7280; line-height:1.45; word-break:keep-all; overflow-wrap:anywhere; }
@@ -2953,6 +2959,11 @@ PILL_HTML = """
 }
 </style>
 
+<div id="pillZoom" class="pill-zoom" role="dialog" aria-label="알약 사진 크게 보기">
+  <button type="button" class="pill-zoom-x" aria-label="닫기">×</button>
+  <img alt="">
+  <div class="pill-zoom-cap"></div>
+</div>
 <div id="pillModal" class="pill-modal">
   <div class="pill-box">
     <div class="pill-head">
@@ -3362,6 +3373,23 @@ PILL_HTML = """
   function esc(s){ var d=document.createElement("div"); d.textContent = (s==null?"":s); return d.innerHTML; }
 
   /* 후보 카드 목록 */
+  /* 후보 사진을 누르면 화면 가득 크게 보기. 아무 곳이나 누르거나 뒤로가기로 닫힘 */
+  var zoom = document.getElementById("pillZoom"), zoomPushed = false, zoomBackSkip = false;
+  function openZoom(src, cap){
+    zoom.querySelector("img").src = src;
+    zoom.querySelector(".pill-zoom-cap").textContent = cap || "";
+    zoom.classList.add("show");
+    try{ history.pushState({ pillZoom:1 }, ""); zoomPushed = true; }catch(e){ zoomPushed = false; }
+  }
+  function hideZoom(){ zoom.classList.remove("show"); zoom.querySelector("img").removeAttribute("src"); }
+  function closeZoom(){
+    if(!zoom.classList.contains("show")) return;
+    hideZoom();
+    if(zoomPushed){ zoomPushed = false; zoomBackSkip = true; try{ history.back(); }catch(e){ zoomBackSkip = false; } }
+  }
+  zoom.addEventListener("click", function(e){ e.stopPropagation(); closeZoom(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && zoom.classList.contains("show")){ e.stopPropagation(); closeZoom(); } }, true);
+
   function renderCards(box, cands){
     box.innerHTML = "";
     (cands || []).forEach(function(c){
@@ -3369,7 +3397,7 @@ PILL_HTML = """
       card.className = "pill-card";
       var prints = [c.print_front, c.print_back].filter(function(x){ return x; }).join(" / ");
       card.innerHTML =
-        (c.image ? '<img src="' + esc(c.image) + '" alt="" loading="lazy">' : '') +
+        (c.image ? '<img src="' + esc(c.image) + '" alt="' + esc(c.name) + ' 사진 (눌러서 크게 보기)" loading="lazy">' : '') +
         '<div class="pill-info">' +
           '<div class="pill-name">' + (c.conf ? '<span class="pill-conf ' + esc(c.conf) + '">' + esc(c.conf_label) + '</span>' : '') + (c.dementia ? '<span class="pill-badge">치매약</span>' : '') + esc(c.name).replace(/\\(/g, '<wbr>(') + '</div>' +
           '<div class="pill-meta">' + (c.care && c.care.kind && !c.dementia ? '<span class="pill-kind">' + esc(c.care.kind) + '</span>' : '') + esc(c.company) + ' · ' + esc(c.etc_otc) + (c.cls ? ' · ' + esc(c.cls) : '') + '</div>' +
@@ -3378,6 +3406,8 @@ PILL_HTML = """
             '<a class="pill-link" href="' + esc(c.detail_url) + '" target="_blank" rel="noopener noreferrer">상세정보(효능·용법) ↗</a>' +
           '</div>' +
         '</div>';
+      var cimg = card.querySelector("img");
+      if(cimg) cimg.addEventListener("click", function(e){ e.stopPropagation(); openZoom(c.image, c.name); });
       if(surveyMode && c.dementia){
         var b = document.createElement("button");
         b.type = "button"; b.className = "pill-yes"; b.textContent = "치매약 복용 '예' 선택";
@@ -3619,6 +3649,9 @@ PILL_HTML = """
   };
   /* 뒤로가기 → 팝업 닫기 (메인화면 유지) */
   window.addEventListener("popstate", function(){
+    /* 사진 크게 보기가 열려 있으면 그것만 닫고 알약 팝업은 유지 */
+    if(zoomBackSkip){ zoomBackSkip = false; return; }   /* 사진을 눌러 닫으며 생긴 뒤로가기는 무시 */
+    if(zoomPushed){ zoomPushed = false; hideZoom(); return; }
     if(historyPushed){ historyPushed = false; hidePill(); }
   });
   modal.addEventListener("click", function(e){ if(e.target === modal) window.closePill(); });
