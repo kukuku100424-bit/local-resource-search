@@ -2935,6 +2935,10 @@ PILL_HTML = """
 .pill-care-sub{ margin-top:12px; font-size:13px; font-weight:800; color:#92400e; }
 .pill-care-sig{ margin:4px 0 0; padding-left:18px; font-size:13px; color:#374151; line-height:1.6; }
 .pill-care-go{ display:block; width:100% !important; height:42px !important; margin:12px 0 0 !important; padding:0 !important; border:none !important; border-radius:10px !important; background:#d97706 !important; color:#fff !important; font-size:14px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
+.pill-care-meds{ display:block; width:100% !important; height:42px !important; margin:12px 0 0 !important; padding:0 !important; border:1.5px solid #d97706 !important; border-radius:10px !important; background:#fff !important; color:#b45309 !important; font-size:14px !important; font-weight:800 !important; box-shadow:none !important; cursor:pointer; }
+.pill-care-meds:disabled{ border-color:#fcd34d !important; color:#d6b25a !important; cursor:default; }
+.pill-care-meds + .pill-care-go{ margin-top:8px !important; }
+.pill-meds-flash{ background:#fef3c7 !important; border-color:#d97706 !important; box-shadow:0 0 0 3px rgba(217,119,6,0.25) !important; transition:background .3s, box-shadow .3s; }
 .pill-care-go:disabled{ background:#fcd34d !important; cursor:default; }
 .pill-care-note{ margin-top:8px; font-size:11px; color:#92400e; line-height:1.5; word-break:keep-all; }
 .pill-yes{ width:auto !important; height:26px !important; margin:0 !important; padding:0 10px !important; border:none !important; border-radius:999px !important; background:#7c3aed !important; color:#fff !important; font-size:12px !important; font-weight:700 !important; box-shadow:none !important; cursor:pointer; }
@@ -3473,12 +3477,13 @@ PILL_HTML = """
   }
   function renderCare(box){
     if(!box) return;
-    var kinds = [], sigMap = {}, pending = 0;
+    var kinds = [], names = [], sigMap = {}, pending = 0;
     careState.forEach(function(st){
       var r = careOf(st);
       if(r.status === "pick"){ pending++; return; }
       if(r.status === "none") return;
       kinds.push(r.care.kind);
+      if(st.sel !== null && st.cands[st.sel]) names.push(st.cands[st.sel].name);
       (r.care.signals || []).forEach(function(sg){
         sigMap[sg] = sigMap[sg] || [];
         if(sigMap[sg].indexOf(r.care.kind) === -1) sigMap[sg].push(r.care.kind);
@@ -3494,13 +3499,36 @@ PILL_HTML = """
       h += '<div class="pill-care-sub">⚠️ 검토해 볼 돌봄</div><ul class="pill-care-sig">' +
         sigs.map(function(sg){ return '<li>' + esc(sg) + ' (' + esc(sigMap[sg].join(", ")) + ')</li>'; }).join("") + '</ul>';
     }
+    /* 지자체 조사서식(/survey)에서 열었을 때만: 고른 약 이름을 '복용약' 칸에 넣는 버튼 */
+    var medsInput = surveyMode ? document.querySelector('input[name="s_meds"]') : null;
+    var unames = uniqList(names);
+    if(medsInput){
+      h += '<button type="button" class="pill-care-meds"' + (unames.length ? '' : ' disabled') + '>조사서식 복용약에 넣기' + (unames.length ? ' (' + unames.length + '개)' : '') + '</button>';
+    }
     h += '<button type="button" class="pill-care-go"' + (ukinds.length ? '' : ' disabled') + '>이 내용으로 돌봄 서비스 찾기</button>' +
-      '<div class="pill-care-note">약 종류로 본 참고 사항이며 의학적 판단이 아닙니다. 약 이름은 넘기지 않고 종류만 사례검색에 입력됩니다.</div>';
+      '<div class="pill-care-note">약 종류로 본 참고 사항이며 의학적 판단이 아닙니다. 사례검색에는 약 이름 없이 종류만 입력됩니다.' +
+      (medsInput ? ' 사례검색은 작성 중인 조사서식이 지워지지 않도록 새 창으로 열립니다.' : '') + '</div>';
     box.innerHTML = h;
+    var medsBtn = box.querySelector(".pill-care-meds");
+    if(medsBtn) medsBtn.addEventListener("click", function(){
+      /* 이미 적힌 약은 그대로 두고, 없는 약만 뒤에 덧붙임 */
+      var cur = medsInput.value.split(/\\s*,\\s*/).filter(function(x){ return x; });
+      unames.forEach(function(n){ if(cur.indexOf(n) === -1) cur.push(n); });
+      medsInput.value = cur.join(", ");
+      medsInput.dispatchEvent(new Event("input", { bubbles:true }));
+      medsInput.dispatchEvent(new Event("change", { bubbles:true }));
+      window.closePill();
+      setTimeout(function(){
+        try{ medsInput.scrollIntoView({ block:"center", behavior:"smooth" }); }catch(e){}
+        medsInput.classList.add("pill-meds-flash");
+        setTimeout(function(){ medsInput.classList.remove("pill-meds-flash"); }, 2200);
+      }, 150);
+    });
     var go = box.querySelector(".pill-care-go");
     if(go) go.addEventListener("click", function(){
       var q = ukinds.join("·") + " 복용 중." + sigs.map(function(sg){ return " " + (SIGNAL_TEXT[sg] || sg) + "."; }).join("");
-      location.href = "/desc?query=" + encodeURIComponent(q);
+      var url = "/desc?query=" + encodeURIComponent(q);
+      if(medsInput){ window.open(url, "_blank", "noopener"); } else { location.href = url; }
     });
   }
 
