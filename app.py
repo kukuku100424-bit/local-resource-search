@@ -3507,7 +3507,7 @@ PILL_HTML = """
     var unames = uniqList(names.map(shortName));
     h += '<button type="button" class="pill-care-go"' + (ukinds.length ? '' : ' disabled') + '>이 내용으로 돌봄 서비스 찾기</button>';
     if(!surveyMode){
-      h += '<button type="button" class="pill-care-meds"' + (unames.length ? '' : ' disabled') + '>지자체 자체조사 서식 \\'복용약물\\'에 넣기</button>';
+      h += '<button type="button" class="pill-care-meds"' + (unames.length ? '' : ' disabled') + '>지자체 자체조사 서식 \\'복용약\\'에 넣기</button>';
     }
     h += '<div class="pill-care-note">약 종류로 본 참고 사항이며 의학적 판단이 아닙니다. 사례검색에는 약 이름 없이 종류만 입력됩니다.' +
       (onSurvey ? ' 사례검색은 작성 중인 조사서식이 지워지지 않도록 새 창으로 열립니다.' : '') + '</div>';
