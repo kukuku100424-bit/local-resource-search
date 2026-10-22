@@ -17684,7 +17684,8 @@ body{ margin:0; background:#e8ecf4; font-family:'Pretendard',-apple-system,'Malg
 h1{ font-size:20px; margin:0 0 6px; font-weight:800; }
 .sub{ font-size:13px; color:#6b7280; line-height:1.6; word-break:keep-all; }
 .sec-title{ font-size:13px; font-weight:800; color:#4b6edc; margin-bottom:12px; }
-.q-title{ font-size:15px; font-weight:800; line-height:1.5; margin-bottom:12px; word-break:keep-all; }
+.q-title{ display:flex; gap:4px; font-size:15px; font-weight:800; line-height:1.5; margin-bottom:12px; word-break:keep-all; }
+.q-no{ flex:none; }
 .opt{ display:flex; align-items:center; gap:10px; padding:12px 14px; border:1.5px solid #e5e7eb; border-radius:12px; margin-bottom:8px; font-size:14px; cursor:pointer; }
 .opt input{ width:18px; height:18px; margin:0; accent-color:#4b6edc; }
 .opt.sel{ border-color:#4b6edc; background:#eef2ff; font-weight:700; }
@@ -17730,7 +17731,7 @@ textarea{ min-height:110px; resize:vertical; }
 
     {% for q in questions %}
     <div class="card">
-      <div class="q-title">{{ loop.index }}. {{ q.title }}</div>
+      <div class="q-title"><span class="q-no">{{ loop.index }}.</span><span>{{ q.title }}</span></div>
       {% for o in q.options %}
       <label class="opt"><input type="radio" name="{{ q.key }}" value="{{ o }}"> {{ o }}</label>
       {% endfor %}
@@ -17738,7 +17739,7 @@ textarea{ min-height:110px; resize:vertical; }
     {% endfor %}
 
     <div class="card">
-      <div class="q-title">5. {{ q5_title }} (선택)</div>
+      <div class="q-title"><span class="q-no">5.</span><span>{{ q5_title }} (선택)</span></div>
       <textarea id="q5" maxlength="1000" placeholder="자유롭게 작성해 주세요."></textarea>
     </div>
 
