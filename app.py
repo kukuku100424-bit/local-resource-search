@@ -17663,7 +17663,7 @@ SAT_SCALE = ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다"
 SAT_QUESTIONS = [
     {"key": "q1", "title": "케어내비를 얼마나 자주 이용하십니까?",
      "options": ["거의 매일", "주 1~2회", "월 1~2회", "처음 이용"]},
-    {"key": "q2", "title": "케어내비가 필요한 복지서비스를 찾는 데 도움이 되었습니까?", "options": SAT_SCALE},
+    {"key": "q2", "title": "케어내비가 필요한 서비스자원을 찾는 데 도움이 되었습니까?", "options": SAT_SCALE},
     {"key": "q3", "title": "케어내비 사용으로 업무 시간이 단축되었다고 생각하십니까?", "options": SAT_SCALE},
     {"key": "q4", "title": "기존 방식과 비교해 서비스 검색이 편리해졌습니까?", "options": SAT_SCALE},
 ]
