@@ -18252,8 +18252,8 @@ def satisfaction_export():
 @app.route("/app-version.json")
 def app_version():
     return {
-        "latestAppVersionCode": 8,
-        "latestAppVersionName": "1.8",
+        "latestAppVersionCode": 9,
+        "latestAppVersionName": "1.9",
         "apkUrl": "https://carenavi.kr/static/carenavi.apk",
         "message": "케어내비 새 버전이 있습니다. 업데이트해 주세요."
     }
