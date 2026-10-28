@@ -4279,12 +4279,12 @@ body.app-mode .container{
   background:rgba(255,255,255,0.85); color:#334155;
   font-size:18px; line-height:1; cursor:pointer;
 }
-.sv-cupwrap{ position:relative; display:inline-block; }
-.sv-cup{ display:block; margin:0 auto; width:72px; height:72px; }
+.sv-cupwrap{ display:inline-flex; align-items:flex-end; gap:8px; }
+.sv-cup{ display:block; width:40px; height:72px; }
 .sv-qty{
-  position:absolute; left:100%; bottom:13px; margin-left:-11px;
   font-size:22px; font-weight:900; color:#1d4ed8;
   letter-spacing:-0.5px; line-height:1; white-space:nowrap;
+  margin-bottom:8px;
 }
 .sv-cup .sv-steam{ animation:svSteam 2.4s ease-in-out infinite; transform-origin:center bottom; }
 .sv-cup .sv-steam.s2{ animation-delay:.6s; }
@@ -4314,12 +4314,12 @@ body.app-mode .container{
 }
 .sv-gift-ico{ font-size:20px; line-height:1; flex-shrink:0; }
 .sv-gift-txt{
-  font-size:13.5px; font-weight:600; color:#334155;
+  font-size:13.5px; font-weight:400; color:#334155;
   line-height:1.5; word-break:keep-all; letter-spacing:-0.2px; text-align:center;
 }
-.sv-gift-txt b{ color:#1d4ed8; font-weight:800; }
+.sv-gift-txt b{ color:#1d4ed8; font-weight:700; }
 .sv-note{
-  font-size:11.5px; color:#94a3b8; line-height:1.55;
+  font-size:11.5px; color:#94a3b8; line-height:1.55; letter-spacing:-0.3px;
   word-break:keep-all; text-align:center;
   margin:0 0 16px;
 }
@@ -4353,8 +4353,9 @@ body.app-mode .container{
   .sv-popup{ width:100%; max-width:400px; border-radius:20px; }
   .sv-hero{ padding:26px 20px 16px; }
   .sv-close{ top:12px; right:12px; width:32px; height:32px; font-size:20px; }
-  .sv-cup{ width:104px; height:104px; }
-  .sv-qty{ font-size:30px; bottom:18px; margin-left:-14px; }
+  .sv-cup{ width:58px; height:104px; }
+  .sv-cupwrap{ gap:10px; }
+  .sv-qty{ font-size:30px; margin-bottom:12px; }
   .sv-body{ padding:30px 26px 18px; }
   .sv-title{ font-size:22px; letter-spacing:-0.8px; margin-bottom:20px; }
   .sv-gift{ padding:13px 14px; margin:0 4px 12px; border-radius:12px; }
@@ -5673,7 +5674,7 @@ window.addEventListener("popstate", function (e) {
     <div class="sv-hero">
       <button type="button" class="sv-close" onclick="closeSurveyPopup()" aria-label="닫기">×</button>
       <span class="sv-cupwrap">
-      <svg class="sv-cup" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-label="아메리카노">
+      <svg class="sv-cup" viewBox="27 0 66 120" xmlns="http://www.w3.org/2000/svg" aria-label="아메리카노">
       <path class="sv-steam" d="M48 30c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
       <path class="sv-steam s2" d="M60 28c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
       <path class="sv-steam s3" d="M72 30c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
@@ -5689,9 +5690,9 @@ window.addEventListener("popstate", function (e) {
     <div class="sv-body">
       <div class="sv-title" id="svTitle"><span>설문에 참여한 지자체 직원분들께</span><br><span>추첨을 통해 <em>커피 쿠폰</em>을 보내드려요</span></div>
       <div class="sv-gift">
-        <span class="sv-gift-txt">경품 이벤트에 응모하려면<br><b>설문 끝에 연락처를 꼭 남겨주세요</b></span>
+        <span class="sv-gift-txt">경품 이벤트에 응모하려면<br>설문 끝에 <b>연락처</b>를 꼭 남겨주세요</span>
       </div>
-      <div class="sv-note"><p>※ 응모자가 많으면 이벤트가 조기 종료될 수 있으며,<br>연락처는 경품 지급 외 다른 용도로 쓰지 않습니다.</p></div>
+      <div class="sv-note"><p>※ 응모자가 많으면 이벤트가 조기 종료될 수 있으며,<br>연락처는 경품 지급 외 다른 용도로 사용하지 않습니다.</p></div>
       <button type="button" class="sv-go" onclick="goSurveyFromPopup()">지금 설문 참여하기</button>
       <div class="sv-foot">
         <button type="button" class="sv-today" onclick="hideSurveyPopupToday()">오늘 다시 보지 않기</button>
