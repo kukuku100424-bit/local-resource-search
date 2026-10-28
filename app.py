@@ -5690,7 +5690,7 @@ window.addEventListener("popstate", function (e) {
     <div class="sv-body">
       <div class="sv-title" id="svTitle"><span>설문에 참여한 지자체 직원분들께</span><br><span>추첨을 통해 <em>커피 쿠폰</em>을 보내드려요</span></div>
       <div class="sv-gift">
-        <span class="sv-gift-txt">경품 이벤트에 응모하려면<br>설문 끝에 <b>연락처</b>를 꼭 남겨주세요</span>
+        <span class="sv-gift-txt">경품 이벤트에 응모하려면<br>설문에서 <b>연락처</b>를 꼭 남겨주세요</span>
       </div>
       <div class="sv-note"><p>※ 응모자가 많으면 이벤트가 조기 종료될 수 있으며,<br>연락처는 경품 지급 외 다른 용도로 사용하지 않습니다.</p></div>
       <button type="button" class="sv-go" onclick="goSurveyFromPopup()">지금 설문 참여하기</button>
@@ -17974,7 +17974,7 @@ textarea{ min-height:110px; resize:vertical; }
       <label class="opt"><input type="radio" name="region" value="{{ r }}"> {{ r }}</label>
       {% endfor %}
       <div class="field-label">3. 연락처 (경품 지급용)</div>
-      <div class="notice">연락처는 경품 지급 목적으로만 수집하며, 설문 성과분석 데이터와 분리하여 관리합니다.</div>
+      <div class="notice">연락처는 경품 지급 목적으로만 수집하며, 경품 지급 외 다른 용도로 사용하지 않습니다.</div>
       <label class="consent"><input type="checkbox" id="consent"> <span>경품 지급을 위한 연락처 수집·이용에 동의합니다. (선택)</span></label>
       <input type="tel" id="contact" placeholder="010-0000-0000" inputmode="numeric" maxlength="13" disabled>
     </div>
