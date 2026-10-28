@@ -4259,9 +4259,9 @@ body.app-mode .container{
 @keyframes svFade{ from{opacity:0;} to{opacity:1;} }
 .sv-popup{
   position:relative;
-  width:100%; max-width:340px;
+  width:85vw; max-width:320px;
   background:#fff;
-  border-radius:20px;
+  border-radius:18px;
   overflow:hidden;
   box-shadow:0 20px 50px rgba(15,23,42,0.35);
   animation:svPop .28s cubic-bezier(.2,1.3,.4,1);
@@ -4270,20 +4270,20 @@ body.app-mode .container{
 .sv-hero{
   position:relative;
   background:linear-gradient(160deg,#eff6ff 0%,#dbeafe 100%);
-  padding:22px 20px 14px;
+  padding:16px 16px 10px;
   text-align:center;
 }
 .sv-close{
-  position:absolute; top:12px; right:12px;
-  width:32px; height:32px; border:none; border-radius:50%;
+  position:absolute; top:10px; right:10px;
+  width:28px; height:28px; border:none; border-radius:50%;
   background:rgba(255,255,255,0.85); color:#334155;
-  font-size:20px; line-height:1; cursor:pointer;
+  font-size:18px; line-height:1; cursor:pointer;
 }
 .sv-cupwrap{ position:relative; display:inline-block; }
-.sv-cup{ display:block; margin:0 auto; width:88px; height:88px; }
+.sv-cup{ display:block; margin:0 auto; width:72px; height:72px; }
 .sv-qty{
-  position:absolute; left:100%; bottom:16px; margin-left:-14px;
-  font-size:26px; font-weight:900; color:#1d4ed8;
+  position:absolute; left:100%; bottom:13px; margin-left:-11px;
+  font-size:22px; font-weight:900; color:#1d4ed8;
   letter-spacing:-0.5px; line-height:1; white-space:nowrap;
 }
 .sv-cup .sv-steam{ animation:svSteam 2.4s ease-in-out infinite; transform-origin:center bottom; }
@@ -4294,34 +4294,34 @@ body.app-mode .container{
   40%{ opacity:.9; }
   100%{ opacity:0; transform:translateY(-8px); }
 }
-.sv-body{ padding:26px 16px 14px; text-align:center; }
+.sv-body{ padding:20px 14px 10px; text-align:center; }
 .sv-title{
-  font-size:20px; font-weight:500; color:#1e293b;
-  line-height:1.55; letter-spacing:-0.8px;
-  word-break:keep-all; margin-bottom:20px;
+  font-size:18px; font-weight:500; color:#1e293b;
+  line-height:1.5; letter-spacing:-0.7px;
+  word-break:keep-all; margin-bottom:16px;
 }
 .sv-title em{ font-style:normal; color:#2563eb; font-weight:800; }
 .sv-title span{ white-space:nowrap; }
 @media (max-width:380px){
-  .sv-overlay{ padding:10px; }
+  .sv-popup{ width:90vw; }
   .sv-body{ padding-left:12px; padding-right:12px; }
 }
 .sv-gift{
   display:flex; align-items:center; justify-content:center; gap:10px;
   background:#f8fafc; border:1px solid #e2e8f0;
-  border-radius:12px; padding:13px 14px;
-  margin:0 4px 12px;
+  border-radius:10px; padding:10px 12px;
+  margin:0 2px 10px;
 }
 .sv-gift-ico{ font-size:20px; line-height:1; flex-shrink:0; }
 .sv-gift-txt{
-  font-size:14px; font-weight:600; color:#334155;
+  font-size:13.5px; font-weight:600; color:#334155;
   line-height:1.5; word-break:keep-all; letter-spacing:-0.2px; text-align:center;
 }
 .sv-gift-txt b{ color:#1d4ed8; font-weight:800; }
 .sv-note{
-  font-size:12px; color:#94a3b8; line-height:1.6;
+  font-size:11.5px; color:#94a3b8; line-height:1.55;
   word-break:keep-all; text-align:center;
-  margin:0 0 22px;
+  margin:0 0 16px;
 }
 .sv-note p{
   display:inline-block; margin:0; text-align:left;
@@ -4331,8 +4331,8 @@ body.app-mode .container{
   display:block; width:100%;
   border:none; border-radius:12px;
   background:linear-gradient(135deg,#3b82f6,#2563eb);
-  color:#fff; font-size:16px; font-weight:700; letter-spacing:-0.2px;
-  padding:14px 0; cursor:pointer;
+  color:#fff; font-size:15px; font-weight:700; letter-spacing:-0.2px;
+  padding:12px 0; cursor:pointer;
   box-shadow:0 6px 16px rgba(37,99,235,0.3);
   animation:svGlow 1.8s ease-in-out infinite;
 }
@@ -4342,22 +4342,27 @@ body.app-mode .container{
 }
 .sv-foot{
   display:flex; justify-content:space-between; align-items:center;
-  margin-top:8px; padding:0 2px;
+  margin-top:4px; padding:0 2px;
 }
 .sv-foot button{
   border:none; background:transparent; cursor:pointer;
-  font-size:13px; font-weight:500; color:#94a3b8; padding:8px 2px;
+  font-size:12.5px; font-weight:500; color:#94a3b8; padding:8px 2px;
 }
 .sv-foot .sv-today{ color:#64748b; }
 @media (min-width:601px){
-  .sv-popup{ max-width:400px; }
+  .sv-popup{ width:100%; max-width:400px; border-radius:20px; }
   .sv-hero{ padding:26px 20px 16px; }
+  .sv-close{ top:12px; right:12px; width:32px; height:32px; font-size:20px; }
   .sv-cup{ width:104px; height:104px; }
-  .sv-qty{ font-size:30px; bottom:18px; }
+  .sv-qty{ font-size:30px; bottom:18px; margin-left:-14px; }
   .sv-body{ padding:30px 26px 18px; }
-  .sv-title{ font-size:22px; }
+  .sv-title{ font-size:22px; letter-spacing:-0.8px; margin-bottom:20px; }
+  .sv-gift{ padding:13px 14px; margin:0 4px 12px; border-radius:12px; }
   .sv-gift-txt{ font-size:15px; }
-  .sv-note{ font-size:12.5px; }
+  .sv-note{ font-size:12.5px; margin-bottom:22px; }
+  .sv-go{ font-size:16px; padding:14px 0; }
+  .sv-foot{ margin-top:8px; }
+  .sv-foot button{ font-size:13px; }
 }
 
 /* 설문 메뉴 항목 — 커피 증정 꼬리표 + 가이드 강조 */
