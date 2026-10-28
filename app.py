@@ -866,6 +866,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 (function(){
   /* 로그인 페이지 진입 시 가이드투어 세션 dismiss 해제 → 재로그인하면 다시 보임 */
   try { sessionStorage.removeItem('careNaviTourSessionDismissed'); } catch(e){}
+  try { sessionStorage.removeItem('careNaviSurveyPopupSession'); } catch(e){}
 
   var pwInput = document.getElementById('care-login-password');
   var pwToggle = document.getElementById('care-login-pw-toggle');
@@ -4246,6 +4247,148 @@ body.app-mode .container{
   .tour-q-icon{ width:20px; height:20px; font-size:12px; }
 }
 
+/* ===== 설문조사 안내 팝업 + 가이드 (앱 기본 파랑 톤) ===== */
+.sv-overlay{
+  display:none; position:fixed; inset:0;
+  background:rgba(15,23,42,0.6);
+  z-index:10000;
+  align-items:center; justify-content:center;
+  padding:16px;
+}
+.sv-overlay.open{ display:flex; animation:svFade .2s ease; }
+@keyframes svFade{ from{opacity:0;} to{opacity:1;} }
+.sv-popup{
+  position:relative;
+  width:100%; max-width:340px;
+  background:#fff;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 20px 50px rgba(15,23,42,0.35);
+  animation:svPop .28s cubic-bezier(.2,1.3,.4,1);
+}
+@keyframes svPop{ from{transform:translateY(16px) scale(.96);opacity:0;} to{transform:none;opacity:1;} }
+.sv-hero{
+  position:relative;
+  background:linear-gradient(160deg,#eff6ff 0%,#dbeafe 100%);
+  padding:22px 20px 14px;
+  text-align:center;
+}
+.sv-close{
+  position:absolute; top:12px; right:12px;
+  width:32px; height:32px; border:none; border-radius:50%;
+  background:rgba(255,255,255,0.85); color:#334155;
+  font-size:20px; line-height:1; cursor:pointer;
+}
+.sv-cupwrap{ position:relative; display:inline-block; }
+.sv-cup{ display:block; margin:0 auto; width:88px; height:88px; }
+.sv-qty{
+  position:absolute; left:100%; bottom:16px; margin-left:-14px;
+  font-size:26px; font-weight:900; color:#1d4ed8;
+  letter-spacing:-0.5px; line-height:1; white-space:nowrap;
+}
+.sv-cup .sv-steam{ animation:svSteam 2.4s ease-in-out infinite; transform-origin:center bottom; }
+.sv-cup .sv-steam.s2{ animation-delay:.6s; }
+.sv-cup .sv-steam.s3{ animation-delay:1.2s; }
+@keyframes svSteam{
+  0%{ opacity:0; transform:translateY(6px); }
+  40%{ opacity:.9; }
+  100%{ opacity:0; transform:translateY(-8px); }
+}
+.sv-body{ padding:26px 16px 14px; text-align:center; }
+.sv-title{
+  font-size:20px; font-weight:500; color:#1e293b;
+  line-height:1.55; letter-spacing:-0.8px;
+  word-break:keep-all; margin-bottom:20px;
+}
+.sv-title em{ font-style:normal; color:#2563eb; font-weight:800; }
+.sv-title span{ white-space:nowrap; }
+@media (max-width:380px){
+  .sv-overlay{ padding:10px; }
+  .sv-body{ padding-left:12px; padding-right:12px; }
+}
+.sv-gift{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  background:#f8fafc; border:1px solid #e2e8f0;
+  border-radius:12px; padding:13px 14px;
+  margin:0 4px 12px;
+}
+.sv-gift-ico{ font-size:20px; line-height:1; flex-shrink:0; }
+.sv-gift-txt{
+  font-size:14px; font-weight:600; color:#334155;
+  line-height:1.5; word-break:keep-all; letter-spacing:-0.2px; text-align:center;
+}
+.sv-gift-txt b{ color:#1d4ed8; font-weight:800; }
+.sv-note{
+  font-size:12px; color:#94a3b8; line-height:1.6;
+  word-break:keep-all; text-align:center;
+  margin:0 0 22px;
+}
+.sv-note p{
+  display:inline-block; margin:0; text-align:left;
+  padding-left:1.25em; text-indent:-1.25em;
+}
+.sv-go{
+  display:block; width:100%;
+  border:none; border-radius:12px;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#fff; font-size:16px; font-weight:700; letter-spacing:-0.2px;
+  padding:14px 0; cursor:pointer;
+  box-shadow:0 6px 16px rgba(37,99,235,0.3);
+  animation:svGlow 1.8s ease-in-out infinite;
+}
+@keyframes svGlow{
+  0%,100%{ box-shadow:0 6px 16px rgba(37,99,235,0.28); }
+  50%{ box-shadow:0 6px 22px rgba(37,99,235,0.5); }
+}
+.sv-foot{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-top:8px; padding:0 2px;
+}
+.sv-foot button{
+  border:none; background:transparent; cursor:pointer;
+  font-size:13px; font-weight:500; color:#94a3b8; padding:8px 2px;
+}
+.sv-foot .sv-today{ color:#64748b; }
+@media (min-width:601px){
+  .sv-popup{ max-width:400px; }
+  .sv-hero{ padding:26px 20px 16px; }
+  .sv-cup{ width:104px; height:104px; }
+  .sv-qty{ font-size:30px; bottom:18px; }
+  .sv-body{ padding:30px 26px 18px; }
+  .sv-title{ font-size:22px; }
+  .sv-gift-txt{ font-size:15px; }
+  .sv-note{ font-size:12.5px; }
+}
+
+/* 설문 메뉴 항목 — 커피 증정 꼬리표 + 가이드 강조 */
+.fab-coffee-tag{
+  display:inline-block; margin-left:4px;
+  background:#ffedd5; color:#c2410c;
+  font-size:11px; font-weight:800;
+  padding:2px 6px; border-radius:999px;
+  vertical-align:middle;
+}
+.fab-item.sv-guide{ position:relative; }
+.fab-item.sv-guide .fab-item-btn-survey{ animation:svRing 1.2s ease-out infinite; }
+@keyframes svRing{
+  0%{ box-shadow:0 0 0 0 rgba(249,115,22,0.7); }
+  100%{ box-shadow:0 0 0 14px rgba(249,115,22,0); }
+}
+.sv-guide-tip{
+  position:absolute; left:calc(100% + 14px); top:50%;
+  transform:translateY(-50%);
+  background:#111827; color:#fff;
+  font-size:12.5px; font-weight:700; line-height:1.4;
+  padding:7px 10px; border-radius:10px;
+  white-space:nowrap; pointer-events:none;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+}
+.sv-guide-tip::before{
+  content:""; position:absolute; right:100%; top:50%;
+  transform:translateY(-50%);
+  border:6px solid transparent; border-right-color:#111827;
+}
+
 .title + .card{
   margin-top:18px;   /* 👈 여기 추가 */
 }
@@ -4760,7 +4903,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
               <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
             </svg>
           </div>
-          <span class="fab-item-label">설문조사</span>
+          <span class="fab-item-label">설문조사<span class="fab-coffee-tag">☕경품</span></span>
         </div>
         {% endif %}
       </div>
@@ -5518,6 +5661,42 @@ window.addEventListener("popstate", function (e) {
   </div>
 </div>
 
+{% if survey_on %}
+<!-- 설문조사 안내 팝업 (오늘 다시 보지 않기 지원) -->
+<div id="svOverlay" class="sv-overlay" onclick="if(event.target===this) closeSurveyPopup();">
+  <div class="sv-popup" role="dialog" aria-modal="true" aria-labelledby="svTitle">
+    <div class="sv-hero">
+      <button type="button" class="sv-close" onclick="closeSurveyPopup()" aria-label="닫기">×</button>
+      <span class="sv-cupwrap">
+      <svg class="sv-cup" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-label="아메리카노">
+      <path class="sv-steam" d="M48 30c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path class="sv-steam s2" d="M60 28c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path class="sv-steam s3" d="M72 30c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <rect x="31" y="34" width="58" height="9" rx="4" fill="#57534e"/>
+      <rect x="35" y="40" width="50" height="6" rx="2" fill="#44403c"/>
+      <path d="M36 46h48l-6 58a6 6 0 0 1-6 5H48a6 6 0 0 1-6-5z" fill="#fafaf9" stroke="#e7e5e4" stroke-width="1.5"/>
+      <path d="M38.5 62h43l-2.6 28H41.1z" fill="#92400e"/>
+      <text x="60" y="80" text-anchor="middle" font-size="9.5" font-weight="900" fill="#fff7ed" font-family="sans-serif">COFFEE</text>
+    </svg>
+    <span class="sv-qty">×50</span>
+      </span>
+    </div>
+    <div class="sv-body">
+      <div class="sv-title" id="svTitle"><span>설문에 참여한 지자체 직원분들께</span><br><span>추첨을 통해 <em>커피 쿠폰</em>을 보내드려요</span></div>
+      <div class="sv-gift">
+        <span class="sv-gift-txt">경품 이벤트에 응모하려면<br><b>설문 끝에 연락처를 꼭 남겨주세요</b></span>
+      </div>
+      <div class="sv-note"><p>※ 응모자가 많으면 이벤트가 조기 종료될 수 있으며,<br>연락처는 경품 지급 외 다른 용도로 쓰지 않습니다.</p></div>
+      <button type="button" class="sv-go" onclick="goSurveyFromPopup()">지금 설문 참여하기</button>
+      <div class="sv-foot">
+        <button type="button" class="sv-today" onclick="hideSurveyPopupToday()">오늘 다시 보지 않기</button>
+        <button type="button" onclick="closeSurveyPopup()">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <script>
 /* ===== 공지사항 ===== */
 /* ===== 공지 아코디언 + 페이지네이션 ===== */
@@ -5635,6 +5814,9 @@ function prevGuidePage(){
 }
 
 /* ===== 첫방문 가이드 투어 ===== */
+/* ⏸ 일시 중지: 설문 안내 기간 동안 투어 팝업을 띄우지 않음.
+   복원하려면 아래 값을 true 로만 바꾸면 됨 (코드는 그대로 보존) */
+var TOUR_ENABLED = false;
 var TOUR_STORAGE_KEY = 'careNaviTourDismissed';        /* 영구 - "다시 보지 않기" */
 var TOUR_SESSION_KEY = 'careNaviTourSessionDismissed'; /* 세션 - 그냥 닫음 (재로그인 전까지) */
 
@@ -5694,10 +5876,72 @@ function openGuideFromTour(){
 
 /* 페이지 로드시 첫방문 체크 */
 window.addEventListener('load', function(){
-  if(!tourDismissed()){
+  if(TOUR_ENABLED && !tourDismissed()){
     /* 약간 딜레이 줘서 레이아웃 안정화 후 띄움 */
     setTimeout(openTour, 350);
   }
+});
+
+
+/* ===== 설문조사 안내 팝업 + 가이드 ===== */
+var SV_TODAY_KEY   = 'careNaviSurveyPopupHideDate';  /* "오늘 다시 보지 않기" → 오늘 날짜 저장 */
+var SV_SESSION_KEY = 'careNaviSurveyPopupSession';   /* 그냥 닫음 → 재로그인 전까지 */
+function svTodayStr(){
+  var d = new Date();
+  return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+}
+function svShouldShow(){
+  if(!document.getElementById('svOverlay')) return false;   /* 설문 OFF면 팝업 자체가 없음 */
+  try {
+    if(localStorage.getItem(SV_TODAY_KEY) === svTodayStr()) return false;
+    if(sessionStorage.getItem(SV_SESSION_KEY) === '1') return false;
+  } catch(e){}
+  return true;
+}
+function openSurveyPopup(){
+  var ov = document.getElementById('svOverlay');
+  if(ov) ov.classList.add('open');
+}
+function svHide(){
+  var ov = document.getElementById('svOverlay');
+  if(ov) ov.classList.remove('open');
+}
+/* 닫으면 설문 버튼 위치를 알려주는 가이드 표시 */
+function showSurveyGuide(){
+  var item = document.getElementById('fabItem_survey');
+  var main = document.getElementById('fabMain');
+  if(!item || !main) return;
+  if(!item.classList.contains('show')) main.click();   /* + 메뉴 펼치기 */
+  item.classList.add('sv-guide');
+  if(!item.querySelector('.sv-guide-tip')){
+    var tip = document.createElement('span');
+    tip.className = 'sv-guide-tip';
+    tip.textContent = '여기서 언제든 참여!';
+    item.appendChild(tip);
+  }
+  try { item.scrollIntoView({block:'nearest', behavior:'smooth'}); } catch(e){}
+  setTimeout(function(){
+    item.classList.remove('sv-guide');
+    var t = item.querySelector('.sv-guide-tip');
+    if(t) t.parentNode.removeChild(t);
+  }, 5000);
+}
+function closeSurveyPopup(){
+  svHide();
+  try { sessionStorage.setItem(SV_SESSION_KEY, '1'); } catch(e){}
+  setTimeout(showSurveyGuide, 200);
+}
+function hideSurveyPopupToday(){
+  svHide();
+  try { localStorage.setItem(SV_TODAY_KEY, svTodayStr()); } catch(e){}
+  setTimeout(showSurveyGuide, 200);
+}
+function goSurveyFromPopup(){
+  try { sessionStorage.setItem(SV_SESSION_KEY, '1'); } catch(e){}
+  location.href = '/satisfaction';
+}
+window.addEventListener('load', function(){
+  if(svShouldShow()) setTimeout(openSurveyPopup, 350);
 });
 
 /* 뒤로가기(bfcache) 복귀 시 끼어있는 누름 상태 초기화 */
