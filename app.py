@@ -4294,7 +4294,7 @@ body.app-mode .container{
   40%{ opacity:.9; }
   100%{ opacity:0; transform:translateY(-8px); }
 }
-.sv-body{ padding:20px 14px 10px; text-align:center; }
+.sv-body{ padding:20px 14px 12px; text-align:center; }
 .sv-title{
   font-size:18px; font-weight:500; color:#1e293b;
   line-height:1.5; letter-spacing:-0.7px;
@@ -4342,7 +4342,7 @@ body.app-mode .container{
 }
 .sv-foot{
   display:flex; justify-content:space-between; align-items:center;
-  margin-top:4px; padding:0 2px;
+  margin-top:14px; padding:0 2px;
 }
 .sv-foot button{
   border:none; background:transparent; cursor:pointer;
@@ -4362,7 +4362,7 @@ body.app-mode .container{
   .sv-gift-txt{ font-size:15px; }
   .sv-note{ font-size:12.5px; margin-bottom:22px; }
   .sv-go{ font-size:16px; padding:14px 0; }
-  .sv-foot{ margin-top:8px; }
+  .sv-foot{ margin-top:16px; }
   .sv-foot button{ font-size:13px; }
 }
 
