@@ -5922,7 +5922,7 @@ function showSurveyGuide(){
   if(!item.querySelector('.sv-guide-tip')){
     var tip = document.createElement('span');
     tip.className = 'sv-guide-tip';
-    tip.textContent = '여기서 언제든 참여!';
+    tip.textContent = '여기서 언제든 참여 가능';
     item.appendChild(tip);
   }
   try { item.scrollIntoView({block:'nearest', behavior:'smooth'}); } catch(e){}
@@ -5930,6 +5930,7 @@ function showSurveyGuide(){
     item.classList.remove('sv-guide');
     var t = item.querySelector('.sv-guide-tip');
     if(t) t.parentNode.removeChild(t);
+    if(item.classList.contains('show')) main.click();   /* + 메뉴도 같이 닫기 */
   }, 5000);
 }
 function closeSurveyPopup(){
@@ -5946,8 +5947,9 @@ function goSurveyFromPopup(){
   try { sessionStorage.setItem(SV_SESSION_KEY, '1'); } catch(e){}
   location.href = '/satisfaction';
 }
-window.addEventListener('load', function(){
-  if(svShouldShow()) setTimeout(openSurveyPopup, 350);
+/* 이미지 로딩(load)까지 기다리지 않고 화면 뼈대가 준비되면 바로 띄움 */
+document.addEventListener('DOMContentLoaded', function(){
+  if(svShouldShow()) openSurveyPopup();
 });
 
 /* 뒤로가기(bfcache) 복귀 시 끼어있는 누름 상태 초기화 */
@@ -14267,7 +14269,8 @@ function declinePrivacyModal(){
   window.location.href = "/home";
 }
 
-window.addEventListener("load", function(){
+/* 이미지 로딩(load)까지 기다리지 않고 화면 뼈대가 준비되면 바로 띄움 */
+document.addEventListener("DOMContentLoaded", function(){
   const modal = document.getElementById("privacyModal");
   if(!modal) return;
 
