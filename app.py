@@ -18284,8 +18284,6 @@ tr.row:hover{ background:#f8faff; }
   <div class="card">
     <h2>응답 목록</h2>
     <div class="actions">
-      <button type="button" class="btn light" onclick="toggleAll(true)">전체 선택</button>
-      <button type="button" class="btn light" onclick="toggleAll(false)">선택 해제</button>
       <button type="button" class="btn" onclick="openViewer()">선택 설문지 보기</button>
       <button type="button" class="btn danger" onclick="deleteSelected()">선택 삭제</button>
     </div>
@@ -18362,7 +18360,7 @@ function deleteSelected(){
   var idx = checkedIdx();
   if(!idx.length){ alert('삭제할 설문지를 먼저 체크해 주세요.'); return; }
   var nos = idx.map(function(i){ return ROWS[i].no; }).sort(function(a,b){ return a-b; });
-  if(!confirm('선택한 ' + idx.length + '건(번호 ' + nos.join(', ') + ')을 삭제할까요?\n체크하지 않은 응답은 그대로 남습니다. (삭제한 응답은 복구 불가)')) return;
+  if(!confirm('선택한 ' + idx.length + '건(번호 ' + nos.join(', ') + ')을 삭제할까요?\\n체크하지 않은 응답은 그대로 남습니다. (삭제한 응답은 복구 불가)')) return;
   var pw = prompt('비밀번호를 입력하세요.');
   if(pw === null) return;
   var ids = idx.map(function(i){ return ROWS[i].id; });
