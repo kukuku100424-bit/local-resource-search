@@ -18287,6 +18287,7 @@ tr.row:hover{ background:#f8faff; }
       <button type="button" class="btn light" onclick="toggleAll(true)">전체 선택</button>
       <button type="button" class="btn light" onclick="toggleAll(false)">선택 해제</button>
       <button type="button" class="btn" onclick="openViewer()">선택 설문지 보기</button>
+      <button type="button" class="btn danger" onclick="deleteSelected()">선택 삭제</button>
     </div>
     {% if rows %}
     <div class="tbl-wrap">
@@ -18353,6 +18354,23 @@ function surveyReset(){
     .then(function(j){
       if(j.success){ alert('초기화되었습니다.'); location.reload(); }
       else alert(j.message || '초기화에 실패했습니다.');
+    })
+    .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
+}
+
+function deleteSelected(){
+  var idx = checkedIdx();
+  if(!idx.length){ alert('삭제할 설문지를 먼저 체크해 주세요.'); return; }
+  var nos = idx.map(function(i){ return ROWS[i].no; }).sort(function(a,b){ return a-b; });
+  if(!confirm('선택한 ' + idx.length + '건(번호 ' + nos.join(', ') + ')을 삭제할까요?\n체크하지 않은 응답은 그대로 남습니다. (삭제한 응답은 복구 불가)')) return;
+  var pw = prompt('비밀번호를 입력하세요.');
+  if(pw === null) return;
+  var ids = idx.map(function(i){ return ROWS[i].id; });
+  fetch('/stats/satisfaction/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids:ids, password:pw})})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(j.success){ alert(j.count + '건 삭제되었습니다.'); location.reload(); }
+      else alert(j.message || '삭제에 실패했습니다.');
     })
     .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
 }
@@ -18456,6 +18474,28 @@ def satisfaction_reset():
     except Exception:
         return jsonify({"success": False, "message": "삭제 중 오류가 발생했습니다."})
     return jsonify({"success": True})
+
+@app.route("/stats/satisfaction/delete", methods=["POST"])
+def satisfaction_delete():
+    """체크한 응답만 삭제 (id 지정). 체크하지 않은 응답은 건드리지 않음."""
+    d = request.get_json(silent=True) or {}
+    if str(d.get("password", "")).strip() != SAT_RESET_PASSWORD:
+        return jsonify({"success": False, "message": "비밀번호가 올바르지 않습니다."})
+    ids = sorted({int(i) for i in (d.get("ids") or []) if str(i).isdigit() and int(i) > 0})
+    if not ids:
+        return jsonify({"success": False, "message": "삭제할 응답을 선택해 주세요."})
+    if os.getenv("RENDER") is None:
+        return jsonify({"success": True, "count": len(ids)})   # 로컬 테스트: 삭제 생략
+    try:
+        res = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/survey_responses?id=in.({','.join(str(i) for i in ids)})",
+            headers={**SUPABASE_HEADERS, "Prefer": "return=minimal"}, timeout=15
+        )
+        if not res.ok:
+            return jsonify({"success": False, "message": "삭제 중 오류가 발생했습니다."})
+    except Exception:
+        return jsonify({"success": False, "message": "삭제 중 오류가 발생했습니다."})
+    return jsonify({"success": True, "count": len(ids)})
 
 @app.route("/stats/satisfaction/export")
 def satisfaction_export():
