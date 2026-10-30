@@ -5688,11 +5688,11 @@ window.addEventListener("popstate", function (e) {
       </span>
     </div>
     <div class="sv-body">
-      <div class="sv-title" id="svTitle"><span>설문에 참여한 지자체 직원분</span><br><span><em>모두에게 커피 쿠폰</em>을 보내드려요</span></div>
+      <div class="sv-title" id="svTitle"><span>설문에 참여한 지자체 직원분 중</span><br><span><em>선착순 50분께 커피 쿠폰</em>을 보내드려요</span></div>
       <div class="sv-gift">
         <span class="sv-gift-txt">쿠폰을 받으시려면<br>설문에서 <b>연락처</b>를 꼭 남겨주세요</span>
       </div>
-      <div class="sv-note"><p>※ 준비된 수량이 소진되면 지급이 종료되며,<br>연락처는 경품 지급 외 다른 용도로 사용하지 않습니다.</p></div>
+      <div class="sv-note"><p>※ 50분께 지급이 완료되면 이벤트가 종료되며,<br>연락처는 경품 지급 외 다른 용도로 사용하지 않습니다.</p></div>
       <button type="button" class="sv-go" onclick="goSurveyFromPopup()">지금 설문 참여하기</button>
       <div class="sv-foot">
         <button type="button" class="sv-today" onclick="hideSurveyPopupToday()">오늘 다시 보지 않기</button>
