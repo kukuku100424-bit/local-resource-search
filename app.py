@@ -4295,6 +4295,15 @@ body.app-mode .container{
   100%{ opacity:0; transform:translateY(-8px); }
 }
 .sv-body{ padding:20px 14px 12px; text-align:center; }
+.sv-period{
+  display:inline-block; vertical-align:top;
+  background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;
+  font-size:12.5px; font-weight:600; line-height:1.45; letter-spacing:-0.3px;
+  word-break:keep-all;
+  padding:4px 12px; border-radius:16px;
+  margin-bottom:12px;
+}
+.sv-period b{ font-weight:800; margin-right:3px; }
 .sv-title{
   font-size:18px; font-weight:500; color:#1e293b;
   line-height:1.5; letter-spacing:-0.7px;
@@ -4357,6 +4366,7 @@ body.app-mode .container{
   .sv-cupwrap{ gap:10px; }
   .sv-qty{ font-size:30px; margin-bottom:12px; }
   .sv-body{ padding:30px 26px 18px; }
+  .sv-period{ font-size:14px; padding:5px 15px; margin-bottom:14px; }
   .sv-title{ font-size:22px; letter-spacing:-0.8px; margin-bottom:20px; }
   .sv-gift{ padding:13px 14px; margin:0 4px 12px; border-radius:12px; }
   .sv-gift-txt{ font-size:15px; }
@@ -5688,6 +5698,7 @@ window.addEventListener("popstate", function (e) {
       </span>
     </div>
     <div class="sv-body">
+      <div class="sv-period"><b>설문기간</b> 10월 30일(금) ~ 11월 6일(금)</div>
       <div class="sv-title" id="svTitle"><span>설문에 참여한 지자체 직원분 중</span><br><span><em>선착순 50분께 커피 쿠폰</em>을 보내드려요</span></div>
       <div class="sv-gift">
         <span class="sv-gift-txt">쿠폰을 받으시려면<br>설문에서 <b>연락처</b>를 꼭 남겨주세요</span>
