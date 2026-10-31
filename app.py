@@ -4328,12 +4328,13 @@ body.app-mode .container{
 }
 .sv-gift-txt b{ color:#1d4ed8; font-weight:700; }
 .sv-note{
+  display:table;   /* 문구 폭만큼 줄어든 뒤 가운데 정렬 → ※ 줄들의 왼쪽 끝이 맞음 */
   font-size:11.5px; color:#94a3b8; line-height:1.55; letter-spacing:-0.3px;
-  word-break:keep-all; text-align:center;
-  margin:0 0 16px;
+  word-break:keep-all; text-align:left;
+  margin:0 auto 16px;
 }
 .sv-note p{
-  display:inline-block; margin:0; text-align:left;
+  margin:0;
   padding-left:1.25em; text-indent:-1.25em;
 }
 .sv-go{
@@ -5703,7 +5704,7 @@ window.addEventListener("popstate", function (e) {
       <div class="sv-gift">
         <span class="sv-gift-txt">쿠폰을 받으시려면<br>설문에서 <b>연락처</b>를 꼭 남겨주세요</span>
       </div>
-      <div class="sv-note"><p>※ 50분께 지급이 완료되면 이벤트가 종료되며,<br>연락처는 경품 지급 외 다른 용도로 사용하지 않습니다.</p></div>
+      <div class="sv-note"><p>※ 50분 접수가 마감되어도 설문은 기간 내 계속 진행됩니다.</p><p>※ 연락처는 경품 지급 외 다른 용도로 사용하지 않습니다.</p></div>
       <button type="button" class="sv-go" onclick="goSurveyFromPopup()">지금 설문 참여하기</button>
       <div class="sv-foot">
         <button type="button" class="sv-today" onclick="hideSurveyPopupToday()">오늘 다시 보지 않기</button>
