@@ -11734,6 +11734,7 @@ body{
   width:100%;
   height:150px;
   padding:14px 58px 14px 14px;
+  font-family:inherit;
 
   border-radius:12px;
   border:1px solid #cbd5e1;
