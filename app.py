@@ -153,9 +153,10 @@ def _survey_set_on(on):
 # - maintenance_mode 테이블의 id=3 행을 재사용 (is_on=True 이면 홈에 당첨자 팝업). 행이 없으면 기본 OFF
 # - 설문 노출(id=2)과 동시에 켜지지 않음 (한쪽을 켜면 다른 쪽은 자동 OFF)
 # =========================
-WINNER_PAY_DATE = ""      # 쿠폰 지급일 (예: "11월 28일(금)") — 정해지면 여기만 채우기
+WINNER_PAY_DATE = "11월 30일(월)까지 순차 발송"      # 쿠폰 지급일 (예: "11월 28일(금)") — 정해지면 여기만 채우기
 WINNER_LIMIT = 50         # 선착순 인원
 WINNER_ORG = "지자체"      # 당첨 대상 소속
+WINNER_EXCLUDE_CONTACTS = {"01012345678"}   # 당첨에서 뺄 번호 (숫자만). 더 뺄 번호가 있으면 여기에 추가
 _WINNER_CACHE = {"on": False, "ts": 0}
 _WINNER_LIST_CACHE = {"rows": [], "ts": 0}
 _WINNER_LIST_TTL = 60  # 초 (홈 접속마다 응답 전체를 읽지 않도록)
@@ -203,10 +204,12 @@ def _winner_list():
     try:
         rows = [r for r in _sat_load(WINNER_ORG) if r.get("contact")]
         rows.sort(key=lambda r: (str(r.get("created_at", "")), r.get("id", 0)))
-        for r in rows[:WINNER_LIMIT]:
+        for r in rows:
+            if len(out) >= WINNER_LIMIT:
+                break
             digits = re.sub(r"\D", "", str(r.get("contact", "")))
-            if len(digits) < 8:
-                continue
+            if len(digits) < 8 or digits in WINNER_EXCLUDE_CONTACTS:
+                continue   # 잘못된 번호·테스트 번호는 건너뛰고 다음 사람으로
             kst = r.get("created_kst", "")   # 'YYYY-MM-DD HH:MM:SS'
             out.append({
                 "dt": f"{kst[5:7]}.{kst[8:10]} {kst[11:16]}",
