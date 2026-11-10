@@ -148,6 +148,86 @@ def _survey_set_on(on):
         except Exception:
             pass
 
+# =========================
+# 설문 당첨자 발표 팝업 ON/OFF
+# - maintenance_mode 테이블의 id=3 행을 재사용 (is_on=True 이면 홈에 당첨자 팝업). 행이 없으면 기본 OFF
+# - 설문 노출(id=2)과 동시에 켜지지 않음 (한쪽을 켜면 다른 쪽은 자동 OFF)
+# =========================
+WINNER_PAY_DATE = ""      # 쿠폰 지급일 (예: "11월 28일(금)") — 정해지면 여기만 채우기
+WINNER_LIMIT = 50         # 선착순 인원
+WINNER_ORG = "지자체"      # 당첨 대상 소속
+_WINNER_CACHE = {"on": False, "ts": 0}
+_WINNER_LIST_CACHE = {"rows": [], "ts": 0}
+_WINNER_LIST_TTL = 60  # 초 (홈 접속마다 응답 전체를 읽지 않도록)
+
+def _winner_is_on():
+    now = _maint_time.time()
+    if now - _WINNER_CACHE["ts"] < _SURVEY_TTL:
+        return _WINNER_CACHE["on"]
+    if os.getenv("RENDER") is not None:
+        try:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?select=is_on&id=eq.3",
+                headers=SUPABASE_HEADERS, timeout=3
+            )
+            rows = res.json() if res.ok else []
+            if rows:
+                _WINNER_CACHE["on"] = bool(rows[0].get("is_on"))
+        except Exception:
+            pass
+    _WINNER_CACHE["ts"] = now
+    return _WINNER_CACHE["on"]
+
+def _winner_set_on(on):
+    _WINNER_CACHE["on"] = bool(on)
+    _WINNER_CACHE["ts"] = _maint_time.time()
+    _WINNER_LIST_CACHE["ts"] = 0   # 켤 때 명단 새로 읽기
+    if os.getenv("RENDER") is not None:
+        try:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/maintenance_mode?on_conflict=id",
+                headers={**SUPABASE_HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"},
+                json={"id": 3, "is_on": bool(on), "message": "winner", "resume_at": ""},
+                timeout=5
+            )
+        except Exception:
+            pass
+
+def _winner_list():
+    """지자체 응답 중 연락처를 남긴 사람을 제출 순으로 WINNER_LIMIT명.
+    화면에는 마스킹된 번호와 'MM.DD HH:MM'만 넘김 (원본 연락처는 템플릿에 전달하지 않음)."""
+    now = _maint_time.time()
+    if now - _WINNER_LIST_CACHE["ts"] < _WINNER_LIST_TTL:
+        return _WINNER_LIST_CACHE["rows"]
+    out = []
+    try:
+        rows = [r for r in _sat_load(WINNER_ORG) if r.get("contact")]
+        rows.sort(key=lambda r: (str(r.get("created_at", "")), r.get("id", 0)))
+        for r in rows[:WINNER_LIMIT]:
+            digits = re.sub(r"\D", "", str(r.get("contact", "")))
+            if len(digits) < 8:
+                continue
+            kst = r.get("created_kst", "")   # 'YYYY-MM-DD HH:MM:SS'
+            out.append({
+                "dt": f"{kst[5:7]}.{kst[8:10]} {kst[11:16]}",
+                "phone": f"{digits[:3]}-****-{digits[-4:]}",
+            })
+    except Exception:
+        out = _WINNER_LIST_CACHE["rows"]
+    _WINNER_LIST_CACHE["rows"] = out
+    _WINNER_LIST_CACHE["ts"] = now
+    return out
+
+def _winner_ctx():
+    """홈 템플릿용. OFF면 명단을 읽지 않음."""
+    on = _winner_is_on()
+    return {
+        "winner_on": on,
+        "winners": _winner_list() if on else [],
+        "winner_pay_date": WINNER_PAY_DATE,
+        "winner_limit": WINNER_LIMIT,
+    }
+
 # === GPT 토큰 단가/환율 (변동 시 여기만 수정) ===
 GPT_PRICE_INPUT_USD = 0.40    # 입력 100만 토큰당 USD (gpt-4.1-mini)
 GPT_PRICE_OUTPUT_USD = 1.60   # 출력 100만 토큰당 USD (gpt-4.1-mini)
@@ -4377,6 +4457,50 @@ body.app-mode .container{
   .sv-foot button{ font-size:13px; }
 }
 
+/* ===== 설문 당첨자 발표 팝업 ===== */
+.wn-popup{ max-width:340px; }
+.wn-head{ text-align:left; margin-bottom:8px; }
+.wn-head small{ display:block; font-size:12px; font-weight:600; color:#1d4ed8; letter-spacing:-0.3px; }
+.wn-head b{ display:block; font-size:22px; font-weight:900; color:#1d4ed8; letter-spacing:-0.6px; line-height:1.15; }
+.wn-body{ padding:16px 12px 12px; text-align:center; }
+.wn-title{ font-size:15.5px; font-weight:500; color:#1e293b; line-height:1.5; letter-spacing:-0.5px; word-break:keep-all; }
+.wn-title em{ font-style:normal; color:#2563eb; font-weight:800; }
+.wn-pay{
+  display:inline-block; min-width:150px; margin:10px 0 12px;
+  background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;
+  font-size:12.5px; font-weight:600; padding:4px 14px; border-radius:16px;
+}
+.wn-pay b{ font-weight:800; margin-right:6px; }
+.wn-box{ background:#f1f5f9; border-radius:12px; padding:7px; }
+.wn-box-head{ display:flex; justify-content:space-between; font-size:11.5px; color:#64748b; padding:0 4px 6px; }
+.wn-grid{
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:5px;
+  max-height:250px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+}
+.wn-card{ background:#fff; border:1px solid #e2e8f0; border-radius:9px; padding:6px 4px; text-align:center; min-width:0; overflow:hidden; }
+.wn-in{ display:inline-block; text-align:left; }   /* 동그라미 왼쪽 끝 = 010의 첫 0 */
+.wn-dt{ display:flex; align-items:center; gap:5px; font-size:11px; color:#64748b; line-height:1.3; white-space:nowrap; }
+.wn-no{
+  flex:none; min-width:17px; height:15px; padding:0 3px; border-radius:8px;
+  background:#dbeafe; color:#1d4ed8; font-size:10.5px; font-weight:700; line-height:15px; text-align:center;
+}
+.wn-ph{ display:block; margin-top:2px; font-size:12px; font-weight:700; color:#1e293b; letter-spacing:-0.4px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.wn-empty{ grid-column:1 / -1; padding:18px 0; font-size:12.5px; color:#94a3b8; }
+.wn-note{ font-size:11px; color:#94a3b8; margin:8px 0 0; white-space:nowrap; letter-spacing:-0.3px; }
+.wn-thanks{
+  margin-top:14px; padding:12px 10px; border-radius:12px; background:#eff6ff;
+  font-size:13px; color:#334155; line-height:1.6; word-break:keep-all;
+}
+.wn-thanks b{ color:#1d4ed8; font-weight:700; }
+@media (max-width:340px){ .wn-ph{ font-size:11px; } }
+@media (min-width:601px){
+  .wn-popup{ max-width:380px; }
+  .wn-body{ padding:22px 20px 16px; }
+  .wn-title{ font-size:18px; }
+  .wn-grid{ max-height:300px; }
+  .wn-ph{ font-size:13px; }
+}
+
 /* 설문 메뉴 항목 — 커피 증정 꼬리표 + 가이드 강조 */
 .fab-coffee-tag{
   display:inline-block; margin-left:4px;
@@ -5715,6 +5839,50 @@ window.addEventListener("popstate", function (e) {
 </div>
 {% endif %}
 
+{% if winner_on %}
+<!-- 설문 당첨자 발표 팝업 (오늘 다시 보지 않기 지원) -->
+<div id="wnOverlay" class="sv-overlay" onclick="if(event.target===this) closeWinnerPopup();">
+  <div class="sv-popup wn-popup" role="dialog" aria-modal="true" aria-labelledby="wnTitle">
+    <div class="sv-hero">
+      <button type="button" class="sv-close" onclick="closeWinnerPopup()" aria-label="닫기">×</button>
+      <span class="sv-cupwrap">
+      <svg class="sv-cup" viewBox="27 0 66 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path class="sv-steam" d="M48 30c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path class="sv-steam s2" d="M60 28c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path class="sv-steam s3" d="M72 30c-5-6 5-9 0-16" stroke="#c2410c" stroke-opacity=".45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <rect x="31" y="34" width="58" height="9" rx="4" fill="#57534e"/>
+      <rect x="35" y="40" width="50" height="6" rx="2" fill="#44403c"/>
+      <path d="M36 46h48l-6 58a6 6 0 0 1-6 5H48a6 6 0 0 1-6-5z" fill="#fafaf9" stroke="#e7e5e4" stroke-width="1.5"/>
+      <path d="M38.5 62h43l-2.6 28H41.1z" fill="#92400e"/>
+      <text x="60" y="80" text-anchor="middle" font-size="9.5" font-weight="900" fill="#fff7ed" font-family="sans-serif">COFFEE</text>
+      </svg>
+      <span class="wn-head"><small>설문 경품</small><b>당첨자 발표</b></span>
+      </span>
+    </div>
+    <div class="wn-body">
+      <div class="wn-title" id="wnTitle">설문에 참여해 주신 <em>지자체 직원분</em> 중<br><em>선착순 {{ winner_limit }}분</em>께 커피 쿠폰을 드립니다</div>
+      <div class="wn-pay"><b>지급일</b>{{ winner_pay_date or '' }}</div>
+      <div class="wn-box">
+        <div class="wn-box-head"><span>당첨자 명단</span><span>제출 순 · {{ winners|length }}명</span></div>
+        <div class="wn-grid">
+          {% for w in winners %}
+          <div class="wn-card"><span class="wn-in"><span class="wn-dt"><span class="wn-no">{{ loop.index }}</span>{{ w.dt }}</span><span class="wn-ph">{{ w.phone }}</span></span></div>
+          {% else %}
+          <div class="wn-empty">당첨자 명단을 준비 중입니다.</div>
+          {% endfor %}
+        </div>
+      </div>
+      <p class="wn-note">※ 개인정보 보호를 위해 번호 일부는 가렸습니다.</p>
+      <div class="wn-thanks">참여해 주신 모든 분께 감사드립니다.<br>앞으로도 <b>케어내비</b>를 많이 이용해 주세요.</div>
+      <div class="sv-foot">
+        <button type="button" class="sv-today" onclick="hideWinnerPopupToday()">오늘 다시 보지 않기</button>
+        <button type="button" onclick="closeWinnerPopup()">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <script>
 /* ===== 공지사항 ===== */
 /* ===== 공지 아코디언 + 페이지네이션 ===== */
@@ -5964,6 +6132,31 @@ document.addEventListener('DOMContentLoaded', function(){
   if(svShouldShow()) openSurveyPopup();
 });
 
+/* ===== 설문 당첨자 발표 팝업 ===== */
+var WN_TODAY_KEY   = 'careNaviWinnerPopupHideDate';
+var WN_SESSION_KEY = 'careNaviWinnerPopupSession';
+function wnHide(){
+  var ov = document.getElementById('wnOverlay');
+  if(ov) ov.classList.remove('open');
+}
+function closeWinnerPopup(){
+  wnHide();
+  try { sessionStorage.setItem(WN_SESSION_KEY, '1'); } catch(e){}
+}
+function hideWinnerPopupToday(){
+  wnHide();
+  try { localStorage.setItem(WN_TODAY_KEY, svTodayStr()); } catch(e){}
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var ov = document.getElementById('wnOverlay');   /* 당첨자 발표 OFF면 팝업 자체가 없음 */
+  if(!ov) return;
+  try {
+    if(localStorage.getItem(WN_TODAY_KEY) === svTodayStr()) return;
+    if(sessionStorage.getItem(WN_SESSION_KEY) === '1') return;
+  } catch(e){}
+  ov.classList.add('open');
+});
+
 /* 뒤로가기(bfcache) 복귀 시 끼어있는 누름 상태 초기화 */
 window.addEventListener('pageshow', function(e){
   if(e.persisted){
@@ -6028,7 +6221,8 @@ def home():
             or n0.get("created_datetime")
             or ""
         )
-    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key, survey_on=_survey_is_on())
+    return render_template_string(HOME_HTML, style=BASE_STYLE, total=total, today=today, notices=notices, latest_notice_key=latest_notice_key, survey_on=_survey_is_on(),
+                                  **_winner_ctx())
 
 STATS_HTML = """
 <!DOCTYPE html>
@@ -18414,7 +18608,13 @@ tr.row:hover{ background:#f8faff; }
         <button type="button" class="btn danger" onclick="surveyReset()">리셋</button>
       </div>
     </div>
-    <div class="ctrl-hint">OFF 하면 메인화면 + 메뉴에서 설문조사 버튼이 사라집니다. 리셋은 모든 응답을 영구 삭제합니다.</div>
+    <div class="ctrl-row" style="margin-top:12px;">
+      <div class="ctrl-label">당첨자 발표
+        <button type="button" id="winnerSwitch" class="sw {{ 'on' if winner_on else '' }}" role="switch" aria-checked="{{ 'true' if winner_on else 'false' }}" onclick="winnerToggle(!this.classList.contains('on'))"></button>
+        <span class="ctrl-state {{ 'on' if winner_on else 'off' }}" id="winnerState">{{ 'ON' if winner_on else 'OFF' }}</span>
+      </div>
+    </div>
+    <div class="ctrl-hint">OFF 하면 메인화면 + 메뉴에서 설문조사 버튼이 사라집니다. 리셋은 모든 응답을 영구 삭제합니다.<br>당첨자 발표를 켜면 메인화면에 지자체 선착순 {{ winner_limit }}명 팝업이 뜹니다. 두 토글은 동시에 켜지지 않습니다.</div>
   </div>
 
   <div class="card">
@@ -18515,6 +18715,16 @@ function surveyToggle(on){
   var st = document.getElementById('surveyState');
   if(st){ st.textContent = on ? 'ON' : 'OFF'; st.className = 'ctrl-state ' + (on ? 'on' : 'off'); }
   fetch('/stats/satisfaction/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({on:on})})
+    .then(function(r){ return r.json(); })
+    .then(function(j){ if(j.success) location.reload(); else alert(j.message || '변경에 실패했습니다.'); })
+    .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
+}
+function winnerToggle(on){
+  var sw = document.getElementById('winnerSwitch');
+  if(sw){ sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  var st = document.getElementById('winnerState');
+  if(st){ st.textContent = on ? 'ON' : 'OFF'; st.className = 'ctrl-state ' + (on ? 'on' : 'off'); }
+  fetch('/stats/satisfaction/winner-toggle', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({on:on})})
     .then(function(r){ return r.json(); })
     .then(function(j){ if(j.success) location.reload(); else alert(j.message || '변경에 실패했습니다.'); })
     .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
@@ -18620,6 +18830,8 @@ def satisfaction_admin():
         orgs=SAT_ORGS, regions=SAT_REGIONS, f_org=f_org, f_region=f_region,
         qtitles=[q["title"] for q in SAT_QUESTIONS],
         survey_on=_survey_is_on(),
+        winner_on=_winner_is_on(),
+        winner_limit=WINNER_LIMIT,
     )
 
 SAT_RESET_PASSWORD = "02401234"
@@ -18627,7 +18839,19 @@ SAT_RESET_PASSWORD = "02401234"
 @app.route("/stats/satisfaction/toggle", methods=["POST"])
 def satisfaction_toggle():
     d = request.get_json(silent=True) or {}
-    _survey_set_on(bool(d.get("on")))
+    on = bool(d.get("on"))
+    _survey_set_on(on)
+    if on:
+        _winner_set_on(False)   # 설문 노출과 당첨자 발표는 동시에 켜지지 않음
+    return jsonify({"success": True})
+
+@app.route("/stats/satisfaction/winner-toggle", methods=["POST"])
+def satisfaction_winner_toggle():
+    d = request.get_json(silent=True) or {}
+    on = bool(d.get("on"))
+    _winner_set_on(on)
+    if on:
+        _survey_set_on(False)   # 당첨자 발표를 켜면 설문 노출은 자동 OFF
     return jsonify({"success": True})
 
 @app.route("/stats/satisfaction/reset", methods=["POST"])
