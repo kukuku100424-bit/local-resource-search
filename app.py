@@ -797,11 +797,12 @@ input:focus{
   box-shadow:none;
   cursor:pointer;
 }
-.login-pw-toggle:hover{ background:#f1f5f9; }
+@media (hover:hover){ .login-pw-toggle:hover{ background:#f1f5f9; } }   /* 폰에서 터치 후 회색 배경이 남지 않게 PC에서만 */
 .login-pw-toggle svg{ width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
-/* 반달 눈: 숨김 = 위로 볼록한 반달 선만, 보기 = 아래에 눈동자 반원 표시 */
-.login-pw-toggle .pw-pupil{ display:none; }
-.login-pw-toggle[aria-pressed="true"] .pw-pupil{ display:inline; }
+/* 반달 눈: 처음(숨김) = 반달 눈 + 눈동자, 비밀번호 보일 때 = 감은 눈(속눈썹) */
+.login-pw-toggle .pw-closed{ display:none; }
+.login-pw-toggle[aria-pressed="true"] .pw-open{ display:none; }
+.login-pw-toggle[aria-pressed="true"] .pw-closed{ display:inline; }
 .login-pw-toggle[aria-pressed="true"]{ color:#64748b; }
 
 button{
@@ -913,7 +914,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   <form method="post" class="form-area">
     <div class="login-pw-wrap">
       <input type="password" id="care-login-password" name="password" placeholder="비밀번호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
-      <button type="button" id="care-login-pw-toggle" class="login-pw-toggle" aria-label="비밀번호 보기" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 14c2.5-4.5 5.5-6.5 9-6.5s6.5 2 9 6.5"/><path class="pw-pupil" d="M8.5 14a3.5 3.5 0 0 0 7 0"/></svg></button>
+      <button type="button" id="care-login-pw-toggle" class="login-pw-toggle" aria-label="비밀번호 보기" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><g class="pw-open"><path d="M3 14c2.5-4.5 5.5-6.5 9-6.5s6.5 2 9 6.5"/><path d="M8.5 14a3.5 3.5 0 0 0 7 0"/></g><g class="pw-closed"><path d="M3 10c2.5 4 5.5 6 9 6s6.5-2 9-6"/><path d="M6.5 14l-1.5 2.2M12 16v2.6M17.5 14l1.5 2.2"/></g></svg></button>
     </div>
     <button type="submit">로그인</button>
   </form>
