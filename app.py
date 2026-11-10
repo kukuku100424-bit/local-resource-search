@@ -4458,8 +4458,7 @@ body.app-mode .container{
 /* ===== 설문 당첨자 발표 팝업 ===== */
 .wn-popup{ max-width:340px; max-height:calc(100vh - 32px); overflow-y:auto; }
 .wn-head{ text-align:left; margin-bottom:8px; }
-.wn-head small{ display:block; font-size:12px; font-weight:600; color:#1d4ed8; letter-spacing:-0.3px; }
-.wn-head b{ display:block; font-size:22px; font-weight:900; color:#1d4ed8; letter-spacing:-0.6px; line-height:1.15; }
+.wn-head b{ display:block; font-size:20px; font-weight:900; color:#1d4ed8; letter-spacing:-0.6px; line-height:1.25; white-space:nowrap; }
 .wn-body{ padding:16px 12px 12px; text-align:center; }
 .wn-title{ font-size:15.5px; font-weight:500; color:#1e293b; line-height:1.5; letter-spacing:-0.5px; word-break:keep-all; }
 .wn-title em{ font-style:normal; color:#2563eb; font-weight:800; }
@@ -5857,19 +5856,19 @@ window.addEventListener("popstate", function (e) {
       <path d="M38.5 62h43l-2.6 28H41.1z" fill="#92400e"/>
       <text x="60" y="80" text-anchor="middle" font-size="9.5" font-weight="900" fill="#fff7ed" font-family="sans-serif">COFFEE</text>
       </svg>
-      <span class="wn-head"><small>설문 경품</small><b>당첨자 발표</b></span>
+      <span class="wn-head"><b>커피 쿠폰</b><b>받으실 분</b></span>
       </span>
     </div>
     <div class="wn-body">
       <div class="wn-title" id="wnTitle">설문에 참여해 주신 <em>지자체 직원분</em> 중<br><em>선착순 {{ winner_limit }}분</em>께 커피 쿠폰을 드립니다</div>
       <div class="wn-pay"><b>지급일</b>{{ winner_pay_date or '' }}</div>
       <div class="wn-box">
-        <div class="wn-box-head"><span>당첨자 명단</span><span>제출 순 · {{ winners|length }}명</span></div>
+        <div class="wn-box-head"><span>지급 대상 명단</span><span>제출 순 · {{ winners|length }}명</span></div>
         <div class="wn-grid">
           {% for w in winners %}
           <div class="wn-card"><span class="wn-no">{{ loop.index }}</span><span class="wn-dt">{{ w.dt }}</span><span class="wn-ph">{{ w.phone }}</span></div>
           {% else %}
-          <div class="wn-empty">당첨자 명단을 준비 중입니다.</div>
+          <div class="wn-empty">지급 대상 명단을 준비 중입니다.</div>
           {% endfor %}
         </div>
       </div>
@@ -18610,12 +18609,12 @@ tr.row:hover{ background:#f8faff; }
       </div>
     </div>
     <div class="ctrl-row" style="margin-top:12px;">
-      <div class="ctrl-label">당첨자 발표
+      <div class="ctrl-label">쿠폰 지급 안내
         <button type="button" id="winnerSwitch" class="sw {{ 'on' if winner_on else '' }}" role="switch" aria-checked="{{ 'true' if winner_on else 'false' }}" onclick="winnerToggle(!this.classList.contains('on'))"></button>
         <span class="ctrl-state {{ 'on' if winner_on else 'off' }}" id="winnerState">{{ 'ON' if winner_on else 'OFF' }}</span>
       </div>
     </div>
-    <div class="ctrl-hint">OFF 하면 메인화면 + 메뉴에서 설문조사 버튼이 사라집니다. 리셋은 모든 응답을 영구 삭제합니다.<br>당첨자 발표를 켜면 메인화면에 지자체 선착순 {{ winner_limit }}명 팝업이 뜹니다. 두 토글은 동시에 켜지지 않습니다.</div>
+    <div class="ctrl-hint">OFF 하면 메인화면 + 메뉴에서 설문조사 버튼이 사라집니다. 리셋은 모든 응답을 영구 삭제합니다.<br>쿠폰 지급 안내를 켜면 메인화면에 지자체 선착순 {{ winner_limit }}명 팝업이 뜹니다. 두 토글은 동시에 켜지지 않습니다.</div>
   </div>
 
   <div class="card">
