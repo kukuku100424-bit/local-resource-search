@@ -799,16 +799,10 @@ input:focus{
 }
 .login-pw-toggle:hover{ background:#f1f5f9; }
 .login-pw-toggle svg{ width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
-.login-pw-toggle[aria-pressed="true"]::after{
-  content:"";
-  position:absolute;
-  width:27px;
-  height:1.5px;
-  background:currentColor;
-  transform:rotate(-43deg);
-  border-radius:2px;
-  box-shadow:0 -2px #fff;
-}
+/* 반달 눈: 숨김 = 위로 볼록한 반달 선만, 보기 = 아래에 눈동자 반원 표시 */
+.login-pw-toggle .pw-pupil{ display:none; }
+.login-pw-toggle[aria-pressed="true"] .pw-pupil{ display:inline; }
+.login-pw-toggle[aria-pressed="true"]{ color:#64748b; }
 
 button{
   width:100%;
@@ -919,7 +913,7 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   <form method="post" class="form-area">
     <div class="login-pw-wrap">
       <input type="password" id="care-login-password" name="password" placeholder="비밀번호를 입력하세요" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
-      <button type="button" id="care-login-pw-toggle" class="login-pw-toggle" aria-label="비밀번호 보기" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button type="button" id="care-login-pw-toggle" class="login-pw-toggle" aria-label="비밀번호 보기" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 14c2.5-4.5 5.5-6.5 9-6.5s6.5 2 9 6.5"/><path class="pw-pupil" d="M8.5 14a3.5 3.5 0 0 0 7 0"/></svg></button>
     </div>
     <button type="submit">로그인</button>
   </form>
@@ -4477,14 +4471,18 @@ body.app-mode .container{
   display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:5px;
   max-height:160px; overflow-y:auto; -webkit-overflow-scrolling:touch;   /* 카드 50px × 3줄 + 간격 = 6명만 보이고 나머지는 스크롤 */
 }
-.wn-card{ box-sizing:border-box; height:50px; display:flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:9px; padding:0 4px; min-width:0; overflow:hidden; }
-.wn-in{ display:inline-block; text-align:left; }   /* 동그라미 왼쪽 끝 = 010의 첫 0 */
-.wn-dt{ display:flex; align-items:center; gap:5px; font-size:11px; color:#64748b; line-height:1.3; white-space:nowrap; }
-.wn-no{
-  flex:none; min-width:17px; height:15px; padding:0 3px; border-radius:8px;
-  background:#dbeafe; color:#1d4ed8; font-size:10.5px; font-weight:700; line-height:15px; text-align:center;
+.wn-card{
+  position:relative; box-sizing:border-box; height:50px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:#fff; border:1px solid #e2e8f0; border-radius:9px; padding:0 4px; min-width:0; overflow:hidden;
 }
-.wn-ph{ display:block; margin-top:2px; font-size:12px; font-weight:700; color:#1e293b; letter-spacing:-0.4px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.wn-no{   /* 순번은 카드 왼쪽 위 모서리 꼬리표 → 날짜·번호 두 줄은 가운데 정렬 */
+  position:absolute; top:0; left:0;
+  min-width:18px; padding:1px 5px; border-radius:8px 0 8px 0;
+  background:#dbeafe; color:#1d4ed8; font-size:10px; font-weight:800; line-height:14px; text-align:center;
+}
+.wn-dt{ font-size:11px; color:#64748b; line-height:1.3; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.wn-ph{ margin-top:2px; font-size:12.5px; font-weight:700; color:#1e293b; letter-spacing:-0.3px; line-height:1.3; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .wn-empty{ grid-column:1 / -1; padding:18px 0; font-size:12.5px; color:#94a3b8; }
 .wn-note{ font-size:11px; color:#94a3b8; margin:8px 0 0; white-space:nowrap; letter-spacing:-0.3px; }
 .wn-thanks{
@@ -4492,7 +4490,7 @@ body.app-mode .container{
   font-size:13px; color:#334155; line-height:1.6; word-break:keep-all;
 }
 .wn-thanks b{ color:#1d4ed8; font-weight:700; }
-@media (max-width:340px){ .wn-ph{ font-size:11px; } }
+@media (max-width:340px){ .wn-ph{ font-size:11.5px; } }
 @media (min-width:601px){
   .wn-popup{ max-width:380px; }
   .wn-body{ padding:22px 20px 16px; }
@@ -5865,7 +5863,7 @@ window.addEventListener("popstate", function (e) {
         <div class="wn-box-head"><span>당첨자 명단</span><span>제출 순 · {{ winners|length }}명</span></div>
         <div class="wn-grid">
           {% for w in winners %}
-          <div class="wn-card"><span class="wn-in"><span class="wn-dt"><span class="wn-no">{{ loop.index }}</span>{{ w.dt }}</span><span class="wn-ph">{{ w.phone }}</span></span></div>
+          <div class="wn-card"><span class="wn-no">{{ loop.index }}</span><span class="wn-dt">{{ w.dt }}</span><span class="wn-ph">{{ w.phone }}</span></div>
           {% else %}
           <div class="wn-empty">당첨자 명단을 준비 중입니다.</div>
           {% endfor %}
