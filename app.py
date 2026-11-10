@@ -4458,7 +4458,7 @@ body.app-mode .container{
 }
 
 /* ===== 설문 당첨자 발표 팝업 ===== */
-.wn-popup{ max-width:340px; }
+.wn-popup{ max-width:340px; max-height:calc(100vh - 32px); overflow-y:auto; }
 .wn-head{ text-align:left; margin-bottom:8px; }
 .wn-head small{ display:block; font-size:12px; font-weight:600; color:#1d4ed8; letter-spacing:-0.3px; }
 .wn-head b{ display:block; font-size:22px; font-weight:900; color:#1d4ed8; letter-spacing:-0.6px; line-height:1.15; }
@@ -4475,9 +4475,9 @@ body.app-mode .container{
 .wn-box-head{ display:flex; justify-content:space-between; font-size:11.5px; color:#64748b; padding:0 4px 6px; }
 .wn-grid{
   display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:5px;
-  max-height:250px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  max-height:160px; overflow-y:auto; -webkit-overflow-scrolling:touch;   /* 카드 50px × 3줄 + 간격 = 6명만 보이고 나머지는 스크롤 */
 }
-.wn-card{ background:#fff; border:1px solid #e2e8f0; border-radius:9px; padding:6px 4px; text-align:center; min-width:0; overflow:hidden; }
+.wn-card{ box-sizing:border-box; height:50px; display:flex; align-items:center; justify-content:center; background:#fff; border:1px solid #e2e8f0; border-radius:9px; padding:0 4px; min-width:0; overflow:hidden; }
 .wn-in{ display:inline-block; text-align:left; }   /* 동그라미 왼쪽 끝 = 010의 첫 0 */
 .wn-dt{ display:flex; align-items:center; gap:5px; font-size:11px; color:#64748b; line-height:1.3; white-space:nowrap; }
 .wn-no{
@@ -4497,7 +4497,6 @@ body.app-mode .container{
   .wn-popup{ max-width:380px; }
   .wn-body{ padding:22px 20px 16px; }
   .wn-title{ font-size:18px; }
-  .wn-grid{ max-height:300px; }
   .wn-ph{ font-size:13px; }
 }
 
