@@ -6588,15 +6588,21 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/home" class="home-button">홈으로</a>
+    <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
 
     <div class="top-right-menu">
-      <a href="/stats/satisfaction" class="home-button">설문</a>
-      <a href="/board/admin" class="home-button">의견</a>
-      <a href="/notice/admin" class="home-button">공지</a>
-      <a href="/stats/export/xlsx/케어내비_통계.xlsx" class="home-button">엑셀</a>
-      <a href="/admin/maintenance" class="home-button maint-btn">점검모드</a>
+      <a href="/stats/satisfaction" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 16h4"/></svg>설문</a>
+      <a href="/board/admin" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>의견</a>
+      <a href="/notice/admin" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg>공지</a>
+      <a href="/stats/export/xlsx/케어내비_통계.xlsx" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>엑셀</a>
+      <a href="/admin/maintenance" class="home-button maint-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>점검모드</a>
     </div>
   </div>
 
@@ -7488,8 +7494,14 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/stats" class="home-button">통계로</a>
+    <a href="/stats" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
   </div>
 
   <div class="card">
@@ -7623,9 +7635,15 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/home" class="home-button">홈으로</a>
-    <a href="/board/write" class="home-button">의견보내기</a>
+    <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
+    <a href="/board/write" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>의견보내기</a>
   </div>
 
   <h2>오류제보 / 의견게시판</h2>
@@ -7749,8 +7767,14 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/home" class="home-button">⌂ 홈으로</a>
+    <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
   </div>
 
   <div class="card">
@@ -8004,8 +8028,14 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/board/admin" class="home-button">목록으로</a>
+    <a href="/board/admin" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>목록으로</a>
   </div>
 
   <div class="card">
@@ -8125,8 +8155,14 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/stats" class="home-button">통계로</a>
+    <a href="/stats" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
   </div>
 
   <h2>비공개 게시판 관리</h2>
@@ -8727,8 +8763,14 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 </head>
 <body>
 <div class="container">
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/stats" class="home-button">통계로</a>
+    <a href="/stats" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
   </div>
   <h2>공지사항 관리</h2>
   <div class="write-card">
@@ -9295,10 +9337,16 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="page-wrap">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
     <div class="btn-group">
-      <button type="button" class="reset-btn" onclick="resetDescPage()">&#8635; 다시 입력</button>
+      <button type="button" class="reset-btn nav-chip" onclick="resetDescPage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
     </div>
   </div>
 
@@ -13454,40 +13502,20 @@ body.privacy-modal-open{
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
 button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
 
-/* ===== 사례별 검색 상단 버튼 리디자인 (고스트 스타일 + SVG 아이콘) ===== */
-.desc-top-bar .home-button,
-.desc-top-bar .reset-button{
-  height:36px !important;
-  padding:0 6px !important;
-  gap:3px !important;
-  background:transparent !important;
-  border:none !important;
-  box-shadow:none !important;
-  color:#5a6172 !important;
-  font-size:15px !important;
-  font-weight:500 !important;
-}
-.desc-top-bar .reset-button{ font-size:14px !important; gap:5px !important; }
-.desc-top-bar .home-button svg{ width:20px; height:20px; }
-.desc-top-bar .reset-button svg{ width:16px; height:16px; }
-.desc-top-bar .home-button:hover,
-.desc-top-bar .reset-button:hover{
-  background:rgba(15,23,42,0.05) !important;
-  color:#1f2937 !important;
-}
+/* ===== 분류표 버튼 리디자인 ===== */
 .desc-title-row .service-table-icon-btn{
   height:30px !important;
   padding:0 12px !important;
   gap:5px;
-  border:none;
-  background:#e3eafd;
+  border:1px solid #c9d6fb;
+  background:#ffffff;
   color:#2e4fc7;
   font-size:13px;
-  font-weight:500;
+  font-weight:600;
 }
 .desc-title-row .service-table-icon-btn em{ font-size:13px; }
 .desc-title-row .service-table-icon-btn svg{ width:15px; height:15px; }
-.desc-title-row .service-table-icon-btn:hover{ background:#d4defb; color:#2440a8; }
+.desc-title-row .service-table-icon-btn:hover{ background:#eef2ff; }
  </style>
 </head>
 
@@ -13554,9 +13582,15 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
 <div class="top-bar desc-top-bar">
-  <a href="/home" class="home-button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈</a>
-  <button type="button" class="reset-button" onclick="resetDescPage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
+  <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
+  <button type="button" class="reset-button nav-chip" onclick="resetDescPage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
 </div>
 
 <div class="title">
@@ -15792,10 +15826,16 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="page-wrap">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
     <div class="btn-group">
-      <button type="button" id="gt-reset" class="reset-btn" onclick="resetCarePage()">&#8635; 다시 입력</button>
+      <button type="button" id="gt-reset" class="reset-btn nav-chip" onclick="resetCarePage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
     </div>
   </div>
 
@@ -16413,8 +16453,14 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
 <div class="top-bar">
-  <a href="/home" class="home-button">⌂ 홈으로</a>
+  <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
 </div>
 
 <h2>건강보험 25시</h2>
@@ -16805,12 +16851,18 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="page-wrap">
 
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar" id="gt-topbar">
-    <a href="/home" class="home-btn">&#8962; 홈으로</a>
+    <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
     <div class="btn-group">
-      <button type="button" class="print-btn" id="gt-email" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
-      <button type="button" class="print-btn" id="gt-print" onclick="doPrint()">&#128196; 출력 / pdf 저장</button>
-      <button type="button" class="reset-btn" id="gt-reset" onclick="resetForm()">&#8635; 다시 입력</button>
+      <button type="button" class="print-btn nav-chip" id="gt-email" onclick="openEmailPopup()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>메일 보내기</button>
+      <button type="button" class="print-btn nav-chip" id="gt-print" onclick="doPrint()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>출력 / pdf 저장</button>
+      <button type="button" class="reset-btn nav-chip" id="gt-reset" onclick="resetForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
     </div>
   </div>
 
@@ -17162,12 +17214,18 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 
       <div class="section-header">&#9632; 종합의견</div>
       <textarea class="form-textarea" name="s_opinion" style="min-height:80px;" placeholder="지자체 자체조사를 수행한 담당자가 대상자(보호자)의 현재 생활현황 및 필요로 하는 서비스 내용, 조사결과 대상자에게 제공되어야 할 서비스 내용(조사자 판단)을 종합적으로 기입함"></textarea>
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
       <div class="top-bar bottom-action-bar">
-  <a href="/home" class="home-btn">&#8962; 홈으로</a>
+  <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
   <div class="btn-group">
-    <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
-    <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
-    <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
+    <button type="button" class="print-btn nav-chip" onclick="openEmailPopup()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>메일 보내기</button>
+    <button type="button" class="print-btn nav-chip" onclick="doPrint()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>출력 / PDF 저장</button>
+    <button type="button" class="reset-btn nav-chip" onclick="resetForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
   </div>
 </div>
     </div><!-- /panel-self -->
@@ -17278,12 +17336,18 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <div class="section-header">&#9632; 종합의견</div>
       <textarea class="form-textarea" name="r_opinion" style="min-height:80px;" placeholder="조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함"></textarea>
       <p class="relay-note" style="display:flex;gap:0.3em;align-items:flex-start;"><span style="flex-shrink:0;">&#10071;</span><span>조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함</span></p>
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
       <div class="top-bar bottom-action-bar">
-        <a href="/home" class="home-btn">&#8962; 홈으로</a>
+        <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
         <div class="btn-group">
-          <button type="button" class="print-btn" onclick="openEmailPopup()">&#9993; 메일 보내기</button>
-          <button type="button" class="print-btn" onclick="doPrint()">&#128196; 출력 / PDF 저장</button>
-          <button type="button" class="reset-btn" onclick="resetForm()">&#8635; 다시 입력</button>
+          <button type="button" class="print-btn nav-chip" onclick="openEmailPopup()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>메일 보내기</button>
+          <button type="button" class="print-btn nav-chip" onclick="doPrint()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>출력 / PDF 저장</button>
+          <button type="button" class="reset-btn nav-chip" onclick="resetForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
         </div>
       </div>
     </div><!-- /panel-relay -->
@@ -18625,10 +18689,16 @@ tr.row:hover{ background:#f8faff; }
 </head>
 <body>
 <div class="container">
+<style>
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.75)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#fff!important;color:#111827!important}
+.top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+</style>
   <div class="top-bar">
-    <a href="/stats" class="btn gray">통계로</a>
+    <a href="/stats" class="btn gray nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
     <div class="top-right">
-      <a href="/stats/satisfaction/export?org={{ f_org }}&region={{ f_region }}" class="btn">엑셀 다운로드</a>
+      <a href="/stats/satisfaction/export?org={{ f_org }}&region={{ f_region }}" class="btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>엑셀 다운로드</a>
     </div>
   </div>
 
