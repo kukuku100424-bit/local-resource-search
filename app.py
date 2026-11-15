@@ -6589,11 +6589,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 @media (max-width:480px){.top-right-menu .nav-chip{padding:0 14px!important}}
 @media (max-width:380px){.top-right-menu .nav-chip{padding:0 11px!important}}
 </style>
@@ -7498,11 +7498,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/stats" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
@@ -7640,11 +7640,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -7773,11 +7773,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -8035,11 +8035,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/board/admin" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>목록으로</a>
@@ -8163,11 +8163,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/stats" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
@@ -8772,11 +8772,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <body>
 <div class="container">
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/stats" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
@@ -9347,11 +9347,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="page-wrap">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -13517,15 +13517,15 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
   height:30px !important;
   padding:0 12px !important;
   gap:5px;
-  border:1px solid #c9d6fb;
+  border:none;border-radius:10px;
   background:#ffffff;
-  color:#2e4fc7;
+  color:#3b5bdb;
   font-size:13px;
   font-weight:600;
 }
 .desc-title-row .service-table-icon-btn em{ font-size:13px; }
 .desc-title-row .service-table-icon-btn svg{ width:15px; height:15px; }
-.desc-title-row .service-table-icon-btn:hover{ background:#eef2ff; }
+.desc-title-row .service-table-icon-btn:hover{ background:#f3f4f6; }
  </style>
 </head>
 
@@ -13593,11 +13593,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
 <div class="top-bar desc-top-bar">
   <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -15838,11 +15838,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="page-wrap">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -16466,11 +16466,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
 <div class="top-bar">
   <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -16865,11 +16865,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="page-wrap">
 
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar" id="gt-topbar">
     <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -17229,11 +17229,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <div class="section-header">&#9632; 종합의견</div>
       <textarea class="form-textarea" name="s_opinion" style="min-height:80px;" placeholder="지자체 자체조사를 수행한 담당자가 대상자(보호자)의 현재 생활현황 및 필요로 하는 서비스 내용, 조사결과 대상자에게 제공되어야 할 서비스 내용(조사자 판단)을 종합적으로 기입함"></textarea>
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
       <div class="top-bar bottom-action-bar">
   <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -17352,11 +17352,11 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
       <textarea class="form-textarea" name="r_opinion" style="min-height:80px;" placeholder="조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함"></textarea>
       <p class="relay-note" style="display:flex;gap:0.3em;align-items:flex-start;"><span style="flex-shrink:0;">&#10071;</span><span>조사자(지자체 담당자)가 국민건강보험공단 지사 담당자와 동행 시 확인한 사항을 기술하고, 이를 통합지원계획 종합의견에 반영함</span></p>
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
       <div class="top-bar bottom-action-bar">
         <a href="/home" class="home-btn nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
@@ -18706,11 +18706,11 @@ tr.row:hover{ background:#f8faff; }
 <body>
 <div class="container">
 <style>
-.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:rgba(255,255,255,.5)!important;border:1px solid rgba(15,23,42,.08)!important;border-radius:999px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
-.top-bar .nav-chip:hover{background:rgba(255,255,255,.85)!important;color:#111827!important}
+.top-bar .nav-chip{display:inline-flex!important;align-items:center!important;gap:4px!important;background:#ffffff!important;border:none!important;border-radius:10px!important;box-shadow:none!important;color:#374151!important;font-weight:600!important;text-decoration:none!important}
+.top-bar .nav-chip:hover{background:#f3f4f6!important;color:#111827!important}
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
-.top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+.top-bar .nav-chip.maint-btn{background:#fee2e2!important;color:#dc2626!important}
 </style>
   <div class="top-bar">
     <a href="/stats" class="btn gray nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>통계로</a>
