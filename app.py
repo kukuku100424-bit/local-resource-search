@@ -13453,7 +13453,42 @@ body.privacy-modal-open{
 /* === 버튼 누름 효과 B (디자인 전용) === */
 button, input[type="submit"], input[type="button"], a.card, .btn, .home-btn, .home-button, .reset-btn, .home-help-btn, .home-notice-btn, .tip-btn, #fabMain, .fab-item, [class*="-btn"], [class*="-button"] { transition:transform .12s ease, box-shadow .12s ease; }
 button:active, input[type="submit"]:active, input[type="button"]:active, .btn:active, .home-btn:active, .home-button:active, .reset-btn:active, .home-help-btn:active, .home-notice-btn:active, .tip-btn:active, #fabMain:active, .fab-item:active, [class*="-btn"]:active, [class*="-button"]:active { transform:scale(0.92) !important; }
-</style>
+
+/* ===== 사례별 검색 상단 버튼 리디자인 (고스트 스타일 + SVG 아이콘) ===== */
+.desc-top-bar .home-button,
+.desc-top-bar .reset-button{
+  height:36px !important;
+  padding:0 6px !important;
+  gap:3px !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  color:#5a6172 !important;
+  font-size:15px !important;
+  font-weight:500 !important;
+}
+.desc-top-bar .reset-button{ font-size:14px !important; gap:5px !important; }
+.desc-top-bar .home-button svg{ width:20px; height:20px; }
+.desc-top-bar .reset-button svg{ width:16px; height:16px; }
+.desc-top-bar .home-button:hover,
+.desc-top-bar .reset-button:hover{
+  background:rgba(15,23,42,0.05) !important;
+  color:#1f2937 !important;
+}
+.desc-title-row .service-table-icon-btn{
+  height:30px !important;
+  padding:0 12px !important;
+  gap:5px;
+  border:none;
+  background:#e3eafd;
+  color:#2e4fc7;
+  font-size:13px;
+  font-weight:500;
+}
+.desc-title-row .service-table-icon-btn em{ font-size:13px; }
+.desc-title-row .service-table-icon-btn svg{ width:15px; height:15px; }
+.desc-title-row .service-table-icon-btn:hover{ background:#d4defb; color:#2440a8; }
+ </style>
 </head>
 
 <body>
@@ -13520,8 +13555,8 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 <div class="container">
 
 <div class="top-bar desc-top-bar">
-  <a href="/home" class="home-button">⌂ 홈으로</a>
-  <button type="button" class="reset-button" onclick="resetDescPage()">↻ 다시 입력</button>
+  <a href="/home" class="home-button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈</a>
+  <button type="button" class="reset-button" onclick="resetDescPage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>다시 입력</button>
 </div>
 
 <div class="title">
@@ -13529,8 +13564,8 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
     <div class="desc-title-row">
   <h2>사례별 AI 추천 서비스 찾기</h2>
   <button type="button" class="service-table-icon-btn" onclick="openServiceTableModal()" title="서비스 분류표">
-  <span>📋</span>
-  <em> 분류표</em>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>
+  <em>분류표</em>
 </button>
 </div>
   </div>
