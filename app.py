@@ -6594,6 +6594,8 @@ button:active, input[type="submit"]:active, input[type="button"]:active, .btn:ac
 @media (max-width:480px){.top-bar .home-btn.nav-chip,.top-bar .reset-btn.nav-chip,.top-bar .print-btn.nav-chip{padding:0 9px!important}}
 .top-bar .nav-chip svg{width:1.2em;height:1.2em;flex:0 0 auto}
 .top-bar .nav-chip.maint-btn{background:#fee2e2!important;border-color:#fecaca!important;color:#dc2626!important}
+@media (max-width:480px){.top-right-menu .nav-chip{padding:0 14px!important}}
+@media (max-width:380px){.top-right-menu .nav-chip{padding:0 11px!important}}
 </style>
   <div class="top-bar">
     <a href="/home" class="home-button nav-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>홈으로</a>
